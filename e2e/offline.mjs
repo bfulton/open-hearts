@@ -21,7 +21,7 @@ import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { chromium } from './browser.mjs';
-import { act, click, freePort, has, labelOf, licensed, log, root, serveApp, sleep, texts, type, waitFor } from './drive.mjs';
+import { act, agreedToTerms, click, freePort, has, labelOf, licensed, log, root, serveApp, sleep, texts, type, waitFor } from './drive.mjs';
 import { flowRelay, runFlows } from './pool.mjs';
 
 const phone = { width: 390, height: 844 };
@@ -390,6 +390,7 @@ async function main() {
         // with the motion on a phone's two.
         const ctx = await browser.newContext({ viewport: phone, locale: 'en-US', hasTouch: true, isMobile: true, deviceScaleFactor: 1, reducedMotion: 'reduce' });
         contexts.push(ctx);
+        await agreedToTerms(ctx);
         return ctx;
       };
       const context = await newContext();

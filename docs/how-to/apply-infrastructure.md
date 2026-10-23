@@ -2,7 +2,7 @@
 
 Use this guide to check the Cloudflare, Stripe and New Relic accounts against their definitions in the repository, and to change the accounts where they differ.
 
-The definitions are `infra/cloudflare.mjs`, `infra/stripe.mjs` and `observability/monitoring.mjs`. `infra/apply.mjs` and `observability/apply.mjs` compare the accounts with them. Both only read unless you add `--apply`.
+The definitions are `infra/cloudflare.mjs`, `infra/stripe.mjs` and `observability/monitoring.mjs`. `./oh infra` compares the accounts with them, through `infra/apply.mjs` and `observability/apply.mjs`. It only reads unless you add `--apply`.
 
 ## Before you begin
 
@@ -14,7 +14,6 @@ The definitions are `infra/cloudflare.mjs`, `infra/stripe.mjs` and `observabilit
   node --test infra/*.test.mjs
   ```
 
-- To fix `by hand:` lines with Wrangler, set `WRANGLER_VERSION` as [Deploy the site, app and service](deploy.md#before-you-begin) shows.
 - If Node cannot verify TLS through a proxy, point `NODE_EXTRA_CA_CERTS` at the proxy's CA bundle. Never turn certificate checking off.
 
 ## Apply the Cloudflare and Stripe definitions
@@ -22,10 +21,11 @@ The definitions are `infra/cloudflare.mjs`, `infra/stripe.mjs` and `observabilit
 1. See what differs:
 
    ```bash
-   node infra/apply.mjs
+   ./oh infra --only cloudflare
+   ./oh infra --only stripe
    ```
 
-   To check one account only, add `--only cloudflare` or `--only stripe`.
+   Without `--only`, `./oh infra` checks Cloudflare, Stripe and New Relic in turn ([the oh command](../reference/oh.md)).
 
    Each line is one of these kinds:
 
@@ -42,18 +42,21 @@ The definitions are `infra/cloudflare.mjs`, `infra/stripe.mjs` and `observabilit
 1. Make the changes:
 
    ```bash
-   node infra/apply.mjs --apply
+   ./oh infra --only cloudflare --apply
+   ./oh infra --only stripe --apply
    ```
 
 1. Fix each `by hand:` line. The common ones:
 
    - **The relay worker differs from `service/do/wrangler.toml`.** Deploy the relay worker, as [Deploy the site, app and service](deploy.md) shows.
-   - **A Pages secret is not set.** Run the `npx wrangler pages secret put` command that the line gives, which names the project and, for a preview secret, `--env preview`. Use `npx wrangler@"$WRANGLER_VERSION"` for `npx wrangler`.
-   - **The relay's `OH_JUROR_SECRET` is not set.** In `service/do`, run `npx wrangler@"$WRANGLER_VERSION" secret put OH_JUROR_SECRET` and paste 64 hex characters, such as the output of `openssl rand -hex 32`. The backup jurors derive their keys from it, so a new value gives them new keys.
+   - **A Pages secret is not set.** Run the `./oh secret set` command that the line gives. It asks for the value, which isn't shown, and sets it in every environment that `infra/cloudflare.mjs` lists it in.
+   - **The relay's `OH_JUROR_SECRET` is not set.** Run `./oh secret set OH_JUROR_SECRET --apply` and paste 64 hex characters, such as the output of `openssl rand -hex 32`. The backup jurors derive their keys from it, so a new value gives them new keys.
    - **No Stripe webhook, or one on another API version.** See [Register the payment and sign-in webhooks](set-up-webhooks.md#register-the-stripe-webhook).
    - **A spend alert or an email forward that needs an address.** Set `OH_ALERT_EMAIL` or `OH_HELP_FORWARD`, and run the script again.
    - **A DNS record that a Cloudflare feature makes is missing**, such as Email Routing's. Turn that feature on again in the dashboard.
    - **A setting only the dashboard can change**, such as Email Sending's onboarding or the customer portal's first save. Change it in the dashboard, where the line points.
+
+1. Once, before the first deploy that sells through Link: in Stripe's Dashboard, under **Settings** > **Managed Payments**, apply for Managed Payments, accept its terms, and turn it on once Stripe approves the account. In **Settings** > **Payments** > **Checkout and Payment Links**, turn on **Legal policies**, which links the terms of service and privacy policy in Public details: without it, Stripe refuses the box the service asks buyers to tick to agree to the terms. No API reports either, so `./oh infra` can't; `./oh verify` proves both by making a checkout through Link and expiring it. Until they're on, every web checkout fails, because the service sells only through Link.
 
 1. Run the dry run again until it has no `would` and no `by hand:` lines.
 
@@ -62,13 +65,13 @@ The definitions are `infra/cloudflare.mjs`, `infra/stripe.mjs` and `observabilit
 1. See what differs:
 
    ```bash
-   node observability/apply.mjs
+   ./oh infra --only newrelic
    ```
 
 1. Make the changes:
 
    ```bash
-   node observability/apply.mjs --apply
+   ./oh infra --only newrelic --apply
    ```
 
    New Relic's search lags about a minute behind what is created, so wait a minute before you run `--apply` again, or it can create a monitor twice.
@@ -77,11 +80,10 @@ The definitions are `infra/cloudflare.mjs`, `infra/stripe.mjs` and `observabilit
 
 ## Check it worked
 
-1. Run both dry runs again. `infra/apply.mjs` ends with `0 change(s), 0 by hand`, and `observability/apply.mjs` with `0 change(s)`:
+1. Run the dry run again. The Cloudflare and Stripe part ends with `0 change(s), 0 by hand`, and the New Relic part with `0 change(s)`:
 
    ```bash
-   node infra/apply.mjs
-   node observability/apply.mjs
+   ./oh infra
    ```
 
 ## Learn more

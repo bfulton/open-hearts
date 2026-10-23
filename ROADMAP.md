@@ -4,6 +4,20 @@ What we plan to build, and what we have chosen to wait on and why. It
 is a plan, not a promise. What has shipped is in the
 [changelog](CHANGELOG.md). To suggest something, open an issue.
 
+## Planned
+
+### A dashboard of production's metrics
+
+The service and the relay already count what they do, in Workers
+Analytics Engine ([Watching it run](docs/explanation/service.md#watching-it-run)):
+each request to the service by handler, status and time taken, and each
+relay object's connections, events, deliveries and refusals. Today
+they are read only by asking the Analytics Engine SQL API. A dashboard
+would show them over time in one place, beside New Relic's checks of
+whether the site, the app and the relay are up, so that a slow handler,
+a rise in refusals or a quiet day is seen without asking. Like the
+counts themselves, it would show nothing about anybody.
+
 ## Waiting on more players
 
 ### Rule options

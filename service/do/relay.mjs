@@ -5,11 +5,14 @@
 // so what the app meets on Cloudflare is what the Dart suites — the
 // same ones that run against the Dart relay — run against here.
 //
-// Nothing is imported: no node, no Cloudflare. Signatures are checked
-// by the wasm the app already carries (app/web/schnorr.wasm, built
-// from crypto/schnorr_wasm), handed in already compiled, because a
-// Worker may not compile wasm at runtime and because BIP-340 is not
-// worth a second implementation in a third language.
+// Nothing is imported but the service's name filter, plain functions
+// too: no node, no Cloudflare. Signatures are checked by the wasm the
+// app already carries (app/web/schnorr.wasm, built from
+// crypto/schnorr_wasm), handed in already compiled, because a Worker
+// may not compile wasm at runtime and because BIP-340 is not worth a
+// second implementation in a third language.
+
+import { nameRefused } from '../functions/names.mjs';
 
 /// Kinds 20000–29999 are ephemeral: forwarded to whoever is listening
 /// and then forgotten. Every kind presence uses is one of these, which
@@ -373,10 +376,11 @@ const supersededWhy = 'superseded: another device of this account is in use';
 
 /// Whether [why] is a refusal the relay will not change its mind about
 /// for this device: superseded, its account suspended
-/// (service/functions/suspension.mjs), or not admitted at all. The app
+/// (service/functions/suspension.mjs) or deleted
+/// (service/functions/deletion.mjs), or not admitted at all. The app
 /// goes by the same first word (packages/table, relays.dart,
 /// turnedAway).
-const finalWhy = (why) => typeof why === 'string' && why.length <= 120 && /^(superseded|suspended|restricted): /.test(why);
+const finalWhy = (why) => typeof why === 'string' && why.length <= 120 && /^(superseded|suspended|deleted|restricted): /.test(why);
 
 /// The relay itself. [verify] checks a signature, [refuse] is a policy
 /// that may turn an event away with a reason — an object that carries
@@ -399,6 +403,10 @@ const finalWhy = (why) => typeof why === 'string' && why.length <= 120 && /^(sup
 /// is asked, and carried nothing until it has answered. A socket may
 /// then also have `close()`, for the relay to end it.
 ///
+/// [heard], when given, is told of each event the relay took, after its
+/// OK, with who the gate let in to say it ({account, key, …}), or null
+/// where there is no gate.
+///
 /// [withhold], when given, says of an event (or a promise of saying)
 /// why the relay keeps it to itself, or null: one the operator took
 /// down (service/do/withheld.mjs). Published, such an event is answered
@@ -406,7 +414,13 @@ const finalWhy = (why) => typeof why === 'string' && why.length <= 120 && /^(sup
 /// counted as refused — and neither stored nor passed on; already held,
 /// it is let go of before a subscription is served, and [forget] tells
 /// the host to let go of its copy too.
-export function createRelay({ verify, store = memoryStore(), refuse = null, log = null, limits = null, now = Date.now, count = null, heard = null, kept = null, gate = null, withhold = null, forget = null }) {
+///
+/// [screen], when given, is asked first of each event published, with
+/// who said it, and answers as [withhold] does: a picture that is not
+/// its account's picture now (service/do/profile_pictures.mjs). What is
+/// already held was screened as it came, so only [withhold] is asked of
+/// that.
+export function createRelay({ verify, store = memoryStore(), refuse = null, log = null, limits = null, now = Date.now, count = null, heard = null, kept = null, gate = null, withhold = null, screen = null, forget = null }) {
   /// socket -> subscription id -> {raw, filters}. The raw filters are
   /// kept beside the parsed ones because a hibernating socket has to
   /// carry them somewhere and JSON is what it can carry.
@@ -581,7 +595,7 @@ export function createRelay({ verify, store = memoryStore(), refuse = null, log 
       log?.(`refused ${event.id.slice(0, 6)}: ${why}`);
       return send(from, ['OK', event.id, false, why]);
     }
-    const held = await withhold?.(event);
+    const held = (await screen?.(event, auths.get(from)?.who ?? null)) ?? (await withhold?.(event));
     if (held) {
       count?.('withheld');
       log?.(`withheld ${event.id.slice(0, 6)}: ${held}`);
@@ -608,9 +622,9 @@ export function createRelay({ verify, store = memoryStore(), refuse = null, log 
       for (const id of stored) seen.add(id);
     }
     send(from, ['OK', event.id, true, '']);
-    // Whatever the host wants to know of an event it took: a call for a
-    // juror, for one (worker.mjs).
-    heard?.(event);
+    // Whatever the host wants to know of an event it took, and from
+    // whom: a call for a juror (worker.mjs).
+    heard?.(event, auths.get(from)?.who ?? null);
     // Written out once, not once a listener: the same text either way.
     const wire = JSON.stringify(event);
     let delivered = 0;
@@ -791,7 +805,7 @@ export function createRelay({ verify, store = memoryStore(), refuse = null, log 
 /// to [objectLimits] or [tableLimits]. [withhold] and [forget] are asked
 /// only where pictures are put out: a lobby's tag, never presence or the
 /// results.
-export function objectRelay(verify, { tag = presenceTag, now = Date.now, count = null, limits = null, heard = null, store = null, kept = null, also = null, gate = null, withhold = null, forget = null } = {}) {
+export function objectRelay(verify, { tag = presenceTag, now = Date.now, count = null, limits = null, heard = null, store = null, kept = null, also = null, gate = null, withhold = null, screen = null, forget = null } = {}) {
   const presence = tag === presenceTag;
   const own = refusalFor(tag);
   const lobby = !presence && tag !== resultsTag;
@@ -803,6 +817,7 @@ export function objectRelay(verify, { tag = presenceTag, now = Date.now, count =
     store: presence ? null : (store ?? memoryStore(storedKeep(tag))),
     kept: presence ? null : kept,
     withhold: lobby ? withhold : null,
+    screen: lobby ? screen : null,
     forget: lobby ? forget : null,
     // [also]: a test's own policy on top, asked only of what the object
     // itself takes (host.mjs, --object --control).
@@ -881,20 +896,73 @@ export function reactionRefusal(tag, event) {
   return shaped ? null : 'invalid: a reaction is a code and the moment it was said at';
 }
 
+/// The kinds whose content names players (packages/table, nostr.dart,
+/// TableKinds): the lobby, waiting in a pool or a room, and a watched
+/// table.
+const namingKinds = new Set([lobbyKind, 24245, 24247]);
+
+/// [event]'s content as an object, for a kind that names players, or
+/// null.
+function namingContent(event) {
+  if (!namingKinds.has(event.kind)) return null;
+  try {
+    const said = JSON.parse(event.content);
+    return said && typeof said === 'object' ? said : null;
+  } catch {
+    return null;
+  }
+}
+
+/// The names [event] shows the others: its content's `name` (waiting),
+/// each of its seats' (a table started or seated) and a watched table's
+/// `names`.
+export function namesIn(event) {
+  const said = namingContent(event);
+  if (!said) return [];
+  const names = [];
+  if (typeof said.name === 'string') names.push(said.name);
+  for (const seat of Array.isArray(said.seats) ? said.seats : []) if (typeof seat?.name === 'string') names.push(seat.name);
+  for (const name of Array.isArray(said.names) ? said.names : []) if (typeof name === 'string') names.push(name);
+  return names;
+}
+
+/// Whether [event] carries a picture inside an avatar — its own, or a
+/// seat's — rather than as a picture of its own (`{"kind":"picture"}`),
+/// the one way the app sends one, where the operator's take-downs
+/// (withheld.mjs) and copies (review.mjs) see it.
+export function pictureInAvatar(event) {
+  const said = namingContent(event);
+  if (!said) return false;
+  const carries = (avatar) => !!avatar && typeof avatar === 'object' && 'picture' in avatar;
+  return carries(said.avatar) || (Array.isArray(said.seats) && said.seats.some((seat) => carries(seat?.avatar)));
+}
+
+/// Why an event with a picture inside an avatar is not carried.
+export const PICTURE_IN_AVATAR_WHY = 'blocked: a picture travels as its own event';
+
+/// Why an event naming somebody as the filter refuses is not carried
+/// (service/functions/names.mjs): the app never sends one.
+export const NAME_REFUSED_WHY = 'blocked: a name that is not allowed';
+
 /// What a tag's object refuses. Presence: anything but the ephemeral
 /// kinds. A table's or a lobby's tag: anything but the ephemeral kinds
 /// and the lobby kind tagged for this very tag — an object stores what
 /// belongs to it, and nobody writes into one tag's store through
-/// another's. And a reaction anywhere but a table's own tag, or in any
-/// shape but a reaction's ([reactionRefusal]).
+/// another's. A reaction anywhere but a table's own tag, or in any
+/// shape but a reaction's ([reactionRefusal]). And anything that shows
+/// the others a name the filter refuses ([namesIn]), or a picture
+/// anywhere but in a picture of its own ([pictureInAvatar]).
 export function refusalFor(tag) {
   return (event) => {
     if (event.kind === reactionKind) return reactionRefusal(tag, event);
-    if (ephemeral(event.kind)) return null;
-    if (tag !== presenceTag && event.kind === lobbyKind && event.tags?.some((t) => t[0] === 't' && t[1] === tag)) return null;
-    return tag === presenceTag
-      ? 'blocked: presence carries ephemeral kinds only'
-      : `blocked: this tag stores only kind ${lobbyKind}, tagged ${tag}`;
+    const carried = ephemeral(event.kind) || (tag !== presenceTag && event.kind === lobbyKind && event.tags?.some((t) => t[0] === 't' && t[1] === tag));
+    if (!carried) {
+      return tag === presenceTag
+        ? 'blocked: presence carries ephemeral kinds only'
+        : `blocked: this tag stores only kind ${lobbyKind}, tagged ${tag}`;
+    }
+    if (pictureInAvatar(event)) return PICTURE_IN_AVATAR_WHY;
+    return namesIn(event).some(nameRefused) ? NAME_REFUSED_WHY : null;
   };
 }
 

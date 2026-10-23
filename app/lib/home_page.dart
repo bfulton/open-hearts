@@ -22,6 +22,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:table/table.dart';
 
 import 'activate_page.dart';
@@ -128,7 +129,7 @@ class _HomePageState extends State<HomePage> {
     _lobby = Lobby(
       who: () => (name: _name, avatar: _avatar),
       options: () => _options.copyWith(target: _playsTo),
-      named: () async => await _named() != null,
+      named: () async => await _named() != null && await _agreed(),
       words: () => context.l10n,
       seat: (controller) => context.push<bool>(located(livePath), extra: controller),
       addressChanged: _showAddress,
@@ -191,7 +192,7 @@ class _HomePageState extends State<HomePage> {
     final avatar = await Identity.avatar();
     if (!mounted) return;
     setState(() {
-      _name = name ?? '';
+      _name = Identity.playable(name);
       _avatar = avatar;
     });
     _showAddress();
@@ -204,7 +205,7 @@ class _HomePageState extends State<HomePage> {
     final avatar = await Identity.avatar();
     if (!mounted) return;
     setState(() {
-      _name = name ?? '';
+      _name = Identity.playable(name);
       _avatar = avatar;
     });
   }
@@ -342,7 +343,7 @@ class _HomePageState extends State<HomePage> {
     setState(() {
       _options = options;
       _avatar = avatar;
-      _name = name ?? '';
+      _name = Identity.playable(name);
       _lobby.pace = pace;
     });
     // Here by a link: straight into the room — unless live play is
@@ -384,6 +385,35 @@ class _HomePageState extends State<HomePage> {
     if (_name.isNotEmpty) return _name;
     await _editProfile();
     return _name.isEmpty ? null : _name;
+  }
+
+  /// The terms agreed to, asked for once on this device before its
+  /// name and picture first go out at a live table: the app stores ask
+  /// for this before anyone publishes anything. Subscribing is agreeing
+  /// too (subscribe_page.dart), but a device brought into an account
+  /// with a code or a sign-in never saw that. False when the player
+  /// says not now.
+  Future<bool> _agreed() async {
+    if (await Identity.agreedToTerms() != null) return true;
+    if (!mounted) return false;
+    final agreed = await showDialog<bool>(
+      context: context,
+      builder: (dialog) {
+        final l10n = dialog.l10n;
+        return AlertDialog(
+          title: Text(l10n.liveAgreeTitle),
+          content: Text(l10n.liveAgreeBody),
+          actions: [
+            TextButton(onPressed: () => openLink(legalPage('terms')), child: Text(l10n.termsOfUse)),
+            TextButton(onPressed: () => Navigator.of(dialog).pop(false), child: Text(l10n.notNow)),
+            FilledButton(onPressed: () => Navigator.of(dialog).pop(true), child: Text(l10n.liveAgree)),
+          ],
+        );
+      },
+    );
+    if (agreed != true) return false;
+    await Identity.agreeToTerms(DateTime.now());
+    return true;
   }
 
   Future<void> _changeOptions() async {
@@ -442,6 +472,7 @@ class _HomePageState extends State<HomePage> {
                                   : RoomView(
                                       room: room,
                                       ledger: _lobby.standing?.ledger,
+                                      pictures: _lobby.pictures,
                                       onLeave: _lobby.leave,
                                       onShare: () => _share(room.code),
                                     ),
@@ -849,14 +880,42 @@ class _LivePaused extends StatelessWidget {
 
 /// What the operator has to say across the top of the front door
 /// (net/remote_config.dart): a notice — an outage, a maintenance
-/// window — and, to a build older than the one asked for, that it is.
-/// Nothing at all when there is nothing to say.
-class OperatorNotes extends StatelessWidget {
+/// window — and, to a build older than the one asked for, that it is;
+/// and a change to the terms or the privacy policy that matters to
+/// subscribers, with a link to it, until it is dismissed. Nothing at
+/// all when there is nothing to say.
+class OperatorNotes extends StatefulWidget {
   const OperatorNotes({super.key, this.published = buildDate});
 
   /// The day this build was published: the build's own, unless a test
   /// says.
   final String published;
+
+  @override
+  State<OperatorNotes> createState() => _OperatorNotesState();
+}
+
+class _OperatorNotesState extends State<OperatorNotes> {
+  /// Where the changes this device dismissed are kept, by id.
+  static const _dismissedKey = 'notices_dismissed';
+
+  /// The changes dismissed here (LegalNotice.id); null until read, and
+  /// none is shown till then, so one dismissed does not flash back.
+  Set<String>? _dismissed;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(SharedPreferences.getInstance().then((prefs) {
+      if (mounted) setState(() => _dismissed = {...?prefs.getStringList(_dismissedKey)});
+    }));
+  }
+
+  Future<void> _dismiss(LegalNotice notice) async {
+    final dismissed = {...?_dismissed, notice.id};
+    setState(() => _dismissed = dismissed);
+    await (await SharedPreferences.getInstance()).setStringList(_dismissedKey, dismissed.toList());
+  }
 
   // Listening for itself: it is a const widget in the door's tree, which
   // a rebuild of the door passes over as unchanged.
@@ -867,11 +926,30 @@ class OperatorNotes extends StatelessWidget {
     final l10n = context.l10n;
     final config = RemoteSettings.current.config;
     final notice = config.banner;
+    final dismissed = _dismissed;
     final lines = <Widget>[
       if (notice != null) _line(notice.text.inLanguage(l10n.localeName), notice.warning ? Palette.danger : Palette.gold),
-      if (config.updateDue(published))
+      if (config.updateDue(widget.published))
         _line(config.updateText?.inLanguage(l10n.localeName) ?? (kIsWeb ? l10n.updateDueWeb : l10n.updateDueApp), Palette.gold,
             action: kIsWeb ? TextButton(onPressed: reloadPage, child: Text(l10n.reload)) : null),
+      if (dismissed != null)
+        for (final change in config.notices.where((n) => !dismissed.contains(n.id)))
+          _line(
+            change.summary.inLanguage(l10n.localeName),
+            Palette.gold,
+            action: Row(mainAxisSize: MainAxisSize.min, children: [
+              TextButton(
+                onPressed: () => openLink(legalPage(change.document)),
+                child: Text(change.document == 'terms' ? l10n.termsOfUse : l10n.privacyPolicy),
+              ),
+              IconButton(
+                icon: const Icon(Icons.close, size: 16),
+                color: Palette.chromeDim,
+                tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
+                onPressed: () => _dismiss(change),
+              ),
+            ]),
+          ),
     ];
     if (lines.isEmpty) return const SizedBox.shrink();
     return Column(children: lines);
@@ -964,13 +1042,17 @@ class _WaitingView extends StatelessWidget {
 /// one who leads sees Start now, and that is the whole of the
 /// difference.
 class RoomView extends StatelessWidget {
-  const RoomView({super.key, required this.room, required this.ledger, required this.onLeave, required this.onShare});
+  const RoomView({super.key, required this.room, required this.ledger, this.pictures, required this.onLeave, required this.onShare});
 
   final Room room;
 
   /// Ratings for the people here, from the results everyone signs;
   /// null until this device has read them off the relays.
   final Ledger? ledger;
+
+  /// What this device does with the others' pictures, and who it
+  /// blocked (pictures.dart).
+  final Pictures? pictures;
 
   final VoidCallback onLeave;
   final VoidCallback onShare;
@@ -980,6 +1062,18 @@ class RoomView extends StatelessWidget {
     final l10n = context.l10n;
     final seconds = room.secondsToStart;
     final members = room.members;
+    final pictures = this.pictures;
+    // A member is shown as this device would show them at the table: a
+    // blocked one by no name and no picture, a picture this device
+    // keeps off by its icon.
+    String idOf(RoomMember m) => m.licence?.account ?? m.key;
+    bool blocked(RoomMember m) => m.key != room.me && (pictures?.isBlocked(idOf(m)) ?? false);
+    Avatar avatarOf(RoomMember m) {
+      final picture = m.avatar.picture;
+      if (m.key == room.me || picture == null || pictures == null || pictures.allows(idOf(m), picture)) return m.avatar;
+      return m.avatar.copyWith(clearPicture: true);
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -1002,13 +1096,13 @@ class RoomView extends StatelessWidget {
             child: Row(
               children: [
                 i < members.length
-                    ? PlayerIcon(name: members[i].name, seed: members[i].licence?.account ?? members[i].key, avatar: members[i].avatar, size: 30)
+                    ? PlayerIcon(name: blocked(members[i]) ? l10n.blockedPlayer : members[i].name, seed: idOf(members[i]), avatar: avatarOf(members[i]), size: 30)
                     : const SizedBox(width: 30, height: 30, child: Icon(Icons.smart_toy_outlined, size: 20, color: Palette.chromeDim)),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
                     i < members.length
-                        ? (members[i].key == room.me ? l10n.nameIsYou(members[i].name) : members[i].name)
+                        ? (members[i].key == room.me ? l10n.nameIsYou(members[i].name) : blocked(members[i]) ? l10n.blockedPlayer : members[i].name)
                         : l10n.emptySeat,
                     style: TextStyle(
                       fontSize: 15,

@@ -7,6 +7,7 @@ import { test } from 'node:test';
 
 import { gunzipSync } from 'node:zlib';
 
+import { accountFor } from './accounts.mjs';
 import { accountsNamed, accountsPaidBy, forgetAccount } from './deletion.mjs';
 import { memoryStore } from './rows.mjs';
 import { anonymizeGames, withoutNames } from './records.mjs';
@@ -214,4 +215,22 @@ test('every subscription an account has had goes with it, and nobody else\'s', a
   // The address the old subscription was paid with finds nobody now.
   const stripe = async (path) => (path.startsWith('/customers/search') ? { data: [{ id: 'cus_1', email: 'ada@example.com' }] } : { data: [{ id: 'sub_old' }] });
   assert.deepEqual(await accountsPaidBy(store, stripe, 'ada@example.com'), []);
+});
+
+test('a lapsed subscriber who pays again keeps a note of the subscription before, and both go with the account, found without a listing', async () => {
+  const store = memoryStore();
+  const device = 'd'.repeat(64);
+  await store.put(`KEY#${device}`, 'ENTITLEMENT', { account: ADA, licensed_until: '2026-01-01' });
+  await store.put(`ACCOUNT#${ADA}`, 'META', { subscription: 'sub_old', created_at: '2025-01-01' });
+  await store.put('SUB#sub_old', 'ACCOUNT', { account: ADA });
+  await store.put('SUB#sub_old', 'META', { source: 'stripe', renews_at: '2026-01-01', cancelled_at: '2025-12-01' });
+  const now = Date.parse('2026-10-19T12:00:00Z');
+  assert.equal(await accountFor(store, 'sub_new', { buyer: device, make: true, now }), ADA, 'the same person, the same account');
+  assert.deepEqual(await store.get(`ACCOUNT#${ADA}`, 'META'), { subscription: 'sub_new', created_at: '2025-01-01', before: ['sub_old'] });
+  // Asked again for the same subscription: nothing noted twice.
+  await accountFor(store, 'sub_new', { buyer: device, make: true, now });
+  assert.deepEqual((await store.get(`ACCOUNT#${ADA}`, 'META')).before, ['sub_old']);
+  await store.put('SUB#sub_new', 'META', { source: 'stripe', renews_at: '2027-10-19', cancelled_at: null });
+  await forgetAccount(store, ADA);
+  assert.deepEqual([...store.rows.keys()].filter((k) => k.startsWith('SUB#')), [], 'both, with no listing of the store');
 });

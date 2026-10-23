@@ -2,15 +2,25 @@
 // to hear about one at a time (config/openhearts.json, `alerts`): each
 // subscription as it is bought, and each subscriber who, finding the
 // pool empty, chose to wait for a person rather than play bots — so
-// that someone can come and play. Each is written down for a while
+// that someone can come and play. (And, once a day, the new pictures
+// subscribers set, `pictures`, which the relay worker sends itself:
+// service/do/review.mjs.) Each is written down for a while
 // under its subscription, so a webhook delivered twice, or a wait
-// chosen twice in a few minutes, is told once.
+// chosen twice in a few minutes, is told once. And, whatever the
+// switches say, a player's report of another, at once: a report is the
+// operator's to answer (docs/how-to/handle-a-report.md), never an alert
+// to turn off.
 //
 // The mail goes from the relay worker, which holds the EMAIL binding (a
 // Pages project cannot bind one), through an object of the Household
 // class with a name of its own, so no household's queue waits on it.
 // What it says is which store or pool, a few characters of the
-// subscription and the device, and dates: nobody's email or name.
+// subscription and the device, and dates: nobody's email or name — but
+// for a report, which says the name the reporter saw.
+
+import { pictureDigest, pictureUrl } from './pictures.mjs';
+import { PROFILE_NAME_MOST } from './profile.mjs';
+import { tableIdShape } from './records.mjs';
 
 /// The Household object the mail goes through.
 export const ALERTS_OBJECT = 'operator-alerts';
@@ -33,7 +43,7 @@ const WAITING_MINUTES = 10;
 export function alertsOf(env) {
   const to = env.OH_ALERTS_TO;
   if (!ours(to)) return null;
-  return { to, subscribed: env.OH_ALERT_SUBSCRIBED === 'on', waiting: env.OH_ALERT_WAITING === 'on' };
+  return { to, subscribed: env.OH_ALERT_SUBSCRIBED === 'on', waiting: env.OH_ALERT_WAITING === 'on', pictures: env.OH_ALERT_PICTURES === 'on' };
 }
 
 const short = (s) => String(s ?? '').slice(0, 8);
@@ -95,6 +105,70 @@ export async function alertWaiting(env, store, { key, account, pool, target, now
   ].join('\n'));
 }
 
+/// An account deleted from the app whose name stayed on [keys], kept
+/// games that would not be written back as they were sent (records.mjs,
+/// NotAsSent): the operator's to look at, whatever the switches say,
+/// since the deletion said it was done.
+export async function alertUnwritten(env, { account, keys, now = Date.now() }) {
+  const alerts = alertsOf(env);
+  if (!alerts || !keys.length) return false;
+  return tell(env, alerts, "Open Hearts: a deleted account's name is still on a kept game", [
+    `Account ${account} was deleted from the app at ${new Date(now).toISOString()}. Its name could not be taken off ${keys.length} kept game(s), which would not be written back as they were sent:`,
+    ...keys.map((k) => `  ${k}`),
+    '',
+    'What to do is in docs/how-to/delete-an-accounts-data.md, under "A game that cannot be rewritten".',
+  ].join('\n'));
+}
+
+/// How often one kind of failure in the automatic handling of known
+/// abuse images is told: once in six hours, so an outage is one email,
+/// not one a picture.
+export const KNOWN_PROBLEM_HOURS = 6;
+
+/// [what] in an automatic duty failed, with [error], told under
+/// [subject], [about] saying what the duty is: whatever the switches
+/// say, as a legal duty may hang on it, at most once in
+/// KNOWN_PROBLEM_HOURS for each [kind] and [what]. Never throws.
+async function alertDuty(env, store, { kind, what, subject, about, error, now }) {
+  const alerts = alertsOf(env);
+  if (!alerts) return false;
+  try {
+    if (store && !(await fresh(store, kind, what, KNOWN_PROBLEM_HOURS * 3600))) return false;
+  } catch {
+    // The store not answering: told all the same.
+  }
+  return tell(env, alerts, subject, [`At ${new Date(now).toISOString()}: ${error}`, '', about].join('\n'));
+}
+
+/// Something in the automatic handling of known images of child sexual
+/// abuse that did not work (service/do/known.mjs): [what] failed, and
+/// the [error].
+export function alertKnownProblem(env, store, { what, error, now = Date.now() }) {
+  return alertDuty(env, store, {
+    kind: 'known',
+    what,
+    subject: `Open Hearts: the automatic handling of abuse images failed (${what})`,
+    about: `Each new picture is checked against known images of child sexual abuse, and a match withheld, held, terminated and reported to NCMEC, by itself (docs/how-to/handle-abuse-material.md). This failure is tried again by itself, and told again in ${KNOWN_PROBLEM_HOURS} hours if it goes on. The relay worker's logs say more.`,
+    error,
+    now,
+  });
+}
+
+/// The daily run over the pictures accounts set (service/do/review.mjs)
+/// failing, with [error]: what keeps each for as long as the privacy
+/// policy says, and no longer.
+export function alertPicturesProblem(env, store, { error, now = Date.now() }) {
+  return alertDuty(env, store, {
+    kind: 'pictures',
+    what: 'run',
+    subject: 'Open Hearts: the daily run over the pictures failed',
+    about:
+      "Each picture an account sets is kept apart for a year after it stops being the account's, then deleted, as the privacy policy says. The daily run deletes it, asks PhotoDNA again about any it has not cleared, hides any the check found should be hidden, and emails you the new ones. It runs again tomorrow; the relay worker's logs say more.",
+    error,
+    now,
+  });
+}
+
 /// The object's side: the mail sent, where the relay binds EMAIL and
 /// says who it is from (OH_MAIL_FROM). {status, body}.
 export async function sendAlert(op, env) {
@@ -105,4 +179,70 @@ export async function sendAlert(op, env) {
   if (!env.EMAIL || typeof from !== 'string' || !from.includes('@')) return { status: 503, body: { error: 'no mail here' } };
   await env.EMAIL.send({ to: op.to, from: { email: from, name: 'Open Hearts' }, subject: op.subject.slice(0, 200), text: op.text.slice(0, 4000) });
   return { status: 200, body: { sent: true } };
+}
+
+/// What a player may report another for.
+export const REPORT_WHAT = Object.freeze(['picture', 'name', 'other']);
+
+/// The most a report's note may be, in characters.
+export const REPORT_NOTE_MOST = 500;
+
+/// How many reports one account may send in a day: enough for a bad
+/// evening, too few to bury the operator.
+export const REPORTS_A_DAY = 10;
+
+/// The report [body] asks to send, as {about, what, table, name,
+/// picture, note}, or null for one that is not: [about] the reported
+/// player's account (32 hex, or a device's key, 64 hex, where no
+/// account names one); [what] one of [REPORT_WHAT]; the table it was
+/// at (32 hex), the name and the digest of the picture as the reporter
+/// saw them, and a note, each optional.
+export function reportOf(body) {
+  const { about, what, table = null, name = null, picture = null, note = '' } = body ?? {};
+  if (typeof about !== 'string' || !/^[0-9a-f]{32}(?:[0-9a-f]{32})?$/.test(about)) return null;
+  if (!REPORT_WHAT.includes(what)) return null;
+  if (table !== null && (typeof table !== 'string' || !tableIdShape.test(table))) return null;
+  if (name !== null && (typeof name !== 'string' || [...name].length > PROFILE_NAME_MOST || /\p{Cc}/u.test(name))) return null;
+  if (picture !== null && (typeof picture !== 'string' || !/^[0-9a-f]{64}$/.test(picture))) return null;
+  if (typeof note !== 'string' || [...note].length > REPORT_NOTE_MOST) return null;
+  return { about, what, table, name, picture, note: note.trim() };
+}
+
+/// [account]'s report, from its device [key], of [about] (reportOf),
+/// told to the operator at once: the same report from the same account
+/// once a day, and no more than [REPORTS_A_DAY] of them. Resolves
+/// `sent`; `already`, for the same one again; `limit`, for one too
+/// many; or `unsent`, when there is nobody to tell or the mail did not
+/// go — and then it is not counted, so it can be sent again.
+export async function alertReport(env, store, { key, account, about, what, table, name, picture, note, now = Date.now() }) {
+  const alerts = alertsOf(env);
+  if (!alerts || !store) return 'unsent';
+  const same = `${account}|${about}|${what}`;
+  if ((await store.get('ALERT#report', same)) !== null) return 'already';
+  const today = `${account}|${new Date(now).toISOString().slice(0, 10)}`;
+  const sent = (await store.get('ALERT#reports', today))?.n ?? 0;
+  if (sent >= REPORTS_A_DAY) return 'limit';
+  const profile = /^[0-9a-f]{32}$/.test(about) ? await store.get(`ACCOUNT#${about}`, 'PROFILE') : null;
+  const itsPicture = profile?.picture ? await pictureDigest(profile.picture) : null;
+  const itsName = typeof profile?.name === 'string' ? profile.name : null;
+  const subject = what === 'other' ? 'Open Hearts: a player reported' : `Open Hearts: a player's ${what} reported`;
+  const text = [
+    `Account ${account} (device ${short(key)}…) reported account ${about} for its ${what === 'other' ? 'conduct' : what}, at ${new Date(now).toISOString()}${table ? `, at table ${table}` : ''}.`,
+    '',
+    note ? `What they wrote: ${note}` : 'They wrote nothing more.',
+    '',
+    ...(picture ? [`The picture they saw: ${pictureUrl(about, picture)} — ${picture === itsPicture ? 'its profile picture now' : 'not its profile picture now'}`] : []),
+    ...(name !== null ? [`The name they saw: ${name} — ${name === itsName ? 'its name now' : `its name now is ${itsName ? itsName : 'none'}`}`] : []),
+    '',
+    'To act on it, under docs/how-to/handle-a-report.md:',
+    `  ./oh account show ${about}`,
+    `  ./oh account remove ${about} picture --apply`,
+    `  ./oh account remove ${about} name --apply`,
+    `  ./oh account suspend ${about} --apply`,
+    'If its picture may show the sexual abuse of a child, follow docs/how-to/handle-abuse-material.md instead.',
+  ].join('\n');
+  if (!(await tell(env, alerts, subject, text))) return 'unsent';
+  await store.put('ALERT#report', same, { at: now }, { ttl: 86400 });
+  await store.put('ALERT#reports', today, { n: sent + 1 }, { ttl: 2 * 86400 });
+  return 'sent';
 }

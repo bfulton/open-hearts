@@ -115,6 +115,17 @@ class AccountProfile extends ChangeNotifier {
     if (account != null && (await SharedPreferences.getInstance()).getString(_unsent) == account) await sync();
   }
 
+  /// Resolves once what [sync] is doing is done, or [within] has passed:
+  /// what this device waits for before it goes to a room or a pool,
+  /// where the relay carries only the account's picture now
+  /// (service/do/profile_pictures.mjs), so that a picture changed a
+  /// moment ago is the service's before it is put out.
+  Future<void> settled({Duration within = const Duration(seconds: 10)}) {
+    final running = _running;
+    if (running == null) return Future.value();
+    return running.timeout(within, onTimeout: () {});
+  }
+
   /// This device's profile and its account's brought together: a change
   /// made here sent, or else the account's read and taken if it is
   /// newer. One at a time; asked again while one runs, it runs once more
@@ -181,7 +192,8 @@ class AccountProfile extends ChangeNotifier {
   /// This device's profile, sent as the account's.
   Future<void> _send(String account) async {
     final changes = _changes;
-    final name = Identity.nameOf(await Identity.name() ?? '');
+    // A name the others may not see goes as none (Identity.playable).
+    final name = Identity.playable(Identity.nameOf(await Identity.name() ?? ''));
     final text = jsonEncode({'name': name, ...(await Identity.avatar()).toJson()});
     final signer = await Identity.signer();
     // The text is what is signed: nobody else's request writes it.
@@ -207,7 +219,7 @@ class AccountProfile extends ChangeNotifier {
   /// What the service says of a profile it will never take
   /// (profile.mjs, `profileOf`). Any other refusal — a service part way
   /// through a deploy among them — is asked again.
-  static const _malformed = {'not a profile', 'not a name', 'not one of the icons', 'not one of the colours', 'not a picture'};
+  static const _malformed = {'not a profile', 'not a name', 'not an allowed name', 'not one of the icons', 'not one of the colours', 'not a picture'};
 
   static String? _errorOf(String body) {
     try {

@@ -11,6 +11,7 @@ import 'package:table/table.dart';
 
 import 'avatar.dart';
 import 'crypto/schnorr.dart';
+import 'names.dart';
 
 class Identity {
   static const _key = 'identity_secret';
@@ -68,6 +69,23 @@ class Identity {
   static Future<void> setAvatar(Avatar avatar) async =>
       (await SharedPreferences.getInstance()).setString(_avatarKey, jsonEncode(avatar.toJson()));
 
+  /// [name], when the others may see it, and nothing when not: a name
+  /// the filter refuses (names.dart) is played as no name, so live play
+  /// asks for another on the way in (home_page.dart, `_named`), and the
+  /// profile says why. Only a name from before the filter was here, or
+  /// taken from the account then, is one.
+  static String playable(String? name) => name == null || nameRefused(name) ? '' : name;
+
   static Future<void> setName(String name) async =>
       (await SharedPreferences.getInstance()).setString(_nameKey, nameOf(name));
+
+  static const _agreedKey = 'identity_agreed_terms';
+
+  /// The day this device's player agreed to the terms of use, before
+  /// their name and picture first went out at a live table
+  /// (home_page.dart, `_agreed`); null until they have.
+  static Future<String?> agreedToTerms() async => (await SharedPreferences.getInstance()).getString(_agreedKey);
+
+  static Future<void> agreeToTerms(DateTime at) async =>
+      (await SharedPreferences.getInstance()).setString(_agreedKey, at.toUtc().toIso8601String().substring(0, 10));
 }

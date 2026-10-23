@@ -59,6 +59,39 @@ class Notice {
   final bool warning;
 }
 
+/// A change to the terms of use or the privacy policy that matters to
+/// subscribers, as the service tells every device of it for a while
+/// after it is published (service/functions/notices.mjs): said at the
+/// front door, with a link to the document, until it is dismissed.
+@immutable
+class LegalNotice {
+  const LegalNotice({required this.document, required this.date, required this.summary});
+
+  /// `terms` or `privacy`: the site's page it is about.
+  final String document;
+
+  /// The day it was published, YYYY-MM-DD.
+  final String date;
+
+  /// What changed, in each language the ledger has it in.
+  final Saying summary;
+
+  /// Which change this is, so one dismissed stays dismissed and the next
+  /// is news.
+  String get id => '$document@$date';
+
+  static final _day = RegExp(r'^\d{4}-\d{2}-\d{2}$');
+
+  static LegalNotice? parse(Object? json) {
+    if (json is! Map) return null;
+    final document = json['document'];
+    final date = json['date'];
+    final summary = Saying.parse(json['summary']);
+    if ((document != 'terms' && document != 'privacy') || date is! String || !_day.hasMatch(date) || summary == null) return null;
+    return LegalNotice(document: document as String, date: date, summary: summary);
+  }
+}
+
 /// How long this device waits on the service and the relays: the
 /// `waits` of the remote config, in milliseconds (minutes for
 /// [configEvery]). Each is taken if it is a whole number within its
@@ -247,9 +280,7 @@ class RemoteConfig {
     this.updateBefore,
     this.updateText,
     this.feedback,
-    this.privacy,
-    this.terms,
-    this.price,
+    this.notices = const [],
     this.table = TableTiming.standard,
     this.waits = AppWaits.standard,
   });
@@ -286,16 +317,10 @@ class RemoteConfig {
   /// page or a mailto address; null for the project's issues.
   final Uri? feedback;
 
-  /// Where the privacy policy and the terms of use are, which the
-  /// subscription page links to (a store's review asks for both); null
-  /// for the site's own (subscribe_page.dart, legalPage).
-  final Uri? privacy;
-  final Uri? terms;
-
-  /// What a year of live play costs, as shown on the web beside
-  /// Subscribe ("\$5.99"), when it is not the build's: changed with the
-  /// Stripe price it describes. A store build shows the store's own.
-  final String? price;
+  /// The changes to the terms and the privacy policy every device is
+  /// told of now: not the operator's to write, but the ledger's the
+  /// service was deployed with.
+  final List<LegalNotice> notices;
 
   /// The clocks of a table this device starts — a person's grace and
   /// bank, a held bot seat's deadlines, the waits on a jury — carried
@@ -362,22 +387,11 @@ class RemoteConfig {
       updateBefore: due ? before : null,
       updateText: due ? Saying.parse((u as Map)['text']) : null,
       feedback: feedback != null && _goesSomewhere(feedback) ? feedback : null,
-      privacy: _page(json['privacy']),
-      terms: _page(json['terms']),
-      price: _price(json['price']),
+      // One for each document at most.
+      notices: [if (json['notices'] case final List<Object?> list) ...list.map(LegalNotice.parse).nonNulls.take(2)],
       table: TableTiming.parse(json['table']),
       waits: AppWaits.parse(json['waits']),
     );
-  }
-
-  /// A short price with a digit in it and nothing that could be markup.
-  static String? _price(Object? raw) =>
-      raw is String && RegExp(r'^[^\s<>{}]{1,12}$').hasMatch(raw) && RegExp(r'\d').hasMatch(raw) ? raw : null;
-
-  /// A page over https, or nothing.
-  static Uri? _page(Object? raw) {
-    final u = raw is String ? Uri.tryParse(raw) : null;
-    return u != null && u.scheme == 'https' && u.host.isNotEmpty && u.userInfo.isEmpty ? u : null;
   }
 
   /// An address a report may be sent to: a page over https, or mail.

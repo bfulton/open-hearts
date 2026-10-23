@@ -37,7 +37,13 @@ import wasm from '../../app/web/schnorr.wasm';
 import { limitsFrom, objectRelay, presenceTag, schnorrVerifier, serviceGate, tagOf, tally } from './relay.mjs';
 import { tagStore } from './tag_store.mjs';
 import { pictureScreen } from './withheld.mjs';
+import { reviewRun } from './review.mjs';
+import { KNOWN_OBJECT, KnownPictures as KnownObject, knownAsker, knownReport } from './known.mjs';
+import { accountPictures, ownedScreen } from './profile_pictures.mjs';
 import { PICTURES_ROW } from '../functions/pictures.mjs';
+import { alertKnownProblem, alertPicturesProblem, alertsOf } from '../functions/alerts.mjs';
+import { Household as HouseholdObject } from '../functions/household.mjs';
+import { storeOf } from '../functions/rows.mjs';
 import { Bench as BenchObject, callIn } from './bench.mjs';
 import { withConfig } from '../functions/deployment.mjs';
 // The service's settings that are not secret, as the Pages worker reads
@@ -45,15 +51,31 @@ import { withConfig } from '../functions/deployment.mjs';
 // key, which an activation has to be signed by.
 import config from '../../config/openhearts.json';
 
-// One object per account, through which its codes, claims, drops and
-// device in use run one at a time (service/functions/household.mjs, "one
-// account at a time"). It lives here because a Pages project cannot
-// define a Durable Object of its own, only bind one.
-export { Household } from '../functions/household.mjs';
+// One object per account, through which its codes, claims, drops,
+// device in use and profile run one at a time (service/functions/
+// household.mjs, "one account at a time"). It lives here because a Pages
+// project cannot define a Durable Object of its own, only bind one; and
+// here it reaches what checks and keeps each picture the account sets
+// (profile_pictures.mjs): the pictures bucket, Workers AI, and PhotoDNA
+// through KnownPictures.
+export class Household extends HouseholdObject {
+  constructor(state, env = {}) {
+    const e = withConfig(env, config);
+    super(state, env, { pictures: accountPictures(e) });
+  }
+}
 
 // The backup jurors, a Cloudflare Container started when a table
 // calls for a juror and nobody is there (bench.mjs).
 export class Bench extends BenchObject {
+  constructor(state, env = {}) {
+    super(state, withConfig(env, config));
+  }
+}
+
+/// Where PhotoDNA is asked about each new picture, and a match acted on
+/// (known.mjs): one object, kept in the United States.
+export class KnownPictures extends KnownObject {
   constructor(state, env = {}) {
     super(state, withConfig(env, config));
   }
@@ -76,11 +98,15 @@ export class TagRelay {
     // The pictures the operator took down (withheld.mjs), read from the
     // store at most once a minute while pictures come this way.
     this.pictures = pictureScreen({ read: () => this.env.OH_STORE?.get(PICTURES_ROW.join('|'), 'json') ?? null });
+    // A picture is carried only as its account's picture now, checked
+    // as the account set it (profile_pictures.mjs): the one it set last,
+    // as its copies in the pictures bucket say.
+    this.owned = ownedScreen({ bucket: this.env.OH_PICTURES ?? null, log: (line) => console.log(line) });
   }
 
-  /// A call for a juror heard here, passed to the backup jurors where
-  /// they are bound (wrangler.toml, BENCH). Not awaited by the relay:
-  /// the caller has its OK already, and they take a while to start.
+  /// An event the relay took: a call for a juror passed to the backup
+  /// jurors where they are bound (wrangler.toml, BENCH), not awaited by
+  /// the relay: the caller has its OK already.
   heard(event) {
     const table = callIn(event);
     if (!table || !this.env.BENCH) return;
@@ -126,6 +152,7 @@ export class TagRelay {
       store: await kept.load(),
       kept: (event, gone) => this.state.waitUntil(kept.keep(event, gone)),
       withhold: (event) => this.pictures.withheld(event),
+      screen: this.owned,
       forget: (event) => this.state.waitUntil(kept.forget(event)),
       gate: this.gate(verify, tag),
     });
@@ -234,11 +261,53 @@ export class TagRelay {
 }
 
 export default {
+  /// Once a day (wrangler.toml, crons): anything left to do after a
+  /// PhotoDNA match tried again (known.mjs); and the pictures accounts
+  /// set kept as long as the privacy policy says and no longer, asked
+  /// about again where PhotoDNA has not cleared them, and emailed to the
+  /// operator since the last run, if the config asks for it
+  /// (review.mjs).
+  async scheduled(controller, env, ctx) {
+    const e = withConfig(env, config);
+    if (knownAsker(e)) {
+      const us = e.KNOWN.jurisdiction('us');
+      ctx.waitUntil(
+        us
+          .get(us.idFromName(KNOWN_OBJECT))
+          .fetch('https://known/wake', { method: 'POST' })
+          .then((res) => {
+            if (!res.ok) throw new Error(`said ${res.status}`);
+          })
+          .catch((err) => {
+            console.log(`known pictures not woken: ${err}`);
+            return alertKnownProblem(e, storeOf(e), { what: 'wake', error: `the daily run could not reach the object that acts on matches: ${err?.message ?? err}` });
+          }),
+      );
+    }
+    const alerts = alertsOf(e);
+    const store = storeOf(e);
+    if (!e.OH_PICTURES || !store) return;
+    const from = { email: e.OH_MAIL_FROM, name: 'Open Hearts' };
+    const send = alerts?.pictures && e.EMAIL ? (mail) => e.EMAIL.send({ to: alerts.to, from, ...mail }) : null;
+    ctx.waitUntil(
+      reviewRun({ bucket: e.OH_PICTURES, store, records: e.OH_RECORDS ?? null, send, ask: knownAsker(e), log: (line) => console.log(`pictures: ${line}`) }).then(
+        (r) => console.log(`pictures: ${r.deleted} deleted, ${r.asked} asked about again, ${r.sent} emailed, ${r.more} for later`),
+        (err) => {
+          console.log(`pictures: the daily run failed: ${err}`);
+          return alertPicturesProblem(e, store, { error: `${err?.message ?? err}` });
+        },
+      ),
+    );
+  },
+
   async fetch(request, env) {
     const path = new URL(request.url).pathname;
     // The root answers, for the monitor that asks whether the relay is
     // up (observability/monitoring.mjs); it opens no object.
     if (path === '/') return new Response('open hearts relay: a relay lives at /<tag>\n', { status: 200 });
+    // A picture the operator found, reported by their tool (`oh picture
+    // report`).
+    if (path === '/known' && request.method === 'POST') return knownReport(request, env);
     const tag = tagOf(path);
     if (!tag) return new Response('a relay lives at /<tag>\n', { status: 404 });
     // An object is handed websockets and nothing else: what it answers

@@ -11,7 +11,7 @@ library;
 
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io' show SocketException;
+import 'dart:io' show File, SocketException;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -22,6 +22,7 @@ import 'package:open_hearts/net/buying.dart';
 import 'package:open_hearts/net/household.dart';
 import 'package:open_hearts/net/licence.dart';
 import 'package:open_hearts/net/remote_config.dart';
+import 'package:open_hearts/start_afresh.dart';
 import 'package:open_hearts/subscribe_page.dart';
 import 'package:open_hearts/ui/qr_view.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -81,16 +82,18 @@ Map<String, Object?> signedFor(PublicKey device, {int days = 30}) {
 }
 
 void main() {
-  test('the privacy policy and the terms are the site\'s, beside the app, unless the config says', () {
+  test('the privacy policy and the terms are the site\'s, beside the app, whatever the config says', () {
     expect(legalPage('privacy', base: Uri.parse('https://open-hearts.pages.dev/play/?e2e')).toString(), 'https://open-hearts.pages.dev/privacy');
     expect(legalPage('terms', base: Uri.parse('http://127.0.0.1:8123/')).toString(), 'http://127.0.0.1:8123/terms');
     expect(legalPage('terms', base: Uri()).toString(), 'https://openhearts.game/terms', reason: 'a phone build');
     // The app at its own host: the site is the host without play.
     expect(legalPage('privacy', base: Uri.parse('https://play.openhearts.game/subscription')).toString(), 'https://openhearts.game/privacy');
     expect(legalPage('terms', base: Uri.parse('http://play.openhearts.localhost:8123/')).toString(), 'http://openhearts.localhost:8123/terms');
+    // Published there and nowhere else (site/ledger.mjs): no row points
+    // them at another document.
     RemoteSettings.current.adopt(RemoteConfig.parse({'terms': 'https://legal.example/t'}));
     addTearDown(() => RemoteSettings.current = RemoteSettings());
-    expect(legalPage('terms', base: Uri.parse('https://open-hearts.pages.dev/play/')).toString(), 'https://legal.example/t');
+    expect(legalPage('terms', base: Uri.parse('https://open-hearts.pages.dev/play/')).toString(), 'https://open-hearts.pages.dev/terms');
   });
 
   setUp(() {
@@ -409,6 +412,131 @@ void main() {
     expect(Entitlement.current.live, isFalse, reason: 'a device that dropped itself is not licensed');
     expect(find.text('open'), findsOneWidget, reason: 'and the page it did it from is gone');
     expect(tester.takeException(), isNull);
+  });
+
+  /// The subscription page, opened from a button, as a subscriber with
+  /// a name, a player blocked and a game target on the device.
+  Future<Signer> openAsSubscriber(WidgetTester tester, Stand stand) async {
+    SharedPreferences.setMockInitialValues({'identity_name': 'Ada', 'players_blocked': '["b0"]', 'game_target': 100});
+    final me = await Identity.signer();
+    await licenceThisDevice();
+    stand.says('devices', {
+      'devices': [
+        {'key': me.publicKey, 'bound_at': '2026-09-01'},
+      ],
+      'most': 5,
+    });
+    await tester.pumpWidget(routed('/', home: Builder(builder: (context) => TextButton(onPressed: () => showSubscribe(context), child: const Text('open')))));
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+    return me;
+  }
+
+  Future<void> askToDelete(WidgetTester tester) async {
+    await tester.ensureVisible(find.widgetWithText(TextButton, 'Delete account'));
+    await tester.tap(find.widgetWithText(TextButton, 'Delete account'));
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets('deleting the account: asked first, and then the device starts afresh with nothing of it kept', (tester) async {
+    final stand = standUp();
+    final me = await openAsSubscriber(tester, stand);
+    stand.says('delete', {'deleted': true});
+
+    await askToDelete(tester);
+    expect(find.text('Delete your account?'), findsOneWidget);
+    expect(find.textContaining('the time left on your subscription is lost'), findsOneWidget, reason: 'what it costs, said first');
+    expect(find.textContaining('cancel instead'), findsOneWidget, reason: 'and the other way to stop paying');
+    await tester.tap(find.text('Keep account'));
+    await tester.pumpAndSettle();
+    expect(stand.seen.where((s) => s.startsWith('/api/delete')), isEmpty, reason: 'keeping it asks nothing');
+    expect(Entitlement.current.live, isTrue);
+
+    await askToDelete(tester);
+    await tester.tap(find.widgetWithText(FilledButton, 'Delete account'));
+    await tester.pumpAndSettle();
+    final asked = stand.seen.where((s) => s.startsWith('/api/delete')).single;
+    final body = jsonDecode(asked.substring('/api/delete '.length)) as Map;
+    expect(body['key'], me.publicKey, reason: 'signed by this device');
+    expect(body['sig'], isA<String>());
+
+    expect(Entitlement.current.live, isFalse);
+    expect(Entitlement.current.inAnAccount, isFalse);
+    final prefs = await SharedPreferences.getInstance();
+    expect(prefs.getKeys(), {'device_started_afresh'}, reason: 'nothing of it left on the device, but that it was started afresh');
+    expect(await Identity.name(), isNull);
+    expect((await Identity.signer()).publicKey, isNot(me.publicKey), reason: 'and it comes back as a new player');
+    // A phone build ends here, until it is closed.
+    expect(find.text('Your account is deleted'), findsOneWidget);
+    await tester.tapAt(const Offset(4, 4));
+    await tester.pumpAndSettle();
+    expect(find.text('Your account is deleted'), findsOneWidget, reason: 'not tapped away');
+    expect(await tester.binding.handlePopRoute(), isTrue);
+    await tester.pumpAndSettle();
+    expect(find.text('Your account is deleted'), findsOneWidget, reason: 'nor gone back from');
+  });
+
+  testWidgets('a deletion the service turned away says so, and nothing on the device goes', (tester) async {
+    final stand = standUp();
+    final me = await openAsSubscriber(tester, stand);
+    stand.says('delete', {'error': 'the shop is not answering'}, status: 502);
+    await askToDelete(tester);
+    await tester.tap(find.widgetWithText(FilledButton, 'Delete account'));
+    await tester.pumpAndSettle();
+    expect(find.text('The shop is not answering.'), findsOneWidget);
+    expect(Entitlement.current.live, isTrue);
+    expect(await Identity.name(), 'Ada');
+    expect((await Identity.signer()).publicKey, me.publicKey);
+    expect(find.text('Your account is deleted'), findsNothing);
+  });
+
+  testWidgets('a service that says there is no account has already deleted it: the device starts afresh', (tester) async {
+    final stand = standUp();
+    await openAsSubscriber(tester, stand);
+    stand.says('delete', {'error': 'no account'}, status: 404);
+    await askToDelete(tester);
+    await tester.tap(find.widgetWithText(FilledButton, 'Delete account'));
+    await tester.pumpAndSettle();
+    expect(find.text('Your account is deleted'), findsOneWidget);
+    expect(await Identity.name(), isNull);
+    // But a service that does not know the handler has deleted nothing.
+    standUp();
+    expect(await deleteAccount(await Identity.signer()), (answer: null, refusal: const Refused('other', 'no such handler')));
+  });
+
+  testWidgets('the way to delete is there for a device in an account — subscribed, lapsed or suspended — and nowhere else', (tester) async {
+    standUp();
+    Future<bool> offered() async {
+      await tester.pumpWidget(routed('/', home: Builder(builder: (context) => TextButton(onPressed: () => showSubscribe(context), child: const Text('open')))));
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+      return find.widgetWithText(TextButton, 'Delete account').evaluate().isNotEmpty;
+    }
+
+    final me = await Identity.signer();
+    await Entitlement.current.load(me.publicKey);
+    expect(await offered(), isFalse, reason: 'never in one');
+    // Its last licence run out: a lapsed subscriber's.
+    SharedPreferences.setMockInitialValues({'licence': jsonEncode(signedFor(me.publicKey, days: -3))});
+    Entitlement.current = Entitlement(service: _service);
+    await Entitlement.current.load(me.publicKey);
+    expect(Entitlement.current.live, isFalse);
+    expect(await offered(), isTrue, reason: 'lapsed');
+    // One signed by somebody else is nobody's.
+    final forged = Licence.parse(signedFor(me.publicKey, days: -3))!;
+    SharedPreferences.setMockInitialValues({
+      'licence': jsonEncode(Licence(key: me.publicKey, account: forged.account, until: forged.until, plan: forged.plan, signature: 'ab' * 64).toJson()),
+    });
+    Entitlement.current = Entitlement(service: _service);
+    await Entitlement.current.load(me.publicKey);
+    expect(await offered(), isFalse, reason: 'not the service\'s');
+    await Entitlement.current.suspend();
+    expect(await offered(), isTrue, reason: 'suspended');
+  });
+
+  test('the key that says a device started afresh is the one the page that brings a device along reads', () async {
+    final carry = await File('web/carry.js').readAsString();
+    expect(carry, contains("'flutter.$startedAfreshKey'"));
   });
   test('a code is read the way a person types, pastes or scans it', () {
     // Off another device's screen: the link it travels in, or the code

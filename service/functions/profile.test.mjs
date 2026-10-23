@@ -11,7 +11,8 @@ import { claimWith, ticketFor } from './accounts.mjs';
 import { forgetAccount } from './deletion.mjs';
 import { activeInStore, forgetHouseholds, householdOp } from './household.mjs';
 import { signerOn } from './licence.mjs';
-import { PROFILE_COLOURS, PROFILE_ICONS, PROFILE_NAME_MOST, PROFILE_PICTURE_MOST, profileOf } from './profile.mjs';
+import { NAME_REFUSED, PROFILE_COLOURS, PROFILE_ICONS, PROFILE_NAME_MOST, PROFILE_PICTURE_MOST, profileOf } from './profile.mjs';
+import { PICTURES_ROW, pictureDigest, withheldOf } from './pictures.mjs';
 import { memoryStore } from './rows.mjs';
 import { SERVICE_DEFAULTS } from './settings.mjs';
 import { record } from './stripe.mjs';
@@ -161,6 +162,7 @@ test('the shape is the app\'s and nothing else: a name, one of the icons, one of
     ['a name untrimmed', JSON.stringify({ name: ' Ada' })],
     ['a name with a control in it', JSON.stringify({ name: 'A\nda' })],
     ['a name that is not text', JSON.stringify({ name: 7 })],
+    ['a name the others may not see', JSON.stringify({ name: 'f u c k' })],
     ['an icon the app has not got', JSON.stringify({ name: 'A', icon: 'skull' })],
     ['a colour past the palette', JSON.stringify({ name: 'A', color: PROFILE_COLOURS })],
     ['a colour that is not whole', JSON.stringify({ name: 'A', color: 1.5 })],
@@ -178,13 +180,17 @@ test('the shape is the app\'s and nothing else: a name, one of the icons, one of
   const refused = await write(ADA, { name: 'A', icon: 'skull' });
   assert.deepEqual([refused.status, refused.body.error], [400, 'not one of the icons']);
   assert.equal((await read(ADA)).body.version, 0);
+  // A name the filter refuses (names.mjs) is not kept either.
+  const named = await write(ADA, { name: 'Sh1t Head', icon: 'rocket' });
+  assert.deepEqual([named.status, named.body.error], [400, NAME_REFUSED]);
+  assert.equal((await read(ADA)).body.version, 0);
   // The biggest picture the app makes goes through the route whole.
   const whole = await write(ADA, { name: 'A', picture: big });
   assert.equal(whole.status, 200);
   assert.equal((await read(BAO)).body.profile.picture, big);
 });
 
-test('the app and the service agree on the icons, the colours and the picture\'s size', async () => {
+test('the app and the service agree on the icons, the colours, the picture\'s size and a refused name', async () => {
   const avatar = await readFile(new URL('../../app/lib/avatar.dart', import.meta.url), 'utf8');
   const icons = [...avatar.slice(avatar.indexOf('static const all')).matchAll(/^\s+'([a-z]+)': Icons\./gm)].map((m) => m[1]);
   assert.deepEqual(icons, [...PROFILE_ICONS]);
@@ -192,6 +198,9 @@ test('the app and the service agree on the icons, the colours and the picture\'s
   assert.equal(Number(/static const maxPictureBytes = (\d+);/.exec(avatar)[1]), PROFILE_PICTURE_MOST);
   const identity = await readFile(new URL('../../app/lib/identity.dart', import.meta.url), 'utf8');
   assert.equal(Number(/static const longestName = (\d+);/.exec(identity)[1]), PROFILE_NAME_MOST);
+  // A refused name is one the app does not send again.
+  const profile = await readFile(new URL('../../app/lib/net/account_profile.dart', import.meta.url), 'utf8');
+  assert.ok(/static const _malformed = \{[^}]*'not an allowed name'/.test(profile) && NAME_REFUSED === 'not an allowed name');
 });
 
 test('an account\'s profile writes are held to their own allowance an hour, and leave the account\'s changes alone', async () => {
@@ -217,6 +226,64 @@ test('in the account\'s turn: a device dropped from the account reads and writes
   assert.equal((await householdOp({ op: 'profile', key: BAO.public }, store, { now, active })).status, 402);
   assert.equal((await householdOp({ op: 'profile', key: BAO.public, profile: '{"name":"Bao"}' }, store, { now, active })).status, 402);
   assert.equal((await householdOp({ op: 'profile', key: ADA.public }, store, { now, active })).body.profile.name, 'Bao', 'what was written stays the account\'s');
+});
+
+test("in the account's turn, every change of its picture goes through what keeps the account's pictures: set from its device, taken off and put back by the operator, and gone with the account", async () => {
+  const { store, account } = await twoDevices();
+  const active = activeInStore(store);
+  const now = Date.now();
+  const calls = [];
+  const matched = new Set([jpeg(30)]);
+  const profiled = [];
+  const pictures = {
+    set: async (c) => {
+      calls.push({ ...c });
+      profiled.push((await store.get(`ACCOUNT#${account}`, 'PROFILE')) !== null);
+      return matched.has(c.picture) ? null : c.picture;
+    },
+  };
+  const op = (o) => householdOp(o, store, { now, active, pictures });
+  const order = async (id, act, more = {}) => {
+    await store.put(...orderRow(id), orderOf(account, act, { ...more, now }));
+    return op({ op: 'order', account, order: id });
+  };
+  const write = (picture) => op({ op: 'profile', key: ADA.public, profile: JSON.stringify({ name: 'Ada', picture }) });
+  const kept = async () => (await store.get(`ACCOUNT#${account}`, 'PROFILE'))?.picture ?? null;
+  const withheld = async () => withheldOf(await store.get(...PICTURES_ROW), now);
+  const [one, two] = [jpeg(10), jpeg(20)];
+  await op({ op: 'activate', key: ADA.public, account, want: 'open' });
+
+  assert.equal((await write(one)).body.profile.picture, one);
+  assert.equal((await write(jpeg(30))).body.profile.picture, undefined, 'a match is not kept');
+  assert.equal(await kept(), null);
+  await write(two);
+  assert.equal((await order('a'.repeat(32), 'remove', { picture: true })).status, 200);
+  assert.equal(await kept(), null);
+  assert.equal((await order('b'.repeat(32), 'restore')).body.restored.includes('picture'), true);
+  assert.equal(await kept(), two);
+  assert.ok(!(await withheld()).has(await pictureDigest(two)));
+  // Taken off again, and since found to match: not put back, and still
+  // withheld.
+  await order('c'.repeat(32), 'remove', { picture: true });
+  matched.add(two);
+  assert.deepEqual((await order('d'.repeat(32), 'restore')).body.restored, []);
+  assert.equal(await kept(), null);
+  assert.ok((await withheld()).has(await pictureDigest(two)));
+  await write(one);
+  assert.equal((await op({ op: 'delete', key: ADA.public })).status, 200);
+
+  assert.deepEqual(calls, [
+    { account, key: ADA.public, picture: one },
+    { account, key: ADA.public, picture: jpeg(30) },
+    { account, key: ADA.public, picture: two },
+    { account, picture: null },
+    { account, picture: two },
+    { account, picture: null },
+    { account, picture: two },
+    { account, key: ADA.public, picture: one },
+    { account, picture: null },
+  ]);
+  assert.equal(profiled.at(-1), true, 'deleted: its pictures no longer its own before its rows go');
 });
 
 test('an account\'s data deleted on request takes its profile with it, and nobody else\'s', async () => {

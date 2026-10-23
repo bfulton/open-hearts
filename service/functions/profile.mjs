@@ -16,9 +16,15 @@
 // most 12,000 bytes, base64 (app/lib/avatar.dart; a test holds the two
 // sides equal). The picture is published at tables anyway; here it is
 // kept with the account, for its devices, until the account's data is
-// deleted.
+// deleted. Where the account's turn runs in the relay worker, each new
+// picture is checked as it is set, and kept apart as one of the
+// account's pictures (service/do/profile_pictures.mjs): one that
+// matches a known image of child sexual abuse is not kept, and the
+// profile is saved without it. A name the filter refuses (names.mjs) is
+// not kept: the others would see it.
 
 import { entitlementOf } from './accounts.mjs';
+import { nameRefused } from './names.mjs';
 import { isAccount } from './rows.mjs';
 
 /// The icons the app offers, by their keys (AvatarIcons.all).
@@ -32,6 +38,11 @@ export const PROFILE_COLOURS = 10;
 
 /// The longest name, in characters.
 export const PROFILE_NAME_MOST = 60;
+
+/// What the service says of a name the filter refuses (names.mjs),
+/// which the app knows (net/account_profile.dart) and does not send
+/// again.
+export const NAME_REFUSED = 'not an allowed name';
 
 /// The most a picture may be, in bytes (Avatar.maxPictureBytes).
 export const PROFILE_PICTURE_MOST = 12000;
@@ -63,6 +74,7 @@ export function profileOf(text) {
   if (typeof name !== 'string' || name !== name.trim() || [...name].length > PROFILE_NAME_MOST || /\p{Cc}/u.test(name)) {
     return { error: 'not a name' };
   }
+  if (nameRefused(name)) return { error: NAME_REFUSED };
   if (icon !== null && !PROFILE_ICONS.includes(icon)) return { error: 'not one of the icons' };
   if (color !== null && !(Number.isInteger(color) && color >= 0 && color < PROFILE_COLOURS)) return { error: 'not one of the colours' };
   if (picture !== null && !isPicture(picture)) return { error: 'not a picture' };
@@ -114,8 +126,10 @@ export async function profileRead(op, store, { now = Date.now() } = {}) {
 }
 
 /// The account's profile written by its device in use, in the account's
-/// turn: the next version, whatever was there.
-export async function profileWritten(op, store, active, { now = Date.now() } = {}) {
+/// turn: the next version, whatever was there, with its picture as
+/// [pictures] keeps it (profile_pictures.mjs, accountPictures), where it
+/// is given.
+export async function profileWritten(op, store, active, { now = Date.now(), pictures = null } = {}) {
   const account = await profileAccount(store, op.key, now);
   if (!account) return { status: 402, body: { error: 'no subscription' } };
   const checked = profileOf(op.profile);
@@ -126,7 +140,8 @@ export async function profileWritten(op, store, active, { now = Date.now() } = {
     return { status: 409, body: { error: 'superseded: another device of this account is in use' } };
   }
   const was = await store.get(`ACCOUNT#${account}`, 'PROFILE');
-  const row = { ...checked.profile, version: (was?.version ?? 0) + 1, updated_at: new Date(now).toISOString() };
+  const picture = pictures ? await pictures.set({ account, key: op.key, picture: checked.profile.picture }) : checked.profile.picture;
+  const row = { ...checked.profile, picture, version: (was?.version ?? 0) + 1, updated_at: new Date(now).toISOString() };
   await store.put(`ACCOUNT#${account}`, 'PROFILE', row);
   return { status: 200, body: profileShown(row) };
 }

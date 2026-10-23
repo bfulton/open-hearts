@@ -227,7 +227,7 @@ test('the email that answers a payment: what was bought, the renewal, how to can
   const text = m.text.replace(/\s+/g, ' ');
   assert.match(text, /^Thank you for subscribing to Open Hearts live play\. You paid \$5\.99 USD for a year of it\./);
   assert.match(text, /renews automatically every year, on the date you subscribed, at the price then in force, until you cancel/);
-  assert.match(text, /Stripe emails you a reminder before each renewal/);
+  assert.match(text, /Link, which sold it to you for us, sends your receipts and a reminder before each renewal/);
   assert.match(text, /https:\/\/openhearts\.game\/support#cancel/);
   assert.match(text, /The terms you agreed to: https:\/\/openhearts\.game\/terms/);
   assert.ok(text.indexOf('until you cancel') < text.indexOf('AAAA-BBBB-CCCC-DDDD'), 'the terms first, then the codes');

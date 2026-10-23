@@ -52,7 +52,7 @@ export const pages = {
       vars: {},
       /// Encrypted: names only. apply.mjs checks each is set, and cannot
       /// set one (it has no value to set), so a missing one is set by
-      /// hand: `npx wrangler pages secret put NAME --project-name open-hearts`.
+      /// hand: `./oh secret set NAME --apply`.
       secrets: ['OH_ID_HMAC', 'OH_SERVICE_SECRET', 'OH_STRIPE_SECRET', 'OH_STRIPE_WEBHOOK_SECRET', 'OH_TURN_API_TOKEN', ...playSecrets],
       kv: { OH_STORE: 'open-hearts-store' },
       r2: { OH_RECORDS: 'open-hearts-records' },
@@ -81,9 +81,23 @@ export const pages = {
 /// KV namespaces, by title.
 export const kv = ['open-hearts-store', 'open-hearts-store-preview'];
 
-/// R2 buckets: game records, private. No r2.dev address, no custom
-/// domain, no CORS: the worker is the only way in.
+/// R2 buckets. The game records are private: no r2.dev address, no
+/// custom domain, no CORS, so the worker is the only way in. Each
+/// account's copy of each picture it sets, kept for the operator to look
+/// at (service/do/profile_pictures.mjs), is served at the pictures
+/// bucket's own domain, for the operator's daily email to show it; each
+/// is named by its account and its SHA-256, so nobody finds one without
+/// both the account and the picture, or the email. The records bucket
+/// also keeps what a legal hold keeps of an account's pictures
+/// (service/functions/holds.mjs), where no address serves it.
 export const r2 = [
+  {
+    name: 'open-hearts-pictures',
+    location: 'ENAM',
+    storageClass: 'Standard',
+    publicDevUrl: false,
+    customDomains: ['pictures.openhearts.game'],
+  },
   {
     name: 'open-hearts-records',
     location: 'ENAM',
@@ -118,6 +132,11 @@ export const turnKeys = [{ name: 'open-hearts-turn', uid: config.turnKeyId }];
 export const relay = {
   wrangler: 'service/do/wrangler.toml',
   secrets: ['OH_JUROR_SECRET'],
+  /// Set once each is issued, and nothing is wrong until then: PhotoDNA's
+  /// key turns on the check of each new picture against known images of
+  /// child sexual abuse, and NCMEC's credentials the reports a match
+  /// files (service/do/known.mjs).
+  optionalSecrets: ['OH_PHOTODNA_KEY', 'OH_NCMEC_USERNAME', 'OH_NCMEC_PASSWORD'],
   /// workers.dev off: relay.openhearts.game is its only address.
   workersDev: false,
 };

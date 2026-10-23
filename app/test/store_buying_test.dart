@@ -255,7 +255,7 @@ void main() {
     expect(canBuyHere, isTrue);
     expect(find.text('£4.99 a year'), findsOneWidget);
     expect(find.textContaining('£4.99 a year, charged to your Apple Account'), findsOneWidget);
-    expect(find.textContaining('renews by itself every year until you cancel'), findsOneWidget);
+    expect(find.textContaining('renews automatically every year until you cancel, at the price then in force, and Apple tells you before a new price applies'), findsOneWidget);
     expect(find.text('By subscribing, you agree to the Terms of use.'), findsOneWidget);
     expect(find.text('Restore purchases'), findsOneWidget);
     expect(find.text('Privacy policy'), findsOneWidget);
@@ -431,7 +431,7 @@ void main() {
     expect(priceShown, r'$5.99');
     await _pumpPage(tester);
     expect(find.text('Restore purchases'), findsNothing);
-    expect(find.textContaining('renews by itself'), findsNothing);
+    expect(find.textContaining('renews automatically'), findsNothing);
     expect(find.textContaining('By subscribing'), findsNothing, reason: 'nothing is bought here');
     expect(find.textContaining('Until the app is in the stores'), findsOneWidget);
 
@@ -453,10 +453,11 @@ void main() {
     await tester.pumpWidget(const SizedBox());
     await _pumpPage(tester);
     // What California's automatic renewal law asks for beside the
-    // button: the price, the period, that it renews, how to cancel.
+    // button: the price, the period, that it renews and at what price,
+    // and how to cancel.
     expect(
       find.text(
-        r"$5.99 a year, paid on Stripe's page. It renews by itself every year until you cancel, which you can do whenever you like under Manage subscription; the year you paid for runs out on its own.",
+        r"$5.99 a year plus any tax, sold by Link, Stripe's affiliate, on Stripe's page. It renews automatically every year until you cancel, at the price then in force: we email you at least 7 days before a new price would apply. Cancel whenever you like under Manage subscription, and live play lasts to the end of the year you paid for.",
       ),
       findsOneWidget,
     );

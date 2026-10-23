@@ -13,7 +13,9 @@ import { dayAfter, dayOf, memoryStore } from './rows.mjs';
 import { SITE, forgetSettings, openHouse, useSettings } from './settings.mjs';
 import { SUSPENDED_WHY } from './suspension.mjs';
 import { forgetProviderKeys, supersede, whoSignedIn } from './signin.mjs';
-import { CHECKOUT_WORDS, checkout, checkoutTerms, manage, record, sameSite, webhookSigned } from './stripe.mjs';
+import { CHECKOUT_LOCALES, STRIPE_VERSION, checkout, checkoutLanguage, endRefunded, manage, record, sameSite, webhookSigned } from './stripe.mjs';
+import { stripe as stripeDefinition } from '../../infra/stripe.mjs';
+import { STATED, withPrice } from './stripe.fixtures.mjs';
 import { mint, serversOf } from './turn.mjs';
 import { eventIdOf } from './records.mjs';
 import { keys } from '../do/sign.mjs';
@@ -403,70 +405,152 @@ test('checkout: a subscription session carrying the key three ways', async () =>
     calls.push({ url, init });
     return new Response(JSON.stringify({ url: 'https://checkout.stripe.com/c/pay/cs_test_1' }), { status: 200 });
   };
-  const shop = { OH_STRIPE_SECRET: 'sk_test', OH_STRIPE_PRICE: 'price_1' };
-  const out = await checkout(KEY, 'https://x/play/?bought=1', 'https://x/play/', shop, stripe);
+  const shop = { OH_STRIPE_SECRET: 'sk_test', OH_STRIPE_PRICE: 'price_1', OH_PRICE: STATED };
+  const out = await checkout(KEY, 'https://x/play/?bought=1', 'https://x/play/', shop, withPrice(stripe));
   assert.deepEqual(out, { status: 200, body: { url: 'https://checkout.stripe.com/c/pay/cs_test_1' } });
   assert.equal(calls[0].url, 'https://api.stripe.com/v1/checkout/sessions');
   assert.equal(calls[0].init.headers.authorization, 'Bearer sk_test');
+  assert.equal(calls[0].init.headers['stripe-version'], STRIPE_VERSION, "in the webhook's API version, not the account's");
   const form = new URLSearchParams(calls[0].init.body);
   assert.equal(form.get('mode'), 'subscription');
+  assert.equal(form.get('managed_payments[enabled]'), 'true', 'sold by Link, Stripe\'s merchant of record');
+  for (const field of ['automatic_tax[enabled]', 'tax_id_collection[enabled]', 'payment_method_types[0]', 'customer_update[address]', 'invoice_creation[enabled]']) {
+    assert.equal(form.get(field), null, `${field} is Stripe's to set in a Managed Payments checkout`);
+  }
   assert.equal(form.get('line_items[0][price]'), 'price_1');
   assert.equal(form.get('success_url'), 'https://x/play/?bought=1');
   assert.equal(form.get('metadata[key]'), KEY);
   assert.equal(form.get('client_reference_id'), KEY);
   assert.equal(form.get('subscription_data[metadata][key]'), KEY, 'so a renewal a year from now still names the device');
+  assert.equal(form.get('subscription_data[metadata][lang]'), 'en', 'and the language a change to the terms is told in');
   // Dressed as the app, with the site's own icon.
   assert.equal(form.get('branding_settings[display_name]'), 'Open Hearts');
   assert.equal(form.get('branding_settings[icon][url]'), 'https://x/icon-512.png');
   assert.equal(form.get('branding_settings[background_color]'), '#06231A');
   assert.equal(form.get('branding_settings[button_color]'), '#E4B363');
-  // Nothing is paid until the buyer ticks that they agree to the terms
-  // and to the renewal, and the line under the button says how to stop
-  // it: in English when the app asked in no language.
-  assert.equal(form.get('consent_collection[terms_of_service]'), 'required');
+  // In English when the app asked in no language. Nothing is paid until
+  // the buyer ticks Stripe's box agreeing to the terms; its words are
+  // Stripe's, since Stripe refuses a Managed Payments checkout with
+  // custom text.
   assert.equal(form.get('locale'), 'en');
-  assert.match(form.get('custom_text[terms_of_service_acceptance][message]'), /^I agree to the \[Terms of Use\]\(https:\/\/openhearts\.game\/terms\), and that this subscription renews automatically every year/);
-  assert.match(form.get('custom_text[submit][message]'), /renews automatically every year until you cancel\. Cancel any time in the game: menu, Subscription, Manage subscription\.$/);
+  assert.equal(form.get('consent_collection[terms_of_service]'), 'required');
+  for (const field of [...form.keys()]) assert.ok(!field.startsWith('custom_text'), `${field}: Stripe refuses it with Managed Payments`);
 });
 
-test('checkout: in the language the app asked in, the terms in that language too', async () => {
+test('the service calls Stripe in the API version its webhook is read in', () => {
+  assert.equal(STRIPE_VERSION, stripeDefinition.webhooks[0].apiVersion);
+  assert.ok(STRIPE_VERSION >= '2025-03-31.basil', 'which Managed Payments needs');
+});
+
+/// Stripe, for a refund: the payment's invoice, the invoice's
+/// subscription and the subscription's status, as [had] says; each call
+/// noted in [calls].
+function refundStripe({ invoice = 'in_1', subscription = 'sub_9', status = 'active', down = false } = {}) {
+  const calls = [];
+  const fake = async (url, init = {}) => {
+    const at = new URL(String(url));
+    calls.push({ method: init.method ?? 'GET', path: at.pathname, query: Object.fromEntries(at.searchParams), version: init.headers?.['stripe-version'] });
+    if (down) return Response.json({ error: {} }, { status: 500 });
+    if (at.pathname === '/v1/invoice_payments') return Response.json({ data: invoice ? [{ invoice, payment: { type: 'payment_intent', payment_intent: at.searchParams.get('payment[payment_intent]') } }] : [] });
+    if (at.pathname === `/v1/invoices/${invoice}`) return Response.json({ id: invoice, parent: subscription ? { type: 'subscription_details', subscription_details: { subscription } } : null });
+    if (at.pathname === `/v1/subscriptions/${subscription}`) return Response.json({ id: subscription, status: init.method === 'DELETE' ? 'canceled' : status });
+    return Response.json({ error: {} }, { status: 404 });
+  };
+  fake.calls = calls;
+  return fake;
+}
+
+const refunded = (more = {}) => ({ id: 'ch_1', object: 'charge', payment_intent: 'pi_1', amount: 599, amount_refunded: 599, ...more });
+
+test('a refund of a payment for a subscription of ours ends it at once', async () => {
+  const store = memoryStore();
+  await store.put('SUB#sub_9', 'META', { source: 'stripe' });
+  const shop = { OH_STRIPE_SECRET: 'rk_test' };
+  const stripe = refundStripe();
+  assert.deepEqual(await endRefunded(refunded(), store, shop, stripe), { status: 200, body: { ended: true, subscription: 'sub_9' } });
+  assert.deepEqual(
+    stripe.calls.map((c) => `${c.method} ${c.path}`),
+    ['GET /v1/invoice_payments', 'GET /v1/invoices/in_1', 'GET /v1/subscriptions/sub_9', 'DELETE /v1/subscriptions/sub_9'],
+  );
+  assert.deepEqual(stripe.calls[0].query, { 'payment[type]': 'payment_intent', 'payment[payment_intent]': 'pi_1', limit: '10' });
+  assert.equal(stripe.calls[3].query['cancellation_details[comment]'], 'refunded');
+  assert.ok(stripe.calls.every((c) => c.version === STRIPE_VERSION));
+  const part = refundStripe();
+  assert.equal((await endRefunded(refunded({ amount_refunded: 100 }), store, shop, part)).body.ended, true, 'a part refunded is a refund too, as the terms say');
+});
+
+test('a refund ends nothing twice, and nothing that is not ours', async () => {
+  const store = memoryStore();
+  await store.put('SUB#sub_9', 'META', { source: 'stripe' });
+  const shop = { OH_STRIPE_SECRET: 'rk_test' };
+  const ended = refundStripe({ status: 'canceled' });
+  assert.deepEqual(await endRefunded(refunded(), store, shop, ended), { status: 200, body: { ended: false, subscription: 'sub_9' } });
+  assert.ok(!ended.calls.some((c) => c.method === 'DELETE'), 'ended already, by the refund that ended it first');
+  for (const [why, stripe, charge] of [
+    ['a subscription this service did not sell', refundStripe({ subscription: 'sub_other' }), refunded()],
+    ['a payment no invoice was for', refundStripe({ invoice: null }), refunded()],
+    ['an invoice no subscription made', refundStripe({ subscription: null }), refunded()],
+    ['nothing refunded', refundStripe(), refunded({ amount_refunded: 0 })],
+    ['no payment intent', refundStripe(), refunded({ payment_intent: null })],
+  ]) {
+    assert.deepEqual(await endRefunded(charge, store, shop, stripe), { status: 200, body: { ended: null } }, why);
+    assert.ok(!stripe.calls.some((c) => c.method === 'DELETE'), why);
+  }
+  assert.equal((await endRefunded(refunded(), store, shop, refundStripe({ down: true }))).status, 502, 'Stripe not saying is asked again');
+  assert.equal((await endRefunded(refunded(), store, {}, refundStripe())).status, 503);
+});
+
+test('the webhook route: a refund ends the subscription, and is sent again when Stripe could not be asked', async () => {
+  const store = memoryStore();
+  await store.put('SUB#sub_9', 'META', { source: 'stripe' });
+  const shop = { ...env, OH_STRIPE_WEBHOOK_SECRET: SIGNING, OH_STORE: kvOf(store), OH_STRIPE_SECRET: 'rk_test' };
+  const at = 'https://dev.open-hearts.pages.dev/api/stripe';
+  const raw = JSON.stringify({ type: 'charge.refunded', data: { object: refunded() } });
+  const send = () => worker.fetch(new Request(at, { method: 'POST', headers: { 'stripe-signature': 'x' }, body: raw }), shop);
+  const realFetch = globalThis.fetch;
+  try {
+    const stripe = refundStripe();
+    globalThis.fetch = stripe;
+    const signed = async () => worker.fetch(new Request(at, { method: 'POST', headers: { 'stripe-signature': await signHook(raw) }, body: raw }), shop);
+    assert.equal((await send()).status, 400, 'unsigned, nothing is asked of Stripe');
+    assert.equal(stripe.calls.length, 0);
+    assert.equal((await signed()).status, 200);
+    assert.ok(stripe.calls.some((c) => c.method === 'DELETE' && c.path === '/v1/subscriptions/sub_9'));
+    globalThis.fetch = refundStripe({ down: true });
+    assert.equal((await signed()).status, 502);
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+});
+
+test('checkout: in the language the app asked in, and the subscription marked with it', async () => {
   const forms = [];
   const stripe = async (_, init) => {
     forms.push(new URLSearchParams(init.body));
     return new Response(JSON.stringify({ url: 'https://checkout.stripe.com/c/pay/cs_test_1' }), { status: 200 });
   };
-  const shop = { OH_STRIPE_SECRET: 'sk_test', OH_STRIPE_PRICE: 'price_1' };
+  const shop = { OH_STRIPE_SECRET: 'sk_test', OH_STRIPE_PRICE: 'price_1', OH_PRICE: STATED };
   for (const lang of ['pt', 'de', 'xx', { toString: () => 'es' }]) {
-    assert.equal((await checkout(KEY, 'https://x/', 'https://x/', shop, stripe, { lang })).status, 200);
+    assert.equal((await checkout(KEY, 'https://x/', 'https://x/', shop, withPrice(stripe), { lang })).status, 200);
   }
   const [pt, de, xx, notAString] = forms;
   assert.equal(pt.get('locale'), 'pt-BR', "the site's Portuguese is Brazil's");
-  assert.match(pt.get('custom_text[terms_of_service_acceptance][message]'), /\(https:\/\/openhearts\.game\/pt\/terms\)/);
+  assert.equal(pt.get('subscription_data[metadata][lang]'), 'pt');
+  assert.equal(xx.get('subscription_data[metadata][lang]'), 'en');
   assert.equal(de.get('locale'), 'de');
-  assert.match(de.get('custom_text[terms_of_service_acceptance][message]'), /^Ich stimme den \[Nutzungsbedingungen\]\(https:\/\/openhearts\.game\/de\/terms\)/);
-  assert.match(de.get('custom_text[submit][message]'), /Menü, Abo, Abo verwalten\.$/);
-  for (const other of [xx, notAString]) {
-    assert.equal(other.get('locale'), 'en', 'a language the site has not got is English');
-    assert.equal(other.get('consent_collection[terms_of_service]'), 'required');
-  }
+  assert.equal(de.get('subscription_data[metadata][lang]'), 'de');
+  for (const other of [xx, notAString]) assert.equal(other.get('locale'), 'en', 'a language the site has not got is English');
 });
 
-test('checkout: every language says the same things, within what Stripe takes', () => {
-  for (const [code, words] of Object.entries(CHECKOUT_WORDS)) {
-    const fields = checkoutTerms(code);
-    assert.equal((words.agree.match(/\{terms\}/g) ?? []).length, 1, `${code}: one link to the terms`);
-    assert.ok(fields['custom_text[terms_of_service_acceptance][message]'].length <= 1200, `${code}: Stripe takes 1200 characters`);
-    assert.ok(fields['custom_text[submit][message]'].length <= 1200, `${code}: Stripe takes 1200 characters`);
-  }
-  // The site's languages, each in the locale its pages are in, at the
-  // site's own address.
+test("checkout: the site's languages, each in the locale its pages are in", () => {
   assert.equal(SITE, origin);
-  assert.deepEqual(Object.fromEntries(Object.entries(CHECKOUT_WORDS).map(([code, w]) => [code, w.locale])), Object.fromEntries(languages.map((l) => [l.code, l.lang])));
+  assert.deepEqual(CHECKOUT_LOCALES, Object.fromEntries(languages.map((l) => [l.code, l.lang])));
+  for (const l of languages) assert.deepEqual(checkoutLanguage(l.code), { locale: l.lang, 'subscription_data[metadata][lang]': l.code });
 });
 
 test('checkout: no keys is a shop that is not open, not a broken one', async () => {
   assert.deepEqual(await checkout(KEY, 'https://x/', 'https://x/', {}), { status: 503, body: { error: 'the shop is not open yet' } });
-  const refused = await checkout(KEY, 'https://x/', 'https://x/', { OH_STRIPE_SECRET: 's', OH_STRIPE_PRICE: 'p' }, async () => new Response('no', { status: 401 }));
+  const refused = await checkout(KEY, 'https://x/', 'https://x/', { OH_STRIPE_SECRET: 's', OH_STRIPE_PRICE: 'p', OH_PRICE: STATED }, async () => new Response('no', { status: 401 }));
   assert.equal(refused.status, 502);
 });
 
@@ -650,17 +734,17 @@ test('the webhook route: a checkout paid for makes the backup codes and emails t
 
 test('the checkout route: the key, and somewhere on this site to come back to', async () => {
   const at = 'https://dev.open-hearts.pages.dev/api/checkout';
-  const shop = { ...env, OH_STRIPE_SECRET: 'sk', OH_STRIPE_PRICE: 'price_1' };
+  const shop = { ...env, OH_STRIPE_SECRET: 'sk', OH_STRIPE_PRICE: 'price_1', OH_PRICE: STATED };
   const send = (body) => new Request(at, { method: 'POST', body: JSON.stringify(body) });
   assert.equal((await worker.fetch(send({ key: 'short', back: '/play/', cancelled: '/play/' }), shop)).status, 400);
   const away = await worker.fetch(send(await asking(ADA, 'checkout', { back: 'https://evil.example/', cancelled: '/play/' })), shop);
   assert.equal(away.status, 400, 'a payment does not land where the caller says');
   const realFetch = globalThis.fetch;
   const sent = [];
-  globalThis.fetch = async (_, init) => {
+  globalThis.fetch = withPrice(async (_, init) => {
     sent.push(new URLSearchParams(init.body));
     return new Response(JSON.stringify({ url: 'https://checkout.stripe.com/c/pay/cs_1' }), { status: 200 });
-  };
+  });
   try {
     const res = await worker.fetch(send(await asking(ADA, 'checkout', { back: '/play/?bought=1', cancelled: '/play/', lang: 'fr' })), shop);
     assert.equal(res.status, 200);
@@ -1000,10 +1084,10 @@ test('TURN is for a device that holds a licence, and asks for it itself', async 
 test('a checkout is opened only by the device it is for', async () => {
   // Paying for somebody else's key would move their device onto a
   // subscription the payer can end.
-  const shop = { ...env, OH_STRIPE_SECRET: 'sk', OH_STRIPE_PRICE: 'price_1' };
+  const shop = { ...env, OH_STRIPE_SECRET: 'sk', OH_STRIPE_PRICE: 'price_1', OH_PRICE: STATED };
   const send = (body) => new Request('https://dev.open-hearts.pages.dev/api/checkout', { method: 'POST', body: JSON.stringify(body) });
   const realFetch = globalThis.fetch;
-  globalThis.fetch = async () => new Response(JSON.stringify({ url: 'https://checkout.stripe.com/c/pay/cs_1' }), { status: 200 });
+  globalThis.fetch = withPrice(async () => new Response(JSON.stringify({ url: 'https://checkout.stripe.com/c/pay/cs_1' }), { status: 200 }));
   try {
     assert.equal((await worker.fetch(send({ key: ADA.public, back: '/play/?bought=1', cancelled: '/play/' }), shop)).status, 401);
     const ok = await worker.fetch(send(await asking(ADA, 'checkout', { back: '/play/?bought=1', cancelled: '/play/' })), shop);

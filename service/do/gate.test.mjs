@@ -12,6 +12,7 @@ import { test } from 'node:test';
 import { activationOf, authKind, benchMark, createRelay, isBenchMark, objectRelay, schnorrVerifier, serviceGate } from './relay.mjs';
 import { wasmPath } from './host.mjs';
 import { keys, signing } from './sign.mjs';
+import { DELETED_WHY } from '../functions/deletion.mjs';
 
 const wasm = readFileSync(wasmPath);
 const verify = await schnorrVerifier(wasm);
@@ -103,6 +104,17 @@ test('a socket is asked who it is, and carried nothing until it has answered', a
   assert.equal(oks[0][2], true, 'the answer is taken');
   assert.equal(oks[1][2], true, 'and then what was held, in order');
   assert.equal(a.of('EOSE').length, 1);
+});
+
+test('what the relay took is told to its host with who said it: the account the gate let in', async () => {
+  const heard = [];
+  const relay = createRelay({ verify, now, gate: serviceGate({ service: SERVICE.public, verify, now }), heard: (event, who) => heard.push([event.id, who]) });
+  const a = socket();
+  relay.open(a);
+  await relay.message(a, JSON.stringify(['AUTH', await showing(ADA, a, await activation(ADA))]));
+  const said = await beat(ADA);
+  await relay.message(a, JSON.stringify(['EVENT', said]));
+  assert.deepEqual(heard, [[said.id, { account: ACCOUNT, key: ADA.public, epoch: 1, until: T + 3600 }]]);
 });
 
 test('no activation, another key\'s, one run out or another challenge\'s answer: nothing carried, and told why', async () => {
@@ -207,6 +219,20 @@ test('the account\'s turn says the account is suspended: its sockets close sayin
   await relay.message(b, JSON.stringify(['AUTH', await showing(BAO, b, await activation(BAO, { account: OTHER }))]));
   relay.revoke(OTHER, 2, 'whatever a caller makes up');
   assert.match(b.closed?.why, /^superseded:/);
+});
+
+test('the account\'s turn says the account was deleted: its sockets close saying so, and a device from before is turned away the same', async () => {
+  const relay = gated({ seen: async () => null });
+  const a = socket();
+  relay.open(a);
+  const first = await activation(ADA, { epoch: 1 });
+  await relay.message(a, JSON.stringify(['AUTH', await showing(ADA, a, first)]));
+  relay.revoke(ACCOUNT, 2, DELETED_WHY);
+  assert.deepEqual(a.closed, { code: 4001, why: DELETED_WHY });
+  const late = socket();
+  relay.open(late);
+  await relay.message(late, JSON.stringify(['AUTH', await showing(ADA, late, first)]));
+  assert.equal(late.of('OK')[0][3], DELETED_WHY);
 });
 
 test('a backup juror by its mark, and nobody else by it', async () => {

@@ -19,7 +19,8 @@
 #                                newest [keep] (5) and anything live
 #   ./deploy.sh --prune -n       says what it would delete and stops
 #
-# Usage:  ./deploy.sh [branch-label]
+# Usage:  ./deploy.sh [branch-label], or better, ./oh deploy site
+# (docs/reference/oh.md), which says first what stands in the way.
 #
 # The label names the Pages branch, and Cloudflare gives every branch a
 # stable alias URL. Default is "dev" on any working branch — a short,
@@ -135,6 +136,12 @@ OH_APPLE_SERVICE_ID=${OH_APPLE_SERVICE_ID:-$(config_of c.apple?.servicesId)}
 # Production without the service's key is a build with live play shut
 # for everyone, subscribers included (it trusts no licence), so it is
 # refused here.
+# Production only from main as it was reviewed, and only when nothing
+# else stands in the way (ops/gate.mjs), whether or not oh started this.
+if [ "$LABEL" = main ]; then
+  node ops/gate.mjs site || { echo "deploy: not deployed to production" >&2; exit 1; }
+fi
+
 if [ "$LABEL" = main ] && ! [[ "${OH_SERVICE_KEY:-}" =~ ^[0-9a-f]{64}$ ]]; then
   echo "deploy: production needs the service's public key (64 hex), serviceKey in config/openhearts.json" >&2
   exit 1
@@ -177,9 +184,13 @@ node site/build.mjs "$STAGE"
 # compile wasm from bytes while running (service/functions/entry.mjs).
 mkdir -p "$STAGE/_worker.js"
 cp service/functions/entry.mjs "$STAGE/_worker.js/index.js"
-# The committed configuration, as a module the entry imports.
+# The committed configuration, as a module the entry imports; and the
+# ledger of the terms and the privacy policy this site is built with,
+# which the service tells subscribers of (service/functions/notices.mjs).
 node -e "process.stdout.write('export default ' + JSON.stringify(require('./config/openhearts.json')) + ';\n')" \
   > "$STAGE/_worker.js/openhearts.config.mjs"
+node -e "process.stdout.write('export default ' + JSON.stringify(require('./site/ledger.json')) + ';\n')" \
+  > "$STAGE/_worker.js/ledger.config.mjs"
 # Every module the handlers import, not a list of them kept by hand:
 # one left off is a worker Cloudflare refuses at upload. Not the tests,
 # nor their fixtures.

@@ -392,7 +392,8 @@ class AppLocalizationsDe extends AppLocalizations {
   String get subscribe => 'Abonnieren';
 
   @override
-  String get aloneIsFree => 'Allein spielen ist kostenlos und bleibt es.';
+  String get aloneIsFree =>
+      'Allein spielen ist kostenlos, und wir haben nicht vor, das zu ändern.';
 
   @override
   String get findingPlayers => 'Suche Mitspieler';
@@ -561,11 +562,11 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get whatMoneyPaysFor =>
-      'Allein spielen ist kostenlos und bleibt es, genau wie die Protokolle, die Engine und jede Zeile hiervon. Das Geld bezahlt den Teil, dessen Betrieb uns etwas kostet: euch miteinander zu verbinden, ein Relay, wenn zwei Geräte keinen direkten Weg finden, und einen Juror, wenn ein Tisch allein gelassen wird.';
+      'Allein spielen ist kostenlos, genau wie die Protokolle, die Engine und jede Zeile hiervon, und wir haben nicht vor, das zu ändern. Das Geld bezahlt den Teil, dessen Betrieb uns etwas kostet: euch miteinander zu verbinden, ein Relay, wenn zwei Geräte keinen direkten Weg finden, und einen Juror, wenn ein Tisch allein gelassen wird.';
 
   @override
   String webRenewal(String price) {
-    return '$price im Jahr, bezahlt auf der Seite von Stripe. Das Abo verlängert sich jedes Jahr von selbst, bis du kündigst – jederzeit, unter Abo verwalten; das bezahlte Jahr läuft einfach aus.';
+    return '$price im Jahr zuzüglich Steuern, verkauft von Link, einem verbundenen Unternehmen von Stripe, auf der Seite von Stripe. Das Abo verlängert sich jedes Jahr automatisch, bis du kündigst, zum dann geltenden Preis: Wir schreiben dir mindestens 7 Tage, bevor ein neuer Preis gelten würde. Kündige jederzeit unter Abo verwalten; Live-Spiel läuft bis zum Ende des bezahlten Jahres.';
   }
 
   @override
@@ -635,6 +636,10 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get yourName => 'Dein Name';
+
+  @override
+  String get nameNotAllowed =>
+      'Dieser Name ist nicht erlaubt. Wähl einen anderen.';
 
   @override
   String get howYouLook => 'Dein Aussehen';
@@ -787,6 +792,88 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get pictureChoiceNote =>
       'Nur auf diesem Gerät, und nur das Bild: Name und Punktestand bleiben.';
+
+  @override
+  String reportPlayer(String name) {
+    return '$name melden';
+  }
+
+  @override
+  String get reportWhat => 'Was ist los?';
+
+  @override
+  String get reportTheirPicture => 'Das Bild';
+
+  @override
+  String get reportTheirName => 'Der Name';
+
+  @override
+  String get reportSomethingElse => 'Etwas anderes';
+
+  @override
+  String get reportNoteHint => 'Was wir wissen sollten (optional)';
+
+  @override
+  String get reportGoesTo =>
+      'Das geht nur an die Leute, die Open Hearts betreiben, mit der Nummer deines Kontos und der des gemeldeten Kontos.';
+
+  @override
+  String get reportSend => 'Senden';
+
+  @override
+  String get reportSent => 'Meldung gesendet. Danke.';
+
+  @override
+  String get reportTooMany => 'Mehr Meldungen kannst du heute nicht senden.';
+
+  @override
+  String get reportFailed =>
+      'Die Meldung ist nicht angekommen. Versuch es noch einmal oder schreib an help@openhearts.game.';
+
+  @override
+  String blockPlayer(String name) {
+    return '$name blockieren';
+  }
+
+  @override
+  String get unblockPlayer => 'Blockierung aufheben';
+
+  @override
+  String get blockedPlayer => 'Blockierte Person';
+
+  @override
+  String get blockNote =>
+      'Nur auf diesem Gerät: Du siehst Namen, Bild und Reaktionen dieser Person nicht mehr. Sie erfährt davon nichts.';
+
+  @override
+  String get liveAgreeTitle => 'Bevor du live spielst';
+
+  @override
+  String get liveAgreeBody =>
+      'Die anderen sehen deinen Namen und dein Bild, also wähle welche, die du jedem zeigen würdest, und spiel fair. Die Nutzungsbedingungen sagen, was nicht erlaubt ist und was passiert, wenn du dagegen verstößt. Wenn du live spielst, stimmst du ihnen zu.';
+
+  @override
+  String get liveAgree => 'Ich stimme zu';
+
+  @override
+  String get deleteAccount => 'Konto löschen';
+
+  @override
+  String get deleteAccountTitle => 'Dein Konto löschen?';
+
+  @override
+  String get deleteAccountBody =>
+      'Das lässt sich nicht rückgängig machen. Dein Konto wird auf allen seinen Geräten gelöscht – sein Profil, seine Geräte, seine Backup-Codes und seine Anmeldung –, und dein Name verschwindet aus den Spielen, die du gespielt hast. Außerdem wird alles gelöscht, was Open Hearts auf diesem Gerät speichert.\n\nDas Live-Spiel endet sofort, und die restliche Zeit deines Abos verfällt. Ein Web-Abo wird gekündigt. Eines aus dem App Store oder von Google Play verlängert sich weiter, bis du es dort kündigst.\n\nWenn du nicht mehr zahlen, aber bis zum Ende deines Jahres weiterspielen willst, kündige stattdessen.';
+
+  @override
+  String get keepAccount => 'Konto behalten';
+
+  @override
+  String get accountDeleted => 'Dein Konto ist gelöscht';
+
+  @override
+  String get accountDeletedClose =>
+      'Schließe Open Hearts und öffne es wieder, um neu anzufangen.';
 
   @override
   String get waitingToReconnect =>
@@ -1095,10 +1182,14 @@ class AppLocalizationsDe extends AppLocalizations {
       'other': 'Google-Konto',
     });
     String _temp1 = intl.Intl.selectLogic(store, {
+      'apple': 'Apple',
+      'other': 'Google',
+    });
+    String _temp2 = intl.Intl.selectLogic(store, {
       'apple': 'des App Store',
       'other': 'von Google Play',
     });
-    return '$price im Jahr, abgebucht über dein $_temp0, wenn du bestätigst. Das Abo verlängert sich jedes Jahr von selbst, bis du kündigst – jederzeit, in den Abo-Einstellungen $_temp1, spätestens einen Tag vor der Verlängerung.';
+    return '$price im Jahr, abgebucht über dein $_temp0, wenn du bestätigst. Das Abo verlängert sich jedes Jahr automatisch, bis du kündigst, zum dann geltenden Preis, und $_temp1 informiert dich, bevor ein neuer Preis gilt. Kündige jederzeit in den Abo-Einstellungen $_temp2, spätestens einen Tag vor der Verlängerung.';
   }
 
   @override

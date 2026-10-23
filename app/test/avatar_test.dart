@@ -33,6 +33,7 @@ void main() {
     expect(Avatar.fromJson(light), const Avatar(icon: 'rocket', color: 3));
     expect(Avatar.fromJson(jsonDecode(jsonEncode(a.toJson()))), a, reason: 'through JSON text');
     expect(Avatar.fromJson(null), Avatar.none);
+    expect(Avatar.fromJson(a.toJson(), withPicture: false), a.copyWith(clearPicture: true), reason: 'another player\'s: no picture inside it');
     expect(Avatar.fromJson({'icon': 'nonsense', 'color': 99, 'picture': 'not base64!'}), Avatar.none, reason: 'unknown is none');
     expect(Avatar.fromJson({'picture': base64Encode(Uint8List(Avatar.maxPictureBytes + 1))}).picture, isNull, reason: 'too heavy for a relay');
     expect(Avatar.none.isDefault, isTrue);

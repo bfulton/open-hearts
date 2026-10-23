@@ -1,0 +1,66 @@
+{
+  "terms": [
+    {
+      "date": "2026-10-16",
+      "fingerprint": "19a414be6c6222ad2e43d8cabbab5c47181aaf220109ed424da8f7b210aec205",
+      "change": "first",
+      "price": {
+        "amount": 599,
+        "currency": "usd"
+      },
+      "storesNotified": null,
+      "summary": {
+        "en": "The terms as published on 16 October 2026, where this record begins.",
+        "es": "Las condiciones tal como se publicaron el 16 de octubre de 2026, donde empieza este registro.",
+        "pt": "Os termos como publicados em 16 de outubro de 2026, onde este registro começa.",
+        "de": "Die Bedingungen, wie sie am 16. Oktober 2026 veröffentlicht wurden; hier beginnt diese Aufzeichnung.",
+        "fr": "Les conditions telles que publiées le 16 octobre 2026, point de départ de ce registre."
+      }
+    },
+    {
+      "date": "2026-10-19",
+      "fingerprint": "f8f04273fdb2501e1a88ccf3a98f52bffbbc4f01324868c33733d95ec8ca9303",
+      "change": "material",
+      "price": {
+        "amount": 599,
+        "currency": "usd"
+      },
+      "storesNotified": null,
+      "summary": {
+        "en": "Bright Fulton LLC now runs Open Hearts; Link, Stripe's affiliate, sells web subscriptions. A change applies from your renewal 30 days after we tell you. Disputes: talk first, then the courts in Charleston, SC. New: reporting, blocking and deleting your account in the app.",
+        "es": "Bright Fulton LLC gestiona ahora Open Hearts; Link, filial de Stripe, vende las suscripciones web. Un cambio se aplica desde tu renovación 30 días tras avisarte. Disputas: primero hablarlo, luego los tribunales de Charleston (SC). Nuevo: denunciar, bloquear y eliminar tu cuenta.",
+        "pt": "A Bright Fulton LLC agora opera o Open Hearts; a Link, afiliada da Stripe, vende as assinaturas web. Uma mudança vale a partir da renovação 30 dias após o aviso. Disputas: primeiro conversar, depois os tribunais de Charleston (SC). Novo: denunciar, bloquear e excluir a conta.",
+        "de": "Open Hearts betreibt jetzt die Bright Fulton LLC; Link, ein Stripe-Unternehmen, verkauft Web-Abos. Eine Änderung gilt ab der Verlängerung 30 Tage nach unserer Nachricht. Streit: erst reden, dann Gerichte in Charleston (SC). Neu: melden, blockieren, Konto in der App löschen.",
+        "fr": "Bright Fulton LLC exploite désormais Open Hearts ; Link, filiale de Stripe, vend les abonnements web. Un changement vaut au renouvellement 30 jours après notre avis. Litiges : d'abord à l'amiable, puis à Charleston (SC). Nouveau : signaler, bloquer, supprimer votre compte."
+      }
+    }
+  ],
+  "privacy": [
+    {
+      "date": "2026-10-13",
+      "fingerprint": "85bfa30bb90e22ac1933e30b343654a539e428c6d4ede2f3c590e1ef8f4e2aa9",
+      "change": "first",
+      "storesNotified": null,
+      "summary": {
+        "en": "The privacy policy as published on 13 October 2026, where this record begins.",
+        "es": "La política de privacidad tal como se publicó el 13 de octubre de 2026, donde empieza este registro.",
+        "pt": "A política de privacidade como publicada em 13 de outubro de 2026, onde este registro começa.",
+        "de": "Die Datenschutzerklärung, wie sie am 13. Oktober 2026 veröffentlicht wurde; hier beginnt diese Aufzeichnung.",
+        "fr": "La politique de confidentialité telle que publiée le 13 octobre 2026, point de départ de ce registre."
+      }
+    },
+    {
+      "date": "2026-10-19",
+      "fingerprint": "7f12279688bd4619ff9863fcd01ed9b502b80f6247d92c9ffa674b151123145d",
+      "change": "material",
+      "storesNotified": null,
+      "summary": {
+        "en": "Each picture your account sets is checked, and a copy kept for us until a year after it stops being yours; one that seems to break the rules is hidden. Reports reach us by email. You can block players and delete your account in the app.",
+        "es": "Cada imagen que elige tu cuenta se revisa, y guardamos una copia hasta un año después de que deje de ser tuya; si parece romper las reglas, se oculta. Las denuncias llegan por correo. Puedes bloquear jugadores y eliminar tu cuenta en la app.",
+        "pt": "Cada imagem que a sua conta escolhe é verificada, e guardamos uma cópia até um ano depois de deixar de ser sua; a que pareça violar as regras é ocultada. Denúncias chegam por e-mail. Você pode bloquear jogadores e excluir a conta no app.",
+        "de": "Jedes Bild, das dein Konto wählt, wird geprüft, und wir bewahren eine Kopie bis ein Jahr, nachdem es nicht mehr deins ist; eines, das gegen die Regeln zu verstoßen scheint, wird verborgen. Meldungen kommen per E-Mail. Du kannst Spieler blockieren und dein Konto löschen.",
+        "fr": "Chaque image que choisit votre compte est vérifiée, et nous en gardons une copie jusqu'à un an après qu'elle n'est plus la vôtre ; celle qui semble enfreindre les règles est masquée. Les signalements arrivent par e-mail. Vous pouvez bloquer des joueurs et supprimer votre compte."
+      }
+    }
+  ]
+}

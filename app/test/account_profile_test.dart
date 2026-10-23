@@ -10,6 +10,7 @@
 /// `node --test service/functions` (profile.test.mjs).
 library;
 
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io' show SocketException;
 import 'dart:typed_data';
@@ -150,6 +151,37 @@ void main() {
     expect(await Identity.name(), 'Ada L.');
   });
 
+  test('what is on its way is waited for before a room or a pool: until the write has gone, at once with nothing going, and no longer than asked', () async {
+    final kept = standUp();
+    await licenceThisDevice();
+    final real = askService;
+    final release = Completer<void>();
+    askService = (url, body) async {
+      await release.future;
+      return real(url, body);
+    };
+    await AccountProfile.current.keep('Ada', Avatar(picture: Uint8List.fromList([0xff, 0xd8, 0xff, 0xe0, 1])));
+    final sending = AccountProfile.current.sync();
+    var settled = false;
+    unawaited(AccountProfile.current.settled().then((_) => settled = true));
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+    expect(settled, isFalse, reason: 'the write still on its way');
+    release.complete();
+    await sending;
+    await Future<void>.delayed(Duration.zero);
+    expect(settled, isTrue);
+    expect(kept.profile?['picture'], isNotNull, reason: 'the service has the picture before a room is gone to');
+    // Nothing on its way: at once.
+    await AccountProfile.current.settled(within: Duration.zero);
+    // A service that never answers is waited for no longer than asked.
+    askService = (url, body) => Completer<({int status, String body})>().future;
+    await AccountProfile.current.keep('Ada', const Avatar(icon: 'star'));
+    unawaited(AccountProfile.current.sync());
+    final waited = Stopwatch()..start();
+    await AccountProfile.current.settled(within: const Duration(milliseconds: 50));
+    expect(waited.elapsed, lessThan(const Duration(seconds: 5)));
+  });
+
   test('a change that cannot go now goes later: offline, or while another device is in use', () async {
     final kept = standUp();
     await licenceThisDevice();
@@ -248,6 +280,15 @@ void main() {
     // back as something new.
     await AccountProfile.current.sync();
     expect(kept.asked, ['read', 'read', 'write', 'read']);
+  });
+
+  test('a name kept here from before the filter goes to the account as none, the look with it', () async {
+    final kept = standUp();
+    await licenceThisDevice();
+    await Identity.setName('Sh1t Head');
+    await Identity.setAvatar(const Avatar(color: 4));
+    await AccountProfile.current.sync();
+    expect(kept.profile, {'name': '', 'color': 4}, reason: 'never the name the service and the relay refuse');
   });
 
   test('a profile the service will never take is not sent again and again', () async {

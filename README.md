@@ -54,8 +54,8 @@ MIT. See [LICENSE](LICENSE).
 
 ## Third-party code
 
-Code from others that ships in this repository, each under its own
-licence beside it:
+Code and data from others that ship in this repository, each under
+its own licence beside it:
 
 - **The deal's proof crates** (`crypto/vendor/`): Geometry's
   mental-poker and proof-toolbox, ported to arkworks 0.6. MIT or
@@ -65,3 +65,8 @@ licence beside it:
 - **New Relic's browser agent** (`app/web/observability.js`): its loader,
   as New Relic serves it, on play.openhearts.game only. Apache-2.0
   (`app/web/nr-loader-full-1.323.0.min.js.LICENSE.txt`).
+- **The name filter's word lists** (`third_party/ldnoobw/`): the
+  English, Spanish, Portuguese, German and French lists from the List
+  of Dirty, Naughty, Obscene, and Otherwise Bad Words, by Shutterstock
+  and its contributors. CC BY 4.0; how Open Hearts reads them is in
+  that folder's README.

@@ -10,6 +10,80 @@ squashed from a pull request, the pull request's number.
 
 ### Added
 
+- A player deletes their account in the app: **Delete account**, at the
+  foot of the subscription page, on any device in the account, lapsed or
+  suspended too. It asks first, and says that the time left on the
+  subscription is lost and that cancelling is the way to stop paying
+  without that. The service ends a web subscription in Stripe, takes the
+  account's name off its kept games, deletes its rows and cuts its device
+  in use off at the relay; the device forgets everything it keeps and
+  starts again as a new player. A kept game notes the accounts at its
+  seats, so only that account's games are read. The support page says
+  how, for Google Play, and the terms and privacy policy say so, in every
+  language. (2026-10-19, #32)
+- The first time a device goes to play live, it asks the player to agree
+  to the terms, saying that the others will see their name and picture.
+  (2026-10-19, #32)
+- A player can block another from the table: on that device, the other
+  is shown by no name, no picture and no reactions, at the table, in a
+  room, watching and reviewing a game. Nobody is told. (2026-10-19, #32)
+- A player can report another from the table, for their picture, their
+  name or something else, with a note. The operator is emailed at once,
+  with both accounts, what the reporter saw and the commands to act on
+  it; a subscriber can send ten a day, the same report once a day.
+  (2026-10-19, #32)
+- A picture is the account's: the account's turn checks it as the
+  account sets it, before anyone is shown it, and keeps the account's
+  own copy of it, apart, for the operator, until a year after it stops
+  being the account's (replaced, taken off, or the account deleted), as
+  long as a hold keeps one reported. Everything known of a picture
+  travels with that one copy, and two accounts that set the same picture
+  have one each, each checked and acted on for itself. The account's
+  picture now is the one it set last, and the relay carries only that
+  one. A room or a pool waits for a profile
+  save on its way, so a picture just changed goes once the service has
+  it. (2026-10-19, #32)
+- Pictures are checked as an account sets them, by Cloudflare's Workers
+  AI, for nudity, gore and hate symbols. One the check flags is withheld
+  from everyone within a couple of minutes, and the daily email shows it
+  first; `./oh picture allow` puts one back. (2026-10-19, #32)
+- Each new picture is checked by Microsoft's PhotoDNA against known
+  images of child sexual abuse as an account sets it, asked from one
+  object kept in the United States. A match is never shown or kept: the
+  profile is saved without it, each account that set it is held and
+  terminated, its web subscription ended with nothing refunded, the
+  match is reported to NCMEC's CyberTipline, and the operator is emailed
+  what was done, all without waiting on the operator. Each step is tried
+  again until it is done, and any failure emails the operator. Off until
+  PhotoDNA's key is set; reports are filed once NCMEC's credentials are,
+  and until then the email says to file one by hand. (2026-10-19, #32)
+- Every new picture is emailed to the operator once a day, account by
+  account, with the commands to take it down. The daily run does only
+  what each copy says is still to do: it keeps what is kept for as long
+  as the privacy policy says whether or not the email is on, asks
+  PhotoDNA again about any picture it has not cleared, and emails the
+  operator if it fails. (2026-10-19, #32)
+- Names that are obscene or slurs, in five languages, are refused by the
+  app, the service and the relay, matched as whole words so real names
+  stay. (2026-10-19, #32)
+- A legal hold keeps an account's data for a year at the least after a
+  report the law requires, with a copy of each picture the account set
+  in its last year, kept where only the operator reaches it.
+  `docs/how-to/handle-abuse-material.md` is the procedure for child
+  sexual abuse material that PhotoDNA doesn't catch. `./oh picture
+  report` has the relay handle a picture the operator found as it does a
+  match, with a report saying the operator looked at it. For what is
+  done by hand, `./oh account find` takes a picture's SHA-256 or address
+  to the accounts that set it, and `./oh picture hide` withholds one an
+  account no longer uses. (2026-10-19, #32)
+- `./oh`, one command for every operator task, each saying what it would
+  do and changing nothing without `--apply`; `docs/reference/oh.md` is
+  made from it. (2026-10-19, #32)
+- Every published version of the terms and the privacy policy is an
+  entry in `site/ledger.json`, which CI and a production deploy hold the
+  text to. Devices show a material change at the front door, and
+  `./oh terms notify` emails web subscribers. (2026-10-19, #32)
+
 - A picture the operator takes off an account is withheld at the relay
   within a couple of minutes, for 30 days or until it is put back. No
   pool or room serves it again, even if a device of the account puts it
@@ -55,6 +129,16 @@ squashed from a pull request, the pull request's number.
 
 ### Changed
 
+- Web subscriptions are sold through Stripe Managed Payments: Link,
+  Stripe's merchant of record, sells them worldwide, collects the tax and
+  keeps to each country's rules for buying online. A refund of any
+  payment, whoever makes it, ends the subscription. (2026-10-19, #32)
+- The terms are with Bright Fulton LLC. Disputes go first to 30 days of
+  talking it over by email, then to the courts in Charleston, South
+  Carolina, individually, with no arbitration. A change applies to a
+  subscription from its first renewal at least 30 days after its
+  subscriber is told, and no deploy emails anyone. The second legal
+  review's other fixes are in, in every language. (2026-10-19, #32)
 - The terms name the copyright agent, with their own address, email and
   telephone. If live play ever stops for good, they promise a refund of
   the unused part of a web subscription, and say that the App Store and

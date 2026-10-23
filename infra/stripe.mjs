@@ -8,9 +8,14 @@
 // the webhooks pointed at this app's hosts.
 //
 // Not here, because they are not readable or not settable through the
-// API with the keys this uses: the restricted keys themselves (the
-// service's OH_STRIPE_SECRET — Products, Subscriptions and Customers
-// read; Checkout Sessions and Customer Portal write), the webhook's
+// API with the keys this uses: Managed Payments itself (turned on, and
+// its terms accepted, in the Dashboard once Stripe has approved the
+// account) and Checkout's Legal policies setting, without which a
+// Managed Payments checkout refuses the terms box (`oh verify` proves
+// both, with a checkout through Link), the
+// restricted keys themselves (the service's OH_STRIPE_SECRET —
+// Products, Customers and Invoices read; Subscriptions, Checkout
+// Sessions and Customer Portal write), the webhook's
 // signing secret (shown once, at creation; it is the Pages project's
 // OH_STRIPE_WEBHOOK_SECRET), Checkout's branding, receipt emails, the
 // emails about upcoming renewals (on, 30 days before, with a link to
@@ -18,28 +23,43 @@
 // in Public details (Checkout's consent box will not open without
 // it), and the account's name and statement descriptor.
 
+import { readFileSync } from 'node:fs';
+
+/// The price the terms state (config/openhearts.json), which the price
+/// below is made at and the service sells at and no other.
+const { price } = JSON.parse(readFileSync(new URL('../config/openhearts.json', import.meta.url), 'utf8'));
+
 export const stripe = {
   /// Which mode this describes. apply.mjs refuses a key of the other.
   mode: 'live',
   /// Hosts a webhook of ours points at; one elsewhere is not ours.
   hosts: ['openhearts.game', 'open-hearts.pages.dev'],
 
-  /// $5.99 a year, paid up front (docs/explanation/service.md). Found by its
-  /// lookup key, which is what the service is given
-  /// (OH_STRIPE_PRICE): a new price takes the key over and nothing else
-  /// changes. A price's amount cannot be edited, so a change to it here
-  /// is a new price.
+  /// A year, paid up front, at the price in config/openhearts.json
+  /// (docs/explanation/service.md). Found by its lookup key, which is
+  /// what the service is given (OH_STRIPE_PRICE): a new price takes the
+  /// key over and nothing else changes. A price's amount cannot be
+  /// edited, so a change to it is a new price
+  /// (docs/how-to/change-the-terms.md, "Change the price").
   price: {
     lookupKey: 'openhearts_annual',
-    currency: 'usd',
-    unitAmount: 599,
+    currency: price.currency,
+    unitAmount: price.amount,
     interval: 'year',
     intervalCount: 1,
-    taxBehavior: 'unspecified',
+    /// Tax on top of the price, as the terms say ("plus any tax shown
+    /// at checkout"), whatever the Dashboard's default: Link, which
+    /// sells it (Managed Payments), adds the buyer's own.
+    taxBehavior: 'exclusive',
   },
   product: {
     name: 'Open Hearts Annual Subscription',
     description: 'All features including multi-player play, paid yearly.',
+    /// What it is for tax, which Managed Payments needs of every product
+    /// it sells: a game, on the device, whose live play lasts as long as
+    /// it is paid for ("Video Games - downloaded - subscription - with
+    /// conditional rights").
+    tax_code: 'txcd_10201002',
   },
 
   /// The default configuration, which is what the service's portal
@@ -70,9 +90,10 @@ export const stripe = {
   },
 
   /// Entitlement (`/api/stripe`, service/functions/stripe.mjs). It reads
-  /// checkout.session.completed and .async_payment_succeeded and the
-  /// subscription's changes; the other checkout and subscription events
-  /// are received, answered and ignored.
+  /// checkout.session.completed and .async_payment_succeeded, the
+  /// subscription's changes, and a refund, which ends the subscription
+  /// it was for; the other checkout and subscription events are
+  /// received, answered and ignored.
   webhooks: [
     {
       url: 'https://play.openhearts.game/api/stripe',
@@ -80,6 +101,7 @@ export const stripe = {
       // endpoint is made.
       apiVersion: '2025-11-17.clover',
       events: [
+        'charge.refunded',
         'checkout.session.async_payment_failed',
         'checkout.session.async_payment_succeeded',
         'checkout.session.completed',

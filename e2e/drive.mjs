@@ -331,19 +331,29 @@ async function handlersFor(serve, turn, records, store, config) {
 }
 
 /// The kept games' bucket (service/functions/records.mjs), in memory:
-/// what the site would keep in R2. A flow can look at it, or put a game
-/// in it to open (`app.records`). One to each rig.
+/// what the site would keep in R2, custom metadata and listing too. A
+/// flow can look at it, or put a game in it to open (`app.records`).
+/// One to each rig.
 const recordsBucket = () => ({
   kept: new Map(),
+  noted: new Map(),
   async head(key) {
     return this.kept.has(key) ? { key } : null;
   },
   async get(key) {
     const body = this.kept.get(key);
-    return body ? { body: new Blob([body]).stream() } : null;
+    return body ? { body: new Blob([body]).stream(), customMetadata: this.noted.get(key) } : null;
   },
-  async put(key, body) {
+  async put(key, body, options = {}) {
     this.kept.set(key, Buffer.from(body));
+    this.noted.set(key, options.customMetadata);
+  },
+  async list({ prefix, include = [] }) {
+    const objects = [...this.kept.keys()].filter((k) => k.startsWith(prefix)).map((key) => ({
+      key,
+      ...(include.includes('customMetadata') ? { customMetadata: this.noted.get(key) } : {}),
+    }));
+    return { objects, truncated: false };
   },
 });
 
@@ -462,6 +472,13 @@ export async function waitFor(page, re, { timeout = 30000, what = String(re) } =
   }
   throw new Error(`timed out waiting for ${what}\nsaw: ${(await texts(page)).join(' | ')}`);
 }
+
+/// [context]'s player agreed to the terms of use already, as a device
+/// that has played live before has (app/lib/home_page.dart, `_agreed`):
+/// every context a suite opens is, so that its flows go straight in.
+/// The screen that asks is held by app/test/home_page_test.dart.
+export const agreedToTerms = (context) =>
+  context.addInitScript(() => localStorage.setItem('flutter.identity_agreed_terms', JSON.stringify('2026-01-01')));
 
 /// Waits for the front door to say this device may play live. The rig
 /// licenses every device that asks (localService), and the app asks as

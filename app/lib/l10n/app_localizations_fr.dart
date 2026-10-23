@@ -385,7 +385,8 @@ class AppLocalizationsFr extends AppLocalizations {
   String get subscribe => 'S\'abonner';
 
   @override
-  String get aloneIsFree => 'Jouer seul est gratuit, et le restera.';
+  String get aloneIsFree =>
+      'Jouer seul est gratuit, et nous n\'avons pas l\'intention de changer cela.';
 
   @override
   String get findingPlayers => 'Recherche de joueurs';
@@ -551,11 +552,11 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get whatMoneyPaysFor =>
-      'Jouer seul est gratuit et le restera, tout comme les relevés, le moteur et chaque ligne de ce code. L\'argent paie ce qui nous coûte à faire tourner : vous mettre en relation, un relais quand deux appareils ne trouvent pas de chemin direct, et un juré quand une table est laissée seule.';
+      'Jouer seul est gratuit, tout comme les relevés, le moteur et chaque ligne de ce code, et nous n\'avons pas l\'intention de changer cela. L\'argent paie ce qui nous coûte à faire tourner : vous mettre en relation, un relais quand deux appareils ne trouvent pas de chemin direct, et un juré quand une table est laissée seule.';
 
   @override
   String webRenewal(String price) {
-    return '$price par an, payé sur la page de Stripe. L\'abonnement se renouvelle tout seul chaque année jusqu\'à ce que vous le résiliiez, quand vous voulez, dans Gérer l\'abonnement ; l\'année payée s\'arrête d\'elle-même.';
+    return '$price par an plus les taxes applicables, vendu par Link, société affiliée à Stripe, sur la page de Stripe. L\'abonnement se renouvelle automatiquement chaque année jusqu\'à ce que vous le résiliiez, au prix alors en vigueur : nous vous écrivons au moins 7 jours avant qu\'un nouveau prix s\'applique. Résiliez quand vous voulez dans Gérer l\'abonnement ; le jeu en direct dure jusqu\'à la fin de l\'année payée.';
   }
 
   @override
@@ -625,6 +626,10 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get yourName => 'Votre nom';
+
+  @override
+  String get nameNotAllowed =>
+      'Ce nom n\'est pas autorisé. Choisissez-en un autre.';
 
   @override
   String get howYouLook => 'Votre apparence';
@@ -777,6 +782,89 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get pictureChoiceNote =>
       'Sur cet appareil seulement, et seulement l\'image : le nom et le score restent.';
+
+  @override
+  String reportPlayer(String name) {
+    return 'Signaler $name';
+  }
+
+  @override
+  String get reportWhat => 'Quel est le problème ?';
+
+  @override
+  String get reportTheirPicture => 'Son image';
+
+  @override
+  String get reportTheirName => 'Son nom';
+
+  @override
+  String get reportSomethingElse => 'Autre chose';
+
+  @override
+  String get reportNoteHint => 'Ce que nous devrions savoir (facultatif)';
+
+  @override
+  String get reportGoesTo =>
+      'Ceci n\'est envoyé qu\'aux personnes qui gèrent Open Hearts, avec le numéro de votre compte et celui du compte signalé.';
+
+  @override
+  String get reportSend => 'Envoyer';
+
+  @override
+  String get reportSent => 'Signalement envoyé. Merci.';
+
+  @override
+  String get reportTooMany =>
+      'Vous avez envoyé autant de signalements que possible aujourd\'hui.';
+
+  @override
+  String get reportFailed =>
+      'Le signalement n\'est pas parti. Réessayez ou écrivez à help@openhearts.game.';
+
+  @override
+  String blockPlayer(String name) {
+    return 'Bloquer $name';
+  }
+
+  @override
+  String get unblockPlayer => 'Débloquer';
+
+  @override
+  String get blockedPlayer => 'Personne bloquée';
+
+  @override
+  String get blockNote =>
+      'Sur cet appareil seulement : vous ne verrez plus son nom, son image ni ses réactions. Cette personne n\'en est pas avertie.';
+
+  @override
+  String get liveAgreeTitle => 'Avant de jouer en direct';
+
+  @override
+  String get liveAgreeBody =>
+      'Les autres joueurs verront votre nom et votre image : choisissez-en que vous montreriez à n\'importe qui, et jouez loyalement. Les Conditions d\'utilisation disent ce qui n\'est pas permis et ce qui se passe si vous les enfreignez. En jouant en direct, vous les acceptez.';
+
+  @override
+  String get liveAgree => 'J\'accepte';
+
+  @override
+  String get deleteAccount => 'Supprimer le compte';
+
+  @override
+  String get deleteAccountTitle => 'Supprimer votre compte ?';
+
+  @override
+  String get deleteAccountBody =>
+      'C\'est définitif. Votre compte est supprimé sur tous ses appareils — son profil, ses appareils, ses codes de secours et sa connexion — et votre nom est retiré des parties que vous avez jouées. Tout ce qu\'Open Hearts garde sur cet appareil est aussi effacé.\n\nLe jeu en direct s\'arrête maintenant, et le temps qui reste sur votre abonnement est perdu. Un abonnement pris sur le web est résilié. Un abonnement de l\'App Store ou de Google Play continue de se renouveler jusqu\'à ce que vous le résiliiez là-bas.\n\nPour ne plus payer mais continuer à jouer jusqu\'à la fin de votre année, résiliez plutôt l\'abonnement.';
+
+  @override
+  String get keepAccount => 'Garder le compte';
+
+  @override
+  String get accountDeleted => 'Votre compte est supprimé';
+
+  @override
+  String get accountDeletedClose =>
+      'Fermez Open Hearts et rouvrez-le pour repartir de zéro.';
 
   @override
   String get waitingToReconnect => 'En attente de la reconnexion des autres';
@@ -1085,10 +1173,14 @@ class AppLocalizationsFr extends AppLocalizations {
       'other': 'compte Google',
     });
     String _temp1 = intl.Intl.selectLogic(store, {
+      'apple': 'Apple',
+      'other': 'Google',
+    });
+    String _temp2 = intl.Intl.selectLogic(store, {
       'apple': 'de l\'App Store',
       'other': 'de Google Play',
     });
-    return '$price par an, débité sur votre $_temp0 à la confirmation. L\'abonnement se renouvelle tout seul chaque année jusqu\'à ce que vous le résiliiez, quand vous voulez, dans les réglages d\'abonnement $_temp1, au moins un jour avant le renouvellement.';
+    return '$price par an, débité sur votre $_temp0 à la confirmation. L\'abonnement se renouvelle automatiquement chaque année jusqu\'à ce que vous le résiliiez, au prix alors en vigueur, et $_temp1 vous prévient avant qu\'un nouveau prix s\'applique. Résiliez quand vous voulez dans les réglages d\'abonnement $_temp2, au moins un jour avant le renouvellement.';
   }
 
   @override

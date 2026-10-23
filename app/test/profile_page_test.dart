@@ -10,10 +10,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:open_hearts/avatar.dart';
+import 'package:open_hearts/identity.dart';
 import 'package:open_hearts/profile_page.dart';
 import 'package:open_hearts/stats.dart';
 import 'package:open_hearts/theme.dart';
 import 'package:open_hearts/ui/player_icon.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:table/table.dart';
 
 const _phone = Size(390, 844);
@@ -41,6 +43,55 @@ Rect _inked(WidgetTester tester, Finder text) {
 }
 
 void main() {
+  testWidgets('a name the others may not see is said so as it is typed, and not kept: the last one stays', (tester) async {
+    // The device's name is Ada, and the page opens on it.
+    SharedPreferences.setMockInitialValues({'identity_name': 'Ada'});
+    tester.view
+      ..physicalSize = _phone
+      ..devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    Profile? left;
+    await tester.pumpWidget(MaterialApp(
+      theme: buildTheme(),
+      home: Builder(
+        builder: (context) => TextButton(
+          onPressed: () async => left = await Navigator.of(context).push<Profile>(MaterialPageRoute(
+              builder: (_) => ProfilePage(current: (name: 'Ada', avatar: Avatar.none), seed: 'k1', stats: const Stream.empty()))),
+          child: const Text('open'),
+        ),
+      ),
+    ));
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+    const said = "This name isn't allowed. Choose another.";
+    expect(find.text(said), findsNothing);
+
+    await tester.enterText(find.byType(TextField), 'Sh1t Head');
+    await tester.pump();
+    expect(find.text(said), findsOneWidget);
+    await tester.tap(find.text('Done'));
+    await tester.pumpAndSettle();
+    expect(left?.name, 'Ada', reason: 'the name the page opened with');
+    expect(await Identity.name(), 'Ada');
+
+    // A name they may see: no word against it, and kept.
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'Cassandra');
+    await tester.pump();
+    expect(find.text(said), findsNothing);
+    await tester.tap(find.text('Done'));
+    await tester.pumpAndSettle();
+    expect(left?.name, 'Cassandra');
+    expect(await Identity.name(), 'Cassandra');
+  });
+
+  test('a name kept from before the filter is played as none, so live play asks for another', () {
+    expect(Identity.playable('Sh1t Head'), '');
+    expect(Identity.playable(null), '');
+    expect(Identity.playable('Ada'), 'Ada');
+  });
+
   testWidgets('a rating, and both halves of the game', (tester) async {
     await pumpProfile(
       tester,

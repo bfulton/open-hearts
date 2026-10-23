@@ -138,6 +138,23 @@ void main() {
     expect((await Pictures.load()).isHidden('bao'), isFalse);
   });
 
+  test('a blocked player: no picture whatever it is, kept with the identity, until unblocked', () async {
+    final p = Pictures();
+    await p.block('bao');
+    expect(p.isBlocked('bao'), isTrue);
+    expect(p.allows('bao', _picture), isFalse);
+    expect(p.allows('bao', _other), isFalse);
+    expect(p.isHidden('bao'), isFalse, reason: 'blocking is its own choice, not hiding the picture');
+    expect(p.allows('dee', _picture), isTrue, reason: 'nobody else');
+
+    final again = await Pictures.load();
+    expect(again.isBlocked('bao'), isTrue, reason: 'kept with the identity');
+    expect(again.allows('bao', _picture), isFalse);
+    await again.unblock('bao');
+    expect(again.allows('bao', _picture), isTrue);
+    expect((await Pictures.load()).isBlocked('bao'), isFalse);
+  });
+
   test('the list notifies, so the badges redraw', () async {
     final p = Pictures(check: _Says(true));
     var beats = 0;
@@ -147,5 +164,10 @@ void main() {
     expect(beats, greaterThan(0), reason: 'the verdict landed');
     await p.hide('dee');
     expect(beats, greaterThan(1));
+    final before = beats;
+    await p.block('cy');
+    expect(beats, before + 1);
+    await p.unblock('cy');
+    expect(beats, before + 2);
   });
 }

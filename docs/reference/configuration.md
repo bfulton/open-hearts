@@ -8,7 +8,7 @@ For why the service is set up this way, see [the service](../explanation/service
 
 The non-secret configuration, committed and the same for every deployment.
 
-- The Pages worker reads it beneath its own settings: `service/functions/entry.mjs` passes the file to `withConfig` in `service/functions/deployment.mjs`, which maps each field to an `OH_` name (`configEnv`). A variable of the same name that is set on the project or by a test wins.
+- The Pages worker reads it beneath its own settings: `service/functions/entry.mjs` passes the file to `withConfig` in `service/functions/deployment.mjs`, which maps each field to an `OH_` name (`configEnv`). A variable of the same name that is set on the project or by a test wins, except `OH_PRICE`: the price is the file's alone. The entry also hands the worker `site/ledger.json` as `OH_LEDGER` (see [Change the terms](../how-to/change-the-terms.md)).
 - The relay worker reads it the same way (`service/do/worker.mjs`).
 - `deploy.sh` compiles `serviceKey`, `google.webClientId` and `apple.servicesId` into the web build.
 - `app/tool/defines.mjs` writes the phone build's `--dart-define-from-file` from it (`appDefines`).
@@ -16,10 +16,11 @@ The non-secret configuration, committed and the same for every deployment.
 
 | Field | Worker name (`configEnv`) | Build define (`appDefines`) | What it is |
 |---|---|---|---|
-| `appOrigin` | none | `OH_APP_ORIGIN` | The app's origin. A phone build calls the service there and builds shared links on it (`app/lib/net/address_io.dart`). `app/tool/defines.mjs` refuses a file without it. |
+| `appOrigin` | `OH_APP_ORIGIN`, which the relay orders a termination at (`service/do/known.mjs`) | `OH_APP_ORIGIN` | The app's origin. A phone build calls the service there and builds shared links on it (`app/lib/net/address_io.dart`). `app/tool/defines.mjs` refuses a file without it. |
 | `serviceKey` | `OH_SERVICE_KEY` | `OH_SERVICE_KEY` | The service's public key, 64 hex characters. Licences and activations are checked against it. A production deploy and a phone build refuse to run without it. |
 | `turnKeyId` | `OH_TURN_KEY_ID` | none | The Cloudflare Realtime TURN key that the worker mints credentials with. `infra/cloudflare.mjs` (`turnKeys`) defines the same key. |
-| `stripePrice` | `OH_STRIPE_PRICE` | none | The Stripe price, as a price ID or lookup key, that a checkout sells. The `stripePrice` field of [service settings](#service-settings) overrides it. |
+| `stripePrice` | `OH_STRIPE_PRICE` | none | The Stripe price, as a price ID or lookup key, that a checkout sells. A checkout sells it only when it is a year at `price`. |
+| `price` | `OH_PRICE` (`"599 usd"`), which no project setting overrides | none | What a year costs on the web: `{"amount": <cents>, "currency": "usd"}`. The terms and the front page state it (`{{price}}`, `site/build.mjs`), Stripe's price is made at it (`infra/stripe.mjs`), and a checkout sells at it and no other. `priceAmount` in `app/lib/net/buying.dart` is held to it by `site/ledger.test.mjs`. Changed only as [Change the terms](../how-to/change-the-terms.md#change-the-price) says. |
 | `apple.bundleId` | `OH_APPLE_BUNDLE_ID`, and part of `OH_APPLE_AUDIENCE` | none | The iOS bundle ID. App Store notifications for another bundle are ignored. |
 | `apple.product` | `OH_APPLE_PRODUCT` | `OH_APPLE_PRODUCT` | The App Store subscription product. |
 | `apple.servicesId` | part of `OH_APPLE_AUDIENCE` | `OH_APPLE_SERVICE_ID` | The Sign in with Apple Services ID that the web uses. |
@@ -31,6 +32,10 @@ The non-secret configuration, committed and the same for every deployment.
 | `alerts.to` | `OH_ALERTS_TO` | none | Where the operator's alerts go. Only an `@openhearts.game` address is taken (`alertsOf` in `service/functions/alerts.mjs`). |
 | `alerts.subscribed` | `OH_ALERT_SUBSCRIBED` (`on` when `true`) | none | Email the operator about each new subscription. |
 | `alerts.waiting` | `OH_ALERT_WAITING` (`on` when `true`) | none | Email the operator when a subscriber waits for a person (the `waiting` handler). |
+| `alerts.pictures` | `OH_ALERT_PICTURES` (`on` when `true`) | none | Email the operator once a day the new pictures subscribers set (`reviewRun` in `service/do/review.mjs`; [Look at the day's new pictures](../how-to/look-at-new-pictures.md)). |
+| `photodna.endpoint` | `OH_PHOTODNA_ENDPOINT` | none | The address of PhotoDNA's Match call, which checks each new picture against known images of child sexual abuse (`photoDnaMatch` in `service/functions/photodna.mjs`). `null` until it is taken from the API reference Microsoft gives with the key, and the request checked against that reference; with the key set and no address, nothing is checked and the operator is emailed. |
+| `ncmec.endpoint` | `OH_NCMEC_ENDPOINT` | none | NCMEC's CyberTipline reporting service: `https://exttest.cybertip.org/ispws`, its test service, until a test report has gone through, then `https://report.cybertip.org/ispws` (`fileReport` in `service/functions/ncmec.mjs`). A report to the test service reaches nobody, and the operator is emailed to report the match by hand. |
+| `ncmec.reporter` | `OH_NCMEC_FIRST_NAME`, `OH_NCMEC_LAST_NAME`, `OH_NCMEC_EMAIL` | none | Who a report names as reporting it. The email address is required to file one. |
 
 The app also reads `OH_PLAY_PACKAGE` as a build define (`app/lib/net/store_buying.dart`). `appDefines` does not set it, so the default in that file applies.
 
@@ -38,25 +43,27 @@ The app also reads `OH_PLAY_PACKAGE` as a build define (`app/lib/net/store_buyin
 
 ### Pages project secrets
 
-Defined by name in `pages.environments` in `infra/cloudflare.mjs`. `node infra/apply.mjs` checks that each one is set, and never reads or sets a value.
+Defined by name in `pages.environments` in `infra/cloudflare.mjs`. `./oh infra` checks that each one is set, and never reads a value; `./oh secret set` sets one.
 
 | Secret | Production | Preview | Read by | Without it |
 |---|---|---|---|---|
 | `OH_SERVICE_SECRET` | Yes | Yes | `serviceSigned` in `service/functions/licence.mjs`: signs licences (`licenceFor`) and activations (`activationFor`) | Handlers that sign answer 503. A secret that does not match `OH_SERVICE_KEY` also answers 503. |
 | `OH_ID_HMAC` | Yes | Yes | `loginRow`: the HMAC key a sign-in's subject is stored under | `attest`, `supersede` and `apple-id` answer 503. |
-| `OH_STRIPE_SECRET` | Yes | No | `checkout`, `manage`, `payerLookup`, `healthOf` | `checkout` and `manage` answer 503. `health` reports Stripe as not configured. Backup codes are not emailed. |
+| `OH_STRIPE_SECRET` | Yes | No | `checkout`, `manage`, `payerLookup`, `endRefunded`, `healthOf` | `checkout` and `manage` answer 503. `health` reports Stripe as not configured. Backup codes are not emailed. A refund's webhook answers 503, so Stripe sends it again. |
 | `OH_STRIPE_WEBHOOK_SECRET` | Yes | No | `webhookSigned` | The `stripe` webhook answers 400 to every delivery. |
 | `OH_TURN_API_TOKEN` | Yes | Yes | `mint` | `turn` answers 503, and the app plays over the relay. |
 | `OH_PLAY_SERVICE_ACCOUNT` | When the config names Play (`playSecrets`) | No | `playToken`: the Google service account's JSON key for the Play Developer API | `store` answers 503 for a Play purchase. `play` answers a subscription notification with 200 and records nothing. |
 
-The worker calls these Stripe endpoints, so `OH_STRIPE_SECRET` needs access to each: `GET /v1/prices`, `POST /v1/checkout/sessions`, `GET /v1/subscriptions/{id}`, `POST /v1/billing_portal/sessions` and `GET /v1/customers/{id}`.
+The worker calls these Stripe endpoints, in the API version `STRIPE_VERSION` in `service/functions/stripe.mjs` names, which is the webhook's, so `OH_STRIPE_SECRET` needs access to each: `GET /v1/prices` and `GET /v1/prices/{id}`, `POST /v1/checkout/sessions`, `GET /v1/subscriptions/{id}` (with its customer expanded, for a notice of a change to the terms), `POST /v1/billing_portal/sessions`, `GET /v1/customers/{id}`, and, to end a refunded subscription, `GET /v1/invoice_payments`, `GET /v1/invoices/{id}` and `DELETE /v1/subscriptions/{id}`. As a restricted key: Prices, Products, Customers and Invoices read; Checkout Sessions, Customer Portal and Subscriptions write.
 
 ### Relay worker secret and variables
 
-The relay worker (`open-hearts-relay`) is defined by `service/do/wrangler.toml`. `infra/cloudflare.mjs` (`relay`) names its secret, and `infra/apply.mjs` checks the live worker against both files.
+The relay worker (`open-hearts-relay`) is defined by `service/do/wrangler.toml`. `infra/cloudflare.mjs` (`relay`) names its secrets, those it needs and those it can do without, and `infra/apply.mjs` checks the live worker against both files.
 
 | Name | Kind | Set in | What it is |
 |---|---|---|---|
+| `OH_PHOTODNA_KEY` | Optional secret | The relay worker's secrets (`relay.optionalSecrets`) | PhotoDNA's subscription key, which Microsoft issues once it has approved the service. Without it, no picture is checked against known images. |
+| `OH_NCMEC_USERNAME`, `OH_NCMEC_PASSWORD` | Optional secrets | The relay worker's secrets (`relay.optionalSecrets`) | The CyberTipline reporting service's credentials, which NCMEC issues to a registered provider. Without them, a match is acted on all the same and the operator is emailed to report it by hand. |
 | `OH_JUROR_SECRET` | Secret | The relay worker's secrets | 64 hex characters. The backup jurors derive their keys from it, and the relay checks each backup juror's mark against it (`benchMark` in `service/do/relay.mjs`). Without it, the relay admits no backup juror. |
 | `OH_MAIL_FROM` | Variable | `[vars]` in `service/do/wrangler.toml` | The sender of backup-code emails and the operator's alerts. |
 | `OH_SERVICE_KEY` | From the config file | `config/openhearts.json` (`serviceKey`) | The key every activation must be signed by. `wrangler.toml` does not set it. Without a valid key, the relay carries no device. |
@@ -72,11 +79,11 @@ From `pages.environments` in `infra/cloudflare.mjs`. Pages also provides `ASSETS
 | Binding | Kind | Production | Preview | Used for |
 |---|---|---|---|---|
 | `OH_STORE` | Workers KV | `open-hearts-store` | `open-hearts-store-preview` | Every row the service keeps. See [Storage](service-api.md#storage). |
-| `OH_RECORDS` | R2 bucket | `open-hearts-records` | `open-hearts-records-preview` | Finished games' records (`service/functions/records.mjs`). |
+| `OH_RECORDS` | R2 bucket | `open-hearts-records` | `open-hearts-records-preview` | Finished games' records (`service/functions/records.mjs`), and the pictures a legal hold keeps (`service/functions/holds.mjs`). |
 | `HOUSEHOLD` | Durable Object (script `open-hearts-relay`, class `Household`) | Bound | Not bound | Runs each account's operations one at a time, and sends the operator's alerts. |
 | `OH_METRICS` | Workers Analytics Engine | Dataset `open_hearts_api` | Not bound | One line per request, sampled for `config` and `health` (`measure` and `SAMPLED` in `service/functions/metrics.mjs`). |
 
-Without `HOUSEHOLD`, the worker runs each account's operations in a queue in its own isolate (`inHousehold`), and sends no alerts.
+Without `HOUSEHOLD`, the worker runs each account's operations in a queue in its own isolate (`inHousehold`), sends no alerts, and neither checks nor keeps the pictures accounts set.
 
 ### Relay worker
 
@@ -85,11 +92,17 @@ From `service/do/wrangler.toml`.
 | Binding | Kind | Used for |
 |---|---|---|
 | `TABLE` | Durable Object, class `TagRelay` | One object per tag. See [Relay tags, kinds and limits](relay.md). |
-| `HOUSEHOLD` | Durable Object, class `Household` | Each account's object. The Pages project binds the same class. |
+| `HOUSEHOLD` | Durable Object, class `Household` | Each account's object, which checks and keeps each picture the account sets with `OH_PICTURES`, `AI` and `KNOWN`. The Pages project binds the same class. |
 | `BENCH` | Durable Object and Cloudflare Container, class `Bench` | The backup jurors (`service/do/bench.mjs`). |
-| `OH_STORE` | Workers KV | The same namespace as production's `OH_STORE`. The `Household` object reads and writes it, and each relay object reads [relay settings](#relay-settings) from it. |
-| `EMAIL` | Email Sending (`send_email`) | Backup-code emails and the operator's alerts. |
+| `OH_STORE` | Workers KV | The same namespace as production's `OH_STORE`. The `Household` object reads and writes it. Each relay object reads [relay settings](#relay-settings) and the pictures withheld from it; an account's object adds a picture the automatic check hides. |
+| `OH_PICTURES` | R2 bucket `open-hearts-pictures` | Each account's own copy of each picture it sets, `account/<account>/<sha256>.jpg`, with all that is known of it in its metadata, kept for the operator until a year after it stops being the account's; served at `pictures.openhearts.game` for the daily email (`service/do/profile_pictures.mjs`, `service/do/review.mjs`). The account's picture now is the one it set last, unless that one says it has ended, and the relay carries only that one. |
+| `KNOWN` | Durable Object, class `KnownPictures`, made in the `us` jurisdiction | Asks PhotoDNA about each new picture as an account sets it, and acts on a match (`service/do/known.mjs`). One object, named `photodna`. |
+| `OH_RECORDS` | R2 bucket `open-hearts-records` | Where a hold the `KnownPictures` object places keeps the account's pictures (`heldPictureKey` in `service/functions/holds.mjs`). |
+| `AI` | Workers AI | The automatic check of each new picture as an account sets it, by `@cf/cloudflare/clef-flash` (`checkPicture` in `service/do/review.mjs`). Without it, pictures are kept and not checked. |
+| `EMAIL` | Email Sending (`send_email`) | Backup-code emails, the operator's alerts, and the day's new pictures. |
 | `OH_METRICS` | Workers Analytics Engine, dataset `open_hearts_relay` | A line of counts from each object: a minute after its last, and at once when its last socket closes, each with the seconds it covers (`tally` and `tallied` in `service/do/relay.mjs`). |
+
+Its schedule (`triggers.crons`) runs once a day at 13:00 UTC. With PhotoDNA's key set, it wakes the `KnownPictures` object to try again anything left to do after a match, such as a report waiting on NCMEC's credentials. It deletes from `OH_PICTURES` each picture a year after it stopped being an account's, asks PhotoDNA again about each picture kept that it hasn't cleared, for each account that set it, and hides any the check found should be hidden that isn't; when `alerts.pictures` is on, it also emails the operator the new ones.
 
 ## Environment variables
 
@@ -97,9 +110,9 @@ From `service/do/wrangler.toml`.
 
 | Variable | Read by | What it is |
 |---|---|---|
-| `CLOUDFLARE_API_TOKEN` | `deploy.sh` (required), `infra/apply.mjs`, `service/tool/forget.mjs` (required), `service/tool/suspend.mjs` (required) | A Cloudflare API token. |
-| `CLOUDFLARE_ACCOUNT_ID` | `deploy.sh` (required), `infra/apply.mjs`, `service/tool/forget.mjs` (required), `service/tool/suspend.mjs` (required) | The Cloudflare account ID. |
-| `STRIPE_API_KEY` | `infra/apply.mjs`, `service/tool/forget.mjs`, `service/tool/suspend.mjs` | The Stripe key: for `infra/apply.mjs`'s Stripe part, and for `--find` with an email address. |
+| `CLOUDFLARE_API_TOKEN` | `./oh` (most commands), `deploy.sh` (required), `infra/apply.mjs` | A Cloudflare API token. |
+| `CLOUDFLARE_ACCOUNT_ID` | `./oh` (most commands), `deploy.sh` (required), `infra/apply.mjs` | The Cloudflare account ID. |
+| `STRIPE_API_KEY` | `./oh account`, `infra/apply.mjs` | The operator's live-mode Stripe key: for `./oh infra`'s Stripe part, for finding an account by email, and for what suspending, ending and refunding an account do in Stripe. What each needs it to allow is in [the oh command](oh.md#credentials). |
 | `OH_HELP_FORWARD` | `infra/apply.mjs` | Where `help@` and `alerts@` forward. When unset, the destination is only checked to be verified. |
 | `OH_ALERT_EMAIL` | `infra/apply.mjs`, `observability/apply.mjs` | Who the Cloudflare spend alerts and the New Relic alerts email. |
 | `NEW_RELIC_API_KEY` | `observability/apply.mjs` (required) | A New Relic User key. |
@@ -115,10 +128,10 @@ From `service/do/wrangler.toml`.
 What each script does with the Cloudflare API token, which is what the token needs to allow:
 
 - `deploy.sh` publishes to the Pages project and, with `--prune`, lists and deletes its deployments.
-- `service/tool/forget.mjs` reads and deletes rows in `OH_STORE` (Workers KV Storage: Edit), and reads and rewrites kept games in `OH_RECORDS` (Workers R2 Storage: Edit).
-- `service/tool/suspend.mjs` reads rows and writes orders in `OH_STORE` (Workers KV Storage: Edit), and, to take a name off, reads and rewrites kept games in `OH_RECORDS` (Workers R2 Storage: Edit).
+- `./oh account delete` reads and deletes rows in `OH_STORE` (Workers KV Storage: Edit), and reads and rewrites kept games in `OH_RECORDS` (Workers R2 Storage: Edit).
+- The other `./oh account` acts read rows and write orders in `OH_STORE` (Workers KV Storage: Edit), and, to take a name off, read and rewrite kept games in `OH_RECORDS` (Workers R2 Storage: Edit). `./oh account find` reads the notes of which accounts set a picture in `OH_PICTURES`, and `./oh account hold` and `./oh account release` copy pictures from it into `OH_RECORDS` and delete them there (Workers R2 Storage: Edit). `./oh config` and `./oh picture` read and write rows in `OH_STORE`.
 - `infra/apply.mjs` reads every resource that `infra/cloudflare.mjs` defines, and with `--apply` changes them.
-- The relay's deploy (`npx wrangler deploy` in `service/do`) uploads the relay worker with its Durable Objects, its container image and its custom domain.
+- The relay's deploy (`./oh deploy relay`, which runs `npx wrangler deploy` in `service/do`) uploads the relay worker with its Durable Objects, its container image and its custom domain.
 
 No script checks the token's permissions first. A missing permission shows as Cloudflare's own error, or for `infra/apply.mjs` as an `unread:` line.
 
@@ -161,10 +174,12 @@ The row `config|app` in `OH_STORE`, which the `config` handler serves to every d
 | `banner` | `id` matching `^[\w.-]{1,64}$`; `level` `warn` (anything else is `info`); `text` by two-letter language code, English required, each up to `LONGEST_SAY` characters | None | A line on the front door. |
 | `update` | `before` as `YYYY-MM-DD`; optional `text` as for `banner` | None | Asks builds published before that day to update. |
 | `feedback` | An `https:` URL or a `mailto:` address | The project's issues | Where "Tell us what's broken" sends a report. |
-| `privacy`, `terms` | `https:` URLs | The site's own pages | The links shown under Subscribe. |
-| `price` | 1 to 12 characters, at least one digit, no whitespace or `<>{}` | The build's | The yearly price shown on the web beside Subscribe. Change it with `stripePrice`. |
 | `table` | See [Table clocks](#table-clocks). All fields pass, or none is served. | The standard table | The clocks of tables this device starts. |
 | `waits` | See the next table. | The app's own | How long the app waits on the network. |
+
+Beside the row's fields, the `config` handler serves `notices`: each document's newest material or price change in `site/ledger.json`, for 60 days from the day it was published, as `[{document, date, summary}]` with the summary in each language (`noticesOf` in `service/functions/notices.mjs`). The row can't set it.
+
+The price, and where the terms and the privacy policy are, are not fields: the site publishes them, and they change only with it.
 
 The `config` handler answers with `cache-control: public, max-age=60`. The app keeps the last answer for its next start, and asks again every `configEveryMin`.
 
@@ -204,7 +219,6 @@ Defaults and bounds: `SERVICE_DEFAULTS` and `SERVICE_BOUNDS` in `service/functio
 
 | Field | What it sets |
 |---|---|
-| `stripePrice` | The Stripe price a checkout sells, as a price ID or lookup key (`STRIPE_PRICE`). Overrides `stripePrice` in `config/openhearts.json`. |
 | `licenceDays` | How long a licence lasts. A licence never runs past the day the subscription is paid to. |
 | `mostDevices` | How many devices one account may have. |
 | `ticketMinutes` | How long a household code is good for. |

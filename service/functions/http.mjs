@@ -115,7 +115,8 @@ export async function textOf(request, most) {
   return text.length > most ? null : text;
 }
 
-async function bodyOf(request, most = MOST_BODY) {
+/// The body as JSON, or null when it is longer than [most] or not JSON.
+export async function bodyOf(request, most = MOST_BODY) {
   const text = await textOf(request, most);
   if (text === null) return null;
   try {

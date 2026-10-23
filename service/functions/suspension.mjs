@@ -1,8 +1,9 @@
-// An account suspended from live play, or a name or picture taken off
-// it, on the operator's word (the terms, "At a live table" and
-// "Copyright"; docs/how-to/suspend-an-account.md). The operator's tool
-// (service/tool/suspend.mjs) reaches the store from outside, as
-// forget.mjs does, but what it asks for is carried out here, in the
+// An account suspended from live play or ended, or a name or picture
+// taken off it, on the operator's word (the terms, "At a live table",
+// "Ending these terms" and "Copyright"; docs/how-to/suspend-an-account.md,
+// docs/how-to/end-an-account.md). The operator's command (`oh account`,
+// ops/account.mjs) reaches the store from outside, as `oh account
+// delete` does, but what it asks for is carried out here, in the
 // account's own turn (household.mjs): that is where the account's
 // device in use is kept, and so where its sockets at the relay are
 // closed at once, and where the devices' own changes to the account
@@ -17,7 +18,7 @@
 // can be carried out twice to the same end, since the answer to the
 // first can be lost and the tool asks again.
 
-import { isSuspended } from './accounts.mjs';
+import { holdOf } from './holds.mjs';
 import { PICTURES_ROW, pictureDigest, releasing, withholding } from './pictures.mjs';
 import { dayOf, isAccount } from './rows.mjs';
 
@@ -38,8 +39,10 @@ export const orderRow = (id) => [`ORDER#${id}`, 'META'];
 /// relays.dart, turnedAway).
 export const SUSPENDED_WHY = 'suspended: this account is suspended from live play';
 
-/// The acts an order may ask for.
-export const ACTS = Object.freeze(['suspend', 'lift', 'remove', 'restore']);
+/// The acts an order may ask for. `terminate` is a suspension that ends
+/// the account under the terms ("Ending these terms"): marked so, and
+/// never lifted.
+export const ACTS = Object.freeze(['suspend', 'terminate', 'lift', 'remove', 'restore']);
 
 /// [act] for [account], as the tool writes it down.
 export function orderOf(account, act, { name = false, picture = false, now = Date.now() } = {}) {
@@ -50,7 +53,7 @@ export function orderOf(account, act, { name = false, picture = false, now = Dat
 /// turn: {status, body}. [active] is where the account's device in use
 /// is kept, and [revoke] closes its sockets at the relay
 /// (household.mjs, revokerOf).
-export async function carryOut(op, store, active, { now = Date.now(), revoke = null } = {}) {
+export async function carryOut(op, store, active, { now = Date.now(), revoke = null, pictures = null } = {}) {
   if (!isOrder(op.order) || !isAccount(op.account)) return { status: 400, body: { error: 'an order and its account' } };
   const order = await store.get(...orderRow(op.order));
   if (!order || order.account !== op.account) return { status: 404, body: { error: 'no such order' } };
@@ -61,17 +64,31 @@ export async function carryOut(op, store, active, { now = Date.now(), revoke = n
   let body;
   switch (order.act) {
     case 'suspend':
-      body = await suspend(op.account, store, active, { now, revoke });
+    case 'terminate':
+      body = await suspend(op.account, store, active, { now, revoke, ending: order.act === 'terminate' });
       break;
-    case 'lift':
+    case 'lift': {
+      const ended = (await store.get(`ACCOUNT#${op.account}`, 'SUSPENDED'))?.terminated;
+      if (ended) {
+        await store.del(...orderRow(op.order));
+        return { status: 409, body: { error: `ended on ${ended}: a terminated account is not let back` } };
+      }
       body = await lift(op.account, store, active);
       break;
+    }
     case 'remove':
-      body = await remove(op.account, store, { name: order.name === true, picture: order.picture === true, now });
+      body = await remove(op.account, store, { name: order.name === true, picture: order.picture === true, now, pictures });
       break;
-    case 'restore':
-      body = await restore(op.account, store, { now });
+    case 'restore': {
+      // What a hold keeps is kept as it was taken off (holds.mjs).
+      const held = await holdOf(store, op.account);
+      if (held) {
+        await store.del(...orderRow(op.order));
+        return { status: 409, body: { error: `held since ${held.since}: nothing taken off it is put back` } };
+      }
+      body = await restore(op.account, store, { now, pictures });
       break;
+    }
     default:
       return { status: 400, body: { error: `not one of ${ACTS.join(', ')}` } };
   }
@@ -96,9 +113,13 @@ async function devicesWithRows(store, account) {
 /// flagged, so that a licence, an activation and everything else that
 /// asks for one is refused at the one read it makes (entitlementOf);
 /// and its device in use cleared, its sockets at the relay closed now
-/// rather than at the end of their activation's hour.
-async function suspend(account, store, active, { now, revoke }) {
-  if (!(await isSuspended(store, account))) await store.put(`ACCOUNT#${account}`, 'SUSPENDED', { since: dayOf(now) });
+/// rather than at the end of their activation's hour. [ending] marks it
+/// terminated too, from the day it is asked, whether or not it was
+/// suspended before.
+async function suspend(account, store, active, { now, revoke, ending = false }) {
+  const mark = await store.get(`ACCOUNT#${account}`, 'SUSPENDED');
+  const terminated = mark?.terminated ?? (ending ? dayOf(now) : null);
+  if (!mark || (terminated && !mark.terminated)) await store.put(`ACCOUNT#${account}`, 'SUSPENDED', { since: mark?.since ?? dayOf(now), ...(terminated ? { terminated } : {}) });
   let flagged = 0;
   for (const { key, row } of await devicesWithRows(store, account)) {
     if (row.suspended) continue;
@@ -112,7 +133,7 @@ async function suspend(account, store, active, { now, revoke }) {
     await active.put(account, { key: null, epoch, at: null, seated: null, tags: [], suspended: true });
     if (was.tags?.length) await revoke?.(was.tags, account, epoch, SUSPENDED_WHY);
   }
-  return { suspended: true, flagged, cutOff };
+  return { suspended: true, ...(terminated ? { terminated } : {}), flagged, cutOff };
 }
 
 /// [account]'s suspension lifted: the mark gone, its devices' rows as
@@ -142,28 +163,38 @@ async function lift(account, store, active) {
 /// made on another device (app/lib/net/account_profile.dart). A name
 /// taken off is an empty one; a picture, none, and the icon shows. What
 /// is held is what the latest removal took, so that a name the player
-/// chose after an earlier one was taken off is the one put back. A
-/// picture taken off is withheld at the relay as well (pictures.mjs),
-/// written first, so that an order carried out again after a failure
-/// part way finds it withheld whatever else it finds.
-async function remove(account, store, { name, picture, now }) {
+/// chose after an earlier one was taken off is the one put back — but
+/// under a legal hold (holds.mjs), what was held first stays, and what
+/// a later removal takes is kept beside it, in `later`. A picture taken
+/// off is withheld at the relay as well (pictures.mjs), written first,
+/// so that an order carried out again after a failure part way finds it
+/// withheld whatever else it finds.
+async function remove(account, store, { name, picture, now, pictures = null }) {
   const pk = `ACCOUNT#${account}`;
   const profile = await store.get(pk, 'PROFILE');
   const removed = [];
   if (!profile) return { removed };
   const held = (await store.get(pk, 'HELD')) ?? {};
+  const kept = !!(await holdOf(store, account));
+  const keep = (part, value) => {
+    if (kept && typeof held[part] === 'string' && held[part] !== value) {
+      held.later = [...(held.later ?? []), { [part]: value, at: new Date(now).toISOString() }];
+    } else held[part] = value;
+  };
   const next = { ...profile };
   if (name && profile.name) {
-    held.name = profile.name;
+    keep('name', profile.name);
     next.name = '';
     removed.push('name');
   }
   if (picture && profile.picture) {
-    held.picture = profile.picture;
+    keep('picture', profile.picture);
     next.picture = null;
     removed.push('picture');
     const digest = await pictureDigest(profile.picture);
     if (digest) await store.put(...PICTURES_ROW, withholding(await store.get(...PICTURES_ROW), digest, now));
+    // No longer the account's picture, and kept as long as one replaced.
+    await pictures?.set({ account, picture: null });
   }
   if (!removed.length) return { removed };
   await store.put(pk, 'HELD', { ...held, at: new Date(now).toISOString() });
@@ -173,7 +204,7 @@ async function remove(account, store, { name, picture, now }) {
 
 /// What [remove] held, put back on [account]'s profile, and no longer
 /// held; a picture no longer withheld at the relay.
-async function restore(account, store, { now }) {
+async function restore(account, store, { now, pictures = null }) {
   const pk = `ACCOUNT#${account}`;
   const held = await store.get(pk, 'HELD');
   const restored = [];
@@ -184,10 +215,14 @@ async function restore(account, store, { now }) {
     next.name = held.name;
     restored.push('name');
   }
-  if (typeof held.picture === 'string') {
-    next.picture = held.picture;
+  // The account's picture again, checked again as it is set: one since
+  // found to match a known image of child sexual abuse is not, and stays
+  // withheld.
+  const picture = typeof held.picture === 'string' && (pictures ? await pictures.set({ account, picture: held.picture }) : held.picture);
+  if (picture) {
+    next.picture = picture;
     restored.push('picture');
-    const digest = await pictureDigest(held.picture);
+    const digest = await pictureDigest(picture);
     if (digest) await store.put(...PICTURES_ROW, releasing(await store.get(...PICTURES_ROW), digest, now));
   }
   if (restored.length) {

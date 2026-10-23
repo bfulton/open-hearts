@@ -385,7 +385,8 @@ class AppLocalizationsEs extends AppLocalizations {
   String get subscribe => 'Suscribirse';
 
   @override
-  String get aloneIsFree => 'Jugar solo es gratis, y siempre lo será.';
+  String get aloneIsFree =>
+      'Jugar solo es gratis, y no tenemos planes de cambiarlo.';
 
   @override
   String get findingPlayers => 'Buscando jugadores';
@@ -554,11 +555,11 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get whatMoneyPaysFor =>
-      'Jugar solo es gratis y siempre lo será, igual que los registros, el motor y cada línea de esto. Lo que pagas cubre la parte que nos cuesta mantener: poner a los jugadores en contacto, un relé cuando dos dispositivos no encuentran un camino directo, y un jurado cuando una mesa se queda sola.';
+      'Jugar solo es gratis, igual que los registros, el motor y cada línea de esto, y no tenemos planes de cambiarlo. Lo que pagas cubre la parte que nos cuesta mantener: poner a los jugadores en contacto, un relé cuando dos dispositivos no encuentran un camino directo, y un jurado cuando una mesa se queda sola.';
 
   @override
   String webRenewal(String price) {
-    return '$price al año, que pagas en la página de Stripe. Se renueva sola cada año hasta que la canceles, cuando quieras, en Gestionar suscripción; el año que pagaste termina por sí solo.';
+    return '$price al año más los impuestos que correspondan, que te vende Link, filial de Stripe, en la página de Stripe. Se renueva automáticamente cada año hasta que la canceles, al precio vigente en ese momento: te avisamos por correo al menos 7 días antes de que se aplique un nuevo precio. Cancela cuando quieras en Gestionar suscripción, y el juego en vivo dura hasta el final del año que pagaste.';
   }
 
   @override
@@ -628,6 +629,9 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get yourName => 'Tu nombre';
+
+  @override
+  String get nameNotAllowed => 'Este nombre no está permitido. Elige otro.';
 
   @override
   String get howYouLook => 'Tu aspecto';
@@ -780,6 +784,89 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get pictureChoiceNote =>
       'Solo en este dispositivo, y solo su imagen: su nombre y su puntuación se quedan.';
+
+  @override
+  String reportPlayer(String name) {
+    return 'Denunciar a $name';
+  }
+
+  @override
+  String get reportWhat => '¿Qué pasa?';
+
+  @override
+  String get reportTheirPicture => 'Su imagen';
+
+  @override
+  String get reportTheirName => 'Su nombre';
+
+  @override
+  String get reportSomethingElse => 'Otra cosa';
+
+  @override
+  String get reportNoteHint => 'Algo que debamos saber (opcional)';
+
+  @override
+  String get reportGoesTo =>
+      'Esto solo les llega a quienes gestionan Open Hearts, con el número de tu cuenta y el de la cuenta denunciada.';
+
+  @override
+  String get reportSend => 'Enviar';
+
+  @override
+  String get reportSent => 'Denuncia enviada. Gracias.';
+
+  @override
+  String get reportTooMany =>
+      'Ya has enviado todas las denuncias que puedes hoy.';
+
+  @override
+  String get reportFailed =>
+      'La denuncia no se ha enviado. Inténtalo de nuevo o escribe a help@openhearts.game.';
+
+  @override
+  String blockPlayer(String name) {
+    return 'Bloquear a $name';
+  }
+
+  @override
+  String get unblockPlayer => 'Desbloquear';
+
+  @override
+  String get blockedPlayer => 'Persona bloqueada';
+
+  @override
+  String get blockNote =>
+      'Solo en este dispositivo: no verás su nombre, su imagen ni sus reacciones. No se le avisa.';
+
+  @override
+  String get liveAgreeTitle => 'Antes de jugar en vivo';
+
+  @override
+  String get liveAgreeBody =>
+      'Los demás jugadores verán tu nombre y tu imagen, así que elige unos que enseñarías a cualquiera, y juega limpio. Las Condiciones de uso dicen qué no está permitido y qué pasa si las incumples. Al jugar en vivo, las aceptas.';
+
+  @override
+  String get liveAgree => 'Acepto';
+
+  @override
+  String get deleteAccount => 'Eliminar cuenta';
+
+  @override
+  String get deleteAccountTitle => '¿Eliminar tu cuenta?';
+
+  @override
+  String get deleteAccountBody =>
+      'No se puede deshacer. Elimina tu cuenta en todos sus dispositivos —su perfil, dispositivos, códigos de respaldo e inicio de sesión— y quita tu nombre de las partidas que jugaste. También borra todo lo que Open Hearts guarda en este dispositivo.\n\nEl juego en vivo se detiene ahora y pierdes el tiempo que te queda de suscripción. Una suscripción web se cancela. Una de la App Store o de Google Play se sigue renovando hasta que la canceles allí.\n\nPara dejar de pagar pero seguir jugando hasta que acabe tu año, cancela la suscripción en su lugar.';
+
+  @override
+  String get keepAccount => 'Conservar la cuenta';
+
+  @override
+  String get accountDeleted => 'Tu cuenta está eliminada';
+
+  @override
+  String get accountDeletedClose =>
+      'Cierra Open Hearts y vuelve a abrirlo para empezar de cero.';
 
   @override
   String get waitingToReconnect => 'Esperando a que los demás se reconecten';
@@ -1086,10 +1173,14 @@ class AppLocalizationsEs extends AppLocalizations {
       'other': 'cuenta de Google',
     });
     String _temp1 = intl.Intl.selectLogic(store, {
+      'apple': 'Apple',
+      'other': 'Google',
+    });
+    String _temp2 = intl.Intl.selectLogic(store, {
       'apple': 'App Store',
       'other': 'Google Play',
     });
-    return '$price al año, cobrado a tu $_temp0 al confirmar. Se renueva sola cada año hasta que la canceles, cuando quieras, en los ajustes de suscripciones de $_temp1, al menos un día antes de la renovación.';
+    return '$price al año, cobrado a tu $_temp0 al confirmar. Se renueva automáticamente cada año hasta que la canceles, al precio vigente en ese momento, y $_temp1 te avisa antes de que se aplique un nuevo precio. Cancela cuando quieras en los ajustes de suscripciones de $_temp2, al menos un día antes de la renovación.';
   }
 
   @override

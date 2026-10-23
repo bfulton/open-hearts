@@ -68,8 +68,18 @@ class Entitlement extends ChangeNotifier {
   Future<void> load(PublicKey device) async {
     _device = device;
     final prefs = await SharedPreferences.getInstance();
-    _keep(Licence.parse(prefs.getString(_stored)));
+    final stored = Licence.parse(prefs.getString(_stored));
+    _lapsed = stored != null && stored.key == device && stored.signedBy(service) ? stored.account : null;
+    _keep(stored);
   }
+
+  String? _lapsed;
+
+  /// Whether this device is in an account, as far as it knows: it holds
+  /// a licence, the account is suspended, or the licence it last held
+  /// has run out — a lapsed subscriber's, whose account is still there
+  /// to delete (subscribe_page.dart).
+  bool get inAnAccount => _licence != null || _suspended || _lapsed != null;
 
   /// The licence the service will give, which supersedes whatever is
   /// on the device — including by expiring it, since a subscription
@@ -172,6 +182,7 @@ class Entitlement extends ChangeNotifier {
   /// play shut. For a device being handed on.
   Future<void> forget() async {
     _licence = null;
+    _lapsed = null;
     await (await SharedPreferences.getInstance()).remove(_stored);
     notifyListeners();
   }

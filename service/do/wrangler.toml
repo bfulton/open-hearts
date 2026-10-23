@@ -91,9 +91,47 @@ class_name = "Bench"
 tag = "v3"
 new_sqlite_classes = ["Bench"]
 
+# Where each new picture is checked against known images of child
+# sexual abuse by Microsoft's PhotoDNA before it is carried, and a match
+# acted on: withheld, its accounts held and terminated, and reported to
+# NCMEC (known.mjs). One object, made in the "us" jurisdiction, so that
+# PhotoDNA is asked only from the United States. Off until the secret
+# OH_PHOTODNA_KEY is set; reports are filed once OH_NCMEC_USERNAME and
+# OH_NCMEC_PASSWORD are too.
+[[durable_objects.bindings]]
+name = "KNOWN"
+class_name = "KnownPictures"
+
+[[migrations]]
+tag = "v4"
+new_sqlite_classes = ["KnownPictures"]
+
 [[kv_namespaces]]
 binding = "OH_STORE"
 id = "5b65151de63341dc9f7a9d417c9b6a4e"
+
+# The pictures subscribers put out at live tables, copied for the
+# operator to look at (review.mjs), and the daily email of the new ones,
+# at 13:00 UTC (9 in the morning in South Carolina in summer, 8 in
+# winter).
+[[r2_buckets]]
+binding = "OH_PICTURES"
+bucket_name = "open-hearts-pictures"
+
+# The private bucket of kept games, where a legal hold keeps the
+# pictures of an account a PhotoDNA match held (known.mjs, holds.mjs).
+[[r2_buckets]]
+binding = "OH_RECORDS"
+bucket_name = "open-hearts-records"
+
+[triggers]
+crons = ["0 13 * * *"]
+
+# The model that looks at each new picture as it is copied, and hides
+# one that shows nudity or sexual content, violence or gore, or a hate
+# symbol (review.mjs).
+[ai]
+binding = "AI"
 
 # Backup codes are emailed from the Household (docs/explanation/service.md) by
 # Cloudflare's Email Sending, which needs the Workers Paid plan and the

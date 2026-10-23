@@ -138,26 +138,52 @@ the licence's date. The worker checks its own signature against
 
 ## Payment
 
-Live play is a yearly subscription, paid up front (the price is
-`infra/stripe.mjs`'s). The rest is free: solo play, the records, the
-verifiable deal and the engine. The price is yearly because a card
-fee's fixed part would be most of a monthly price.
+Live play is a yearly subscription, paid up front, at the price in
+`config/openhearts.json` ([changing the terms](#changing-the-terms)).
+The rest is free: solo play, the records, the verifiable deal and the
+engine. The price is yearly because a card fee's fixed part would be
+most of a monthly price.
 
-**Web: Stripe.** `checkout` writes the device's key into the session's
+**Web: Stripe, sold through Link.** Every checkout is a Managed
+Payments one (`managed_payments[enabled]`): the buyer buys from Link
+(Sold through Link, LLC), Stripe's merchant of record, which charges
+and pays over the tax of wherever the buyer is, keeps to their
+country's rules for buying online, such as the EU's and the UK's 14
+days to cancel, and answers their questions about the payment. So Open
+Hearts registers for no sales tax or VAT anywhere, and can sell
+anywhere Link does. Link's support may refund a payment within 60 days
+of it without asking us, and the terms say a refund ends the
+subscription, so a refund of any payment for one of our subscriptions,
+whoever makes it, ends that subscription (`endRefunded` in
+`service/functions/stripe.mjs`, from the webhook's `charge.refunded`).
+Whether Stripe sells this way is a setting in Stripe's Dashboard that no
+API reports; `./oh verify` makes a checkout through Link and expires it,
+which proves it. The service calls Stripe in the webhook's API version
+(`STRIPE_VERSION`), not the account's default.
+
+`checkout` writes the device's key into the session's
 metadata and the subscription's metadata, so renewals carry it too. The
 return address must be on the origin the checkout was asked of, which is
 the app's own ([above](#where-the-app-is)), and the app only
-leaves for Stripe's own hosts. Nothing is paid until the buyer ticks
-that they agree to the terms and to the yearly renewal, in the app's
-language (`checkoutTerms`), and the email that follows says what was
-bought, how it renews and how to cancel (`mailerOf` in
-`service/functions/household.mjs`): California's automatic renewal law
-asks for both. The webhook binds the device once the
+leaves for Stripe's own hosts. The app's subscribe screen states the
+price, the yearly renewal and how to cancel beside its button. On
+Link's checkout, in the app's language (`checkoutLanguage`), nothing is
+paid until the buyer ticks Stripe's box agreeing to the terms and the
+privacy policy, and the line under the button says that subscribing
+authorizes Link to charge them until they cancel. The email that
+follows says what was bought, how it renews and how to cancel
+(`mailerOf` in `service/functions/household.mjs`). California's
+automatic renewal law asks for all of it. A Managed Payments checkout
+takes no custom text, so the box's words are Stripe's, and it takes the
+box only while Checkout's Legal policies setting is on; Stripe refuses
+a checkout otherwise, which `./oh verify` shows. The webhook binds the device once the
 session is paid, and the subscription's own events carry its dates.
-`stripePrice` (in `config/openhearts.json`, or the
-[service settings](../reference/configuration.md#service-settings)) is a
-price id or a lookup key; the active price for a lookup key is cached
-briefly (`PRICE_KEPT_MS`).
+`stripePrice` in `config/openhearts.json` names the Stripe price, by id
+or lookup key. A checkout sells it only when it is the price the terms
+state, a year at `price` (`shopPrice` in `service/functions/stripe.mjs`);
+the answer is cached briefly (`PRICE_KEPT_MS`). Tax is added on top
+of that price (`taxBehavior` in `infra/stripe.mjs`), as the terms say,
+and Link shows it in the buyer's own currency.
 
 **Phones: the store.** The phone buys in its own store and sends the
 proof to `store`: an App Store signed transaction, or a Google Play
@@ -361,6 +387,15 @@ JSON text, which is also the request's signed *what*, so nobody else's
 request writes it. The text is taken only in the shape the app makes,
 and a test holds the worker's limits equal to the app's.
 
+**A new picture is checked and kept as it is written.** The account's
+turn, which runs in the relay worker, asks PhotoDNA about it and has a
+model look at it before the profile keeps it, and keeps a copy of each
+picture the account sets apart, for the operator, until a year after it
+stops being the account's. A picture that matches a known image of
+child sexual abuse is not kept, and the profile is saved without it. The
+relay carries only the account's picture now ([an account's
+pictures](relay.md#an-accounts-pictures)).
+
 **The last write wins.** Each write is the next version, whatever
 version the writing device had last seen. There is nothing to merge in a
 name, writes come only from the device in use, which is the one in the
@@ -401,27 +436,89 @@ it which account and version it last matched:
 What is published at tables is read from the device's copy
 ([live play](live-play.md)).
 
+### Names the others see
+
+A name the others would see is refused if it has a word on the lists of
+obscene and offensive words in `third_party/ldnoobw/`, in English,
+Spanish, Portuguese, German or French, or one of a few words refused
+even inside another word. Words are compared in lower case, with
+accents folded and with digits and signs written for letters read as
+letters, so `5h1t` is read as *shit*. Words are matched whole, so
+*Cassandra* and *Scunthorpe* stay names. Entries that would refuse
+real names are left out, and the folder's README says which and why.
+What the lists miss, a report catches.
+
+The filter is one set of steps written twice and held to the same
+answers by one file of cases (`service/functions/names.vectors.json`):
+
+- **In the app** (`app/lib/names.dart`), the profile page says under
+  the name, as it is typed, that the name is not allowed, and keeps the
+  last allowed name when the page is left. A refused name kept on a
+  device from before the filter is played as no name, so live play asks
+  for another, and it goes to the account as none.
+- **In the service** (`service/functions/names.mjs`), a profile with a
+  refused name is not kept: the write is refused with
+  `not an allowed name`, which the app does not send again. A kept
+  game is kept without a refused name beside it.
+- **At the relay**, an event naming somebody with a refused name is not
+  carried ([refused names](relay.md#refused-names)).
+
 ### Deleting an account's data
 
-On request (the privacy policy's choices), the account is forgotten.
+A player deletes their account in the app, from any of its devices:
+**Delete account** on the subscription page, there for a device that
+holds a licence, holds one that has run out, or is suspended. The
+service also deletes one on request (the privacy policy's choices),
+when the operator runs `./oh account delete`. Either way the account is
+forgotten.
+
 Its name comes off every kept game it played, found by the licence at
 its seat (`anonymizeGames`), which stays the other players' game: the
 names are kept beside a record unsigned, so the record verifies as
-before. The account is marked
-forgotten first, so a game kept later, such as one its last licence
-let it finish, is kept without its name. Every row kept for the
-account is deleted (`forgetAccount`): those under `ACCOUNT#` (its
-devices, code, backup codes, sign-in, device in use, profile, and any
-suspension or name and picture held), each
+before. A kept game notes the accounts at its seats beside it in R2
+(`accounts`, in its custom metadata), so the worker reads only the games
+that name the account; a game kept before games noted them is read
+whatever it names. The account is marked forgotten first, so a game kept
+later, such as one its last licence let it finish, is kept without its
+name. Every row kept for the account is deleted (`forgetAccount`): those
+under `ACCOUNT#` (its devices, code, backup codes, sign-in, device in
+use, profile, and any suspension or name and picture held), each
 device's `ENTITLEMENT`, the rows its codes and sign-in are found by, and
-the `SUB#` rows of every subscription it has had. A subscription still paid up is
-cancelled first. Where the `Household` object runs, its note of the
-device in use (its key, the epoch, times, the table it said it sat at,
-the relay objects it was seen at, and whether the account was suspended)
-is in the object's own storage and
-is not reached from outside. It is written over the next time the
-account is taken up, which after deletion is never, and it holds no name
-or picture. Its results stay on the relay, under its account number,
+the `SUB#` rows of every subscription it has had, which its `META` row
+names, the one before a lapsed subscriber paid again among them
+(`before`).
+
+From the app (`deleteRoute` in `service/functions/worker.mjs`), the
+service first ends in Stripe each web subscription of the account still
+running, and the time left on it goes with it, as the terms say. A
+subscription bought in a store is the store's to end: the app says to
+cancel it there. Then the games, and then the rows, in the account's
+own turn (`deleteAccount` in `service/functions/deletion.mjs`), where
+its device in use is cut off at the relay with the reason `deleted:`
+and the `Household` object keeps only the epoch it counts devices in use
+by. A run that stops part way finds the account still there when the
+device asks again, and goes on. A kept game that would not be written
+back as it was sent keeps the name, and the operator is emailed which
+(`alertUnwritten`). The device then forgets everything it keeps and
+starts afresh (`app/lib/start_afresh.dart`): the page loads again on the
+web, and a phone build asks to be closed and opened again.
+
+Stripe tells the service of the subscription's end after the account is
+gone. Its `SUB#` row comes back as the note that it ended, with no
+customer and no account (`record` in `service/functions/stripe.mjs`), so
+that a late event about it is turned away. Under a legal hold
+(`holds.mjs`), nothing is deleted or ended: the asking is noted, and the
+app is answered as for a deletion.
+
+From the operator's command, a subscription still paid up is cancelled
+first. Where the `Household` object runs, its note of the device in use
+(its key, the epoch, times, the table it said it sat at, the relay
+objects it was seen at, and whether the account was suspended) is in the
+object's own storage and is not reached from outside. It is written over
+the next time the account is taken up, which after deletion is never,
+and it holds no name or picture.
+
+Either way, its results stay on the relay, under its account number,
 which nothing left in the service ties to the person; a result cannot be
 changed in any case, since every copy is signed by the device that
 published it
@@ -429,24 +526,27 @@ published it
 
 ### Suspending an account
 
-The terms let the operator suspend an account from live play, and take
-its name or picture off, in their sections "At a live table" and
-"Copyright". `service/tool/suspend.mjs` asks for it
-([suspend an account](../how-to/suspend-an-account.md)), and
-`service/functions/suspension.mjs` carries it out.
+The terms let the operator suspend an account from live play, end it,
+and take its name or picture off, in their sections "At a live table",
+"Ending these terms" and "Copyright". `./oh account` asks for it
+([suspend an account](../how-to/suspend-an-account.md),
+[end an account](../how-to/end-an-account.md)), and
+`service/functions/suspension.mjs` carries it out. What a suspension or
+an ending does in Stripe, the command does itself, with the operator's
+own key: the service's key can't cancel or refund.
 
 **In the account's turn.** The account's device in use, and the relay
 objects it was seen at, are known only in the account's turn, where
 `Household` keeps them. So that is where a suspension is carried out,
 one after another with the devices' own requests, and where the device
-in use can be cut off at once. The tool reaches the store from outside,
-as `forget.mjs` does, but not the object. It writes an **order** into the
+in use can be cut off at once. The command reaches the store from
+outside, as `./oh account delete` does, but not the object. It writes an **order** into the
 store (`ORDER#<id>`, which KV deletes after `ORDER_KEPT_S`) and asks the
 service to carry it out (`order`). The handler reads the order before it
 wakes anything, so a request that names no order does nothing, and only
 someone who can write the store, the operator, can make one; no new
 secret is needed. A carried-out order is deleted. Each act can be
-carried out twice to the same end, since the tool asks again when an
+carried out twice to the same end, since the command asks again when an
 answer is lost or KV has not shown the order yet.
 
 **Suspended**, the account is marked (`SUSPENDED`), and each of its
@@ -523,13 +623,43 @@ HMAC, and nothing on the device's side leads back to a provider.
 Entitlement is copied to each device so that a licence is one read.
 Cards, plays, game state, ratings and email addresses are not stored.
 
+## Changing the terms
+
+The terms of use, the privacy policy and the price change only through
+one process ([change the terms](../how-to/change-the-terms.md)), and
+each step of it is checked by something that runs whether or not
+anyone remembers it:
+
+| Check | Where | What it stops |
+|---|---|---|
+| The text is what the newest entry in `site/ledger.json` fingerprints. | CI (`site/ledger.test.mjs`) and the deploy (`ops/gate.mjs`) | A change to either document, or to the price they state, without its entry: its day, its kind and what it says to subscribers. |
+| An entry on `main` is never changed or taken out. | CI | A change slipped into an entry already reviewed. |
+| The terms' price, the front page's, Stripe's definition and the app's are `price` in `config/openhearts.json`. | The site's build, `infra/stripe.mjs`, CI | One of them saying another price. |
+| The site serves a version the ledger has, and the newest to go live is dated today. | The deploy | Publishing outside the process, and a stale "Last updated". |
+| A material change goes out only once the stores were told, while an app is in its store. | The deploy | Texas's notice to the stores being missed. |
+| Every device is shown a material change from the day it is published, and each web subscriber is emailed it. | `/api/config`; `./oh terms notify`, which no deploy runs, and `./oh verify`, which fails until every web subscriber was told | A change nobody was told of, and a deploy emailing everyone as a side effect. |
+| The terms apply a material change to a subscription only from its first renewal at least 30 days after its subscriber was told. | The terms, and the email, which names that renewal (`APPLIES_AFTER_DAYS`) | A change applied to someone with no time to read it or cancel. |
+| A checkout sells only at the price the terms state. | The service (`shopPrice`), and `/api/health` | A price edited in Stripe's dashboard being charged. |
+
+Which version is live is read off the site itself, every page in every
+language, so a deploy that skipped all this is found by the next. What
+stays outside: someone with Stripe's dashboard can still move an
+existing subscription to another price, and store prices are set in
+App Store Connect and the Play Console, where Apple and Google run their
+own notices.
+
+The remote config has no say in any of it: the price, and where the
+terms and the privacy policy are, are not remote-config fields.
+
 ## Remote config
 
 Some things have to change for every device at once, faster than a
 release: closing live play, a banner, the relays, the table's clocks,
 how long the app waits on the network. `config` serves one row the
 operator writes ([remote config](../reference/configuration.md#remote-config);
-[change remote config](../how-to/change-remote-config.md)).
+[change remote config](../how-to/change-remote-config.md)), and beside
+it the notices of a change to the terms
+([above](#changing-the-terms)).
 
 The worker validates every field (`configOf`), and the app validates
 them again (`app/lib/net/remote_config.dart`). An invalid field is
@@ -596,6 +726,12 @@ While there are few subscribers, the operator is emailed about each one
   (`waiting`), so that someone can come and play. Told at most once per
   subscription in a while (`WAITING_MINUTES`).
 
+Whatever the flags say, a failure in the automatic handling of known
+images of child sexual abuse is told too (`alertKnownProblem`), at most
+once in six hours for each kind, since a legal duty may hang on it
+([relay](relay.md#known-images-of-child-sexual-abuse)); and each match
+that handling acts on is emailed with what it did.
+
 The mail says which store or pool, the first characters of the
 subscription and device, and dates. It never includes an email address
 or name. It goes to `alerts@openhearts.game`, which forwards to where
@@ -603,6 +739,22 @@ help@ goes (`infra/`). It is sent from the relay worker, which holds the
 `EMAIL` binding, through a Household object named `operator-alerts`,
 which mails only `@openhearts.game`. A failed alert never fails the
 request. Set either flag to `false` and deploy to stop it.
+
+### Reports
+
+A player reports another from the app: holding their badge at the
+table, they say what is wrong — the picture, the name or something
+else — and can add a note (`app/lib/report.dart`). The `report` handler
+emails it to the operator the same way as an alert, but at once and
+whatever the flags say, since the app stores require that reports are
+answered ([Handle a report from a player](../how-to/handle-a-report.md)).
+The mail says both accounts, the table, the name and picture the
+reporter saw beside the account's profile now, and the note: what the
+operator needs to judge it. Only a subscriber's device can send one,
+the same report goes once a day, and an account sends at most
+`REPORTS_A_DAY` a day, so that reports cannot bury the operator. A
+report that could not be sent is answered 503 and not counted, and the
+app says it did not go.
 
 ## The relay and the backup jurors
 

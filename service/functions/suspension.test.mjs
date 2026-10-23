@@ -109,6 +109,34 @@ test('lifted: the mark gone, the devices as they were, and the relay told nothin
   assert.equal((await seenAt({ account, key: KEY, epoch: 4 }, active)).body.error, 'superseded: another device of this account is in use', 'an old activation is just old');
 });
 
+test('terminated: suspended as ever, marked as ended, and never lifted', async () => {
+  const { store, account } = await household();
+  const active = activeInStore(store);
+  await active.put(account, { key: KEY, epoch: 3, at: now, seated: null, tags: ['online'] });
+  const done = await ordered(store, account, 'terminate', { active });
+  assert.equal(done.status, 200);
+  assert.deepEqual(done.body, { act: 'terminate', suspended: true, terminated: dayOf(now), flagged: 2, cutOff: true });
+  assert.deepEqual(await store.get(`ACCOUNT#${account}`, 'SUSPENDED'), { since: dayOf(now), terminated: dayOf(now) });
+  assert.deepEqual(done.revoked, [[['online'], account, 4, SUSPENDED_WHY]]);
+  // Asked to lift it, the account's turn refuses, and spends the order.
+  const lifted = await ordered(store, account, 'lift', { active });
+  assert.equal(lifted.status, 409);
+  assert.match(lifted.body.error, /terminated account is not let back/);
+  assert.equal(await store.get(...orderRow(lifted.id)), null);
+  assert.equal(await entitlementOf(store, KEY, { now }), null, 'still refused');
+});
+
+test('a suspended account terminated later keeps the day it was first suspended', async () => {
+  const { store, account } = await household();
+  await ordered(store, account, 'suspend', { at: now - 5 * 86400000, carried: now - 5 * 86400000 });
+  const done = await ordered(store, account, 'terminate');
+  assert.equal(done.body.terminated, dayOf(now));
+  assert.deepEqual(await store.get(`ACCOUNT#${account}`, 'SUSPENDED'), { since: dayOf(now - 5 * 86400000), terminated: dayOf(now) });
+  // A second termination changes nothing.
+  await ordered(store, account, 'terminate', { at: now + 86400000, carried: now + 86400000 });
+  assert.deepEqual(await store.get(`ACCOUNT#${account}`, 'SUSPENDED'), { since: dayOf(now - 5 * 86400000), terminated: dayOf(now) });
+});
+
 test('a name and a picture taken off, held, and put back, each as a change every device takes', async () => {
   const { store, account } = await household();
   const pk = `ACCOUNT#${account}`;
@@ -200,7 +228,7 @@ test("the operator's tool: says how the account stands, and asks the service unt
   const { store, account } = await household();
   await store.put(`ACCOUNT#${account}`, 'PROFILE', { name: 'N', icon: null, color: null, picture: null, version: 1 });
   const stands = await standing(store, account);
-  assert.deepEqual(stands, { exists: true, suspended: null, devices: 2, name: true, picture: false, held: { name: false, picture: false } });
+  assert.deepEqual(stands, { exists: true, suspended: null, terminated: null, hold: null, devices: 2, name: true, picture: false, held: { name: false, picture: false } });
   assert.equal((await standing(store, '9'.repeat(32))).exists, false);
   assert.match(wouldDo('suspend', stands), /would refuse its 2 device\(s\) licences and activations, and cut the one in use off/);
   assert.equal(wouldDo('remove', stands, { picture: true }), 'nothing of that on its profile');

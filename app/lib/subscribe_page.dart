@@ -25,11 +25,11 @@ import 'net/buying.dart';
 import 'net/copy.dart';
 import 'net/household.dart';
 import 'net/provider_tokens.dart';
-import 'net/remote_config.dart';
 import 'net/share.dart';
 import 'net/sign_in.dart';
 import 'net/store_buying.dart';
 import 'pages.dart';
+import 'start_afresh.dart';
 import 'theme.dart';
 import 'ui/qr_view.dart';
 import 'ui/reading_time.dart';
@@ -399,6 +399,54 @@ class _SubscribePageState extends State<SubscribePage> {
     }
   }
 
+  /// The account deleted, on all its devices, once the player has said
+  /// so (net/household.dart, deleteAccount), and this device started
+  /// afresh (start_afresh.dart). A phone build, which cannot start
+  /// itself again, ends on a screen that says to close it.
+  Future<void> _delete() async {
+    final me = _me;
+    if (me == null || _working) return;
+    final l10n = context.l10n;
+    final sure = await showDialog<bool>(
+      context: context,
+      builder: (dialog) => AlertDialog(
+        title: Text(l10n.deleteAccountTitle),
+        content: SingleChildScrollView(child: Text(l10n.deleteAccountBody)),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(dialog).pop(false), child: Text(l10n.keepAccount)),
+          FilledButton(
+            onPressed: () => Navigator.of(dialog).pop(true),
+            style: FilledButton.styleFrom(backgroundColor: Palette.danger, foregroundColor: Felt.dark),
+            child: Text(l10n.deleteAccount),
+          ),
+        ],
+      ),
+    );
+    if (sure != true || !mounted) return;
+    setState(() {
+      _working = true;
+      _refusal = null;
+    });
+    final said = await deleteAccount(me);
+    if (!mounted) return;
+    if (said.answer != true) {
+      setState(() {
+        _working = false;
+        _refusal = said.refusal?.say(context.l10n);
+      });
+      return;
+    }
+    if (!await startAfresh() || !mounted) return;
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialog) => PopScope(
+        canPop: false,
+        child: AlertDialog(title: Text(l10n.accountDeleted), content: Text(l10n.accountDeletedClose)),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
@@ -516,6 +564,17 @@ class _SubscribePageState extends State<SubscribePage> {
                       TextButton(onPressed: () => openLink(legalPage('terms')), child: Text(l10n.termsOfUse)),
                     ],
                   ),
+                  // Wherever this device is in an account, lapsed or
+                  // suspended too: the stores ask that an account made
+                  // in the app can be deleted in it.
+                  if (Entitlement.current.inAnAccount)
+                    Center(
+                      child: TextButton(
+                        onPressed: _working || waiting ? null : _delete,
+                        style: TextButton.styleFrom(foregroundColor: Palette.danger),
+                        child: Text(l10n.deleteAccount),
+                      ),
+                    ),
                   if (refusal != null) ...[
                     const SizedBox(height: 14),
                     Text(refusal, textAlign: TextAlign.center, style: const TextStyle(color: Palette.danger, fontSize: 13)),
@@ -871,15 +930,13 @@ class _Point extends StatelessWidget {
   }
 }
 
-/// The site's page [name] — `privacy` or `terms` — or where the remote
-/// config says it is. On the web the site is the app's own host without
-/// its `play.` (play.openhearts.game's site is openhearts.game), or the
-/// app's own origin on a preview, which serves the app beside the site
-/// at /play/; a phone's build has no origin and goes to the site's home.
+/// The site's page [name] — `privacy` or `terms` — which is where they
+/// are published, and nowhere else (site/ledger.mjs). On the web the
+/// site is the app's own host without its `play.` (play.openhearts.game's
+/// site is openhearts.game), or the app's own origin on a preview, which
+/// serves the app beside the site at /play/; a phone's build has no
+/// origin and goes to the site's home.
 Uri legalPage(String name, {Uri? base}) {
-  final config = RemoteSettings.current.config;
-  final set = name == 'privacy' ? config.privacy : config.terms;
-  if (set != null) return set;
   final at = base ?? Uri.base;
   if ((at.scheme == 'https' || at.scheme == 'http') && at.host.isNotEmpty) {
     final host = at.host.startsWith('play.') ? at.host.substring('play.'.length) : at.host;

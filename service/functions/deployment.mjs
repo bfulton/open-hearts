@@ -5,17 +5,18 @@
 // The handlers read their settings off env by their OH_ names, as the
 // tests and the local rig hand them in, so the file is laid under env
 // rather than read in each handler: a name set on the project or by a
-// test still wins.
+// test still wins, except the price, which is the file's alone.
 
 /// The file's fields as the env names the handlers read. A field left
 /// null is left out, so a handler finds it missing, as before.
 export function configEnv(config) {
-  const { apple = {}, google = {}, alerts = {} } = config ?? {};
+  const { apple = {}, google = {}, alerts = {}, photodna = {}, ncmec = {} } = config ?? {};
   const on = (flag) => (flag === true ? 'on' : null);
   const named = {
     OH_SERVICE_KEY: config?.serviceKey,
     OH_TURN_KEY_ID: config?.turnKeyId,
     OH_STRIPE_PRICE: config?.stripePrice,
+    OH_PRICE: priceOf(config),
     OH_APPLE_BUNDLE_ID: apple.bundleId,
     OH_APPLE_PRODUCT: apple.product,
     // Apple's token names the bundle on an iPhone and the Services ID
@@ -30,12 +31,35 @@ export function configEnv(config) {
     OH_ALERTS_TO: alerts.to,
     OH_ALERT_SUBSCRIBED: on(alerts.subscribed),
     OH_ALERT_WAITING: on(alerts.waiting),
+    OH_ALERT_PICTURES: on(alerts.pictures),
+    // Where the relay orders a termination (service/do/known.mjs).
+    OH_APP_ORIGIN: config?.appOrigin,
+    // PhotoDNA's Match call, and NCMEC's reporting service and who its
+    // reports name as reporting (known.mjs); the keys are secrets.
+    OH_PHOTODNA_ENDPOINT: photodna.endpoint,
+    OH_NCMEC_ENDPOINT: ncmec.endpoint,
+    OH_NCMEC_FIRST_NAME: ncmec.reporter?.firstName,
+    OH_NCMEC_LAST_NAME: ncmec.reporter?.lastName,
+    OH_NCMEC_EMAIL: ncmec.reporter?.email,
   };
   return Object.fromEntries(Object.entries(named).filter(([, v]) => typeof v === 'string' && v));
 }
 
-/// env with the file beneath it.
-export const withConfig = (env, config) => ({ ...configEnv(config), ...env });
+/// The price the terms state, as the checkout reads it (stripe.mjs,
+/// statedPrice): "599 usd". Null for none.
+const priceOf = (config) => {
+  const { amount, currency } = config?.price ?? {};
+  return Number.isInteger(amount) && typeof currency === 'string' ? `${amount} ${currency}` : null;
+};
+
+/// env with the file beneath it, but for the price, which is the file's
+/// alone: it is what the terms state, and no setting on the project
+/// sells at another.
+export function withConfig(env, config) {
+  const laid = configEnv(config);
+  const { OH_PRICE: _, ...rest } = env;
+  return { ...laid, ...rest };
+}
 
 /// What a phone build is compiled with, out of the same file
 /// (`--dart-define-from-file`, build_phone.sh): the service key it takes

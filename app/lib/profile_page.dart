@@ -29,6 +29,7 @@ import 'avatar.dart';
 import 'entitlement.dart';
 import 'identity.dart';
 import 'l10n/l10n.dart';
+import 'names.dart';
 import 'net/account_profile.dart';
 import 'net/network.dart';
 import 'net/relays.dart';
@@ -295,7 +296,9 @@ class _ProfilePageState extends State<ProfilePage> {
                   controller: _name,
                   textAlign: TextAlign.center,
                   textCapitalization: TextCapitalization.words,
-                  decoration: _field(context.l10n.yourName),
+                  // Said as it is typed: a name the others may not see
+                  // is not kept.
+                  decoration: _field(context.l10n.yourName).copyWith(errorText: _refused ? context.l10n.nameNotAllowed : null),
                   // The badge above it wears the initials of what is
                   // being typed, so a name with no avatar behind it
                   // is still a picture of something.
@@ -391,13 +394,19 @@ class _ProfilePageState extends State<ProfilePage> {
   /// the account's other devices too, behind the page
   /// (net/account_profile.dart).
   Future<void> _done() async {
-    final chosen = (name: Identity.nameOf(_name.text), avatar: _avatar);
+    // A name the others may not see is not kept: the one the page
+    // opened with stays, if they may see that.
+    final typed = Identity.nameOf(_name.text);
+    final chosen = (name: nameRefused(typed) ? Identity.playable(_opened.name) : typed, avatar: _avatar);
     if (chosen != _opened) {
       await AccountProfile.current.keep(chosen.name, chosen.avatar);
       unawaited(AccountProfile.current.sync());
     }
     if (mounted) Navigator.of(context).pop(chosen);
   }
+
+  /// Whether the name typed is one the filter refuses (names.dart).
+  bool get _refused => nameRefused(Identity.nameOf(_name.text));
 
   /// What the badge in the sheet wears while there is nothing to go on.
   String get _shownName => _name.text.trim().isEmpty ? '?' : _name.text.trim();

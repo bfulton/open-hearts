@@ -1,11 +1,19 @@
-/// What is done with a picture somebody else chose.
+/// What is done with a picture somebody else chose, and with a player
+/// somebody blocked.
 ///
-/// Two different things can keep one off the table, and they are not
-/// the same kind of thing. The person looking can hide another
+/// Two different things can keep a picture off the table, and they are
+/// not the same kind of thing. The person looking can hide another
 /// player's picture on this device, which is their decision and stands
 /// until they take it back. And a check on this device can say a
 /// picture is one most people would not want at a table, which keeps it
 /// off until they ask for it.
+///
+/// The person looking can also block another player on this device:
+/// their picture, their name and their reactions are not shown here,
+/// wherever they meet, until they are unblocked. Nobody else is told,
+/// and nothing about who sits where changes: seating is worked out in
+/// the open by the players' own devices (packages/table, matching.dart),
+/// so keeping two players apart would mean saying who blocked whom.
 ///
 /// The check runs here, on the device looking at the picture, never on
 /// the one that sent it. A device its owner controls will sign whatever
@@ -37,10 +45,12 @@ abstract class PictureCheck {
 }
 
 class Pictures extends ChangeNotifier {
-  Pictures({this.check, Set<String>? hidden, this.grace = const Duration(seconds: 3)})
-      : _hidden = {...?hidden};
+  Pictures({this.check, Set<String>? hidden, Set<String>? blocked, this.grace = const Duration(seconds: 3)})
+      : _hidden = {...?hidden},
+        _blocked = {...?blocked};
 
   static const _hiddenKey = 'pictures_hidden';
+  static const _blockedKey = 'players_blocked';
 
   /// Whatever this device can ask about a picture; null until there is
   /// a model, which is the same as a check that never flags anything.
@@ -52,6 +62,10 @@ class Pictures extends ChangeNotifier {
   /// Keys whose pictures this device does not show, by the viewer's
   /// own decision; kept with the identity.
   final Set<String> _hidden;
+
+  /// Accounts (or keys, where no account names one) the viewer
+  /// blocked; kept with the identity.
+  final Set<String> _blocked;
 
   /// Keys whose picture the viewer asked for after the check kept it
   /// off. Not kept: it is about one picture, not a person.
@@ -71,10 +85,29 @@ class Pictures extends ChangeNotifier {
   /// The device's list, as it was left.
   static Future<Pictures> load({PictureCheck? check}) async {
     final prefs = await SharedPreferences.getInstance();
-    return Pictures(check: check, hidden: (prefs.getStringList(_hiddenKey) ?? const <String>[]).toSet());
+    return Pictures(
+      check: check,
+      hidden: (prefs.getStringList(_hiddenKey) ?? const <String>[]).toSet(),
+      blocked: (prefs.getStringList(_blockedKey) ?? const <String>[]).toSet(),
+    );
   }
 
   bool isHidden(String key) => _hidden.contains(key);
+
+  /// Whether the viewer blocked [key]: nothing of theirs is shown here.
+  bool isBlocked(String key) => _blocked.contains(key);
+
+  Future<void> block(String key) async {
+    if (!_blocked.add(key)) return;
+    await _save();
+    notifyListeners();
+  }
+
+  Future<void> unblock(String key) async {
+    if (!_blocked.remove(key)) return;
+    await _save();
+    notifyListeners();
+  }
 
   /// Whether [key]'s picture is off the table for a reason the viewer
   /// did not choose: the check flagged it and they have not asked.
@@ -108,7 +141,7 @@ class Pictures extends ChangeNotifier {
   /// for a moment and withdrawn is the price of failing open, and it is
   /// cheaper than a table of blank badges whenever the check is slow.
   bool allows(String key, Uint8List picture) {
-    if (_hidden.contains(key)) return false;
+    if (_hidden.contains(key) || _blocked.contains(key)) return false;
     if (_asked.contains(key)) return true;
     final check = this.check;
     if (check == null) return true;
@@ -137,6 +170,7 @@ class Pictures extends ChangeNotifier {
   Future<void> _save() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setStringList(_hiddenKey, _hidden.toList());
+    await prefs.setStringList(_blockedKey, _blocked.toList());
   }
 
   /// FNV-1a over the bytes: a name for a picture, not a promise about

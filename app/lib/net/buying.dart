@@ -24,17 +24,19 @@ import 'licence.dart';
 import 'remote_config.dart';
 import 'store_buying.dart';
 
-/// What live play costs a year, as it is written on the front door
-/// (`pricePerYear`, l10n). The shape of the price is chosen by the fees
-/// — a year rather than a month, since a card's fixed thirty cents is
-/// paid once (docs/explanation/service.md).
+/// What live play costs a year on the web, as it is written on the
+/// front door (`pricePerYear`, l10n): config/openhearts.json's `price`,
+/// which the terms state and the checkout sells at, as English writes it
+/// (site/build.mjs, priceIn; site/ledger.test.mjs holds the two
+/// together). The shape of the price is chosen by the fees — a year
+/// rather than a month, since a card's fixed thirty cents is paid once
+/// (docs/explanation/service.md).
 const priceAmount = r'$5.99';
 
 /// The price as shown: the store's, in a store build, since it is the
-/// store's price that is charged and in the buyer's own currency; else
-/// the operator's, when remote config gives one with a new Stripe
-/// price; and the build's otherwise.
-String get priceShown => StoreShop.current.product?.price ?? RemoteSettings.current.config.price ?? priceAmount;
+/// store's price that is charged and in the buyer's own currency; the
+/// web's otherwise.
+String get priceShown => StoreShop.current.product?.price ?? priceAmount;
 
 /// Whether this build can take money at all: the web can, over Stripe;
 /// a phone can over its store, once the store has the product.

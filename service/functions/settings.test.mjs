@@ -6,8 +6,9 @@ import { afterEach, test } from 'node:test';
 import { claimWith, ticketFor } from './accounts.mjs';
 import { sequencer } from './household.mjs';
 import { memoryStore } from './rows.mjs';
-import { S, SERVICE_BOUNDS, SERVICE_DEFAULTS, forgetSettings, serviceSettingsOf, settle, useSettings } from './settings.mjs';
+import { S, SERVICE_BOUNDS, SERVICE_DEFAULTS, STRIPE_PRICE, forgetSettings, serviceSettingsOf, settle, useSettings } from './settings.mjs';
 import { checkout, forgetPriceIds, record } from './stripe.mjs';
+import { STATED, stripePrice, withPrice } from './stripe.fixtures.mjs';
 import { mint } from './turn.mjs';
 
 const KEY = 'ab'.repeat(32);
@@ -40,7 +41,6 @@ test('no row is the defaults', () => {
     activationsPerHour: 600,
     profileWritesPerHour: 30,
     recordsPerHour: 12,
-    stripePrice: null,
   });
   for (const raw of [[], 'x', 7]) assert.deepEqual(serviceSettingsOf(raw), { ...SERVICE_DEFAULTS });
 });
@@ -64,12 +64,11 @@ test('a code handed back again always has time left in it', () => {
   assert.equal(serviceSettingsOf({ ticketMinutes: 1 }).ticketReuseMinutes, 0);
 });
 
-test('a Stripe price is a price id or a lookup key, and nothing else', () => {
-  assert.equal(serviceSettingsOf({ stripePrice: 'price_1QxYz' }).stripePrice, 'price_1QxYz');
-  assert.equal(serviceSettingsOf({ stripePrice: 'openhearts_annual' }).stripePrice, 'openhearts_annual');
-  for (const bad of ['', 'price_', 'price_1&mode=payment', 'live play', 'a/b', 'x'.repeat(201), 42]) {
-    assert.equal(serviceSettingsOf({ stripePrice: bad }).stripePrice, null, String(bad));
-  }
+test('a Stripe price is named by a price id or a lookup key, and nothing else', () => {
+  for (const good of ['price_1QxYz', 'openhearts_annual']) assert.ok(STRIPE_PRICE.test(good), good);
+  for (const bad of ['', 'price_', 'price_1&mode=payment', 'live play', 'a/b', 'x'.repeat(201)]) assert.ok(!STRIPE_PRICE.test(bad), bad);
+  // And not by the row: the price is the one the terms state.
+  assert.ok(!('stripePrice' in serviceSettingsOf({ stripePrice: 'price_1QxYz' })));
 });
 
 test('the row is read once a minute, and a store that is down is the defaults', async () => {
@@ -110,17 +109,30 @@ test('a code good for as long as the row says', async () => {
   assert.equal((await claimWith('11'.repeat(32), made.body.ticket, store, { now: now + 3 * 60000 + 1 })).status, 410);
 });
 
-test('the Stripe price in the row is the one a checkout sells', async () => {
+test('a checkout sells only at the price the terms state, whatever the row says', async () => {
+  forgetPriceIds();
   const sent = [];
-  const stripe = async (url, init) => {
+  const sell = (price) => withPrice(async (url, init) => {
     sent.push(new URLSearchParams(init.body).get('line_items[0][price]'));
     return Response.json({ url: 'https://checkout.stripe.com/c/pay/cs_1' });
-  };
-  const env = { OH_STRIPE_SECRET: 'sk_test', OH_STRIPE_PRICE: 'price_build' };
-  await checkout(KEY, 'https://x/', 'https://x/', env, stripe);
+  }, price);
+  const env = { OH_STRIPE_SECRET: 'sk_test', OH_STRIPE_PRICE: 'price_1', OH_PRICE: STATED };
+  // No row moves the shop to another price.
   useSettings({ stripePrice: 'price_new' });
-  await checkout(KEY, 'https://x/', 'https://x/', env, stripe);
-  assert.deepEqual(sent, ['price_build', 'price_new']);
+  assert.equal((await checkout(KEY, 'https://x/', 'https://x/', env, sell())).status, 200);
+  assert.deepEqual(sent, ['price_1']);
+  // A price in Stripe that is not the terms' is not sold at, however it
+  // came to be named.
+  for (const other of [{ unit_amount: 699 }, { currency: 'eur' }, { recurring: { interval: 'month', interval_count: 1 } }, { recurring: null }, { active: false }]) {
+    forgetPriceIds();
+    assert.deepEqual(await checkout(KEY, 'https://x/', 'https://x/', env, sell(stripePrice(other))), { status: 503, body: { error: 'the shop is not open yet' } }, JSON.stringify(other));
+  }
+  assert.equal(sent.length, 1, 'no checkout opened at another price');
+  // Nor with no price stated.
+  forgetPriceIds();
+  const { OH_PRICE, ...unstated } = env;
+  assert.equal((await checkout(KEY, 'https://x/', 'https://x/', unstated, sell())).status, 503);
+  assert.equal(sent.length, 1);
 });
 
 test('a lookup key is asked of Stripe once, for its active price, and sold by id', async () => {
@@ -130,12 +142,12 @@ test('a lookup key is asked of Stripe once, for its active price, and sold by id
   const stripe = async (url, init) => {
     if (String(url).startsWith('https://api.stripe.com/v1/prices?')) {
       asked.push(new URL(url).searchParams);
-      return Response.json({ data: [{ id: 'price_Yearly599' }] });
+      return Response.json({ data: [stripePrice({ id: 'price_Yearly599' })] });
     }
     sold.push(new URLSearchParams(init.body).get('line_items[0][price]'));
     return Response.json({ url: 'https://checkout.stripe.com/c/pay/cs_1' });
   };
-  const env = { OH_STRIPE_SECRET: 'sk_test', OH_STRIPE_PRICE: 'openhearts_annual' };
+  const env = { OH_STRIPE_SECRET: 'sk_test', OH_STRIPE_PRICE: 'openhearts_annual', OH_PRICE: STATED };
   for (let i = 0; i < 2; i++) assert.equal((await checkout(KEY, 'https://x/', 'https://x/', env, stripe)).status, 200);
   assert.deepEqual(sold, ['price_Yearly599', 'price_Yearly599']);
   assert.equal(asked.length, 1, 'kept, not asked for every checkout');
@@ -146,11 +158,13 @@ test('a lookup key is asked of Stripe once, for its active price, and sold by id
 test('a lookup key Stripe has no price for is a shop not open; Stripe not answering is said so', async () => {
   forgetPriceIds();
   const none = async () => Response.json({ data: [] });
-  const env = { OH_STRIPE_SECRET: 'sk_test', OH_STRIPE_PRICE: 'no_such_key' };
+  const env = { OH_STRIPE_SECRET: 'sk_test', OH_STRIPE_PRICE: 'no_such_key', OH_PRICE: STATED };
   assert.deepEqual(await checkout(KEY, 'https://x/', 'https://x/', env, none), { status: 503, body: { error: 'the shop is not open yet' } });
   const down = async () => new Response('no', { status: 500 });
   assert.equal((await checkout(KEY, 'https://x/', 'https://x/', env, down)).status, 502);
-  const bad = { OH_STRIPE_SECRET: 'sk_test', OH_STRIPE_PRICE: 'price_1&mode=payment' };
+  const gone = { ...env, OH_STRIPE_PRICE: 'price_gone' };
+  assert.equal((await checkout(KEY, 'https://x/', 'https://x/', gone, withPrice(down, null))).status, 503, 'a price id Stripe has not got');
+  const bad = { ...env, OH_STRIPE_PRICE: 'price_1&mode=payment' };
   assert.equal((await checkout(KEY, 'https://x/', 'https://x/', bad, none)).status, 503, 'nothing sent for a name that is neither');
 });
 

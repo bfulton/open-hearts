@@ -2,7 +2,7 @@
 
 Use this guide to build a signed store release of the app for iOS or Android.
 
-`build_phone.sh` builds the deal's native libraries first, then the release, compiled with what `config/openhearts.json` names (`app/tool/defines.mjs`): the service key the app takes a licence from, the app's origin, the sign-in identifiers and the store products.
+`./oh phone` builds, through `build_phone.sh`, the deal's native libraries first, then the release, compiled with what `config/openhearts.json` names (`app/tool/defines.mjs`): the service key the app takes a licence from, the app's origin, the sign-in identifiers and the store products.
 
 ## Before you begin
 
@@ -24,7 +24,7 @@ Use this guide to build a signed store release of the app for iOS or Android.
 1. From the repository root, build the release:
 
    ```bash
-   ./build_phone.sh ios
+   ./oh phone ios
    ```
 
    This builds the deal and Schnorr libraries as XCFrameworks into `app/ios/Frameworks`, which the Runner target embeds and signs, and then runs `flutter build ipa`. Anything after `ios` is passed to `flutter build` as it is.
@@ -42,7 +42,7 @@ Use this guide to build a signed store release of the app for iOS or Android.
 1. From the repository root, build the release:
 
    ```bash
-   ./build_phone.sh android
+   ./oh phone android
    ```
 
    This builds the deal and Schnorr libraries for three ABIs into `app/android/app/src/main/jniLibs/`, and then runs `flutter build appbundle`. Anything after `android` is passed to `flutter build` as it is.

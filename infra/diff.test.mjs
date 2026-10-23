@@ -250,15 +250,15 @@ test('Pages: a missing secret is set by hand, and nothing is patched for it', ()
   assert.doesNotMatch(plan.owner.join(' '), /oops/);
 });
 
-test('Pages: the command for a missing secret sets it in its own environment', () => {
+test('Pages: a missing secret is put right with oh, which sets it in every environment that lists it', () => {
   const production = liveProduction();
   delete production.env_vars.OH_ID_HMAC;
-  const [prod] = pagesEnvPlan(pages.environments.production, production, ids, 'production').owner;
-  assert.match(prod, /secret put OH_ID_HMAC --project-name <project>`$/);
+  const [prod] = pagesEnvPlan(pages.environments.production, production, ids).owner;
+  assert.match(prod, /`\.\/oh secret set OH_ID_HMAC --apply`$/);
   const preview = liveProduction();
   delete preview.env_vars.OH_ID_HMAC;
-  const [prev] = pagesEnvPlan(pages.environments.production, preview, ids, 'preview').owner;
-  assert.match(prev, /secret put OH_ID_HMAC --project-name <project> --env preview`$/);
+  const [prev] = pagesEnvPlan(pages.environments.production, preview, ids).owner;
+  assert.match(prev, /`\.\/oh secret set OH_ID_HMAC --apply`$/);
 });
 
 test("Pages: production wants Play's service account when the config names Play, as the worker does", () => {
@@ -400,7 +400,7 @@ test("toml: the relay's own wrangler.toml reads", () => {
   assert.deepEqual(wrangler.routes, [{ pattern: 'relay.openhearts.game', custom_domain: true }]);
   assert.deepEqual(
     wranglerBindings(wrangler).map((b) => `${b.type}:${b.name}`).sort(),
-    ['analytics_engine:OH_METRICS', 'durable_object_namespace:BENCH', 'durable_object_namespace:HOUSEHOLD', 'durable_object_namespace:TABLE', 'kv_namespace:OH_STORE', 'plain_text:OH_MAIL_FROM', 'send_email:EMAIL', 'version_metadata:CF_VERSION_METADATA'],
+    ['ai:AI', 'analytics_engine:OH_METRICS', 'durable_object_namespace:BENCH', 'durable_object_namespace:HOUSEHOLD', 'durable_object_namespace:KNOWN', 'durable_object_namespace:TABLE', 'kv_namespace:OH_STORE', 'plain_text:OH_MAIL_FROM', 'r2_bucket:OH_PICTURES', 'r2_bucket:OH_RECORDS', 'send_email:EMAIL', 'version_metadata:CF_VERSION_METADATA'],
   );
 });
 
@@ -410,13 +410,17 @@ const liveRelay = () => ({
     compatibility_flags: [],
     observability: { enabled: true },
     bindings: [
+      { name: 'AI', type: 'ai' },
       { class_name: 'Bench', name: 'BENCH', namespace_id: 'fba6', type: 'durable_object_namespace' },
       { name: 'CF_VERSION_METADATA', type: 'version_metadata' },
       { name: 'EMAIL', type: 'send_email' },
       { class_name: 'Household', name: 'HOUSEHOLD', namespace_id: 'a1c3', type: 'durable_object_namespace' },
+      { class_name: 'KnownPictures', name: 'KNOWN', namespace_id: 'b2d4', type: 'durable_object_namespace' },
       { name: 'OH_JUROR_SECRET', type: 'secret_text' },
       { dataset: 'open_hearts_relay', name: 'OH_METRICS', type: 'analytics_engine' },
       { name: 'OH_MAIL_FROM', text: 'noreply@openhearts.game', type: 'plain_text' },
+      { bucket_name: 'open-hearts-pictures', name: 'OH_PICTURES', type: 'r2_bucket' },
+      { bucket_name: 'open-hearts-records', name: 'OH_RECORDS', type: 'r2_bucket' },
       { name: 'OH_STORE', namespace_id: '5b65151de63341dc9f7a9d417c9b6a4e', type: 'kv_namespace' },
       { class_name: 'TagRelay', name: 'TABLE', namespace_id: '744b', type: 'durable_object_namespace' },
     ],
@@ -424,7 +428,7 @@ const liveRelay = () => ({
   secrets: ['OH_JUROR_SECRET'],
   domains: [{ hostname: 'relay.openhearts.game', service: 'open-hearts-relay', enabled: true }],
   subdomain: { enabled: false },
-  namespaces: ['TagRelay', 'Household', 'Bench'].map((c) => ({ script: 'open-hearts-relay', class: c })),
+  namespaces: ['TagRelay', 'Household', 'Bench', 'KnownPictures'].map((c) => ({ script: 'open-hearts-relay', class: c })),
   containers: [{ name: 'open-hearts-relay-bench', max_instances: 1 }],
 });
 
@@ -447,6 +451,14 @@ test('relay: each kind of drift is said', () => {
   for (const said of [/compatibility date/, /EMAIL .* not on the worker/, /CF_VERSION_METADATA .* not on the worker/, /OH_MAIL_FROM: text/, /EXTRA .* not in wrangler.toml/, /OH_JUROR_SECRET is not set/, /relay.openhearts.game is not attached/, /workers.dev address is on/, /namespace for Household/, /max_instances is 3/]) {
     assert.match(problems, said);
   }
+});
+
+test("relay: PhotoDNA's and NCMEC's secrets are nothing amiss, set or not; any other undefined one is", () => {
+  const live = liveRelay();
+  live.secrets = ['OH_JUROR_SECRET', 'OH_PHOTODNA_KEY', 'OH_NCMEC_USERNAME', 'OH_NCMEC_PASSWORD'];
+  assert.deepEqual(relayProblems(wrangler, relay, live), []);
+  live.secrets.push('OH_OTHER');
+  assert.deepEqual(relayProblems(wrangler, relay, live), ['secret OH_OTHER is set but not defined (infra/cloudflare.mjs, relay.secrets)']);
 });
 
 test('relay: not deployed at all', () => {
@@ -561,17 +573,31 @@ const livePrice = () => ({
   currency: 'usd',
   lookup_key: 'openhearts_annual',
   recurring: { interval: 'year', interval_count: 1, usage_type: 'licensed' },
-  tax_behavior: 'unspecified',
+  tax_behavior: 'exclusive',
   type: 'recurring',
   unit_amount: 599,
 });
 
 test('price: as it is; another amount is a new price', () => {
-  assert.equal(pricePlan(stripe.price, livePrice()).create, false);
+  assert.deepEqual(pricePlan(stripe.price, livePrice()), { create: false, why: '', diffs: [] });
   assert.equal(pricePlan(stripe.price, null).create, true);
   const dearer = { ...livePrice(), unit_amount: 699 };
   assert.deepEqual(pricePlan(stripe.price, dearer), { create: true, why: 'unit_amount: 699 -> 599', diffs: [{ path: 'unit_amount', want: 599, have: 699 }] });
   assert.equal(pricePlan(stripe.price, { ...livePrice(), recurring: { interval: 'month', interval_count: 1 } }).create, true);
+});
+
+test('price: its tax behaviour is set where it was never set, and is a new price where it was', () => {
+  assert.equal(stripe.price.taxBehavior, 'exclusive', 'tax on top, as the terms say');
+  const unset = pricePlan(stripe.price, { ...livePrice(), tax_behavior: 'unspecified' });
+  assert.deepEqual([unset.create, unset.update, unset.why], [false, { tax_behavior: 'exclusive' }, 'tax_behavior: "unspecified" -> "exclusive"']);
+  assert.equal(pricePlan(stripe.price, { ...livePrice(), tax_behavior: 'inclusive' }).create, true, 'Stripe sets it once');
+  const both = pricePlan(stripe.price, { ...livePrice(), tax_behavior: 'unspecified', unit_amount: 699 });
+  assert.deepEqual([both.create, both.update], [true, undefined], 'a new amount is a new price anyway, made with it');
+});
+
+test('product: Managed Payments needs a tax code of a digital product it sells', () => {
+  assert.equal(stripe.product.tax_code, 'txcd_10201002');
+  assert.ok(stripe.webhooks[0].events.includes('charge.refunded'), 'a refund ends the subscription it was for');
 });
 
 const liveWebhooks = () => [

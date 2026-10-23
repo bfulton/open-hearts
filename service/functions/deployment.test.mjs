@@ -46,6 +46,13 @@ test('a name set on the project, or by a test, wins over the file', () => {
   assert.equal(env.OH_STORE, 'kv');
 });
 
+test('the price is the file\'s alone: what the terms state, which no setting on the project changes', () => {
+  const env = withConfig({ OH_PRICE: '1 usd' }, { price: { amount: 599, currency: 'usd' } });
+  assert.equal(env.OH_PRICE, '599 usd');
+  assert.ok(!('OH_PRICE' in withConfig({ OH_PRICE: '1 usd' }, {})), 'no price in the file is none to sell at');
+  assert.equal(configEnv(committed).OH_PRICE, `${committed.price.amount} ${committed.price.currency}`);
+});
+
 test('a phone build is compiled with the key, the sign-in identifiers and the products, from the same file', () => {
   const defines = appDefines(committed);
   assert.equal(defines.OH_SERVICE_KEY, committed.serviceKey);

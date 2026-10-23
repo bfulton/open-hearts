@@ -29,6 +29,16 @@ cores=$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)
 #
 # One function each, run from the root with its output to its log.
 
+# Every Dart package's dependencies, fetched before any suite reads
+# them, as CI does: `dart analyze` does not fetch them itself, and the
+# service's three suites, side by side in one package, would each fetch
+# them at once. lanes() runs it first wherever a Dart suite is to run.
+suite_deps() {
+  local d
+  for d in packages/engine packages/deal packages/table_sim packages/table service; do
+    echo "==> $d" && (cd "$d" && dart pub get) || return 1
+  done
+}
 suite_engine() { cd packages/engine && dart analyze --fatal-infos && dart test -j "$cores"; }
 suite_deal() { cd packages/deal && dart analyze --fatal-infos && dart test -j "$cores"; }
 # The table's fast tier, after its simulator's own checks
@@ -46,8 +56,11 @@ suite_service_js() { cd service && OH_RELAY=js dart test -j "$cores"; }
 suite_service_object() { cd service && OH_RELAY=object dart test -j "$cores"; }
 suite_relay_js() { node --test service/do/*.test.mjs; }
 suite_functions() { node --test service/functions/*.test.mjs; }
-suite_site() { node --test site/build.test.mjs; }
+suite_site() { node --test site/*.test.mjs; }
 suite_infra() { node --test infra/*.test.mjs; }
+# The operator's command: its reference is its table, and each command
+# does what it says (docs/reference/oh.md).
+suite_ops() { node --test ops/*.test.mjs; }
 # The page's own workers, in node, against the committed wasm.
 suite_workers() { node --test e2e/deal_worker.test.mjs e2e/deal_golden.test.mjs e2e/offline_worker.test.mjs e2e/carry.test.mjs crypto/schnorr_wasm/vectors.test.mjs; }
 suite_crypto() {
@@ -59,8 +72,9 @@ suite_crypto() {
 # The scripts that are not anybody's suite: that each still parses.
 suite_scripts() {
   local f ok=0
-  for f in check.sh deploy.sh build_phone.sh e2e/*.sh crypto/*.sh app/ios/*.sh; do bash -n "$f" || ok=1; done
+  for f in check.sh deploy.sh build_phone.sh oh e2e/*.sh crypto/*.sh app/ios/*.sh service/bench/build.sh; do bash -n "$f" || ok=1; done
   for f in e2e/*.mjs app/tool/*.mjs; do node --check "$f" || ok=1; done
+  CHECK_PLAN=1 ./check.sh full > /dev/null || ok=1
   if python3 -c 'import yaml' 2> /dev/null; then
     python3 -c 'import sys, yaml; [yaml.safe_load(open(f)) for f in sys.argv[1:]]' .github/workflows/*.yml || ok=1
   fi
@@ -111,7 +125,7 @@ suite_e2e_offline() { node e2e/offline.mjs; }
 suite_e2e_site() { node e2e/site.mjs; }
 suite_e2e_move() { node e2e/move.mjs; }
 
-all_suites="engine deal table table_slow service service_js service_object relay_js functions site infra workers crypto scripts docs app_analyze app
+all_suites="engine deal table table_slow service service_js service_object relay_js functions site infra ops workers crypto scripts docs app_analyze app
   e2e_build e2e_flows e2e_run e2e_escrow e2e_offline e2e_site e2e_move"
 
 # ---- running them ----------------------------------------------------------
@@ -184,7 +198,10 @@ lanes() {
     return 0
   fi
   mkdir -p "$logs"
-  local pids=() l
+  local pids=() l s
+  for s in ${*//,/ }; do
+    case $s in engine | deal | table | table_slow | service | service_js | service_object) run deps; break ;; esac
+  done
   for l in "$@"; do
     # shellcheck disable=SC2086
     lane $l &
@@ -222,16 +239,25 @@ quick() {
     case $f in
       app/lib/*|app/test/*|app/web/*|app/worker/*|app/pubspec.yaml|app/analysis_options.yaml|app/l10n.yaml)
         add app_analyze app; app_files+=("$f")
-        case $f in app/web/*|app/worker/*) add workers ;; esac ;;
+        case $f in app/web/*|app/worker/*) add workers ;; app/lib/net/buying.dart) add site ;; esac ;;
       packages/engine/*) add engine ;;
       packages/deal/*) add deal ;;
       packages/table/*|packages/table_sim/*) add table ;;
       service/do/*) add relay_js service_js service_object ;;
-      service/functions/*) add functions ;;
-      service/tool/*.mjs) add functions ;;
+      # The name filter: the relay reads it too, and the app is held to
+      # its cases.
+      service/functions/names.vectors.json) add functions ops relay_js app_analyze app; app_files+=(app/lib/names.dart) ;;
+      service/functions/names.mjs|service/functions/name_fold.mjs|service/functions/blocked_names.mjs) add functions ops relay_js ;;
+      third_party/ldnoobw/*) add functions ops ;;
+      # The pictures withheld: the relay reads the list too.
+      service/functions/pictures.mjs) add functions ops relay_js ;;
+      service/functions/*) add functions ops ;;
+      service/tool/*.mjs) add functions ops ;;
       service/*) add service ;;
-      site/*) add site e2e_site ;;
-      infra/*) add infra ;;
+      site/*) add site e2e_site ops ;;
+      config/*) add site functions infra ops ;;
+      infra/*) add infra ops ;;
+      ops/*|oh) add ops ;;
       e2e/*.test.mjs) add workers ;;
       e2e/*|*.sh|.github/*) add scripts ;;
       crypto/*) add crypto deal workers ;;
@@ -288,11 +314,18 @@ quick() {
 # tests where cargo has built them here; a machine that was handed the
 # libraries has nothing to test them with.
 full() {
-  local crypto=""
+  local crypto="" s
   [ -d crypto/deal/target/release/.fingerprint ] && command -v cargo > /dev/null && crypto=crypto
+  local plan=("table table_slow" "app_analyze app" "engine,deal" "relay_js,functions,site,infra,ops,workers,scripts,docs $crypto"
+    "e2e_build e2e_move,e2e_site service,service_js,service_object,e2e_escrow e2e_run,e2e_offline e2e_flows")
+  # Every suite there is, in a lane: one left out would never run here.
+  for s in $all_suites; do
+    [ "$s" = crypto ] && [ -z "$crypto" ] && continue
+    [[ " ${plan[*]//,/ } " == *" $s "* ]] || { echo "check: full runs no $s: put it in a lane" >&2; exit 2; }
+  done
   echo "logs in $logs/"
-  lanes "table table_slow" "app_analyze app" "engine,deal" "relay_js,functions,site,infra,workers,scripts,docs $crypto" \
-    "e2e_build e2e_move,e2e_site service,service_js,service_object,e2e_escrow e2e_run,e2e_offline e2e_flows"
+  [ -n "$crypto" ] || echo "crypto: not run, as crypto/deal has not been built here (./check.sh crypto builds and runs it)"
+  lanes "${plan[@]}"
   verdict
 }
 

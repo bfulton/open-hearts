@@ -4,14 +4,14 @@
 // whether this worker answers — any page would say that — but whether
 // what a purchase needs does. The store is read, and Stripe is asked
 // for the price with the key the service holds, which catches an
-// expired key while the worker answers everything else. The answer is
-// kept for half a minute in this isolate, so asking in a loop does not
-// put the asker's load on Stripe.
+// expired key while the worker answers everything else, and a price
+// other than the one the terms state, which the shop will not sell.
+// The answer is kept for half a minute in this isolate, so asking in a
+// loop does not put the asker's load on Stripe.
 
 import { CONFIG_ROW } from './config.mjs';
 import { storeOf } from './rows.mjs';
-import { S } from './settings.mjs';
-import { StripeRefused, priceLookup } from './stripe.mjs';
+import { StripeRefused, priceDiffers, priceLookup, statedPrice } from './stripe.mjs';
 
 const HEALTH_KEPT_MS = 30 * 1000;
 let health = null;
@@ -34,14 +34,19 @@ export async function healthOf(env, fetchImpl = fetch, { now = Date.now() } = {}
     said.store = 'unreadable';
   }
   const secret = env.OH_STRIPE_SECRET;
-  const named = S().stripePrice ?? env.OH_STRIPE_PRICE;
-  if (!secret || typeof named !== 'string') {
+  const named = env.OH_STRIPE_PRICE;
+  const stated = statedPrice(env);
+  if (!secret || typeof named !== 'string' || !stated) {
     said.stripe = 'not configured';
   } else {
-    // Asked now, not the checkout's kept answer (priceIdOf): this is
-    // whether Stripe answers at all.
+    // Asked now, not the checkout's kept answer (shopPrice): this is
+    // whether Stripe answers at all, and has the price the terms state,
+    // which is the only one a checkout sells at.
     try {
-      if (!(await priceLookup(named, secret, fetchImpl))) said.stripe = 'no such price';
+      const price = await priceLookup(named, secret, fetchImpl);
+      const differs = price ? priceDiffers(price, stated) : null;
+      if (!price) said.stripe = 'no such price';
+      else if (differs) said.stripe = `not the price the terms state: ${differs}`;
     } catch (e) {
       said.stripe = e instanceof StripeRefused ? `stripe said ${e.status}` : 'not answering';
     }

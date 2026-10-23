@@ -1,5 +1,5 @@
 // Makes the New Relic account match monitoring.mjs, for this app and
-// nothing else in the account.
+// nothing else in the account. Run by `./oh infra` (docs/reference/oh.md):
 //
 //   node observability/apply.mjs            what would change, and stop
 //   node observability/apply.mjs --apply    change it

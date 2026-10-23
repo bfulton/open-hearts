@@ -133,10 +133,9 @@ export function rulesPlan(want, have) {
 /// Returns { patch, lines, owner }: `patch` is the deployment_configs
 /// entry a PATCH of the project takes (null deletes), `lines` say what
 /// it changes, and `owner` what only the operator can do — a secret
-/// missing, which this has no value for, with the command that sets it
-/// in [env] (`<project>` for the caller to fill in). Secret values are
-/// never read: a secret is present or it is not.
-export function pagesEnvPlan(want, have, ids, env = 'production') {
+/// missing, which this has no value for, with the oh command that sets
+/// it. Secret values are never read: a secret is present or it is not.
+export function pagesEnvPlan(want, have, ids) {
   const patch = {};
   const lines = [];
   const owner = [];
@@ -148,9 +147,9 @@ export function pagesEnvPlan(want, have, ids, env = 'production') {
     envPatch[name] = { type: 'plain_text', value };
     lines.push(h ? (h.type === 'plain_text' ? `set ${name}: ${JSON.stringify(h.value)} -> ${JSON.stringify(value)}` : `set ${name} as plain text (it is ${h.type})`) : `add ${name} = ${JSON.stringify(value)}`);
   }
-  // Without --env, Wrangler sets production's: a preview secret named
-  // without it would be set in the wrong place.
-  const put = (name) => `\`npx wrangler pages secret put ${name} --project-name <project>${env === 'production' ? '' : ` --env ${env}`}\``;
+  // oh sets a secret in every environment that lists it, so one command
+  // puts right a secret missing from either (docs/reference/oh.md).
+  const put = (name) => `\`./oh secret set ${name} --apply\``;
   for (const name of want.secrets) {
     const h = vars[name];
     if (h?.type === 'secret_text') continue;
@@ -362,6 +361,7 @@ export function wranglerBindings(toml) {
   for (const a of toml.analytics_engine_datasets ?? []) out.push({ name: a.binding, type: 'analytics_engine', dataset: a.dataset });
   for (const s of toml.services ?? []) out.push({ name: s.binding, type: 'service', service: s.service });
   if (toml.version_metadata) out.push({ name: toml.version_metadata.binding, type: 'version_metadata' });
+  if (toml.ai) out.push({ name: toml.ai.binding, type: 'ai' });
   for (const [name, text] of Object.entries(toml.vars ?? {})) out.push({ name, type: 'plain_text', text });
   return out;
 }
@@ -394,10 +394,10 @@ export function relayProblems(toml, relay, live) {
     if (!wranglerBindings(toml).some((w) => w.name === b.name)) out.push(`binding ${b.name} (${b.type}) is on the worker but not in wrangler.toml`);
   }
   for (const secret of relay.secrets) {
-    if (!live.secrets.includes(secret)) out.push(`secret ${secret} is not set: \`npx wrangler secret put ${secret}\` in service/do`);
+    if (!live.secrets.includes(secret)) out.push(`secret ${secret} is not set: \`./oh secret set ${secret} --apply\``);
   }
   for (const secret of live.secrets) {
-    if (!relay.secrets.includes(secret)) out.push(`secret ${secret} is set but not defined (infra/cloudflare.mjs, relay.secrets)`);
+    if (!relay.secrets.includes(secret) && !(relay.optionalSecrets ?? []).includes(secret)) out.push(`secret ${secret} is set but not defined (infra/cloudflare.mjs, relay.secrets)`);
   }
   // Its addresses: the routes wrangler.toml gives, as custom domains.
   const routes = (toml.routes ?? []).filter((r) => r.custom_domain);
@@ -537,13 +537,17 @@ export const formBody = (obj) => new URLSearchParams(form(obj)).toString();
 
 /// The price holding the lookup key against the definition. A price's
 /// amount, currency and interval cannot change, so a difference in them
-/// means a new price that takes the lookup key over.
+/// means a new price that takes the lookup key over; its tax behaviour
+/// can be set once, from unspecified, which is an update of it instead
+/// ({update: {tax_behavior}}).
 export function pricePlan(want, price) {
   if (!price) return { create: true, why: 'no active price holds the lookup key', diffs: [] };
   const diffs = drift(
     { currency: want.currency, unit_amount: want.unitAmount, type: 'recurring', recurring: { interval: want.interval, interval_count: want.intervalCount }, tax_behavior: want.taxBehavior, active: true },
     price,
   );
+  const settable = diffs.length === 1 && diffs[0].path === 'tax_behavior' && price.tax_behavior === 'unspecified';
+  if (settable) return { create: false, update: { tax_behavior: want.taxBehavior }, why: describe(diffs[0]), diffs };
   return { create: diffs.length > 0, why: diffs.map(describe).join(', '), diffs };
 }
 

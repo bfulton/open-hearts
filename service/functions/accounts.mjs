@@ -75,7 +75,10 @@ export async function accountFor(store, subscription, { buyer = null, make = fal
   }
   account ??= newAccount();
   const meta = await store.get(`ACCOUNT#${account}`, 'META');
-  await store.put(`ACCOUNT#${account}`, 'META', { subscription, created_at: meta?.created_at ?? today });
+  // The subscriptions it had before, whose rows still name it: what its
+  // deletion deletes too (deletion.mjs), found without a listing.
+  const before = [...(meta?.before ?? []), ...(typeof meta?.subscription === 'string' && meta.subscription !== subscription ? [meta.subscription] : [])];
+  await store.put(`ACCOUNT#${account}`, 'META', { subscription, created_at: meta?.created_at ?? today, ...(before.length ? { before } : {}) });
   await store.put(`SUB#${subscription}`, 'ACCOUNT', { account });
   return account;
 }

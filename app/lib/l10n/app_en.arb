@@ -491,7 +491,7 @@
   "@subscribe": {
     "description": "Button: buy live play."
   },
-  "aloneIsFree": "Playing alone is free, and always will be.",
+  "aloneIsFree": "Playing alone is free, and we have no plans to change that.",
   "@aloneIsFree": {
     "description": "Under the Subscribe button on the front door."
   },
@@ -664,13 +664,13 @@
   "@pointDeal": {
     "description": "One of the points on the Live play page."
   },
-  "whatMoneyPaysFor": "Playing alone is free and always will be, and so are the records, the engine and every line of this. What the money pays for is the part that costs us to run: putting you in touch with each other, a relay when your two devices cannot find a way through, and a juror when a table is left alone.",
+  "whatMoneyPaysFor": "Playing alone is free, and so are the records, the engine and every line of this; we have no plans to change that. What the money pays for is the part that costs us to run: putting you in touch with each other, a relay when your two devices cannot find a way through, and a juror when a table is left alone.",
   "@whatMoneyPaysFor": {
     "description": "On the Live play page, under the points."
   },
-  "webRenewal": "{price} a year, paid on Stripe's page. It renews by itself every year until you cancel, which you can do whenever you like under Manage subscription; the year you paid for runs out on its own.",
+  "webRenewal": "{price} a year plus any tax, sold by Link, Stripe's affiliate, on Stripe's page. It renews automatically every year until you cancel, at the price then in force: we email you at least 7 days before a new price would apply. Cancel whenever you like under Manage subscription, and live play lasts to the end of the year you paid for.",
   "@webRenewal": {
-    "description": "Under the Subscribe button on the web, where Stripe takes the payment: the price, that it is a year, that it renews by itself until cancelled, and where to cancel (Manage subscription, on this page once subscribed). California's automatic renewal law asks for all of it beside the button.",
+    "description": "Under the Subscribe button on the web, where Stripe takes the payment and Link, Stripe's affiliate, sells the subscription: the price and that tax is added, that it is a year, that it renews by itself until cancelled, and where to cancel (Manage subscription, on this page once subscribed). California's automatic renewal law asks for all of it beside the button.",
     "placeholders": {
       "price": {
         "type": "String"
@@ -770,6 +770,10 @@
   "yourName": "Your name",
   "@yourName": {
     "description": "The field for the player's name, which the others see."
+  },
+  "nameNotAllowed": "This name isn't allowed. Choose another.",
+  "@nameNotAllowed": {
+    "description": "Under the name field, when the name is one the filter refuses (names.dart): the others would not see it, and the last allowed name stays."
   },
   "howYouLook": "How you look",
   "@howYouLook": {
@@ -916,6 +920,112 @@
   "pictureChoiceNote": "On this device only, and only their picture: their name and their score stay.",
   "@pictureChoiceNote": {
     "description": "Under the show or hide picture button."
+  },
+  "reportPlayer": "Report {name}",
+  "@reportPlayer": {
+    "description": "Button and title: report another player to the people who run the game.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "reportWhat": "What's wrong?",
+  "@reportWhat": {
+    "description": "In the report sheet, above the choices of what is reported."
+  },
+  "reportTheirPicture": "Their picture",
+  "@reportTheirPicture": {
+    "description": "Report choice: the other player's picture."
+  },
+  "reportTheirName": "Their name",
+  "@reportTheirName": {
+    "description": "Report choice: the other player's name."
+  },
+  "reportSomethingElse": "Something else",
+  "@reportSomethingElse": {
+    "description": "Report choice: anything other than the picture or the name."
+  },
+  "reportNoteHint": "Anything we should know (optional)",
+  "@reportNoteHint": {
+    "description": "Hint in the report's note field."
+  },
+  "reportGoesTo": "This goes only to the people who run Open Hearts, with your account number and theirs.",
+  "@reportGoesTo": {
+    "description": "Under the report's note: who sees a report."
+  },
+  "reportSend": "Send",
+  "@reportSend": {
+    "description": "Button: send the report."
+  },
+  "reportSent": "Report sent. Thank you.",
+  "@reportSent": {
+    "description": "After a report has gone."
+  },
+  "reportTooMany": "That's as many reports as you can send today.",
+  "@reportTooMany": {
+    "description": "When the service refuses a report as one too many today."
+  },
+  "reportFailed": "The report didn't go. Try again, or write to help@openhearts.game.",
+  "@reportFailed": {
+    "description": "When a report could not be sent."
+  },
+  "blockPlayer": "Block {name}",
+  "@blockPlayer": {
+    "description": "Button: block another player on this device.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "unblockPlayer": "Unblock",
+  "@unblockPlayer": {
+    "description": "Button, on a blocked player: show them again on this device."
+  },
+  "blockedPlayer": "Blocked player",
+  "@blockedPlayer": {
+    "description": "Shown in place of the name of a player this device blocked."
+  },
+  "blockNote": "On this device only: you won't see their name, picture or reactions. They aren't told.",
+  "@blockNote": {
+    "description": "Under the block button: what blocking does."
+  },
+  "liveAgreeTitle": "Before you play live",
+  "@liveAgreeTitle": {
+    "description": "Title of the screen asking a player, once on each device, to agree to the terms before they first play live."
+  },
+  "liveAgreeBody": "The other players will see your name and picture, so choose ones you'd show anyone, and play fair. The Terms of use say what isn't allowed, and what happens if you break them. By playing live, you agree to them.",
+  "@liveAgreeBody": {
+    "description": "What the player agrees to before they first play live: the terms, linked by a button below."
+  },
+  "liveAgree": "I agree",
+  "@liveAgree": {
+    "description": "Button: agree to the terms and go on into live play."
+  },
+  "deleteAccount": "Delete account",
+  "@deleteAccount": {
+    "description": "Button on the subscription page, and on the screen that asks: delete this device's account for good."
+  },
+  "deleteAccountTitle": "Delete your account?",
+  "@deleteAccountTitle": {
+    "description": "Title of the screen that asks before an account is deleted."
+  },
+  "deleteAccountBody": "This can't be undone. It deletes your account on all its devices — its profile, devices, backup codes and sign-in — and takes your name off the games you played. It also clears everything Open Hearts keeps on this device.\n\nLive play stops now, and the time left on your subscription is lost. A web subscription is cancelled. One from the App Store or Google Play goes on renewing until you cancel it there.\n\nTo stop paying but keep playing until your year is up, cancel instead.",
+  "@deleteAccountBody": {
+    "description": "What deleting an account does, said before it is done: what goes, that the time paid for is lost, and that cancelling is the other way to stop paying."
+  },
+  "keepAccount": "Keep account",
+  "@keepAccount": {
+    "description": "Button: do not delete the account after all."
+  },
+  "accountDeleted": "Your account is deleted",
+  "@accountDeleted": {
+    "description": "Title of the last screen in a phone build after the account was deleted."
+  },
+  "accountDeletedClose": "Close Open Hearts and open it again to start afresh.",
+  "@accountDeletedClose": {
+    "description": "On the last screen after the account was deleted: a phone app cannot start itself again."
   },
   "waitingToReconnect": "Waiting for the others to reconnect",
   "@waitingToReconnect": {
@@ -1295,7 +1405,7 @@
   "@storePending": {
     "description": "On the Live play page while the App Store or Google Play holds a purchase for approval (a parent's, or a slow payment method)."
   },
-  "storeRenewal": "{price} a year, charged to your {store, select, apple{Apple Account} other{Google account}} when you confirm. It renews by itself every year until you cancel, which you can do whenever you like in {store, select, apple{the App Store's} other{Google Play's}} subscription settings, at least a day before it renews.",
+  "storeRenewal": "{price} a year, charged to your {store, select, apple{Apple Account} other{Google account}} when you confirm. It renews automatically every year until you cancel, at the price then in force, and {store, select, apple{Apple} other{Google}} tells you before a new price applies. Cancel whenever you like in {store, select, apple{the App Store's} other{Google Play's}} subscription settings, at least a day before it renews.",
   "@storeRenewal": {
     "description": "Under the Subscribe button in the App Store and Google Play builds: the price, that it is a year, that it renews by itself, and how to cancel. The stores require all four. 'store' is apple or google.",
     "placeholders": {

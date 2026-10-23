@@ -1,6 +1,9 @@
 // Makes the Cloudflare and Stripe accounts match cloudflare.mjs and
 // stripe.mjs, for this app and nothing else in them.
 //
+// Run by `./oh infra` (docs/reference/oh.md), which also runs
+// observability/apply.mjs:
+//
 //   node infra/apply.mjs                        what would change, and stop
 //   node infra/apply.mjs --apply                change it
 //   node infra/apply.mjs --only cloudflare      one account (or: stripe)
@@ -166,8 +169,8 @@ async function applyPages() {
   const summary = [];
   for (const [env, want] of Object.entries(pages.environments)) {
     const have = project.deployment_configs?.[env] ?? {};
-    const { patch, lines, owner: theirs } = pagesEnvPlan(want, have, ids, env);
-    for (const line of theirs) owner(`${p} ${env}: ${line.replace('<project>', p)}`);
+    const { patch, lines, owner: theirs } = pagesEnvPlan(want, have, ids);
+    for (const line of theirs) owner(`${p} ${env}: ${line}`);
     for (const line of lines) say(`${p} ${env}: ${line}`);
     if (write && Object.keys(patch).length) await cf('PATCH', `${acct}/pages/projects/${p}`, { deployment_configs: { [env]: patch } });
     const bindings = ['kv', 'r2', 'durableObjects', 'analyticsEngine'].reduce((n, k) => n + Object.keys(want[k] ?? {}).length, 0);
@@ -193,6 +196,9 @@ async function applyStores() {
     if (!bucket) {
       say(`create R2 bucket ${b.name} (${b.location})`);
       if (write) await cf('POST', `${acct}/r2/buckets`, { name: b.name, locationHint: b.location.toLowerCase(), storageClass: b.storageClass });
+      // A new bucket has no address but what is defined: its custom
+      // domains, attached in the same run.
+      for (const d of b.customDomains) await attachDomain(b, base, d);
       continue;
     }
     const before = counts.change + counts.owner;
@@ -208,9 +214,7 @@ async function applyStores() {
       say(`detach custom domain ${d.domain} from R2 bucket ${b.name}`);
       if (write) await cf('DELETE', `${base}/domains/custom/${d.domain}`);
     }
-    for (const d of b.customDomains.filter((x) => !custom.some((c) => c.domain === x))) {
-      owner(`attach custom domain ${d} to R2 bucket ${b.name} (the dashboard's Settings, Custom Domains)`);
-    }
+    for (const d of b.customDomains.filter((x) => !custom.some((c) => c.domain === x))) await attachDomain(b, base, d);
     // No CORS rules: a page elsewhere has no business reading it.
     const cors = await maybe(`${base}/cors`).catch((e) => {
       // 404 and "does not exist" (10059) both mean none.
@@ -253,6 +257,19 @@ async function applyRelay() {
     const routes = (toml.routes ?? []).map((r) => r.pattern).join(', ');
     ok(`relay worker ${name} matches ${relay.wrangler}: ${routes} only, ${settings.bindings.length} bindings, secrets ${relay.secrets.join(', ')}`);
   }
+}
+
+/// Custom domain [d] attached to R2 bucket [b], at [base], in the
+/// defined zone the name ends with.
+async function attachDomain(b, base, d) {
+  const zone = Object.keys(zones).find((z) => d === z || d.endsWith(`.${z}`));
+  const id = zone ? await zoneId(zone) : null;
+  if (!id) {
+    owner(`attach custom domain ${d} to R2 bucket ${b.name}: no zone of the account holds it`);
+    return;
+  }
+  say(`attach custom domain ${d} to R2 bucket ${b.name}`);
+  if (write) await cf('POST', `${base}/domains/custom`, { domain: d, zoneId: id, enabled: true, minTLS: '1.2' });
 }
 
 async function zoneId(name) {
@@ -525,20 +542,24 @@ async function applyStripe() {
           tax_behavior: stripe.price.taxBehavior,
           lookup_key: stripe.price.lookupKey,
           transfer_lookup_key: true,
-          ...(product ? { product: product.id } : { product_data: { name: stripe.product.name } }),
+          ...(product ? { product: product.id } : { product_data: { name: stripe.product.name, tax_code: stripe.product.tax_code } }),
         });
         await st('POST', `/products/${made.product}`, { default_price: made.id, description: stripe.product.description });
       }
     }
+    if (plan.update) {
+      say(`update price ${price.id}: ${plan.why}`);
+      if (write) await st('POST', `/prices/${price.id}`, plan.update);
+    }
     if (productDiffs.length) {
       say(`update product ${product.id}: ${productDiffs.map(describe).join(', ')}`);
-      if (write) await st('POST', `/products/${product.id}`, { name: stripe.product.name, description: stripe.product.description, active: true });
+      if (write) await st('POST', `/products/${product.id}`, { name: stripe.product.name, description: stripe.product.description, tax_code: stripe.product.tax_code, active: true });
     }
     if (product && !plan.create && product.default_price !== price.id) {
       say(`make ${price.id} product ${product.id}'s default price`);
       if (write) await st('POST', `/products/${product.id}`, { default_price: price.id });
     }
-    if (!plan.create && !productDiffs.length && product.default_price === price.id) {
+    if (!plan.create && !plan.update && !productDiffs.length && product.default_price === price.id) {
       ok(`price ${stripe.price.lookupKey} (${price.id}): $${(price.unit_amount / 100).toFixed(2)} ${price.currency} every ${price.recurring.interval_count} ${price.recurring.interval}, active, the default of "${product.name}" (${product.id})`);
     }
   });

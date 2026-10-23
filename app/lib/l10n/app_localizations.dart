@@ -539,7 +539,7 @@ abstract class AppLocalizations {
   /// Under the Subscribe button on the front door.
   ///
   /// In en, this message translates to:
-  /// **'Playing alone is free, and always will be.'**
+  /// **'Playing alone is free, and we have no plans to change that.'**
   String get aloneIsFree;
 
   /// Heading while waiting to be seated at a live table.
@@ -731,13 +731,13 @@ abstract class AppLocalizations {
   /// On the Live play page, under the points.
   ///
   /// In en, this message translates to:
-  /// **'Playing alone is free and always will be, and so are the records, the engine and every line of this. What the money pays for is the part that costs us to run: putting you in touch with each other, a relay when your two devices cannot find a way through, and a juror when a table is left alone.'**
+  /// **'Playing alone is free, and so are the records, the engine and every line of this; we have no plans to change that. What the money pays for is the part that costs us to run: putting you in touch with each other, a relay when your two devices cannot find a way through, and a juror when a table is left alone.'**
   String get whatMoneyPaysFor;
 
-  /// Under the Subscribe button on the web, where Stripe takes the payment: the price, that it is a year, that it renews by itself until cancelled, and where to cancel (Manage subscription, on this page once subscribed). California's automatic renewal law asks for all of it beside the button.
+  /// Under the Subscribe button on the web, where Stripe takes the payment and Link, Stripe's affiliate, sells the subscription: the price and that tax is added, that it is a year, that it renews by itself until cancelled, and where to cancel (Manage subscription, on this page once subscribed). California's automatic renewal law asks for all of it beside the button.
   ///
   /// In en, this message translates to:
-  /// **'{price} a year, paid on Stripe\'s page. It renews by itself every year until you cancel, which you can do whenever you like under Manage subscription; the year you paid for runs out on its own.'**
+  /// **'{price} a year plus any tax, sold by Link, Stripe\'s affiliate, on Stripe\'s page. It renews automatically every year until you cancel, at the price then in force: we email you at least 7 days before a new price would apply. Cancel whenever you like under Manage subscription, and live play lasts to the end of the year you paid for.'**
   String webRenewal(String price);
 
   /// Under the Subscribe button, on the web and in the stores: buying is agreeing to the terms, linked just below.
@@ -853,6 +853,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Your name'**
   String get yourName;
+
+  /// Under the name field, when the name is one the filter refuses (names.dart): the others would not see it, and the last allowed name stays.
+  ///
+  /// In en, this message translates to:
+  /// **'This name isn\'t allowed. Choose another.'**
+  String get nameNotAllowed;
 
   /// Heading above the icons and colours the player can choose.
   ///
@@ -1015,6 +1021,150 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'On this device only, and only their picture: their name and their score stay.'**
   String get pictureChoiceNote;
+
+  /// Button and title: report another player to the people who run the game.
+  ///
+  /// In en, this message translates to:
+  /// **'Report {name}'**
+  String reportPlayer(String name);
+
+  /// In the report sheet, above the choices of what is reported.
+  ///
+  /// In en, this message translates to:
+  /// **'What\'s wrong?'**
+  String get reportWhat;
+
+  /// Report choice: the other player's picture.
+  ///
+  /// In en, this message translates to:
+  /// **'Their picture'**
+  String get reportTheirPicture;
+
+  /// Report choice: the other player's name.
+  ///
+  /// In en, this message translates to:
+  /// **'Their name'**
+  String get reportTheirName;
+
+  /// Report choice: anything other than the picture or the name.
+  ///
+  /// In en, this message translates to:
+  /// **'Something else'**
+  String get reportSomethingElse;
+
+  /// Hint in the report's note field.
+  ///
+  /// In en, this message translates to:
+  /// **'Anything we should know (optional)'**
+  String get reportNoteHint;
+
+  /// Under the report's note: who sees a report.
+  ///
+  /// In en, this message translates to:
+  /// **'This goes only to the people who run Open Hearts, with your account number and theirs.'**
+  String get reportGoesTo;
+
+  /// Button: send the report.
+  ///
+  /// In en, this message translates to:
+  /// **'Send'**
+  String get reportSend;
+
+  /// After a report has gone.
+  ///
+  /// In en, this message translates to:
+  /// **'Report sent. Thank you.'**
+  String get reportSent;
+
+  /// When the service refuses a report as one too many today.
+  ///
+  /// In en, this message translates to:
+  /// **'That\'s as many reports as you can send today.'**
+  String get reportTooMany;
+
+  /// When a report could not be sent.
+  ///
+  /// In en, this message translates to:
+  /// **'The report didn\'t go. Try again, or write to help@openhearts.game.'**
+  String get reportFailed;
+
+  /// Button: block another player on this device.
+  ///
+  /// In en, this message translates to:
+  /// **'Block {name}'**
+  String blockPlayer(String name);
+
+  /// Button, on a blocked player: show them again on this device.
+  ///
+  /// In en, this message translates to:
+  /// **'Unblock'**
+  String get unblockPlayer;
+
+  /// Shown in place of the name of a player this device blocked.
+  ///
+  /// In en, this message translates to:
+  /// **'Blocked player'**
+  String get blockedPlayer;
+
+  /// Under the block button: what blocking does.
+  ///
+  /// In en, this message translates to:
+  /// **'On this device only: you won\'t see their name, picture or reactions. They aren\'t told.'**
+  String get blockNote;
+
+  /// Title of the screen asking a player, once on each device, to agree to the terms before they first play live.
+  ///
+  /// In en, this message translates to:
+  /// **'Before you play live'**
+  String get liveAgreeTitle;
+
+  /// What the player agrees to before they first play live: the terms, linked by a button below.
+  ///
+  /// In en, this message translates to:
+  /// **'The other players will see your name and picture, so choose ones you\'d show anyone, and play fair. The Terms of use say what isn\'t allowed, and what happens if you break them. By playing live, you agree to them.'**
+  String get liveAgreeBody;
+
+  /// Button: agree to the terms and go on into live play.
+  ///
+  /// In en, this message translates to:
+  /// **'I agree'**
+  String get liveAgree;
+
+  /// Button on the subscription page, and on the screen that asks: delete this device's account for good.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete account'**
+  String get deleteAccount;
+
+  /// Title of the screen that asks before an account is deleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete your account?'**
+  String get deleteAccountTitle;
+
+  /// What deleting an account does, said before it is done: what goes, that the time paid for is lost, and that cancelling is the other way to stop paying.
+  ///
+  /// In en, this message translates to:
+  /// **'This can\'t be undone. It deletes your account on all its devices — its profile, devices, backup codes and sign-in — and takes your name off the games you played. It also clears everything Open Hearts keeps on this device.\n\nLive play stops now, and the time left on your subscription is lost. A web subscription is cancelled. One from the App Store or Google Play goes on renewing until you cancel it there.\n\nTo stop paying but keep playing until your year is up, cancel instead.'**
+  String get deleteAccountBody;
+
+  /// Button: do not delete the account after all.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep account'**
+  String get keepAccount;
+
+  /// Title of the last screen in a phone build after the account was deleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Your account is deleted'**
+  String get accountDeleted;
+
+  /// On the last screen after the account was deleted: a phone app cannot start itself again.
+  ///
+  /// In en, this message translates to:
+  /// **'Close Open Hearts and open it again to start afresh.'**
+  String get accountDeletedClose;
 
   /// Under the table while the game is paused.
   ///
@@ -1457,7 +1607,7 @@ abstract class AppLocalizations {
   /// Under the Subscribe button in the App Store and Google Play builds: the price, that it is a year, that it renews by itself, and how to cancel. The stores require all four. 'store' is apple or google.
   ///
   /// In en, this message translates to:
-  /// **'{price} a year, charged to your {store, select, apple{Apple Account} other{Google account}} when you confirm. It renews by itself every year until you cancel, which you can do whenever you like in {store, select, apple{the App Store\'s} other{Google Play\'s}} subscription settings, at least a day before it renews.'**
+  /// **'{price} a year, charged to your {store, select, apple{Apple Account} other{Google account}} when you confirm. It renews automatically every year until you cancel, at the price then in force, and {store, select, apple{Apple} other{Google}} tells you before a new price applies. Cancel whenever you like in {store, select, apple{the App Store\'s} other{Google Play\'s}} subscription settings, at least a day before it renews.'**
   String storeRenewal(String price, String store);
 
   /// Above the Manage subscription button for a subscription bought in the App Store or Google Play. 'store' is apple or google.

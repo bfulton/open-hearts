@@ -207,3 +207,43 @@ test('presence and the results are never screened: no picture is put out there',
     assert.equal(asked, 0, tag);
   }
 });
+
+test("a picture the screen keeps back — one that is not its account's picture now — is screened as it is published, with who said it, and kept to the relay as a take-down is; what is held is never screened again", async () => {
+  const screened = [];
+  const relay = objectRelay(verify, {
+    tag: pool,
+    screen: async (event, who) => (screened.push([event.id, who]), JSON.parse(event.content).jpeg === taken ? WITHHELD_WHY : null),
+    withhold: async () => null,
+  });
+  const sender = socket();
+  const waiting = socket();
+  relay.open(sender);
+  relay.open(waiting);
+  await relay.message(waiting, JSON.stringify(['REQ', 'lobby', { kinds: [lobbyKind], '#t': [pool] }]));
+  const matched = await picture(keys[0], taken);
+  const clear = await picture(keys[1], other);
+  await relay.message(sender, JSON.stringify(['EVENT', matched]));
+  await relay.message(sender, JSON.stringify(['EVENT', clear]));
+  assert.deepEqual(sender.of('OK'), [
+    ['OK', matched.id, true, WITHHELD_WHY],
+    ['OK', clear.id, true, ''],
+  ]);
+  assert.deepEqual(waiting.of('EVENT').map((m) => m[2].id), [clear.id], 'only the clear one passed on');
+  assert.deepEqual(screened, [[matched.id, null], [clear.id, null]], 'asked with who said it: nobody, without a gate');
+
+  // A later subscriber is served what is held, unscreened.
+  const later = socket();
+  relay.open(later);
+  await relay.message(later, JSON.stringify(['REQ', 'lobby', { kinds: [lobbyKind], '#t': [pool] }]));
+  assert.deepEqual(later.of('EVENT').map((m) => m[2].id), [clear.id]);
+  assert.equal(screened.length, 2);
+
+  // Presence keeps nothing and screens nothing.
+  const presenceScreened = [];
+  const presence = objectRelay(verify, { tag: presenceTag, screen: async (e) => (presenceScreened.push(e.id), null) });
+  const s = socket();
+  presence.open(s);
+  await presence.message(s, JSON.stringify(['EVENT', await sign.event(keys[0], { kind: 20000, content: '', tags: [['t', presenceTag]], created_at: 1000 })]));
+  assert.equal(s.of('OK').length, 1, 'presence answered');
+  assert.deepEqual(presenceScreened, []);
+});

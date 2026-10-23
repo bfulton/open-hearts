@@ -16,22 +16,24 @@
 // on is in the modules they import.
 
 import { accountOfKey, backupCodeOf, backupRow, entitlementOf } from './accounts.mjs';
-import { alertSubscribed, alertWaiting } from './alerts.mjs';
+import { alertReport, alertSubscribed, alertUnwritten, alertWaiting, reportOf } from './alerts.mjs';
 import { appHostFor, serveStatic } from './app_host.mjs';
 import { CONFIG_ROW, configOf } from './config.mjs';
 import { healthOf } from './health.mjs';
+import { holdOf } from './holds.mjs';
 import { inHousehold, inSubscription } from './household.mjs';
 import { MOST_BODY, MOST_EVENT, cors, json, preflight, signedFor, textOf } from './http.mjs';
 import { ACTIVATION_S, activationFor, licence, serviceKeys } from './licence.mjs';
 import { loginRow } from './logins.mjs';
 import { measure } from './metrics.mjs';
+import { carryOutNotice, noticesOf } from './notices.mjs';
 import { MOST_PROFILE_BODY } from './profile.mjs';
-import { keepRecord, recordMost, recordResponse, tableIdShape } from './records.mjs';
+import { anonymizeGames, keepRecord, keptGames, markForgotten, recordMost, recordResponse, tableIdShape } from './records.mjs';
 import { isAccount, storeOf } from './rows.mjs';
 import { S, notConfigured, openHouse, settle } from './settings.mjs';
 import { APPLE_ID_GONE, PROVIDERS, appleIdNotice, supersede, unlinkFromAccount, whoSignedIn } from './signin.mjs';
 import { playPurchase, playSubscriptionOf, pushedByPlay, storeAccountOf } from './stores.mjs';
-import { checkout, manage, payerLookup, record, sameSite, webhookSigned } from './stripe.mjs';
+import { checkout, endAtStripe, endRefunded, manage, payerLookup, record, sameSite, webSubscriptionsOf, webhookSigned } from './stripe.mjs';
 import { dateSubscription } from './subscriptions.mjs';
 import { SUSPENDED_WHY, isOrder, orderRow } from './suspension.mjs';
 import { LOCAL_TURN, mint } from './turn.mjs';
@@ -319,9 +321,14 @@ async function checkoutRoute(request, env) {
 }
 
 /// An operator's order, carried out in its account's turn
-/// (suspension.mjs): `{order}`, the id the operator's tool wrote it
-/// under. The order is read here first, so a request that names none
-/// wakes no account's object.
+/// (suspension.mjs), or, for a notice of a change to the terms, here
+/// (notices.mjs): `{order}`, the id the operator's tool wrote it under.
+/// The order is read here first, so a request that names none wakes no
+/// account's object. A termination the relay orders when PhotoDNA
+/// matches a picture (service/do/known.mjs) says `endWeb`: once the
+/// account is ended, so is each of its web subscriptions in Stripe,
+/// with nothing refunded, as for any serious breach. Stripe not
+/// answering is a 502, and the relay orders it again.
 async function orderRoute(request, env) {
   if (request.method !== 'POST') return json(request, 405, { error: 'POST' }, { allow: 'POST' });
   const store = storeOf(env);
@@ -334,9 +341,21 @@ async function orderRoute(request, env) {
   }
   if (!isOrder(id)) return json(request, 400, { error: 'an order, 32 hex' });
   const order = await store.get(...orderRow(id));
+  if (order?.act === 'notice') {
+    const { status, body } = await carryOutNotice(order, store, env);
+    return json(request, status, body);
+  }
   if (!order || !isAccount(order.account)) return json(request, 404, { error: 'no such order' });
   const { status, body } = await inHousehold(env, order.account, { op: 'order', account: order.account, order: id });
-  return json(request, status, body);
+  if (status !== 200 || order.act !== 'terminate' || order.endWeb !== true) return json(request, status, body);
+  const web = webSubscriptionsOf(await store.get(`ACCOUNT#${order.account}`, 'META'));
+  if (web.length && !env.OH_STRIPE_SECRET) return json(request, 503, notConfigured('OH_STRIPE_SECRET'));
+  try {
+    for (const sub of web) await endAtStripe(sub, env.OH_STRIPE_SECRET, 'terminated under the terms');
+  } catch {
+    return json(request, 502, { error: 'the shop is not answering' });
+  }
+  return json(request, 200, { ...body, endedWeb: web });
 }
 
 async function manageRoute(request, env) {
@@ -368,6 +387,13 @@ async function stripeRoute(request, env, ctx) {
     event = JSON.parse(raw);
   } catch {
     return json(request, 400, { error: 'not json' });
+  }
+  // A refund, by anyone, ends the subscription it was for: answered
+  // with an error when Stripe could not be asked, so Stripe sends it
+  // again.
+  if (event?.type === 'charge.refunded') {
+    const ended = await endRefunded(event.data?.object, store, env);
+    return json(request, ended.status, ended.status === 200 ? { ok: true } : ended.body);
   }
   const done = await record(event, store);
   if (done?.bound) await after(ctx, alertSubscribed(env, store, { subscription: done.subscription, source: 'stripe', key: done.bound }));
@@ -421,6 +447,71 @@ async function waitingRoute(request, env, ctx) {
   return json(request, 200, { ok: true });
 }
 
+/// A subscriber's report of another player (alerts.mjs, alertReport):
+/// emailed to the operator at once. 429 for one too many in a day; 503
+/// when it could not be sent, so the app can say so.
+async function reportRoute(request, env) {
+  const pre = preflight(request, 'POST');
+  if (pre) return pre;
+  if (request.method !== 'POST') return json(request, 405, { error: 'POST' }, { allow: 'POST, OPTIONS' });
+  const asked = await signedFor(request, env, 'report', (body) => `${body.about ?? ''} ${body.what ?? ''}`);
+  if (asked instanceof Response) return asked;
+  const report = reportOf(asked.body);
+  if (!report) return json(request, 400, { error: 'a report: who, for what, and a short note at most' });
+  const store = storeOf(env);
+  if (!store) return json(request, 503, notConfigured('OH_STORE'));
+  const account = await accountOfKey(store, asked.key);
+  if (!account || !(await entitlementOf(store, asked.key))) return json(request, 402, { error: 'no subscription' });
+  if (report.about === account) return json(request, 400, { error: 'a report is of somebody else' });
+  // Local mode tells nobody, as for a wait.
+  if (openHouse(env, request)) return json(request, 200, { ok: true });
+  const said = await alertReport(env, store, { key: asked.key, account, ...report });
+  if (said === 'limit') return json(request, 429, { error: 'too many reports today' });
+  if (said === 'unsent') return json(request, 503, { error: 'the report could not be sent' });
+  return json(request, 200, { ok: true });
+}
+
+/// The account of the device asking, deleted: by any device of it, as
+/// any may drop another (docs/explanation/service.md, "Deleting an
+/// account's data"). Signed for `delete`. What is outside the store
+/// goes first, so that a run that stops part way finds the account
+/// still there when the device asks again: each web subscription of it
+/// still running is ended in Stripe, the time left on it with it (the
+/// terms, "Ending these terms"); the account is marked forgotten, and
+/// its name taken off the games it played (records.mjs). Then its rows,
+/// in its turn (deletion.mjs, deleteAccount). A game that would not be
+/// written back as it was sent keeps the name, and the operator is told
+/// (alerts.mjs). 404 for a device in no account: one whose deletion is
+/// done. Under a legal hold, only the asking is noted.
+async function deleteRoute(request, env) {
+  const pre = preflight(request, 'POST');
+  if (pre) return pre;
+  if (request.method !== 'POST') return json(request, 405, { error: 'POST' }, { allow: 'POST, OPTIONS' });
+  const asked = await signedFor(request, env, 'delete');
+  if (asked instanceof Response) return asked;
+  const store = storeOf(env);
+  if (!store) return json(request, 503, notConfigured('OH_STORE'));
+  const account = await accountOfKey(store, asked.key);
+  if (!account || !(await store.get(`ACCOUNT#${account}`, `DEVICE#${asked.key}`))) return json(request, 404, { error: 'no account' });
+  if (!(await holdOf(store, account))) {
+    const web = webSubscriptionsOf(await store.get(`ACCOUNT#${account}`, 'META'));
+    if (web.length && !env.OH_STRIPE_SECRET) return json(request, 503, notConfigured('OH_STRIPE_SECRET'));
+    try {
+      for (const sub of web) await endAtStripe(sub, env.OH_STRIPE_SECRET, 'account deleted');
+    } catch {
+      return json(request, 502, { error: 'the shop is not answering' });
+    }
+    if (env.OH_RECORDS) {
+      await markForgotten(env.OH_RECORDS, account);
+      const unwritten = [];
+      await anonymizeGames(keptGames(env.OH_RECORDS), account, { refused: (key) => unwritten.push(key) });
+      await alertUnwritten(env, { account, keys: unwritten });
+    }
+  }
+  const { status, body } = await inHousehold(env, account, { op: 'delete', key: asked.key });
+  return json(request, status, body);
+}
+
 async function turn(request, env) {
   const pre = preflight(request, 'POST');
   if (pre) return pre;
@@ -459,8 +550,10 @@ async function configRoute(request, env) {
     // Unreadable is the same as absent: the defaults.
   }
   // A minute in the browser's cache: a kill switch thrown reaches every
-  // device opening the app within one.
-  return json(request, 200, configOf(raw), { 'cache-control': 'public, max-age=60' });
+  // device opening the app within one. With the operator's row, the
+  // changes to the terms and the privacy policy every device is told of
+  // (notices.mjs), from the ledger this deploy published.
+  return json(request, 200, { ...configOf(raw), notices: noticesOf(env.OH_LEDGER) }, { 'cache-control': 'public, max-age=60' });
 }
 
 async function storeRoute(request, env, ctx) {
@@ -612,6 +705,8 @@ const ROUTES = {
   devices: (request, env) => devicesRoute(request, env),
   profile: (request, env) => profileRoute(request, env),
   waiting: (request, env, ctx) => waitingRoute(request, env, ctx),
+  report: (request, env) => reportRoute(request, env),
+  delete: (request, env) => deleteRoute(request, env),
   attest: (request, env) => signInRoute(request, env, false),
   supersede: (request, env) => signInRoute(request, env, true),
   'apple-id': (request, env) => appleIdRoute(request, env),

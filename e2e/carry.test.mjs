@@ -134,10 +134,13 @@ test('a key made here while the answer was on its way is kept', async () => {
   assert.equal(storage.getItem('flutter.identity_name'), null);
 });
 
-test('nothing asked with a key here, after a carry, on a preview, or anywhere else', async () => {
+test('nothing asked with a key here, after a carry, on a device started afresh, on a preview, or anywhere else', async () => {
   for (const [href, storage, outcome] of [
     ['https://play.openhearts.game/', new Storage({ [KEY]: key }), 'kept'],
     ['https://play.openhearts.game/', new Storage({ 'oh.carried': '{}' }), 'kept'],
+    // Its account deleted from here (app/lib/start_afresh.dart): the
+    // device it was is not brought back from the old address.
+    ['https://play.openhearts.game/', new Storage({ 'flutter.device_started_afresh': '"2026-10-19"' }), 'kept'],
     ['https://dev.open-hearts.pages.dev/play/', new Storage(), 'not here'],
     ['https://openhearts.game/play/', new Storage(), 'not here'],
     ['http://play.openhearts.game/', new Storage(), 'not here'],

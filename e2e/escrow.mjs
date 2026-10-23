@@ -20,7 +20,7 @@
 // seat is drawn, and the deal says so.
 
 import { chromium } from './browser.mjs';
-import { act, click, has, licensed, log, serveApp, sleep, startRelay, texts, type, waitFor } from './drive.mjs';
+import { act, agreedToTerms, click, has, licensed, log, serveApp, sleep, startRelay, texts, type, waitFor } from './drive.mjs';
 
 const driven = 'e2e=1';
 
@@ -53,6 +53,7 @@ async function main() {
   try {
     // Spared motion, as in run.mjs: the escrow is what is looked at.
     const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: 'en-US', reducedMotion: 'reduce' });
+    await agreedToTerms(ctx);
     const page = await ctx.newPage();
     // Every line the table writes, kept whether or not it is logged:
     // this suite reads what the browser saw, which is more than is

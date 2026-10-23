@@ -21,6 +21,10 @@
 //   {{appStore}}, {{googlePlay}}  the store, linked to the listing once it is live
 //   {{appStoreBadge}}, {{googlePlayBadge}}  a badge's link, or inactive
 //   {{storesSoon}}  home.soon, said under the badges while either is inactive
+//   {{price}}       what a year of live play costs on the web, written the
+//                   language's way: config/openhearts.json's `price`
+//   {{updated.terms}}, {{updated.privacy}}  the day the document's newest
+//                   version in ledger.json was published, in the language
 //   {{> name}}      pages/_name.html, filled in the same way
 import { createHash } from 'node:crypto';
 import { cpSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
@@ -44,13 +48,59 @@ const storeFronts = { appStore: 'https://www.apple.com/app-store/', googlePlay: 
 const storeLink = (store, name) => `<a href="${stores[store] ?? storeFronts[store]}">${name}</a>`;
 const storeBadge = (url) => (url ? `href="${url}"` : 'aria-disabled="true"');
 
+/// Each language, with how it writes US dollars and a day. Written out
+/// rather than asked of Intl, whose answer moves with the ICU a Node
+/// has: these are in the terms, whose every word is fingerprinted
+/// (ledger.mjs).
 export const languages = [
-  { code: 'en', lang: 'en', locale: 'en_US', name: 'English' },
-  { code: 'es', lang: 'es', locale: 'es_ES', name: 'Español' },
-  { code: 'pt', lang: 'pt-BR', locale: 'pt_BR', name: 'Português' },
-  { code: 'de', lang: 'de', locale: 'de_DE', name: 'Deutsch' },
-  { code: 'fr', lang: 'fr', locale: 'fr_FR', name: 'Français' },
+  {
+    code: 'en', lang: 'en', locale: 'en_US', name: 'English',
+    usd: (whole, cents) => `$${whole}.${cents}`,
+    day: (d, m, y) => `${d} ${['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'][m]} ${y}`,
+  },
+  {
+    code: 'es', lang: 'es', locale: 'es_ES', name: 'Español',
+    usd: (whole, cents) => `${whole},${cents} US$`,
+    day: (d, m, y) => `${d} de ${['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'][m]} de ${y}`,
+  },
+  {
+    code: 'pt', lang: 'pt-BR', locale: 'pt_BR', name: 'Português',
+    usd: (whole, cents) => `US$ ${whole},${cents}`,
+    day: (d, m, y) => `${d} de ${['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'][m]} de ${y}`,
+  },
+  {
+    code: 'de', lang: 'de', locale: 'de_DE', name: 'Deutsch',
+    usd: (whole, cents) => `${whole},${cents} US$`,
+    day: (d, m, y) => `${d}. ${['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'][m]} ${y}`,
+  },
+  {
+    code: 'fr', lang: 'fr', locale: 'fr_FR', name: 'Français',
+    usd: (whole, cents) => `${whole},${cents} $ US`,
+    day: (d, m, y) => `${d === 1 ? '1er' : d} ${['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'][m]} ${y}`,
+  },
 ];
+
+/// The committed configuration (config/openhearts.json).
+export const config = () => JSON.parse(readFileSync(join(here, '..', 'config', 'openhearts.json'), 'utf8'));
+
+/// The published versions of the terms and the privacy policy (ledger.mjs).
+export const ledger = () => JSON.parse(readFileSync(join(here, 'ledger.json'), 'utf8'));
+
+/// [price] — {amount, currency}, the amount in cents — as [language]
+/// writes it. Only US dollars: the terms sell in them, and another
+/// currency would need its words in every language.
+export function priceIn(language, price) {
+  if (price?.currency !== 'usd' || !Number.isInteger(price.amount) || price.amount <= 0) {
+    throw new Error(`config/openhearts.json: price must be {"amount": <cents>, "currency": "usd"}, not ${JSON.stringify(price)}`);
+  }
+  return language.usd(Math.floor(price.amount / 100), String(price.amount % 100).padStart(2, '0'));
+}
+
+/// [date] (YYYY-MM-DD) as [language] writes a day.
+export function dayIn(language, date) {
+  const [y, m, d] = date.split('-').map(Number);
+  return language.day(d, m - 1, y);
+}
 
 export const strings = (code) => JSON.parse(readFileSync(join(here, 'strings', `${code}.json`), 'utf8'));
 
@@ -65,9 +115,11 @@ const base = (code) => (code === 'en' ? '' : `/${code}`);
 const pathOf = (page) => (page === 'index' ? '/' : `/${page}`);
 const partial = (name) => readFileSync(join(here, 'pages', `_${name}.html`), 'utf8');
 
-/// One page in one language.
-export function render(page, language, words) {
+/// One page in one language. [price] and [published] — the ledger's
+/// documents — are the committed ones unless given.
+export function render(page, language, words, { price = config().price, published = ledger() } = {}) {
   const path = pathOf(page);
+  const newest = (doc) => published[doc].at(-1).date;
   const builtins = {
     code: language.code,
     lang: language.lang,
@@ -92,6 +144,9 @@ export function render(page, language, words) {
     appStoreBadge: storeBadge(stores.appStore),
     googlePlayBadge: storeBadge(stores.googlePlay),
     storesSoon: stores.appStore && stores.googlePlay ? '' : `<p class="soon">${lookup(words, 'home.soon')}</p>`,
+    price: priceIn(language, price),
+    'updated.terms': dayIn(language, newest('terms')),
+    'updated.privacy': dayIn(language, newest('privacy')),
   };
   const fill = (text, depth = 0) => {
     if (depth > 4) throw new Error(`${page}: placeholders nested too deep`);

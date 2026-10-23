@@ -19,6 +19,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:open_hearts/l10n/l10n.dart';
 import 'package:open_hearts/net/in_use.dart';
 import 'package:open_hearts/net/watching.dart';
+import 'package:open_hearts/pictures.dart';
 import 'package:open_hearts/reaction_mute.dart';
 import 'package:open_hearts/review_page.dart';
 import 'package:open_hearts/table_page.dart';
@@ -310,6 +311,36 @@ void main() {
     await live.advance(tester, 3000);
   });
 
+  testWidgets('a blocked player\'s reactions neither show nor are said, and one showing goes as they are blocked', (tester) async {
+    final pictures = Pictures();
+    final live = await pumpLive(tester, pictures: pictures);
+    final bao = (live.spec.seats[1] as HumanSeat).account;
+    live.reactFrom(1, Reaction.nice);
+    await tester.pump();
+    await tester.pump();
+    expect(_bubbleOf('Bao'), findsOneWidget);
+    await pictures.block(bao);
+    await tester.pump();
+    expect(find.byType(ReactionBubble), findsNothing, reason: 'gone with the block');
+
+    await live.advance(tester, 3000);
+    final said = await _heard(tester, () async {
+      live.reactFrom(1, Reaction.wow);
+      await tester.pump();
+      await tester.pump();
+      expect(find.byType(ReactionBubble), findsNothing);
+    });
+    expect([for (final m in said) m['message']], isNot(contains(contains('Wow'))));
+
+    await pictures.unblock(bao);
+    await live.advance(tester, 3000);
+    live.reactFrom(1, Reaction.ouch);
+    await tester.pump();
+    await tester.pump();
+    expect(_bubbleOf('Bao'), findsOneWidget);
+    await live.advance(tester, 3000);
+  });
+
   testWidgets('a bot\'s seat says nothing: the key that sat there before is nobody\'s to show', (tester) async {
     final live = await pumpLive(tester, botSeats: {1});
     live.reactFrom(1, Reaction.nice);
@@ -419,6 +450,59 @@ void main() {
     await tester.pump();
     expect(find.byType(ReactionBubble), findsNothing);
     // The page asks for the record a few more times meanwhile.
+    await tester.pump(const Duration(seconds: 10));
+    unawaited(watched.close());
+  });
+
+  testWidgets('watching, a player this device blocked is shown by no name, and their reactions are not', (tester) async {
+    tester.view
+      ..physicalSize = const Size(390, 1200)
+      ..devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    final ada = FakeSigner('ada').publicKey;
+    final bao = FakeSigner('bao').publicKey;
+    final baoAccount = 'b0' * 16;
+    const table = '0123456789abcdef0123456789abcdef';
+    final watched = StreamController<Watched>();
+    await tester.pumpWidget(MaterialApp(
+      theme: buildTheme(),
+      home: ReviewPage(table: table, load: (_) async => null, watch: (_) => watched.stream, pictures: Pictures(blocked: {baoAccount})),
+    ));
+    await tester.pump();
+    watched.add(Viewed(WatchedTable(
+      table: table,
+      target: 50,
+      seq: 3,
+      hand: 1,
+      phase: Phase.playing,
+      names: const ['Ada', 'Romeo', 'Bao', 'Juliet'],
+      totals: const [0, 0, 0, 0],
+      taken: const [0, 0, 0, 0],
+      plays: const [],
+      toPlay: 2,
+      keys: [ada, null, bao, null],
+      accounts: ['a0' * 16, null, baoAccount, null],
+    )));
+    await tester.pump();
+    expect(find.textContaining('Bao'), findsNothing);
+    expect(find.text('Blocked player'), findsOneWidget);
+    expect(find.text('Ada'), findsOneWidget);
+
+    var n = 0;
+    Reacted from(PublicKey key, String code) => Reacted((
+          from: key,
+          id: 'e${n++}',
+          createdAt: DateTime.now().millisecondsSinceEpoch ~/ 1000,
+          content: '{"react":"$code","hand":1,"turn":8}',
+        ));
+    watched.add(from(bao, 'gg'));
+    await tester.pump();
+    await tester.pump();
+    expect(find.byType(ReactionBubble), findsNothing);
+    watched.add(from(ada, 'nice'));
+    await tester.pump();
+    await tester.pump();
+    expect(_bubbleOf('Ada'), findsOneWidget, reason: 'everyone else as before');
     await tester.pump(const Duration(seconds: 10));
     unawaited(watched.close());
   });

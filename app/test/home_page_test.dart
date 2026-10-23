@@ -20,6 +20,7 @@ import 'package:open_hearts/identity.dart';
 import 'package:open_hearts/live/lobby.dart';
 import 'package:open_hearts/net/network.dart';
 import 'package:open_hearts/net/room.dart';
+import 'package:open_hearts/pictures.dart';
 import 'package:open_hearts/router.dart';
 import 'package:open_hearts/table_page.dart';
 import 'package:open_hearts/theme.dart';
@@ -144,7 +145,7 @@ void main() {
   });
 
   testWidgets('the spinner belongs to the button that was pressed', (tester) async {
-    SharedPreferences.setMockInitialValues({'identity_name': 'Ada'});
+    SharedPreferences.setMockInitialValues({'identity_name': 'Ada', 'identity_agreed_terms': '2026-01-01'});
     await pumpHome(tester);
     expect(find.byType(CircularProgressIndicator), findsNothing);
 
@@ -225,6 +226,65 @@ void main() {
         reason: 'the room needs a name, and the profile is where a name is given');
   });
 
+  testWidgets('a link to a room, on a device whose name is one the others may not see, asks for another', (tester) async {
+    // Kept from before the filter (names.dart): played as no name.
+    SharedPreferences.setMockInitialValues({'identity_name': 'Sh1t Head'});
+    await pumpHome(tester, openRoom: 'KP4T9MXR');
+    expect(find.widgetWithText(TextField, 'Your name'), findsOneWidget, reason: 'asked for a name, as with none');
+    expect(find.text("This name isn't allowed. Choose another."), findsOneWidget, reason: 'and told why');
+  });
+
+  testWidgets('live play asks once for the terms: not now goes nowhere, and agreeing goes on and is kept', (tester) async {
+    // A name, and a licence, but never an agreement: a device brought
+    // into the account with a code, which never saw the subscribe page.
+    SharedPreferences.setMockInitialValues({'identity_name': 'Ada'});
+    await pumpHome(tester);
+
+    await tester.tap(find.text('Play friends'));
+    await tester.pumpAndSettle();
+    expect(find.text('Before you play live'), findsOneWidget, reason: 'asked before the name goes out');
+    expect(find.widgetWithText(TextButton, 'Terms of use'), findsOneWidget, reason: 'with the terms a tap away');
+    await tester.tap(find.text('Not now'));
+    await tester.pump();
+    await tester.pump();
+    expect(find.byType(CircularProgressIndicator), findsNothing, reason: 'not now opens nothing');
+    await tester.pumpAndSettle();
+    expect(find.text('Before you play live'), findsNothing);
+    expect(find.text('Share the link'), findsNothing, reason: 'and no room');
+    expect(await Identity.agreedToTerms(), isNull, reason: 'nor is it taken as agreeing');
+
+    // Tapped away, as not now.
+    await tester.tap(find.text('Play friends'));
+    await tester.pumpAndSettle();
+    await tester.tapAt(const Offset(8, 836));
+    await tester.pump();
+    await tester.pump();
+    expect(find.byType(CircularProgressIndicator), findsNothing, reason: 'tapping away opens nothing either');
+    await tester.pumpAndSettle();
+    expect(find.text('Before you play live'), findsNothing);
+    expect(await Identity.agreedToTerms(), isNull);
+
+    await tester.tap(find.text('Play friends'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('I agree'));
+    await tester.pump();
+    await tester.pump();
+    expect(find.descendant(of: find.widgetWithText(FilledButton, 'Play friends'), matching: find.byType(CircularProgressIndicator)),
+        findsOneWidget, reason: 'agreeing goes on to the room');
+    expect(await Identity.agreedToTerms(), DateTime.now().toUtc().toIso8601String().substring(0, 10), reason: 'and the day is kept');
+    await tester.pump(stopWaiting + const Duration(seconds: 2));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Play live'));
+    await tester.pump();
+    await tester.pump();
+    expect(find.text('Before you play live'), findsNothing, reason: 'asked once, not every time');
+    expect(find.descendant(of: find.widgetWithText(FilledButton, 'Play live'), matching: find.byType(CircularProgressIndicator)),
+        findsOneWidget);
+    await tester.pump(stopWaiting + const Duration(seconds: 2));
+    await tester.pumpAndSettle();
+  });
+
   testWidgets('the options line says what the next game is; the sheet changes it and the device keeps it', (tester) async {
     await pumpHome(tester);
     expect(find.text('50 points · rated'), findsOneWidget);
@@ -274,6 +334,32 @@ void main() {
     expect(find.text('Ada (you)'), findsOneWidget);
     expect(find.text('Share the link'), findsOneWidget);
     expect(find.textContaining('KP4T9MXR'), findsNothing, reason: 'the link is the way in; the code is not for reading off a screen');
+    room.dispose();
+  });
+
+  testWidgets('in a room, a member this device blocked is shown by no name', (tester) async {
+    tester.view
+      ..physicalSize = const Size(390, 844)
+      ..devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    final bus = Bus();
+    final room = Room(channel: bus.attach(FakeSigner('a')), code: 'KP4T9MXR', myName: 'Ada');
+    final bao = Room(channel: bus.attach(FakeSigner('b')), code: 'KP4T9MXR', myName: 'Bao');
+    await tester.pumpWidget(still(Scaffold(
+      body: ListenableBuilder(
+        listenable: room,
+        builder: (_, _) =>
+            RoomView(room: room, ledger: null, pictures: Pictures(blocked: {FakeSigner('b').publicKey}), onLeave: () {}, onShare: () {}),
+      ),
+    )));
+    for (var i = 0; i < 10 && room.members.length < 2; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    expect(room.members, hasLength(2), reason: 'Bao is in the room');
+    expect(find.text('Ada (you)'), findsOneWidget);
+    expect(find.text('Blocked player'), findsOneWidget);
+    expect(find.textContaining('Bao'), findsNothing);
+    bao.dispose();
     room.dispose();
   });
 

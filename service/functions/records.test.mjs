@@ -3,11 +3,11 @@
 
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { gunzipSync } from 'node:zlib';
+import { gunzipSync, gzipSync } from 'node:zlib';
 import { test } from 'node:test';
 
 import { keys } from '../do/sign.mjs';
-import { eventIdOf, forgottenKey, keepRecord, recordMost, recordResponse } from './records.mjs';
+import { NotAsSent, anonymizeGames, eventIdOf, forgottenKey, keepRecord, keptGames, markForgotten, recordMost, recordResponse } from './records.mjs';
 import { licenceFor, signerOn } from './licence.mjs';
 
 // Devices that can sign: BIP-340's published pairs, the second skipped
@@ -39,20 +39,31 @@ const game = {
   ],
 };
 
-/// An R2 bucket in memory: head, get, put.
+/// An R2 bucket in memory: head, get, put, and a listing a page of one
+/// at a time, as R2's binding lists, with each object's custom metadata
+/// when it is asked for.
 function bucket() {
   const kept = new Map();
   return {
     kept,
+    read: [],
     async head(key) {
       return kept.has(key) ? { key } : null;
     },
     async get(key) {
+      this.read.push(key);
       const k = kept.get(key);
-      return k ? { body: new Blob([k.body]).stream(), httpMetadata: k.meta } : null;
+      return k ? { body: new Blob([k.body]).stream(), httpMetadata: k.meta, customMetadata: k.custom } : null;
     },
     async put(key, body, options) {
-      kept.set(key, { body: Buffer.from(body), meta: options.httpMetadata, custom: options.customMetadata });
+      kept.set(key, { body: Buffer.from(typeof body === 'string' ? body : new Uint8Array(body)), meta: options.httpMetadata, custom: options.customMetadata });
+    },
+    async list({ prefix, cursor, include = [] }) {
+      const all = [...kept.keys()].filter((k) => k.startsWith(prefix)).sort();
+      const at = cursor ? all.indexOf(cursor) : 0;
+      const key = all[at];
+      const objects = key === undefined ? [] : [{ key, ...(include.includes('customMetadata') ? { customMetadata: kept.get(key).custom } : {}) }];
+      return { objects, truncated: at + 1 < all.length, cursor: all[at + 1] };
     },
   };
 }
@@ -204,4 +215,68 @@ test('a game sent after an account was forgotten is kept without its name', asyn
   b5.kept.set(forgottenKey(FORGOTTEN), { body: Buffer.from('{}') });
   assert.equal((await keep(b5, ADA, TABLE, spaced)).status, 422);
   assert.equal(b5.kept.has(`tables/${TABLE}.json`), false);
+});
+
+test('a game is kept without a name the filter refuses, the rest as it was sent', async () => {
+  const named = (names) => (r) => ({ ...r, names });
+  const b = bucket();
+  assert.deepEqual(await keep(b, ADA, TABLE, record(named({ 0: 'Ada', 1: 'Sh1t Head' }))), { status: 200, body: { kept: true } });
+  const kept = JSON.parse(gunzipSync(b.kept.get(`tables/${TABLE}.json`).body).toString());
+  assert.deepEqual(kept.names, { 0: 'Ada' });
+  assert.deepEqual({ ...kept, names: undefined }, { ...JSON.parse(record(named({}))), names: undefined });
+  // None left: no names at all.
+  const b2 = bucket();
+  await keep(b2, ADA, TABLE, record(named({ 1: 'f u c k' })));
+  assert.equal('names' in JSON.parse(gunzipSync(b2.kept.get(`tables/${TABLE}.json`).body).toString()), false);
+  // Every name one the others may see: kept byte for byte.
+  const b3 = bucket();
+  const fine = record(named({ 0: 'Ada', 1: 'Cassandra' }));
+  await keep(b3, ADA, TABLE, fine);
+  assert.equal(gunzipSync(b3.kept.get(`tables/${TABLE}.json`).body).toString(), fine);
+});
+
+test('a kept game notes the accounts at its seats, and the worker reads only the games that name the one being deleted', async () => {
+  const A = 'a'.repeat(32);
+  const B = 'b'.repeat(32);
+  const b = bucket();
+  const kept = (r) => JSON.parse(gunzipSync(b.kept.get(`tables/${r}.json`).body).toString());
+  // Ada's and Bao's game, kept as a player sends it: its accounts noted.
+  await keep(b, ADA, TABLE, record((r) => {
+    r.spec.seats[0].licence = { key: ADA, account: A };
+    r.spec.seats[1].licence = { key: BAO, account: B };
+    return { ...r, names: { 0: 'Ada', 1: 'Bao' } };
+  }));
+  assert.deepEqual(b.kept.get(`tables/${TABLE}.json`).custom, { from: ADA, accounts: `${A},${B}` });
+  // A game kept before accounts were noted, one of Bao's alone, and one
+  // of Ada's that would not be written back as it was sent.
+  const put = (id, text, custom) => b.put(`tables/${id}.json`, gzipSync(text), { httpMetadata: { contentType: 'application/json', contentEncoding: 'gzip' }, customMetadata: custom });
+  const seated = (id, accounts, names) => JSON.stringify({ v: 2, spec: { id, seats: accounts.map((account, i) => ({ key: `${i}`.repeat(64), licence: { account } })) }, record: [], names });
+  await put('before', seated('before', [B, A], { 0: 'Bao', 1: 'Ada' }), { from: BAO });
+  await put('baos', seated('baos', [B], { 0: 'Bao' }), { from: BAO, accounts: B });
+  await put('odd', '{"v":2,"spec":{"id":"odd","seats":[{"licence":{"account":"' + A + '"}}]},"record":[{"at":2.0}],"names":{"0":"Ada"}}', { from: ADA, accounts: A });
+  const refused = [];
+  b.read.length = 0;
+  const changed = await anonymizeGames(keptGames(b), A, { refused: (key) => refused.push(key) });
+  assert.deepEqual(changed, [{ key: `tables/${TABLE}.json`, named: [0] }, { key: 'tables/before.json', named: [1] }]);
+  assert.deepEqual(refused, ['tables/odd.json'], 'one it would not write back is said, and the rest go on');
+  assert.ok(!b.read.includes('tables/baos.json'), 'a game noted without the account is never read');
+  assert.deepEqual(kept(TABLE).names, { 1: 'Bao' });
+  assert.deepEqual(kept('before').names, { 0: 'Bao' });
+  assert.deepEqual(kept('baos').names, { 0: 'Bao' });
+  // Rewritten as it is kept: packed, said so, with what was noted beside
+  // it, and now the accounts too where a game had none.
+  assert.equal(b.kept.get(`tables/${TABLE}.json`).meta.contentEncoding, 'gzip');
+  assert.deepEqual(b.kept.get(`tables/${TABLE}.json`).custom, { from: ADA, accounts: `${A},${B}` });
+  assert.deepEqual(b.kept.get('tables/before.json').custom, { from: BAO, accounts: `${B},${A}` });
+  // Without [refused], such a game stops the run, as for the operator.
+  await assert.rejects(anonymizeGames(keptGames(b), A), NotAsSent);
+});
+
+test('an account marked forgotten from the worker is marked once', async () => {
+  const b = bucket();
+  const A = 'a'.repeat(32);
+  await markForgotten(b, A, { now: Date.parse('2026-10-19T12:00:00Z') });
+  assert.deepEqual(JSON.parse(b.kept.get(forgottenKey(A)).body.toString()), { forgotten: '2026-10-19' });
+  await markForgotten(b, A, { now: Date.parse('2026-10-20T12:00:00Z') });
+  assert.deepEqual(JSON.parse(b.kept.get(forgottenKey(A)).body.toString()), { forgotten: '2026-10-19' }, 'the first day stays');
 });

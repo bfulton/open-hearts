@@ -1,6 +1,12 @@
 // Buying on the web with Stripe: the checkout, what Stripe's webhook
-// says, the billing portal, and the payer's email address for backup
-// codes.
+// says, a refund ending the subscription it was for, the billing
+// portal, and the payer's email address for backup codes.
+//
+// Stripe sells it, not us: every checkout is a Managed Payments one, so
+// the buyer buys from Link, Stripe's merchant of record, which charges
+// and pays over the tax of wherever they are, keeps to their country's
+// rules for buying online, and answers their questions about the
+// payment (docs/explanation/service.md, "Payment").
 
 import { paidFor } from './accounts.mjs';
 import { dayOf, isAccount } from './rows.mjs';
@@ -8,13 +14,23 @@ import { S, SITE, STRIPE_PRICE } from './settings.mjs';
 import { dateSubscription } from './subscriptions.mjs';
 
 // ---- buying, on the web ------------------------------------------------
-// Stripe Checkout in subscription mode, with the device's key in the
-// session. Nobody is asked for an email or a password: the account is
+// Stripe Checkout in subscription mode, sold through Link (Managed
+// Payments), with the device's key in the session. Nobody is asked for
+// an email or a password: the account is
 // made when the subscription is paid for, with the paying device on it
 // ([paidFor]), and the licence follows. A phone buys through its own
 // store instead (stores.mjs, "buying in a store").
 
 const STRIPE = 'https://api.stripe.com/v1';
+
+/// The API version every call here is made in: the one the webhook is
+/// read in (infra/stripe.mjs; worker.test.mjs holds the two together),
+/// not whichever the account defaults to. Managed Payments needs
+/// 2025-03-31.basil or later.
+export const STRIPE_VERSION = '2025-11-17.clover';
+
+/// The headers a call to Stripe with [secret] carries.
+export const stripeAuth = (secret) => ({ authorization: `Bearer ${secret}`, 'stripe-version': STRIPE_VERSION });
 
 /// The states a subscription does not come back from. Not `canceled`
 /// alone: dunning that gives up leaves `unpaid`, and a checkout that
@@ -40,24 +56,47 @@ export function sameSite(candidate, requestUrl) {
   return at.origin === new URL(requestUrl).origin ? at.toString() : null;
 }
 
-/// Lookup keys already asked of Stripe, kept a few minutes: a key moved
-/// to a new price reaches checkouts within that.
-const priceIds = new Map();
+/// Prices already asked of Stripe, kept a few minutes: a key moved to a
+/// new price reaches checkouts within that.
+const shopPrices = new Map();
 const PRICE_KEPT_MS = 5 * 60 * 1000;
 
 /// For a test: ask Stripe again.
-export const forgetPriceIds = () => priceIds.clear();
+export const forgetPriceIds = () => shopPrices.clear();
 
-/// The price id [named] stands for — itself, when it is one; the active
-/// price holding it as its lookup key, when it is not; null when Stripe
-/// has no such price.
-export async function priceIdOf(named, secret, fetchImpl = fetch, { now = Date.now() } = {}) {
-  if (named.startsWith('price_')) return named;
-  const kept = priceIds.get(named);
-  if (kept && kept.until > now) return kept.id;
-  const id = await priceLookup(named, secret, fetchImpl);
-  if (id) priceIds.set(named, { id, until: now + PRICE_KEPT_MS });
-  return id;
+/// The price the terms state, and so the only one a checkout sells at:
+/// config/openhearts.json's `price`, laid over the project's settings
+/// where none of them can change it (deployment.mjs, OH_PRICE, "599
+/// usd"). {amount, currency}, or null when there is none.
+export function statedPrice(env) {
+  const m = /^([1-9]\d{0,6}) ([a-z]{3})$/.exec(env.OH_PRICE ?? '');
+  return m ? { amount: Number(m[1]), currency: m[2] } : null;
+}
+
+/// How [price], as Stripe has it, is not the one [stated]: that amount
+/// in that currency, once a year. Null when it is.
+export function priceDiffers(price, stated) {
+  const found = [];
+  if (price.unit_amount !== stated.amount) found.push(`unit_amount ${price.unit_amount}`);
+  if (price.currency !== stated.currency) found.push(`currency ${price.currency}`);
+  if (price.recurring?.interval !== 'year' || price.recurring?.interval_count !== 1) {
+    found.push(`every ${price.recurring?.interval_count ?? '?'} ${price.recurring?.interval ?? 'once'}`);
+  }
+  return found.length ? found.join(', ') : null;
+}
+
+/// What a checkout sells: the active price [named] — the price itself,
+/// or the one holding it as its lookup key — when it is the one the
+/// terms state ([stated]), kept a few minutes. {id}, or {error} saying
+/// why there is none to sell. Throws as [priceLookup] does.
+export async function shopPrice(named, secret, stated, fetchImpl = fetch, { now = Date.now() } = {}) {
+  const kept = shopPrices.get(named);
+  if (kept && kept.until > now) return kept.said;
+  const price = await priceLookup(named, secret, fetchImpl);
+  const differs = price ? priceDiffers(price, stated) : null;
+  const said = !price ? { error: 'no such price' } : differs ? { error: `not the price the terms state: ${differs}` } : { id: price.id };
+  if (said.id) shopPrices.set(named, { said, until: now + PRICE_KEPT_MS });
+  return said;
 }
 
 /// Stripe refusing to say: its status.
@@ -68,15 +107,21 @@ export class StripeRefused extends Error {
   }
 }
 
-/// The price Stripe has under the lookup key [named], asked now: its
-/// id, or null for none. Throws [StripeRefused] when Stripe says no,
-/// and whatever the fetch throws when it does not answer.
+/// The active price [named] stands for, as Stripe has it, asked now:
+/// the price [named] is, or the one holding it as its lookup key; null
+/// for none. Throws [StripeRefused] when Stripe says no, and whatever
+/// the fetch throws when it does not answer.
 export async function priceLookup(named, secret, fetchImpl) {
-  const url = `${STRIPE}/prices?${new URLSearchParams({ 'lookup_keys[]': named, active: 'true', limit: '1' })}`;
-  const res = await fetchImpl(url, { headers: { authorization: `Bearer ${secret}` } });
+  const one = named.startsWith('price_');
+  const url = one
+    ? `${STRIPE}/prices/${encodeURIComponent(named)}`
+    : `${STRIPE}/prices?${new URLSearchParams({ 'lookup_keys[]': named, active: 'true', limit: '1' })}`;
+  const res = await fetchImpl(url, { headers: stripeAuth(secret) });
+  if (one && res.status === 404) return null;
   if (!res.ok) throw new StripeRefused(res.status);
-  const id = (await res.json())?.data?.[0]?.id;
-  return typeof id === 'string' && id.startsWith('price_') ? id : null;
+  const body = await res.json();
+  const price = one ? body : body?.data?.[0];
+  return typeof price?.id === 'string' && price.id.startsWith('price_') && price.active !== false ? price : null;
 }
 
 /// How Stripe's checkout page looks: the app's, not the account's — the
@@ -96,69 +141,25 @@ export function checkoutBranding(back) {
   };
 }
 
-/// What checkout says about renewing, in the app's language (`lang`,
-/// as the site names it) or English: the box the buyer ticks to agree
-/// to the terms, which Stripe will not let them pay without, and the
-/// line under the button. The subscription renews by itself, so the
-/// buyer agrees to that in so many words before paying, and is told
-/// how to stop it (California's automatic renewal law; the terms say
-/// the rest). Stripe adds its own words about the charge.
-export const CHECKOUT_WORDS = Object.freeze({
-  en: {
-    locale: 'en',
-    agree: 'I agree to the [Terms of Use]({terms}), and that this subscription renews automatically every year, at the price then in force, until I cancel it.',
-    submit: 'It renews automatically every year until you cancel. Cancel any time in the game: menu, Subscription, Manage subscription.',
-  },
-  es: {
-    locale: 'es',
-    agree: 'Acepto las [Condiciones de uso]({terms}) y que esta suscripción se renueve automáticamente cada año, al precio vigente entonces, hasta que la cancele.',
-    submit: 'Se renueva automáticamente cada año hasta que la canceles. Cancélala cuando quieras en el juego: menú, Suscripción, Gestionar suscripción.',
-  },
-  pt: {
-    locale: 'pt-BR',
-    agree: 'Aceito os [Termos de uso]({terms}) e que esta assinatura seja renovada automaticamente todo ano, pelo preço em vigor na época, até que eu a cancele.',
-    submit: 'Ela é renovada automaticamente todo ano até você cancelar. Cancele quando quiser no jogo: menu, Assinatura, Gerenciar assinatura.',
-  },
-  de: {
-    locale: 'de',
-    agree: 'Ich stimme den [Nutzungsbedingungen]({terms}) zu und damit, dass sich dieses Abo jedes Jahr automatisch zum dann geltenden Preis verlängert, bis ich es kündige.',
-    submit: 'Es verlängert sich jedes Jahr automatisch, bis du kündigst. Kündigen kannst du jederzeit im Spiel: Menü, Abo, Abo verwalten.',
-  },
-  fr: {
-    locale: 'fr',
-    agree: "J'accepte les [Conditions d'utilisation]({terms}), et que cet abonnement se renouvelle automatiquement chaque année, au prix alors en vigueur, jusqu'à ce que je le résilie.",
-    submit: "Il se renouvelle automatiquement chaque année jusqu'à ce que vous le résiliiez. Résiliez-le quand vous voulez dans le jeu : menu, Abonnement, Gérer l'abonnement.",
-  },
-});
+/// The locale Stripe's page is in, by the site's language code: the one
+/// the site's own pages for that language are in.
+export const CHECKOUT_LOCALES = Object.freeze({ en: 'en', es: 'es', pt: 'pt-BR', de: 'de', fr: 'fr' });
 
-/// [CHECKOUT_WORDS] as a checkout's fields: Stripe's page in the same
-/// language, the box to tick, linking the terms in that language, and
-/// the line under the button.
-export function checkoutTerms(lang) {
-  const code = typeof lang === 'string' && Object.hasOwn(CHECKOUT_WORDS, lang) ? lang : 'en';
-  const words = CHECKOUT_WORDS[code];
-  return {
-    locale: words.locale,
-    'consent_collection[terms_of_service]': 'required',
-    'custom_text[terms_of_service_acceptance][message]': words.agree.replace('{terms}', `${SITE}${code === 'en' ? '' : `/${code}`}/terms`),
-    'custom_text[submit][message]': words.submit,
-  };
+/// The app's language [lang] (as the site names it, or English) as a
+/// checkout's fields: Stripe's page in it, and the subscription marked
+/// with it, the language a change to the terms is told in
+/// (notices.mjs).
+export function checkoutLanguage(lang) {
+  const code = typeof lang === 'string' && Object.hasOwn(CHECKOUT_LOCALES, lang) ? lang : 'en';
+  return { locale: CHECKOUT_LOCALES[code], 'subscription_data[metadata][lang]': code };
 }
 
-/// A checkout session for [key], as Stripe answers: {status, body}, in
-/// the app's language [lang] ([checkoutTerms]).
-export async function checkout(key, back, cancelled, env, fetchImpl = fetch, { lang = 'en' } = {}) {
-  const secret = env.OH_STRIPE_SECRET;
-  const named = S().stripePrice ?? env.OH_STRIPE_PRICE;
-  if (!secret || typeof named !== 'string' || !STRIPE_PRICE.test(named)) return { status: 503, body: { error: 'the shop is not open yet' } };
-  let price;
-  try {
-    price = await priceIdOf(named, secret, fetchImpl);
-  } catch {
-    return { status: 502, body: { error: 'the shop is not answering' } };
-  }
-  if (!price) return { status: 503, body: { error: 'the shop is not open yet' } };
-  const form = new URLSearchParams({
+/// What a checkout session for the device [key] asks Stripe for: a year
+/// of [price], coming back to [back], or to [cancelled], in the app's
+/// language [lang]. `oh verify` asks for the same, to prove Link sells
+/// it (ops/release.mjs).
+export function checkoutFields(key, price, back, cancelled, lang) {
+  return {
     mode: 'subscription',
     'line_items[0][price]': price,
     'line_items[0][quantity]': '1',
@@ -171,14 +172,46 @@ export async function checkout(key, back, cancelled, env, fetchImpl = fetch, { l
     'metadata[key]': key,
     client_reference_id: key,
     'subscription_data[metadata][key]': key,
+    // Sold by Link, Stripe's merchant of record, in the buyer's own
+    // currency and with their own country's tax: the terms say so
+    // ("Price and length"), and a checkout Stripe will not sell this way
+    // is not sold at all, rather than sold by us.
+    'managed_payments[enabled]': 'true',
+    // Nothing is paid until the buyer ticks Stripe's own box, "I agree
+    // to Open Hearts's Terms of Service and Privacy Policy", linking the
+    // two in the account's public details. Link's line under the button
+    // says subscribing authorizes it to charge them until they cancel.
+    // Managed Payments takes no custom text, so the box's words are
+    // Stripe's, and it takes the box itself only while Checkout's Legal
+    // policies setting is on (docs/how-to/apply-infrastructure.md).
+    'consent_collection[terms_of_service]': 'required',
     ...checkoutBranding(back),
-    ...checkoutTerms(lang),
-  });
+    ...checkoutLanguage(lang),
+  };
+}
+
+/// A checkout session for [key], as Stripe answers: {status, body}, in
+/// the app's language [lang] ([checkoutLanguage]).
+export async function checkout(key, back, cancelled, env, fetchImpl = fetch, { lang = 'en' } = {}) {
+  const secret = env.OH_STRIPE_SECRET;
+  const named = env.OH_STRIPE_PRICE;
+  const stated = statedPrice(env);
+  if (!secret || !stated || typeof named !== 'string' || !STRIPE_PRICE.test(named)) return { status: 503, body: { error: 'the shop is not open yet' } };
+  let sells;
+  try {
+    sells = await shopPrice(named, secret, stated, fetchImpl);
+  } catch {
+    return { status: 502, body: { error: 'the shop is not answering' } };
+  }
+  // A price that is not the terms' is not sold at: /api/health says
+  // which (health.mjs), for the operator to put right.
+  if (!sells.id) return { status: 503, body: { error: 'the shop is not open yet' } };
+  const form = new URLSearchParams(checkoutFields(key, sells.id, back, cancelled, lang));
   let res;
   try {
     res = await fetchImpl(`${STRIPE}/checkout/sessions`, {
       method: 'POST',
-      headers: { authorization: `Bearer ${secret}`, 'content-type': 'application/x-www-form-urlencoded' },
+      headers: { ...stripeAuth(secret), 'content-type': 'application/x-www-form-urlencoded' },
       body: form.toString(),
     });
   } catch {
@@ -258,13 +291,16 @@ export async function record(event, store, { now = Date.now() } = {}) {
   if (event?.type?.startsWith('customer.subscription.')) {
     const subscription = object.id;
     if (!subscription) return null;
-    await keepCustomer(store, subscription, object.customer);
     const period = object.current_period_end ?? object.items?.data?.[0]?.current_period_end;
     // Ended: Stripe deleted it, or dunning gave up, or it was refunded
     // out. A subscription that is merely *cancelling* is not this — it
     // runs to the end of what was paid for, which is what renews_at
     // already says.
     const final = event.type.endsWith('.deleted') || FINAL.has(object.status);
+    // An ending of one with no account here — deleted with its account
+    // (deletion.mjs), or not yet bound — keeps no customer: only the
+    // note that it ended, which turns a late event about it away.
+    if (!final || (await store.get(`SUB#${subscription}`, 'ACCOUNT'))) await keepCustomer(store, subscription, object.customer);
     return dateSubscription(store, subscription, {
       source: 'stripe',
       txn_ref: object.latest_invoice ?? null,
@@ -277,6 +313,68 @@ export async function record(event, store, { now = Date.now() } = {}) {
     });
   }
   return null;
+}
+
+// ---- a refund ---------------------------------------------------------
+// The terms: a refund ends the subscription. The operator's refund ends
+// it first (`oh account refund`, ops/billing.mjs), but Link's support
+// can refund a payment within 60 days of it without asking us, and
+// anyone with the Dashboard can refund one. So a refund of any payment
+// for a subscription of ours ends that subscription here, in Stripe and
+// at once; its deletion, which Stripe sends next, cuts its devices'
+// licences to the day (subscriptions.mjs).
+
+/// The subscription [charge] was a payment for, ended now that some of
+/// it was refunded: when it is one this service sold and has not ended
+/// already. {status, body: {ended: true | false | null, subscription}},
+/// null being no subscription of ours; 502 when Stripe did not say, so
+/// that Stripe sends the event again.
+export async function endRefunded(charge, store, env, fetchImpl = fetch) {
+  const intent = typeof charge?.payment_intent === 'string' ? charge.payment_intent : charge?.payment_intent?.id;
+  if (!(charge?.amount_refunded > 0) || typeof intent !== 'string' || !/^pi_[A-Za-z0-9]{1,64}$/.test(intent)) return { status: 200, body: { ended: null } };
+  const secret = env.OH_STRIPE_SECRET;
+  if (!secret) return { status: 503, body: { error: 'service not configured: OH_STRIPE_SECRET' } };
+  const ask = async (path, method = 'GET') => {
+    const res = await fetchImpl(`${STRIPE}${path}`, { method, headers: stripeAuth(secret) });
+    if (!res.ok) throw new StripeRefused(res.status);
+    return res.json();
+  };
+  try {
+    // A payment is an invoice's, and an invoice its subscription's, in
+    // this API version: neither the charge nor its payment names either.
+    const paid = await ask(`/invoice_payments?${new URLSearchParams({ 'payment[type]': 'payment_intent', 'payment[payment_intent]': intent, limit: '10' })}`);
+    const invoice = (paid.data ?? []).find((p) => typeof p.invoice === 'string')?.invoice;
+    if (!invoice) return { status: 200, body: { ended: null } };
+    const named = (await ask(`/invoices/${encodeURIComponent(invoice)}`)).parent?.subscription_details?.subscription;
+    const subscription = typeof named === 'string' ? named : named?.id;
+    if (typeof subscription !== 'string' || !(await store.get(`SUB#${subscription}`, 'META'))) return { status: 200, body: { ended: null } };
+    return { status: 200, body: { ended: await endAtStripe(subscription, secret, 'refunded', fetchImpl), subscription } };
+  } catch {
+    return { status: 502, body: { error: 'the shop is not answering' } };
+  }
+}
+
+/// The web subscriptions an account's META row names, the one it has
+/// now and those it had before (accounts.mjs, accountFor), by their
+/// Stripe ids; one bought in a store is the store's to end.
+export const webSubscriptionsOf = (meta) => [meta?.subscription, ...(Array.isArray(meta?.before) ? meta.before : [])].filter((s) => typeof s === 'string' && s.startsWith('sub_'));
+
+/// [subscription] ended in Stripe now, with [comment] as the reason
+/// Stripe keeps, unless it has ended already or Stripe has none by that
+/// name, which renews nothing: true when it ended here. Throws
+/// [StripeRefused] when Stripe says no, or the fetch's error.
+export async function endAtStripe(subscription, secret, comment, fetchImpl = fetch) {
+  const ask = async (path, method = 'GET') => {
+    const res = await fetchImpl(`${STRIPE}${path}`, { method, headers: stripeAuth(secret) });
+    if (res.status === 404 && method === 'GET') return null;
+    if (!res.ok) throw new StripeRefused(res.status);
+    return res.json();
+  };
+  const at = `/subscriptions/${encodeURIComponent(subscription)}`;
+  const now = await ask(at);
+  if (!now || FINAL.has(now.status)) return false;
+  await ask(`${at}?${new URLSearchParams({ 'cancellation_details[comment]': comment })}`, 'DELETE');
+  return true;
 }
 
 /// The Stripe customer behind [subscription], kept so a device on it can
@@ -309,7 +407,7 @@ export async function manage(key, back, store, env, fetchImpl = fetch) {
   const subscription = (await store.get(`ACCOUNT#${account}`, 'META'))?.subscription;
   if (!subscription) return { status: 402, body: { error: 'no subscription' } };
   if (!subscription.startsWith('sub_')) return { status: 409, body: { error: 'not a web subscription' } };
-  const auth = { authorization: `Bearer ${secret}` };
+  const auth = stripeAuth(secret);
   let customer = (await store.get(`SUB#${subscription}`, 'CUSTOMER'))?.customer;
   if (!customer) {
     // No customer row for this subscription: Stripe knows.
@@ -362,7 +460,7 @@ export async function payerLookup(store, subscription, env, fetchImpl = fetch) {
   const customer = (await store.get(`SUB#${subscription}`, 'CUSTOMER'))?.customer;
   if (!customer) return { email: null, why: 'no customer on record' };
   try {
-    const res = await fetchImpl(`${STRIPE}/customers/${encodeURIComponent(customer)}`, { headers: { authorization: `Bearer ${secret}` } });
+    const res = await fetchImpl(`${STRIPE}/customers/${encodeURIComponent(customer)}`, { headers: stripeAuth(secret) });
     if (!res.ok) {
       const code = (await res.json().catch(() => null))?.error?.code;
       return { email: null, why: `Stripe said ${res.status}${code ? ` (${code})` : ''}` };

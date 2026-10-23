@@ -29,6 +29,15 @@ picture travels once, as a stored event. The live area says which game
 is asked for (the target score, and rated or unrated), and *Play live*
 shows how many devices are online.
 
+Nothing goes to a relay without a name, and, the first time on each
+device, without the player agreeing to the terms of use: a screen says
+that the others will see their name and picture, links the terms, and
+asks (`_agreed` in `app/lib/home_page.dart`). The day they agreed is kept
+on the device (`Identity.agreedToTerms`). The app stores ask for this
+before anyone can publish anything; subscribing is agreeing too, but a
+device brought into an account with a code or a sign-in never saw the
+subscribe screen.
+
 ### Matchmaking
 
 There is no matchmaker (`packages/table/lib/src/matching.dart`).
@@ -590,8 +599,9 @@ subscription. The watcher's device, its account's device in use, says
 on the table's tag that it is watching, with its licence. One seated
 player's device answers after every move, while anyone has asked lately
 (`WatchBroadcast.watchedFor`), with what anyone at the table can see: names,
-scores, this hand's cards, whose turn it is, and the keys the seats are
-held by, whose [reactions](#reactions) the watcher shows. A watcher of
+scores, this hand's cards, whose turn it is, and the keys and accounts
+the seats are held by: whose [reactions](#reactions) the watcher shows,
+and whom the watcher has [blocked](#blocking-and-reporting). A watcher of
 an account seated at the table is not answered: nobody watches their
 own game from another device. Nothing hidden is in a view. It is a
 player's signed account, believed only as far as a scoreboard is, and
@@ -672,6 +682,25 @@ the badge offers a kept-off picture anyway. No model ships yet; one
 would be fetched from the app's origin and checked against a hash the
 app carries. Needing no model, holding another player's badge hides
 their picture on this device for good.
+
+## Blocking and reporting
+
+Holding another player's badge at the table also offers to block them,
+and to report them.
+
+Blocking is on the viewer's device too (`app/lib/pictures.dart`): the
+account is kept on a list there, and wherever this device shows it —
+at a table, in a friends' room, watching a game or reviewing one — it
+is shown as a blocked player, with no picture, and its reactions are
+neither shown nor said. Nobody else is told, and nothing about seating
+changes: seating is worked out in the open by the waiting players'
+devices ([getting to a table](#getting-to-a-table)), so keeping two
+players apart would mean publishing who blocked whom. The list is the
+device's own, so another device of the same account keeps its own.
+
+A report goes to the people who run the game, by email, with both
+accounts and what the reporter saw (`app/lib/report.dart`;
+[reports](service.md#reports)).
 
 ## Identity
 
