@@ -10,6 +10,10 @@ squashed from a pull request, the pull request's number.
 
 ### Added
 
+- `robots.txt`, on openhearts.game and play.openhearts.game, names
+  Project Arachnid's crawler, which Arachnid Shield checks before it
+  takes Open Hearts on. Every other crawler is let in, as before.
+  (2026-10-23, #36)
 - A player deletes their account in the app: **Delete account**, at the
   foot of the subscription page, on any device in the account, lapsed or
   suspended too. It asks first, and says that the time left on the
@@ -237,6 +241,10 @@ squashed from a pull request, the pull request's number.
 
 ### Fixed
 
+- The app's German words in Dart are what `app_de.arb` says. Every
+  build rewrote them, which left the checkout changed, and a deploy
+  refuses a changed checkout. CI now fails when the words in Dart are
+  not what the `.arb` files make. (2026-10-23, #36)
 - `oh` tells which version of the terms or the privacy policy the site
   serves by the day its page says it was last updated as well as by its
   text, so an entry that publishes the same text on a later day counts

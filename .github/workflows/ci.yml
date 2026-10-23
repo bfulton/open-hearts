@@ -69,6 +69,11 @@ jobs:
         run: cd packages/deal && dart pub get && dart analyze --fatal-infos && dart test -j 4
       - name: Analyze
         run: cd app && flutter pub get && flutter analyze
+      # The app's words in Dart (lib/l10n) are made from its .arb files and
+      # committed: one made from an older .arb is rewritten by every build,
+      # which leaves the checkout changed, and a deploy refuses that.
+      - name: The app's words are what their .arb files make
+        run: cd app && flutter gen-l10n && git diff --exit-code --stat -- lib/l10n
       - name: Test (widgets)
         run: cd app && flutter test -j 4
       - name: Test (on a page, in Chrome)

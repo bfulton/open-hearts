@@ -857,7 +857,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get changedBoth =>
-      'Unsere Nutzungsbedingungen und unsere Datenschutzerklärung haben sich geändert.';
+      'Unsere Nutzungsbedingungen und Datenschutzerklärung haben sich geändert.';
 
   @override
   String get changedTerms => 'Unsere Nutzungsbedingungen haben sich geändert.';
