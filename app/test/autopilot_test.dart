@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:open_hearts/l10n/l10n.dart';
+import 'package:open_hearts/pacing.dart';
 import 'package:open_hearts/table_model.dart';
 import 'package:open_hearts/table_page.dart';
 import 'package:open_hearts/theme.dart';
@@ -24,7 +25,7 @@ const _seed = 156;
 
 /// The table, solo, in [locale] and at [textScale], [size] big.
 Future<TableModel> _pumpTable(WidgetTester tester,
-    {Size size = const Size(390, 844), Locale locale = const Locale('en'), double textScale = 1, bool paced = false}) async {
+    {Size size = const Size(390, 844), Locale locale = const Locale('en'), double textScale = 1, bool paced = false, int seed = _seed}) async {
   tester.view
     ..physicalSize = size
     ..devicePixelRatio = 1.0;
@@ -36,7 +37,7 @@ Future<TableModel> _pumpTable(WidgetTester tester,
     localizationsDelegates: AppLocalizations.localizationsDelegates,
     supportedLocales: AppLocalizations.supportedLocales,
     locale: locale,
-    home: TablePage(seed: _seed, paced: paced),
+    home: TablePage(seed: seed, paced: paced),
   ));
   if (paced) {
     await tester.pump(const Duration(seconds: 2));
@@ -104,6 +105,8 @@ Future<List<String>> _heard(WidgetTester tester, Future<void> Function() body) a
 }
 
 void main() {
+  _pacedAutopilot();
+
   testWidgets('not through the pass, nor the start of the play', (tester) async {
     final c = await _pumpTable(tester);
     expect(c.awaitingPass, isTrue);
@@ -364,5 +367,85 @@ void main() {
     expect(mine.toSet(), hasLength(13));
     expect(c.autoPlay, isFalse, reason: 'off for the next hand');
     expect(tester.takeException(), isNull);
+  });
+}
+
+/// Each card played at [c] from now, as the test's clock [now] says:
+/// when, by whom, and how many were on the felt before it.
+List<({Duration at, int seat, int before})> _timePlays(TableModel c, Duration Function() now) {
+  final plays = <({Duration at, int seat, int before})>[];
+  var seen = c.playedThisHand.length;
+  void look() {
+    if (c.playedThisHand.length <= seen) return;
+    seen = c.playedThisHand.length;
+    final trick = c.game.pendingTrick?.plays ?? c.game.trick;
+    plays.add((at: now(), seat: trick.last.seat, before: trick.length - 1));
+  }
+
+  c.addListener(look);
+  addTearDown(() => c.removeListener(look));
+  return plays;
+}
+
+void _pacedAutopilot() {
+  const step = Duration(milliseconds: 10);
+
+  testWidgets('on, solo, the rest of the hand plays at the speed its cards land: nobody thinks, and a trick waits only for its last card and its sweep',
+      (tester) async {
+    // A deal in which a bot wins a trick after the switch, and leads.
+    final c = await _pumpTable(tester, paced: true, seed: 3);
+    await _playToOffer(tester, c, paced: true);
+    final tricks = c.handShown.length;
+    var now = Duration.zero;
+    final plays = _timePlays(c, () => now);
+    await tester.tap(find.byType(Switch));
+    while (find.text('Next hand').evaluate().isEmpty && now < const Duration(seconds: 60)) {
+      now += step;
+      await tester.pump(step);
+    }
+    expect(find.text('Next hand'), findsOneWidget);
+    expect(plays.first.seat, c.mySeat, reason: 'the player\'s turn, played at once');
+    expect(plays.where((p) => p.before == 0 && p.seat != c.mySeat), isNotEmpty, reason: 'a bot leads a trick');
+    final lands = Pacing.cardLands.inMilliseconds, sweeps = Pacing.trickSweeps.inMilliseconds, tick = step.inMilliseconds;
+    for (var i = 1; i < plays.length; i++) {
+      final p = plays[i];
+      final gap = (p.at - plays[i - 1].at).inMilliseconds;
+      final which = 'card ${i + 1} after the switch, seat ${p.seat}, ${p.before} on the felt';
+      if (p.before == 0) {
+        // The trick before held until its last card landed, then swept.
+        expect(gap, inInclusiveRange(lands + sweeps, lands + sweeps + tick), reason: which);
+      } else if (p.seat == c.mySeat) {
+        expect(gap, lessThanOrEqualTo(tick), reason: '$which: the player\'s, at once');
+      } else {
+        expect(gap, inInclusiveRange(lands, lands + tick), reason: '$which: as the card before it lands');
+      }
+    }
+    // The last trick held until its last card landed, swept, and then the
+    // sheet, with no beat of bare felt between.
+    expect((now - plays.last.at).inMilliseconds, inInclusiveRange(lands + sweeps, lands + sweeps + tick), reason: 'the sheet');
+    // Before, a bot took 400 ms at the least over a card and a trick was
+    // held 950 ms: 2.15 s a trick at the quickest.
+    expect(now, lessThan(const Duration(milliseconds: 1300) * tricks), reason: '$tricks tricks');
+  });
+
+  testWidgets('turned on while a bot thinks, it thinks no longer than the card before takes to land', (tester) async {
+    final c = await _pumpTable(tester, paced: true);
+    await _playToOffer(tester, c, paced: true);
+    // Played by hand into a trick a bot is still to play to.
+    var now = Duration.zero;
+    final plays = _timePlays(c, () => now);
+    c.playCard(c.handShown.firstWhere(c.legalNow.contains));
+    now += step;
+    await tester.pump(step);
+    expect(c.game.pendingTrick, isNull, reason: 'a bot still to play');
+    await tester.tap(find.byType(Switch));
+    while (plays.length < 2 && now < const Duration(seconds: 5)) {
+      now += step;
+      await tester.pump(step);
+    }
+    expect(plays[1].seat, isNot(c.mySeat));
+    // The quickest bot takes 400 ms; turned on, the bot is done by the
+    // time the player's card has landed.
+    expect(plays[1].at - plays[0].at, lessThanOrEqualTo(step + Pacing.cardLands + step));
   });
 }

@@ -125,17 +125,27 @@ class GameController extends ChangeNotifier implements TableModel {
   bool _disposed = false;
   bool _pumping = false;
 
-  /// How long [seat]'s bot appears to think: its persona's rhythm.
+  /// How long [seat]'s bot appears to think: its persona's rhythm. With
+  /// the Auto switch on nobody is thinking, and a card comes as soon as
+  /// the one before it has landed.
   Duration _botThink(int seat) {
     if (!paced) return Duration.zero;
+    if (_auto.on) return _game.trick.isEmpty ? Duration.zero : Pacing.cardLands;
     return Pacing.think(_bots[seat]!.persona, _rhythm);
   }
 
-  Duration get _trickHold => paced ? Pacing.trickHold : Duration.zero;
+  /// A finished trick on the felt: held to be read, or, with the Auto
+  /// switch on, until its last card has landed.
+  Duration get _trickHold => !paced ? Duration.zero : (_auto.on ? Pacing.cardLands : Pacing.trickHold);
+
+  /// With the Auto switch on, a trick swept off before the next is led.
+  Duration get _swept => paced && _auto.on ? Pacing.trickSweeps : Duration.zero;
   /// How long the player's three sit on the line, gone from the hand,
   /// before the others' come back: the swap is seen as a swap.
   Duration get _passBeat => paced ? const Duration(milliseconds: 900) : Duration.zero;
-  Duration get _sweepBeat => paced ? Pacing.sweepBeat : Duration.zero;
+  /// The bare felt before the score sheet, or, with the Auto switch on,
+  /// the last trick's sweep.
+  Duration get _sweepBeat => !paced ? Duration.zero : (_auto.on ? Pacing.trickSweeps : Pacing.sweepBeat);
 
   /// Whether the score sheet may show: the hand (or the game) is over
   /// and its last trick has been seen off the table.
@@ -257,11 +267,13 @@ class GameController extends ChangeNotifier implements TableModel {
   bool get autoPlay => _auto.on;
 
   /// On, and the player's turn — if it is theirs now — is played at
-  /// once; the pump plays every one after it as it comes round.
+  /// once; the pump plays every one after it as it comes round, at the
+  /// speed the cards land, a bot's thinking already begun cut short.
   @override
   void setAutoPlay(bool on) {
     _auto.set(this, on);
     notifyListeners();
+    if (_auto.on) _hurry();
     if (on) _pump();
   }
 
@@ -332,6 +344,8 @@ class GameController extends ChangeNotifier implements TableModel {
             if (!await _wait(_sweepBeat)) return;
             _sheetDue = true;
             notifyListeners();
+          } else if (_swept > Duration.zero && !await _wait(_swept)) {
+            return;
           }
           continue;
         }
@@ -361,6 +375,7 @@ class GameController extends ChangeNotifier implements TableModel {
   }
 
   Timer? _waitTimer;
+  Completer<void>? _waiting;
 
   /// Sleeps, and reports whether the controller is still alive after —
   /// every await point is a place the widget can be torn down.
@@ -370,12 +385,21 @@ class GameController extends ChangeNotifier implements TableModel {
   /// pacing. The live table cancels its own the same way.
   Future<bool> _wait(Duration d) async {
     if (d > Duration.zero) {
-      final done = Completer<void>();
+      final done = _waiting = Completer<void>();
       _waitTimer?.cancel();
       _waitTimer = Timer(d * tableBeats, done.complete);
       await done.future;
     }
     return !_disposed;
+  }
+
+  /// The beat being waited out, if one is, cut to a card's landing: the
+  /// Auto switch turned on waits for nobody's thinking.
+  void _hurry() {
+    final waiting = _waiting;
+    if (waiting == null || waiting.isCompleted) return;
+    _waitTimer?.cancel();
+    _waitTimer = Timer(Pacing.cardLands * tableBeats, waiting.complete);
   }
 
   BotView _viewFor(int seat) => BotView(

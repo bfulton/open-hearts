@@ -26,6 +26,7 @@ import 'package:engine/engine.dart' as engine;
 import 'package:flutter/material.dart';
 
 import '../l10n/l10n.dart';
+import '../pacing.dart';
 import 'card_view.dart';
 
 /// Extra space between two suits in the fan. Grouping is most of what
@@ -207,7 +208,7 @@ class _HandFanState extends State<HandFan> with TickerProviderStateMixin {
       out: out,
       controller: AnimationController(
         vsync: this,
-        duration: Duration(milliseconds: side == null ? 240 : 420),
+        duration: side == null ? Pacing.cardLands : const Duration(milliseconds: 420),
       ),
     );
     flight.controller.addStatusListener((status) {

@@ -24,6 +24,13 @@ abstract final class Pacing {
   /// unseen, and the score it is about unexplained.
   static const sweepBeat = Duration(milliseconds: 1200);
 
+  /// A card coming down onto its place in the trick, and the player's
+  /// own leaving the hand for it (ui/table_view.dart, ui/hand_fan.dart).
+  static const cardLands = Duration(milliseconds: 240);
+
+  /// A finished trick swept off to whoever took it (ui/table_view.dart).
+  static const trickSweeps = Duration(milliseconds: 300);
+
   /// How long [persona]'s bot appears to think: a draw from its rhythm.
   static Duration think(Persona persona, Random rhythm) {
     final pace = persona.pace;

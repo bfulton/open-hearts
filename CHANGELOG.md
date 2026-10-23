@@ -166,6 +166,14 @@ squashed from a pull request, the pull request's number.
 
 ### Changed
 
+- Playing alone, the Auto switch plays the rest of the hand as fast as
+  its cards land: the bots stop thinking, a trick goes as soon as its
+  last card has landed, and the score sheet follows the last trick's
+  sweep. Turned on while a bot thinks, the bot plays at once.
+  (2026-10-23, #37)
+- `crypto/build_android.sh` links the 64-bit libraries 16 KB-aligned
+  with any NDK, and refuses one that isn't, since Google Play takes no
+  other. (2026-10-23, #37)
 - A change to the terms of use or the privacy policy is one line at the
   front door, "Our terms of use and privacy policy have changed", with
   **What changed** beside it for each document's summary and one tap to
@@ -262,6 +270,11 @@ squashed from a pull request, the pull request's number.
 
 ### Fixed
 
+- On a phone whose store hasn't said what live play costs, opened
+  offline say, the subscription page asks the store again when it opens
+  and on Subscribe, shows no price until the store gives its own, and no
+  longer says that live play is bought on the web. Before, the store was
+  asked once, at launch. (2026-10-23, #37)
 - `./oh secret set` sets the relay's optional secrets, Arachnid Shield's,
   PhotoDNA's and NCMEC's credentials, on the relay worker. It refused
   them before, though the abuse-material guide said to use it.

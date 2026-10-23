@@ -9,6 +9,7 @@ import 'package:flutter/semantics.dart';
 
 import '../avatar.dart';
 import '../l10n/l10n.dart';
+import '../pacing.dart';
 import '../table_model.dart';
 import '../theme.dart';
 import 'card_view.dart';
@@ -759,7 +760,7 @@ class _Trick extends StatefulWidget {
 class _TrickState extends State<_Trick> with SingleTickerProviderStateMixin {
   late final AnimationController _sweep = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 300),
+    duration: Pacing.trickSweeps,
   )..addStatusListener((status) {
       if (status == AnimationStatus.completed && mounted) setState(() => _taken = const []);
     });
@@ -898,7 +899,7 @@ class _TrickSlot extends StatelessWidget {
             ? l10n.seatLed(name, l10n.cardInSentence(card!))
             : l10n.seatPlayed(name, l10n.cardInSentence(card!));
     return AnimatedSwitcher(
-      duration: const Duration(milliseconds: 240),
+      duration: Pacing.cardLands,
       // What leaves a slot is carried off by the sweep above, so there
       // is nothing here to play backwards.
       reverseDuration: Duration.zero,
