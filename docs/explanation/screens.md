@@ -87,8 +87,10 @@ changes hands travels the way the table is laid out
 
 Arrivals decelerate, departures accelerate, and moves within the screen
 ease both in and out (Flutter's `Easing`). Each movement is a fraction
-of a second, a pass a little longer than a play; the durations are in
-`app/lib/ui/hand_fan.dart` and `app/lib/ui/table_view.dart`. Animations
+of a second, a pass a little longer than a play; a card's landing and a
+trick's sweep are `Pacing.cardLands` and `Pacing.trickSweeps`
+(`app/lib/pacing.dart`), and the rest are in `app/lib/ui/hand_fan.dart`
+and `app/lib/ui/table_view.dart`. Animations
 that a tap triggers begin one frame in, so the first drawn frame is never
 a frame of nothing. With `MediaQuery.disableAnimations` the table is
 identical, just with nothing in flight.
@@ -97,7 +99,14 @@ At the end of a hand the last trick is named and swept, there is a beat
 of bare felt, and then the score sheet comes down. At a live table the
 next hand is already being dealt underneath. The beat is a step of the
 screen's walk through the record, not a separate timer, so incoming
-events cannot cut it short.
+events cannot cut it short. Alone, with the Auto switch on, nobody waits
+on anybody: each card comes as the one before it lands, a trick goes as
+its last card lands, and the sheet follows the sweep.
+
+A moon the player shot rains confetti over the table as its sheet comes
+in, once, for under three seconds (`app/lib/ui/confetti.dart`). Taps go
+through it and screen readers never meet it, and with
+`MediaQuery.disableAnimations` there is none.
 
 The heart on the front door folds and opens, then holds still for a
 while (`app/lib/ui/folding_heart.dart`). It requests no frames between

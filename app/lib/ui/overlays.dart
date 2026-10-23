@@ -11,6 +11,7 @@ import 'package:table/table.dart' show Rating;
 import '../avatar.dart';
 import '../l10n/l10n.dart';
 import '../theme.dart';
+import 'confetti.dart';
 import 'player_icon.dart';
 
 class HandOverSheet extends StatelessWidget {
@@ -79,6 +80,7 @@ class HandOverSheet extends StatelessWidget {
               : l10n.shotTheMoon(names[shooter]),
       tone: shooter == null || shooter == mySeat ? Palette.chrome : Palette.danger,
       subtitle: shooter == null ? null : l10n.shotTheMoonDetail,
+      celebrate: shooter == mySeat,
       rows: [
         for (var seat = 0; seat < seatCount; seat++)
           (
@@ -170,6 +172,8 @@ class GameOverSheet extends StatelessWidget {
     return _Sheet(
       title: title,
       tone: youWon ? Palette.chrome : Palette.danger,
+      // The game's last hand was a moon the player shot.
+      celebrate: game.moonShooter == mySeat,
       subtitle: l10n.lowestScoreAfter(game.handNumber + 1),
       rows: [
         for (var seat = 0; seat < seatCount; seat++)
@@ -216,10 +220,15 @@ class _Sheet extends StatelessWidget {
     this.subtitle,
     this.note,
     this.quiet = const [],
+    this.celebrate = false,
   });
 
   final String title;
   final String? subtitle;
+
+  /// A moon the player shot: confetti falls over the table as the sheet
+  /// comes in (confetti.dart).
+  final bool celebrate;
 
   /// What the sheet is *about*, which is never an action: white for a
   /// hand that ended or a game you won, red for one that went against
@@ -243,7 +252,7 @@ class _Sheet extends StatelessWidget {
 
     // The sheet comes in over a quarter of a second — the scrim
     // darkening, the card settling — rather than landing in a frame.
-    return TweenAnimationBuilder<double>(
+    final sheet = TweenAnimationBuilder<double>(
       tween: Tween(begin: 0, end: 1),
       duration: const Duration(milliseconds: 260),
       curve: Curves.easeOutCubic,
@@ -330,6 +339,8 @@ class _Sheet extends StatelessWidget {
         ),
       ),
     );
+    if (!celebrate) return sheet;
+    return Stack(children: [sheet, const Positioned.fill(child: Confetti())]);
   }
 }
 

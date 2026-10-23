@@ -10,6 +10,10 @@ squashed from a pull request, the pull request's number.
 
 ### Added
 
+- Shooting the moon rains confetti over the table as the hand's sheet
+  comes in, or the game's when it was the last hand: once, for the
+  player's own moon only, and not where the device asks for less
+  motion. (2026-10-23, #37)
 - `robots.txt`, on openhearts.game and play.openhearts.game, names
   Project Arachnid's crawler, which Arachnid Shield checks before it
   takes Open Hearts on. Every other crawler is let in, as before.
