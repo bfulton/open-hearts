@@ -51,7 +51,7 @@ Use this guide to build a signed store release of the app for iOS or Android.
 
 ## Check it worked
 
-1. The build finished. A release is refused when it lacks the service key (by `app/ios/release_check.sh` in Xcode, and by Gradle), when the native libraries are missing (Xcode cannot find the XCFrameworks, or Gradle finds no `libdeal.so` for an ABI), or when `app/android/key.properties` is missing.
+1. The build finished. A release is refused when it lacks the service key (by `app/ios/release_check.sh` in Xcode, and by Gradle), when the native libraries are missing (Xcode cannot find the XCFrameworks, or Gradle finds no `libdeal.so` for an ABI), or when `app/android/key.properties` is missing. `crypto/build_android.sh` refuses a 64-bit library that isn't aligned to 16 KB, which Google Play turns away.
 1. Check that the release was compiled with the key in the config:
 
    ```bash
