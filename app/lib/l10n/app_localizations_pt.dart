@@ -839,11 +839,26 @@ class AppLocalizationsPt extends AppLocalizations {
   String get liveAgreeTitle => 'Antes de jogar ao vivo';
 
   @override
-  String get liveAgreeBody =>
-      'Os outros jogadores vão ver o seu nome e a sua imagem, então escolha um nome e uma imagem que você mostraria a qualquer pessoa, e jogue limpo. Os Termos de uso dizem o que não é permitido e o que acontece se você os desrespeitar. Ao jogar ao vivo, você os aceita.';
+  String get liveAgreeBody => 'Para jogar ao vivo, aceite os Termos de uso.';
 
   @override
-  String get liveAgree => 'Concordo';
+  String get liveAgree => 'Aceitar';
+
+  @override
+  String get changedBoth =>
+      'Mudamos nossos termos de uso e nossa política de privacidade.';
+
+  @override
+  String get changedTerms => 'Mudamos nossos termos de uso.';
+
+  @override
+  String get changedPrivacy => 'Mudamos nossa política de privacidade.';
+
+  @override
+  String get whatChanged => 'O que mudou';
+
+  @override
+  String get readInFull => 'Ler o texto completo';
 
   @override
   String get deleteAccount => 'Excluir conta';

@@ -843,10 +843,26 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get liveAgreeBody =>
-      'Los demás jugadores verán tu nombre y tu imagen, así que elige unos que enseñarías a cualquiera, y juega limpio. Las Condiciones de uso dicen qué no está permitido y qué pasa si las incumples. Al jugar en vivo, las aceptas.';
+      'Para jugar en vivo, acepta las Condiciones de uso.';
 
   @override
-  String get liveAgree => 'Acepto';
+  String get liveAgree => 'Aceptar';
+
+  @override
+  String get changedBoth =>
+      'Hemos cambiado nuestras condiciones de uso y nuestra política de privacidad.';
+
+  @override
+  String get changedTerms => 'Hemos cambiado nuestras condiciones de uso.';
+
+  @override
+  String get changedPrivacy => 'Hemos cambiado nuestra política de privacidad.';
+
+  @override
+  String get whatChanged => 'Qué cambió';
+
+  @override
+  String get readInFull => 'Leer el texto completo';
 
   @override
   String get deleteAccount => 'Eliminar cuenta';

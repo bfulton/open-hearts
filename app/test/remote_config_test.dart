@@ -298,33 +298,46 @@ void main() {
     expect(RemoteConfig.parse({'notices': 'all'}).notices, isEmpty);
   });
 
-  testWidgets('a change to the terms: said at the front door with a link to them, until dismissed, and dismissed for good', (tester) async {
+  testWidgets('changes to the terms and the privacy policy: one line at the front door, what each says a tap away, dismissed together and for good', (tester) async {
     final terms = {'document': 'terms', 'date': '2026-11-02', 'summary': {'en': 'Refunds end the subscription.'}};
-    RemoteSettings.current.adopt(RemoteConfig.parse({
-      'notices': [terms, {'document': 'privacy', 'date': '2026-11-01', 'summary': {'en': 'Reports are kept a year.'}}],
-    }));
+    final privacy = {'document': 'privacy', 'date': '2026-11-01', 'summary': {'en': 'Reports are kept a year.'}};
+    RemoteSettings.current.adopt(RemoteConfig.parse({'notices': [terms, privacy]}));
     await tester.pumpWidget(const MaterialApp(home: Scaffold(body: OperatorNotes())));
     await tester.pumpAndSettle();
-    expect(find.text('Refunds end the subscription.'), findsOneWidget);
-    expect(find.text('Terms of use'), findsOneWidget);
-    expect(find.text('Reports are kept a year.'), findsOneWidget);
-    expect(find.text('Privacy policy'), findsOneWidget);
+    expect(find.text('Our terms of use and privacy policy have changed.'), findsOneWidget);
+    expect(find.text('Refunds end the subscription.'), findsNothing, reason: 'what changed is a tap away, not at the door');
 
-    await tester.tap(find.byTooltip('Close').first);
+    await tester.tap(find.text('What changed'));
     await tester.pumpAndSettle();
-    expect(find.text('Refunds end the subscription.'), findsNothing);
-    expect(find.text('Reports are kept a year.'), findsOneWidget, reason: 'only the one dismissed');
+    expect(find.text('Terms of use'), findsOneWidget);
+    expect(find.text('Refunds end the subscription.'), findsOneWidget);
+    expect(find.text('Privacy policy'), findsOneWidget);
+    expect(find.text('Reports are kept a year.'), findsOneWidget);
+    expect(find.text('Read in full'), findsNWidgets(2), reason: 'each with its document a tap away');
+    await tester.tap(find.text('Close'));
+    await tester.pumpAndSettle();
+    expect(find.text('Our terms of use and privacy policy have changed.'), findsOneWidget, reason: 'reading them is not dismissing them');
 
-    // Opened again, it stays dismissed; a later change is news.
+    await tester.tap(find.byTooltip('Close'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('changed.'), findsNothing, reason: 'one tap dismisses both');
+
+    // Opened again, they stay dismissed; a later change is news, said of
+    // its own document.
     await tester.pumpWidget(const SizedBox());
     await tester.pumpWidget(const MaterialApp(home: Scaffold(body: OperatorNotes())));
     await tester.pumpAndSettle();
-    expect(find.text('Refunds end the subscription.'), findsNothing);
+    expect(find.textContaining('changed.'), findsNothing);
     RemoteSettings.current.adopt(RemoteConfig.parse({
-      'notices': [{...terms, 'date': '2026-12-01', 'summary': {'en': 'Disputes go to Charleston.'}}],
+      'notices': [{...terms, 'date': '2026-12-01', 'summary': {'en': 'Disputes go to Charleston.'}}, privacy],
     }));
     await tester.pumpAndSettle();
-    expect(find.text('Disputes go to Charleston.'), findsOneWidget);
+    expect(find.text('Our terms of use have changed.'), findsOneWidget);
+    RemoteSettings.current.adopt(RemoteConfig.parse({
+      'notices': [terms, {...privacy, 'date': '2026-12-01'}],
+    }));
+    await tester.pumpAndSettle();
+    expect(find.text('Our privacy policy has changed.'), findsOneWidget);
   });
 
   testWidgets('please update: said to a build older than the day asked for, and only to one', (tester) async {

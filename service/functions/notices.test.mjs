@@ -44,26 +44,46 @@ test('the config route serves the notices of the ledger this deploy published', 
 
 test('the email: what changed, where to read it, and when it applies, in the subscriber\'s language', () => {
   const told = LEDGER.terms[1];
-  const en = noticeMail('en', 'terms', told, { renews: '2027-03-04' });
+  const terms = [{ document: 'terms', entry: told }];
+  const en = noticeMail('en', terms, { renews: '2027-03-04' });
   assert.equal(en.subject, 'Changes to the Open Hearts terms of use');
-  assert.match(en.text, /^We have changed the Open Hearts terms of use, on 2026-11-01\.\n\nRefunds end the subscription\.\n\nRead them in full: https:\/\/openhearts\.game\/terms\n\n/);
-  assert.match(en.text, /from its first renewal at least 30 days from today, except where they say a change applies sooner\. For yours, that is the renewal on 2027-03-04\. If you do not want/);
+  assert.match(en.text, /^We have changed the Open Hearts terms of use, on 2026-11-01\.\n\nTerms of use: Refunds end the subscription\.\nRead them in full: https:\/\/openhearts\.game\/terms\n\n/);
+  assert.match(en.text, /The new terms apply to your subscription from its first renewal at least 30 days from today, except where they say a change applies sooner\. For yours, that is the renewal on 2027-03-04\. If you do not want/);
   assert.match(en.text, /You are getting this email because you subscribe to Open Hearts on the web\.$/);
-  assert.match(noticeMail('en', 'terms', told).text, /from today, except where they say a change applies sooner\. If you do not want/, 'one that does not renew');
-  const de = noticeMail('de', 'terms', told, { renews: '2027-03-04' });
-  assert.match(de.text, /Refunds end the subscription \(de\)\./);
+  assert.match(noticeMail('en', terms).text, /from today, except where they say a change applies sooner\. If you do not want/, 'one that does not renew');
+  const de = noticeMail('de', terms, { renews: '2027-03-04' });
+  assert.match(de.text, /Nutzungsbedingungen: Refunds end the subscription \(de\)\./);
   assert.match(de.text, /https:\/\/openhearts\.game\/de\/terms/);
   assert.match(de.text, /mindestens 30 Tage nach heute liegt, außer wo sie sagen, dass eine Änderung früher gilt\. Bei deinem ist das die Verlängerung am 2027-03-04\. Wenn/);
+  const privacy = { document: 'privacy', entry: { ...told, date: '2026-11-03', summary: summary('Reports are kept') } };
   for (const lang of ['en', 'es', 'pt', 'de', 'fr']) {
-    const text = noticeMail(lang, 'terms', told, { renews: '2027-03-04' }).text;
-    assert.doesNotMatch(text, /\{\w+\}/, `${lang}: every blank filled`);
-    assert.match(text, / 30 .* 2027-03-04/, `${lang}: the days, then the renewal`);
+    for (const changes of [terms, [privacy], [privacy, ...terms]]) {
+      const text = noticeMail(lang, changes, { renews: '2027-03-04' }).text;
+      assert.doesNotMatch(text, /\{\w+\}/, `${lang}: every blank filled`);
+      if (changes.some((c) => c.document === 'terms')) assert.match(text, / 30 .* 2027-03-04/, `${lang}: the days, then the renewal`);
+    }
   }
-  const privacy = noticeMail('fr', 'privacy', { ...told, summary: summary('Reports are kept') });
-  assert.equal(privacy.subject, "Modifications de la politique de confidentialité d'Open Hearts");
-  assert.match(privacy.text, /https:\/\/openhearts\.game\/fr\/privacy/);
-  assert.doesNotMatch(privacy.text, /renouvellement/, 'a privacy policy is not renewed into');
-  assert.equal(noticeMail('xx', 'terms', told).subject, en.subject, 'an unknown language is English');
+  const fr = noticeMail('fr', [privacy]);
+  assert.equal(fr.subject, "Modifications de la politique de confidentialité d'Open Hearts");
+  assert.match(fr.text, /https:\/\/openhearts\.game\/fr\/privacy/);
+  assert.doesNotMatch(fr.text, /renouvellement/, 'a privacy policy is not renewed into');
+  assert.equal(noticeMail('xx', terms).subject, en.subject, 'an unknown language is English');
+
+  // Both documents, in one email: the terms first, each with its summary
+  // and its link, the days each changed, and the renewal for the terms.
+  const both = noticeMail('en', [privacy, ...terms], { renews: '2027-03-04' });
+  assert.equal(both.subject, 'Changes to the Open Hearts terms of use and privacy policy');
+  assert.equal(
+    both.text,
+    [
+      'We have changed the Open Hearts terms of use and privacy policy, on 2026-11-01 and 2026-11-03.',
+      'Terms of use: Refunds end the subscription.\nRead them in full: https://openhearts.game/terms',
+      'Privacy policy: Reports are kept.\nRead it in full: https://openhearts.game/privacy',
+      'The new terms apply to your subscription from its first renewal at least 30 days from today, except where they say a change applies sooner. For yours, that is the renewal on 2027-03-04. If you do not want to go on under them, you can cancel before then, in the game: menu, Subscription, Manage subscription.',
+      'You are getting this email because you subscribe to Open Hearts on the web.',
+    ].join('\n\n'),
+  );
+  assert.match(noticeMail('es', [privacy, { ...privacy, document: 'terms', entry: { ...privacy.entry, summary: summary('x') } }]).text, /^Hemos cambiado las condiciones de uso y la política de privacidad de Open Hearts el 2026-11-03\./, 'one day, said once');
 });
 
 test('the terms say a change applies from the first renewal as many days after a subscriber is told as the email counts', () => {
@@ -108,7 +128,8 @@ function stripeWith(subs) {
   return fetchImpl;
 }
 
-const order = (subscriptions, more = {}) => ({ act: 'notice', document: 'terms', date: '2026-11-01', subscriptions, at: new Date(now).toISOString(), ...more });
+const order = (subscriptions, more = {}) => ({ act: 'notice', changes: [{ document: 'terms', date: '2026-11-01', covers: [] }], subscriptions, at: new Date(now).toISOString(), ...more });
+const termsOf = [{ document: 'terms', date: '2026-11-01' }];
 const env = { OH_LEDGER: LEDGER, OH_STRIPE_SECRET: 'rk_live_x' };
 
 test('an order tells each subscription once; one with no address is noted, and one whose mail did not go is tried again', async () => {
@@ -125,11 +146,12 @@ test('an order tells each subscription once; one with no address is noted, and o
   const sent = [];
   const send = async (mail) => (mail.to === 'c@example.com' ? false : (sent.push(mail), true));
   const said = await carryOutNotice(order(['sub_told', 'sub_fr', 'sub_soon', 'sub_none', 'sub_bounce', 'sub_gone']), store, env, { fetchImpl, send, now });
-  assert.deepEqual(said, { status: 200, body: { act: 'notice', document: 'terms', date: '2026-11-01', told: 2, already: 1, unsent: { 'no address': 1, 'no such subscription': 1 }, failed: 1 } });
+  assert.deepEqual(said, { status: 200, body: { act: 'notice', changes: termsOf, told: 2, already: 1, unsent: { 'no address': 1, 'no such subscription': 1 }, failed: 1 } });
   assert.equal(sent.length, 2);
   assert.equal(sent[0].to, 'b@example.com');
   assert.equal(sent[0].subject, "Modifications des conditions d'utilisation d'Open Hearts");
   assert.match(sent[0].text, /Pour le vôtre, c'est le renouvellement du 2027-02-01\./);
+  assert.match(sent[0].text, /^Nous avons modifié les conditions d'utilisation d'Open Hearts le 2026-11-10\./, 'the day the terms as they now read were published, a minor change after it');
   assert.match(sent[1].text, /For yours, that is the renewal on 2027-12-05\./, 'renewing in fifteen days: the renewal after');
   assert.ok(fetchImpl.asked.every((a) => a.auth === 'Bearer rk_live_x'), 'with the service\'s own key');
   assert.ok(!fetchImpl.asked.some((a) => a.url.includes('sub_told')), 'one told already is not asked about');
@@ -139,7 +161,7 @@ test('an order tells each subscription once; one with no address is noted, and o
   assert.ok(!JSON.stringify([...store.rows]).includes('@example.com'), 'no address is kept');
 
   const again = await carryOutNotice(order(['sub_fr', 'sub_none', 'sub_bounce']), store, env, { fetchImpl, send: async (m) => (sent.push(m), true), now });
-  assert.deepEqual(again.body, { act: 'notice', document: 'terms', date: '2026-11-01', told: 1, already: 2, unsent: {}, failed: 0 });
+  assert.deepEqual(again.body, { act: 'notice', changes: termsOf, told: 1, already: 2, unsent: {}, failed: 0 });
   assert.equal(sent.at(-1).to, 'c@example.com');
 
   const down = await carryOutNotice(order(['sub_down']), store, env, { fetchImpl: stripeWith({ sub_down: 'down' }), send, now });
@@ -147,14 +169,73 @@ test('an order tells each subscription once; one with no address is noted, and o
   assert.equal(await store.get(...noticeRow('terms', '2026-11-01', 'sub_down')), null);
 });
 
+test('one email tells a subscriber every change they were not told of; the earlier change it says too is noted told, keeping a day already told', async () => {
+  const ledger = {
+    terms: [entry('2026-10-16', 'first'), entry('2026-11-01', 'material', 'Refunds end the subscription')],
+    privacy: [entry('2026-10-13', 'first'), entry('2026-10-20', 'material', 'Pictures are checked'), entry('2026-11-01', 'material', 'Pictures are checked and kept')],
+  };
+  const store = memoryStore();
+  await store.put(...noticeRow('privacy', '2026-10-20', 'sub_old'), { at: '2026-10-21T00:00:00.000Z', lang: 'en' });
+  await store.put(...noticeRow('terms', '2026-11-01', 'sub_half'), { at: '2026-11-02T00:00:00.000Z', lang: 'en' });
+  const subs = {
+    sub_old: { customer: { email: 'a@example.com' } },
+    sub_half: { customer: { email: 'b@example.com' } },
+    sub_new: { customer: { email: 'c@example.com' } },
+    sub_none: { customer: { email: null } },
+  };
+  const both = {
+    act: 'notice',
+    changes: [{ document: 'privacy', date: '2026-11-01', covers: ['2026-10-20'] }, { document: 'terms', date: '2026-11-01', covers: [] }],
+    subscriptions: ['sub_old', 'sub_half', 'sub_new', 'sub_none'],
+    at: new Date(now).toISOString(),
+  };
+  const e = { OH_LEDGER: ledger, OH_STRIPE_SECRET: 'rk_live_x' };
+  const sent = [];
+  const said = await carryOutNotice(both, store, e, { fetchImpl: stripeWith(subs), send: async (m) => (sent.push(m), true), now });
+  assert.deepEqual(said.body, {
+    act: 'notice',
+    changes: [{ document: 'privacy', date: '2026-11-01' }, { document: 'terms', date: '2026-11-01' }],
+    told: 3,
+    already: 0,
+    unsent: { 'no address': 1 },
+    failed: 0,
+  });
+  assert.equal(sent.length, 3, 'one email each');
+  const to = (address) => sent.find((m) => m.to === address);
+  assert.equal(to('a@example.com').subject, 'Changes to the Open Hearts terms of use and privacy policy');
+  assert.match(to('a@example.com').text, /^We have changed the Open Hearts terms of use and privacy policy, on 2026-11-01\.\n\nTerms of use: /, 'the terms first');
+  assert.match(to('a@example.com').text, /Privacy policy: Pictures are checked and kept\./);
+  assert.doesNotMatch(to('a@example.com').text, /Pictures are checked\./, 'the newest change says what the earlier one did');
+  assert.equal(to('b@example.com').subject, 'Changes to the Open Hearts privacy policy', 'told of the terms already');
+  assert.doesNotMatch(to('b@example.com').text, /renewal/);
+
+  const at = new Date(now).toISOString();
+  assert.deepEqual(await store.get(...noticeRow('privacy', '2026-10-20', 'sub_old')), { at: '2026-10-21T00:00:00.000Z', lang: 'en' }, 'the day it was told is kept');
+  assert.deepEqual(await store.get(...noticeRow('privacy', '2026-11-01', 'sub_old')), { at, lang: 'en' });
+  assert.deepEqual(await store.get(...noticeRow('privacy', '2026-10-20', 'sub_new')), { at, lang: 'en', by: '2026-11-01' }, 'told by the newest change');
+  assert.deepEqual(await store.get(...noticeRow('terms', '2026-11-01', 'sub_half')), { at: '2026-11-02T00:00:00.000Z', lang: 'en' }, 'not told twice, nor noted again');
+  assert.deepEqual(await store.get(...noticeRow('privacy', '2026-10-20', 'sub_none')), { at, unsent: 'no address', by: '2026-11-01' });
+  assert.deepEqual(await store.get(...noticeRow('terms', '2026-11-01', 'sub_none')), { at, unsent: 'no address' });
+
+  const again = await carryOutNotice(both, store, e, { fetchImpl: stripeWith(subs), send: async () => assert.fail('told twice'), now });
+  assert.equal(again.body.already, 4);
+});
+
 test('an order for a change nobody is told of, run out, or naming anything but a few web subscriptions, is refused', async () => {
   const store = memoryStore();
   const fetchImpl = stripeWith({});
   const send = async () => assert.fail('nothing is sent');
   const refused = async (o, e = env) => (await carryOutNotice(o, store, e, { fetchImpl, send, now })).status;
-  assert.equal(await refused(order(['sub_1'], { date: '2026-11-10' })), 400, 'a minor change');
-  assert.equal(await refused(order(['sub_1'], { date: '2026-10-16' })), 400, 'the first entry');
-  assert.equal(await refused(order(['sub_1'], { document: 'cookies' })), 400);
+  const changes = (...c) => ({ changes: c });
+  assert.equal(await refused(order(['sub_1'], changes({ document: 'terms', date: '2026-11-10' }))), 400, 'a minor change');
+  assert.equal(await refused(order(['sub_1'], changes({ document: 'terms', date: '2026-10-16' }))), 400, 'the first entry');
+  assert.equal(await refused(order(['sub_1'], changes({ document: 'cookies', date: '2026-11-01' }))), 400);
+  assert.equal(await refused(order(['sub_1'], changes())), 400, 'no change');
+  assert.equal(await refused(order(['sub_1'], { changes: undefined })), 400);
+  assert.equal(await refused(order(['sub_1'], changes({ document: 'terms', date: '2026-11-01' }, { document: 'terms', date: '2026-11-01' }))), 400, 'a document twice');
+  assert.equal(await refused(order(['sub_1'], changes({ document: 'terms', date: '2026-11-01', covers: ['2026-11-10'] }))), 400, 'covering a minor change');
+  assert.equal(await refused(order(['sub_1'], changes({ document: 'terms', date: '2026-11-01', covers: ['2026-11-01'] }))), 400, 'covering itself');
+  assert.equal(await refused(order(['sub_1'], changes({ document: 'terms', date: '2026-11-01', covers: '2026-11-01' }))), 400);
   assert.equal(await refused(order(['sub_1'], { at: new Date(now - 11 * 60000).toISOString() })), 410);
   assert.equal(await refused(order([])), 400);
   assert.equal(await refused(order(['apple:1000'])), 400, 'a store\'s subscription has no address of ours');

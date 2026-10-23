@@ -16,7 +16,7 @@ import { join } from 'node:path';
 import { Failed, Usage, root } from './env.mjs';
 import { dayIn, languages, origin, render, stores, strings } from '../site/build.mjs';
 import { DOCUMENTS, fingerprintOf, fingerprintOfTexts, formatLedger, ledgerProblems, rewritten, textOf, told } from '../site/ledger.mjs';
-import { NOTICE_DAYS, NOTICES_PER_ORDER } from '../service/functions/notices.mjs';
+import { NOTICE_DAYS, NOTICES_PER_ORDER, noticeMail } from '../service/functions/notices.mjs';
 import { dayOf } from '../service/functions/rows.mjs';
 import { placeOrder } from '../service/tool/suspend.mjs';
 
@@ -225,10 +225,13 @@ async function subscribersBefore(stripe, date) {
   return found;
 }
 
-/// Each published change that matters to subscribers, of the last
-/// [NOTICE_DAYS] days, with the web subscriptions it is told to and
-/// those of them not told yet: [{document, entry, subscriptions, left}].
-/// Failed when which version is live cannot be told.
+/// Each document's newest published change that matters to
+/// subscribers, of the last [NOTICE_DAYS] days, with the earlier ones of
+/// those days that its summary says too, as the app shows only the
+/// newest (notices.mjs, noticesOf); the web subscriptions it is told to,
+/// and those of them not told yet, and the day the document as it now
+/// reads was published: [{document, entry, covers, subscriptions, left,
+/// day}]. Failed when which version is live cannot be told.
 export async function untold(ctx, ledger = null) {
   ledger ??= await readLedger(ctx);
   const live = await liveVersions(ctx, ledger);
@@ -236,7 +239,8 @@ export async function untold(ctx, ledger = null) {
   const due = [];
   for (const doc of DOCUMENTS) {
     if (live[doc].error) throw new Failed(`which ${doc} are live cannot be told: ${live[doc].error}`);
-    for (const e of ledger[doc].slice(0, live[doc].index + 1)) if (told(e) && e.date > since) due.push({ document: doc, entry: e });
+    const published = ledger[doc].slice(0, live[doc].index + 1).filter((e) => told(e) && e.date > since);
+    if (published.length) due.push({ document: doc, entry: published.at(-1), covers: published.slice(0, -1), day: live[doc].entry.date });
   }
   if (!due.length) return [];
   const store = await ctx.store();
@@ -249,24 +253,49 @@ export async function untold(ctx, ledger = null) {
   return due;
 }
 
-/// Every web subscriber told, by email, of each published change that
-/// matters to them in the last [NOTICE_DAYS] days, once: the
-/// subscriptions are Stripe's, each order names a few of them, and the
-/// service writes to each (service/functions/notices.mjs). The operator
-/// runs it once a change is published, and again whenever a notice did
-/// not go; a deploy never does, so that no deploy emails anyone.
+/// [due] in a few words: "the terms of 2026-10-23 (material), saying
+/// what changed on 2026-10-19 too".
+const changeSaid = ({ document, entry, covers }) => `the ${document} of ${entry.date} (${entry.change})${covers.length ? `, saying what changed on ${covers.map((e) => e.date).join(' and ')} too` : ''}`;
+
+/// Every web subscriber told, by one email, of each published change
+/// that matters to them in the last [NOTICE_DAYS] days that they were
+/// not told of, once: the subscriptions are Stripe's, each order names a
+/// few of them that are owed the same changes, and the service writes
+/// to each (service/functions/notices.mjs). Without --apply it says what
+/// it would send, and shows the email as it reads in English. The
+/// operator runs it once a change is published, and again whenever a
+/// notice did not go; a deploy never does, so that no deploy emails
+/// anyone.
 export async function notify(ctx, { flags }) {
   const due = await untold(ctx);
   if (!due.length) return ctx.log('no published change to tell subscribers of');
+  for (const d of due) ctx.log(`${changeSaid(d)}: ${d.subscriptions.length} web subscription(s) to tell, ${d.subscriptions.length - d.left.length} told already`);
+  // Each subscription is owed the changes it was not told of, and is
+  // told of them in one email; an order names those owed the same.
+  const owed = new Map();
+  for (const d of due) {
+    for (const id of d.left) owed.set(id, [...(owed.get(id) ?? []), d]);
+  }
+  const groups = new Map();
+  for (const [id, changes] of owed) {
+    const key = changes.map((c) => `${c.document}@${c.entry.date}`).join(' ');
+    groups.set(key, { changes, subscriptions: [...(groups.get(key)?.subscriptions ?? []), id] });
+  }
+  if (!flags.apply) {
+    for (const { changes, subscriptions } of groups.values()) {
+      const { subject, text } = noticeMail('en', changes, { renews: 'YYYY-MM-DD' });
+      ctx.log(`\nthe email to ${subscriptions.length} of them, as it reads in English (each in their own language, the renewal theirs):\n\nSubject: ${subject}\n\n${text}\n`);
+    }
+    return ctx.log('nothing sent; --apply sends it');
+  }
   const store = await ctx.store();
   const config = await ctx.config();
   let failed = 0;
-  for (const { document: doc, entry, subscriptions: subs, left } of due) {
-    ctx.log(`the ${doc} of ${entry.date} (${entry.change}): ${subs.length} web subscription(s) to tell, ${subs.length - left.length} told already`);
-    if (!flags.apply || !left.length) continue;
-    for (let i = 0; i < left.length; i += NOTICES_PER_ORDER) {
-      const batch = left.slice(i, i + NOTICES_PER_ORDER);
-      const answer = await placeOrder(store, { act: 'notice', document: doc, date: entry.date, subscriptions: batch, at: new Date(ctx.now()).toISOString() }, { origin: config.appOrigin, fetchImpl: ctx.fetch, ...(ctx.carryOptions ?? {}) });
+  for (const { changes, subscriptions } of groups.values()) {
+    const named = changes.map((c) => ({ document: c.document, date: c.entry.date, covers: c.covers.map((e) => e.date) }));
+    for (let i = 0; i < subscriptions.length; i += NOTICES_PER_ORDER) {
+      const batch = subscriptions.slice(i, i + NOTICES_PER_ORDER);
+      const answer = await placeOrder(store, { act: 'notice', changes: named, subscriptions: batch, at: new Date(ctx.now()).toISOString() }, { origin: config.appOrigin, fetchImpl: ctx.fetch, ...(ctx.carryOptions ?? {}) });
       if (answer?.status !== 200) {
         failed += batch.length;
         ctx.warn(`the service said ${answer?.status ?? 'nothing'} to ${batch.length} of them: ${answer?.body?.error ?? ''}`);
@@ -275,10 +304,9 @@ export async function notify(ctx, { flags }) {
       const b = answer.body;
       failed += b.failed;
       const unsent = Object.entries(b.unsent ?? {}).map(([why, n]) => `${n} ${why}`).join(', ');
-      ctx.log(`  told ${b.told}, told already ${b.already}${unsent ? `, not told: ${unsent}` : ''}${b.failed ? `, not sent ${b.failed}` : ''}`);
+      ctx.log(`  ${changes.map(changeSaid).join('; ')}: told ${b.told}, told already ${b.already}${unsent ? `, not told: ${unsent}` : ''}${b.failed ? `, not sent ${b.failed}` : ''}`);
     }
   }
-  if (!flags.apply) return ctx.log('nothing sent; --apply sends it');
   if (failed) throw new Failed(`${failed} notice(s) did not go: run ./oh terms notify --apply again`);
 }
 

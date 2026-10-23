@@ -50,9 +50,9 @@ const ledgerFile = (ledger) => {
 };
 
 /// The site, serving the terms as old ([old]) and the privacy policy as
-/// this checkout has it; the service, answering notice orders with
+/// this checkout has it unless [oldPrivacy]; the service, answering notice orders with
 /// [answer]; Stripe, with [subs].
-function context({ ledger, old = true, subs = [], answer = null, env = { STRIPE_API_KEY: 'rk', CLOUDFLARE_API_TOKEN: 't', CLOUDFLARE_ACCOUNT_ID: 'a' }, mainLedger = null, store = memoryStore() }) {
+function context({ ledger, old = true, oldPrivacy = false, subs = [], answer = null, env = { STRIPE_API_KEY: 'rk', CLOUDFLARE_API_TOKEN: 't', CLOUDFLARE_ACCOUNT_ID: 'a' }, mainLedger = null, store = memoryStore() }) {
   const said = [];
   const orders = [];
   const file = ledgerFile(ledger);
@@ -80,13 +80,15 @@ function context({ ledger, old = true, subs = [], answer = null, env = { STRIPE_
         const id = JSON.parse(init.body).order;
         const order = await store.get(`ORDER#${id}`, 'META');
         orders.push(order);
-        for (const s of order.subscriptions) await store.put(`NOTICE#${order.document}@${order.date}`, `SUB#${s}`, { at: 'now' });
+        for (const s of order.subscriptions) {
+          for (const c of order.changes) for (const date of [c.date, ...c.covers]) await store.put(`NOTICE#${c.document}@${date}`, `SUB#${s}`, { at: 'now' });
+        }
         return Response.json(answer ?? { act: 'notice', told: order.subscriptions.length, already: 0, unsent: {}, failed: 0 });
       }
       const m = new RegExp(`^${origin}(?:/(es|pt|de|fr))?/(terms|privacy)$`).exec(String(url));
       if (!m) return new Response('no', { status: 404 });
       const [, code = 'en', doc] = m;
-      return new Response(page(doc, code, doc === 'terms' && old));
+      return new Response(page(doc, code, doc === 'terms' ? old : oldPrivacy));
     },
   };
 }
@@ -108,9 +110,10 @@ test('the site serves the version it serves: a deploy publishes what comes after
 test('an entry that repeats the text of the one before it, to publish it on a later day: the live one is the one the page is dated by', async () => {
   const ledger = ledgerWith({ date: '2026-10-19' });
   ledger.terms.push({ ...ledger.terms[1], date: '2026-11-02', change: 'minor', summary: summary('Published later, unchanged') });
-  // The site, serving the terms as built when [newest] was their newest entry.
-  const dated = (newest) => {
-    const ctx = context({ ledger, old: false });
+  // The site, serving the terms as built when [newest] was their newest
+  // entry; Stripe, with [subs].
+  const dated = (newest, subs = []) => {
+    const ctx = context({ ledger, old: false, subs });
     const served = ctx.fetch;
     ctx.fetch = async (url, init) => {
       const m = new RegExp(`^${origin}(?:/(es|pt|de|fr))?/terms$`).exec(String(url));
@@ -124,6 +127,13 @@ test('an entry that repeats the text of the one before it, to publish it on a la
   assert.deepEqual(before.problems, []);
   assert.deepEqual(before.publishing.map(({ document, entry }) => `${document} ${entry.date} ${entry.change}`), ['terms 2026-11-02 minor']);
   assert.deepEqual(await termsProblems(dated(2)), { problems: [], publishing: [] }, 'published: nothing left to publish');
+  // Subscribers are told of the change of 2026-10-19, as published on
+  // 2026-11-02, which its page says.
+  const [told] = await untold(dated(2));
+  assert.deepEqual([told.entry.date, told.day], ['2026-10-19', '2026-11-02']);
+  const ctx = dated(2, subscriptions(['sub_1', 'active', 30]));
+  await main(['terms', 'notify'], ctx);
+  assert.match(ctx.said.join('\n'), /We have changed the Open Hearts terms of use, on 2026-11-02\./);
 });
 
 test('no deploy emails anyone: a change subscribers are told of is published without Stripe, and no deploy script tells them', async () => {
@@ -260,10 +270,46 @@ test('notify: each subscription begun before a published change is told once, a 
   assert.ok(!named.includes('sub_0'), 'told already');
   assert.ok(!named.includes('sub_gone') && !named.includes('sub_new'), 'ended, or begun after the change');
   assert.ok(named.includes('sub_trial') && named.includes('sub_late'));
-  assert.deepEqual(Object.keys(ctx.orders[0]).sort(), ['act', 'at', 'date', 'document', 'subscriptions']);
+  assert.deepEqual(Object.keys(ctx.orders[0]).sort(), ['act', 'at', 'changes', 'subscriptions']);
   assert.equal(ctx.orders[0].act, 'notice');
+  assert.deepEqual(ctx.orders[0].changes, [{ document: 'terms', date: '2026-11-02', covers: [] }]);
 
   const twice = context({ ledger: ledgerWith(), old: false, subs, store });
+  assert.equal(await main(['terms', 'notify', '--apply'], twice), 0);
+  assert.deepEqual(twice.orders, [], 'run again, nobody is told twice');
+});
+
+test('notify: one email to each subscriber, of every change they are owed, each document\'s newest saying the earlier too; the dry run shows it', async () => {
+  const ledger = ledgerWith();
+  ledger.privacy = [
+    { date: '2026-10-13', fingerprint: fingerprintServed('privacy', true), change: 'first', storesNotified: null, summary: summary('Where it begins') },
+    { date: '2026-10-20', fingerprint: 'c'.repeat(64), change: 'material', storesNotified: null, summary: summary('Pictures are checked') },
+    { date: '2026-11-02', fingerprint: fingerprintOf('privacy'), change: 'material', storesNotified: null, summary: summary('Pictures are checked and kept') },
+  ];
+  const store = memoryStore();
+  await store.put('NOTICE#terms@2026-11-02', 'SUB#sub_t', { at: 'before' });
+  const subs = subscriptions(['sub_a', 'active', 30], ['sub_b', 'active', 30], ['sub_t', 'active', 30]);
+  const ctx = context({ ledger, old: false, subs, store });
+  assert.equal(await main(['terms', 'notify'], ctx), 0);
+  assert.deepEqual(ctx.orders, [], 'a dry run tells nobody');
+  const said = ctx.said.join('\n');
+  assert.match(said, /the terms of 2026-11-02 \(material\): 3 web subscription\(s\) to tell, 1 told already/);
+  assert.match(said, /the privacy of 2026-11-02 \(material\), saying what changed on 2026-10-20 too: 3 web subscription\(s\) to tell, 0 told already/);
+  assert.match(said, /the email to 2 of them, as it reads in English .*\n\nSubject: Changes to the Open Hearts terms of use and privacy policy\n\nWe have changed the Open Hearts terms of use and privacy policy, on 2026-11-02\.\n\nTerms of use: Refunds end the subscription \(en\)\.\n/);
+  assert.match(said, /Privacy policy: Pictures are checked and kept \(en\)\./);
+  assert.doesNotMatch(said, /Pictures are checked \(en\)/, 'the earlier change is said by the newest');
+  assert.match(said, /the email to 1 of them, as it reads in English .*\n\nSubject: Changes to the Open Hearts privacy policy\n/, 'told of the terms already');
+
+  assert.equal(await main(['terms', 'notify', '--apply'], ctx), 0);
+  const privacy = { document: 'privacy', date: '2026-11-02', covers: ['2026-10-20'] };
+  assert.deepEqual(
+    ctx.orders.map((o) => [o.changes, o.subscriptions]),
+    [
+      [[{ document: 'terms', date: '2026-11-02', covers: [] }, privacy], ['sub_a', 'sub_b']],
+      [[privacy], ['sub_t']],
+    ],
+  );
+  const twice = context({ ledger, old: false, subs, store });
   assert.equal(await main(['terms', 'notify', '--apply'], twice), 0);
   assert.deepEqual(twice.orders, [], 'run again, nobody is told twice');
 });
@@ -290,7 +336,7 @@ test('what is left to tell: each published change\'s web subscriptions, and thos
   const subs = subscriptions(['sub_1', 'active', 3], ['sub_2', 'active', 3], ['sub_new', 'active', -1]);
   const [terms, ...rest] = await untold(context({ ledger: ledgerWith(), old: false, subs, store }));
   assert.deepEqual(rest, [], 'the privacy policy has no change to tell');
-  assert.deepEqual([terms.document, terms.entry.date, terms.subscriptions, terms.left], ['terms', '2026-11-02', ['sub_1', 'sub_2'], ['sub_2']]);
+  assert.deepEqual([terms.document, terms.entry.date, terms.covers, terms.subscriptions, terms.left], ['terms', '2026-11-02', [], ['sub_1', 'sub_2'], ['sub_2']]);
   assert.deepEqual(await untold(context({ ledger: ledgerWith(), subs, store })), [], 'not published yet: nothing to tell');
   const unknown = context({ ledger: ledgerWith(), subs, store });
   unknown.fetch = async () => new Response('down', { status: 503 });

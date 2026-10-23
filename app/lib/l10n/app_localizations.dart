@@ -1118,17 +1118,47 @@ abstract class AppLocalizations {
   /// **'Before you play live'**
   String get liveAgreeTitle;
 
-  /// What the player agrees to before they first play live: the terms, linked by a button below.
+  /// What the player is asked before they first play live: to accept the terms, linked below.
   ///
   /// In en, this message translates to:
-  /// **'The other players will see your name and picture, so choose ones you\'d show anyone, and play fair. The Terms of use say what isn\'t allowed, and what happens if you break them. By playing live, you agree to them.'**
+  /// **'To play live, accept the Terms of use.'**
   String get liveAgreeBody;
 
-  /// Button: agree to the terms and go on into live play.
+  /// Button: accept the terms and go on into live play.
   ///
   /// In en, this message translates to:
-  /// **'I agree'**
+  /// **'Accept'**
   String get liveAgree;
+
+  /// At the front door: the terms of use and the privacy policy have both changed since this device last dismissed a notice.
+  ///
+  /// In en, this message translates to:
+  /// **'Our terms of use and privacy policy have changed.'**
+  String get changedBoth;
+
+  /// At the front door: the terms of use have changed since this device last dismissed a notice.
+  ///
+  /// In en, this message translates to:
+  /// **'Our terms of use have changed.'**
+  String get changedTerms;
+
+  /// At the front door: the privacy policy has changed since this device last dismissed a notice.
+  ///
+  /// In en, this message translates to:
+  /// **'Our privacy policy has changed.'**
+  String get changedPrivacy;
+
+  /// Button beside a notice that the terms or the privacy policy changed, and the title of what it opens: a short summary of each change.
+  ///
+  /// In en, this message translates to:
+  /// **'What changed'**
+  String get whatChanged;
+
+  /// Link under the summary of a change to the terms or the privacy policy: opens the whole document.
+  ///
+  /// In en, this message translates to:
+  /// **'Read in full'**
+  String get readInFull;
 
   /// Button on the subscription page, and on the screen that asks: delete this device's account for good.
   ///

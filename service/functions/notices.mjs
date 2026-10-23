@@ -2,8 +2,9 @@
 // matters to them: a material or price change in the ledger
 // (site/ledger.mjs). Every device shows it at the front door for
 // [NOTICE_DAYS] from the day it is published (config.mjs, the app's
-// OperatorNotes), and each web subscriber is emailed it when the
-// operator says so: never by a deploy. A change to the terms applies to
+// OperatorNotes), and each web subscriber is emailed it, in one email
+// with any other change they were not told of, when the operator says
+// so: never by a deploy. A change to the terms applies to
 // a subscription only from its first renewal [APPLIES_AFTER_DAYS] after
 // its subscriber was told, so an email sent a day late is a change
 // applied a renewal late, never one applied untold.
@@ -43,6 +44,9 @@ export const NOTICES_OBJECT = 'operator-notices';
 export const noticeRow = (document, date, subscription) => [`NOTICE#${document}@${date}`, `SUB#${subscription}`];
 
 const LANGUAGES = ['en', 'es', 'pt', 'de', 'fr'];
+
+/// The documents a change is told of, in the order an email names them.
+const DOCUMENTS = ['terms', 'privacy'];
 const DAY_MS = 86400000;
 
 /// The renewal that a change to the terms, told on [now], first applies
@@ -70,7 +74,7 @@ export function noticesOf(ledger, now = Date.now()) {
   const before = new Date(now - NOTICE_DAYS * DAY_MS).toISOString().slice(0, 10);
   const today = new Date(now).toISOString().slice(0, 10);
   const out = [];
-  for (const document of ['terms', 'privacy']) {
+  for (const document of DOCUMENTS) {
     const entry = (ledger?.[document] ?? []).filter(told).at(-1);
     if (entry && entry.date > before && entry.date <= today) out.push({ document, date: entry.date, summary: entry.summary });
   }
@@ -96,53 +100,77 @@ export function languageOf(subscription) {
 
 const WORDS = {
   en: {
-    terms: ['Changes to the Open Hearts terms of use', 'We have changed the Open Hearts terms of use, on {day}.', 'Read them in full: {url}', 'They apply to your subscription from its first renewal at least {days} days from today, except where they say a change applies sooner.{renews} If you do not want to go on under them, you can cancel before then, in the game: menu, Subscription, Manage subscription.'],
-    privacy: ['Changes to the Open Hearts privacy policy', 'We have changed the Open Hearts privacy policy, on {day}.', 'Read it in full: {url}', ''],
+    subject: { terms: 'Changes to the Open Hearts terms of use', privacy: 'Changes to the Open Hearts privacy policy', both: 'Changes to the Open Hearts terms of use and privacy policy' },
+    opening: { terms: 'We have changed the Open Hearts terms of use, on {day}.', privacy: 'We have changed the Open Hearts privacy policy, on {day}.', both: 'We have changed the Open Hearts terms of use and privacy policy, on {day}.' },
+    and: 'and',
+    name: { terms: 'Terms of use', privacy: 'Privacy policy' },
+    read: { terms: 'Read them in full: {url}', privacy: 'Read it in full: {url}' },
+    applies: 'The new terms apply to your subscription from its first renewal at least {days} days from today, except where they say a change applies sooner.{renews} If you do not want to go on under them, you can cancel before then, in the game: menu, Subscription, Manage subscription.',
     renews: ' For yours, that is the renewal on {day}.',
     why: 'You are getting this email because you subscribe to Open Hearts on the web.',
   },
   es: {
-    terms: ['Cambios en las condiciones de uso de Open Hearts', 'Hemos cambiado las condiciones de uso de Open Hearts el {day}.', 'Léelas completas: {url}', 'Se aplican a tu suscripción desde su primera renovación al menos {days} días a partir de hoy, salvo cuando digan que un cambio se aplica antes.{renews} Si no quieres continuar con ellas, puedes cancelar antes, en el juego: menú, Suscripción, Gestionar suscripción.'],
-    privacy: ['Cambios en la política de privacidad de Open Hearts', 'Hemos cambiado la política de privacidad de Open Hearts el {day}.', 'Léela completa: {url}', ''],
+    subject: { terms: 'Cambios en las condiciones de uso de Open Hearts', privacy: 'Cambios en la política de privacidad de Open Hearts', both: 'Cambios en las condiciones de uso y la política de privacidad de Open Hearts' },
+    opening: { terms: 'Hemos cambiado las condiciones de uso de Open Hearts el {day}.', privacy: 'Hemos cambiado la política de privacidad de Open Hearts el {day}.', both: 'Hemos cambiado las condiciones de uso y la política de privacidad de Open Hearts el {day}.' },
+    and: 'y',
+    name: { terms: 'Condiciones de uso', privacy: 'Política de privacidad' },
+    read: { terms: 'Léelas completas: {url}', privacy: 'Léela completa: {url}' },
+    applies: 'Las nuevas condiciones se aplican a tu suscripción desde su primera renovación al menos {days} días a partir de hoy, salvo cuando digan que un cambio se aplica antes.{renews} Si no quieres continuar con ellas, puedes cancelar antes, en el juego: menú, Suscripción, Gestionar suscripción.',
     renews: ' Para la tuya, es la renovación del {day}.',
     why: 'Recibes este correo porque estás suscrito a Open Hearts en la web.',
   },
   pt: {
-    terms: ['Mudanças nos termos de uso do Open Hearts', 'Mudamos os termos de uso do Open Hearts em {day}.', 'Leia-os na íntegra: {url}', 'Eles se aplicam à sua assinatura a partir da primeira renovação que ocorra pelo menos {days} dias depois de hoje, exceto quando disserem que uma mudança se aplica antes.{renews} Se não quiser continuar com eles, você pode cancelar antes disso, no jogo: menu, Assinatura, Gerenciar assinatura.'],
-    privacy: ['Mudanças na política de privacidade do Open Hearts', 'Mudamos a política de privacidade do Open Hearts em {day}.', 'Leia-a na íntegra: {url}', ''],
+    subject: { terms: 'Mudanças nos termos de uso do Open Hearts', privacy: 'Mudanças na política de privacidade do Open Hearts', both: 'Mudanças nos termos de uso e na política de privacidade do Open Hearts' },
+    opening: { terms: 'Mudamos os termos de uso do Open Hearts em {day}.', privacy: 'Mudamos a política de privacidade do Open Hearts em {day}.', both: 'Mudamos os termos de uso e a política de privacidade do Open Hearts em {day}.' },
+    and: 'e',
+    name: { terms: 'Termos de uso', privacy: 'Política de privacidade' },
+    read: { terms: 'Leia-os na íntegra: {url}', privacy: 'Leia-a na íntegra: {url}' },
+    applies: 'Os novos termos se aplicam à sua assinatura a partir da primeira renovação que ocorra pelo menos {days} dias depois de hoje, exceto quando disserem que uma mudança se aplica antes.{renews} Se não quiser continuar com eles, você pode cancelar antes disso, no jogo: menu, Assinatura, Gerenciar assinatura.',
     renews: ' Para a sua, é a renovação de {day}.',
     why: 'Você está recebendo este e-mail porque assina o Open Hearts na web.',
   },
   de: {
-    terms: ['Änderungen der Nutzungsbedingungen von Open Hearts', 'Wir haben die Nutzungsbedingungen von Open Hearts am {day} geändert.', 'Hier liest du sie vollständig: {url}', 'Sie gelten für dein Abo ab seiner ersten Verlängerung, die mindestens {days} Tage nach heute liegt, außer wo sie sagen, dass eine Änderung früher gilt.{renews} Wenn du unter ihnen nicht weitermachen willst, kannst du vorher kündigen, im Spiel: Menü, Abo, Abo verwalten.'],
-    privacy: ['Änderungen der Datenschutzerklärung von Open Hearts', 'Wir haben die Datenschutzerklärung von Open Hearts am {day} geändert.', 'Hier liest du sie vollständig: {url}', ''],
+    subject: { terms: 'Änderungen der Nutzungsbedingungen von Open Hearts', privacy: 'Änderungen der Datenschutzerklärung von Open Hearts', both: 'Änderungen der Nutzungsbedingungen und der Datenschutzerklärung von Open Hearts' },
+    opening: { terms: 'Wir haben die Nutzungsbedingungen von Open Hearts am {day} geändert.', privacy: 'Wir haben die Datenschutzerklärung von Open Hearts am {day} geändert.', both: 'Wir haben die Nutzungsbedingungen und die Datenschutzerklärung von Open Hearts am {day} geändert.' },
+    and: 'und',
+    name: { terms: 'Nutzungsbedingungen', privacy: 'Datenschutzerklärung' },
+    read: { terms: 'Hier liest du sie vollständig: {url}', privacy: 'Hier liest du sie vollständig: {url}' },
+    applies: 'Die neuen Nutzungsbedingungen gelten für dein Abo ab seiner ersten Verlängerung, die mindestens {days} Tage nach heute liegt, außer wo sie sagen, dass eine Änderung früher gilt.{renews} Wenn du unter ihnen nicht weitermachen willst, kannst du vorher kündigen, im Spiel: Menü, Abo, Abo verwalten.',
     renews: ' Bei deinem ist das die Verlängerung am {day}.',
     why: 'Du bekommst diese E-Mail, weil du Open Hearts im Web abonniert hast.',
   },
   fr: {
-    terms: ["Modifications des conditions d'utilisation d'Open Hearts", "Nous avons modifié les conditions d'utilisation d'Open Hearts le {day}.", 'Lisez-les en entier : {url}', "Elles s'appliquent à votre abonnement à partir de son premier renouvellement intervenant au moins {days} jours après aujourd'hui, sauf lorsqu'elles indiquent qu'un changement s'applique plus tôt.{renews} Si vous ne souhaitez pas continuer dans ces conditions, vous pouvez résilier avant, dans le jeu : menu, Abonnement, Gérer l'abonnement."],
-    privacy: ["Modifications de la politique de confidentialité d'Open Hearts", "Nous avons modifié la politique de confidentialité d'Open Hearts le {day}.", 'Lisez-la en entier : {url}', ''],
+    subject: { terms: "Modifications des conditions d'utilisation d'Open Hearts", privacy: "Modifications de la politique de confidentialité d'Open Hearts", both: "Modifications des conditions d'utilisation et de la politique de confidentialité d'Open Hearts" },
+    opening: { terms: "Nous avons modifié les conditions d'utilisation d'Open Hearts le {day}.", privacy: "Nous avons modifié la politique de confidentialité d'Open Hearts le {day}.", both: "Nous avons modifié les conditions d'utilisation et la politique de confidentialité d'Open Hearts le {day}." },
+    and: 'et',
+    name: { terms: "Conditions d'utilisation", privacy: 'Politique de confidentialité' },
+    read: { terms: 'Lisez-les en entier : {url}', privacy: 'Lisez-la en entier : {url}' },
+    applies: "Les nouvelles conditions s'appliquent à votre abonnement à partir de son premier renouvellement intervenant au moins {days} jours après aujourd'hui, sauf lorsqu'elles indiquent qu'un changement s'applique plus tôt.{renews} Si vous ne souhaitez pas continuer dans ces conditions, vous pouvez résilier avant, dans le jeu : menu, Abonnement, Gérer l'abonnement.",
     renews: " Pour le vôtre, c'est le renouvellement du {day}.",
     why: 'Vous recevez cet e-mail parce que vous êtes abonné à Open Hearts sur le web.',
   },
 };
 
-/// The words of [document]'s notice of [entry], in [lang], to a
-/// subscription whose change applies at its renewal on [renews]
-/// (YYYY-MM-DD, or null for one that does not renew): {subject, text}.
-/// Days are written YYYY-MM-DD, which reads the same in every language.
-export function noticeMail(lang, document, entry, { renews = null } = {}) {
+/// The one email that tells a subscriber of [changes] ({document, entry,
+/// day} each: a document's newest change they were not told of, and the
+/// day the document as it now reads was published, which its page says
+/// it was last updated, the entry's own unless given), in [lang],
+/// to a subscription whose change to the terms applies at its renewal
+/// on [renews] (YYYY-MM-DD, or null for one that does not renew):
+/// {subject, text}. Days are written YYYY-MM-DD, which reads the same in
+/// every language.
+export function noticeMail(lang, changes, { renews = null } = {}) {
   const w = WORDS[lang] ?? WORDS.en;
-  const [subject, opening, read, applies] = w[document];
-  const url = `${SITE}${lang === 'en' ? '' : `/${lang}`}/${document}`;
+  const ordered = DOCUMENTS.flatMap((d) => changes.filter((c) => c.document === d));
+  const kind = ordered.length > 1 ? 'both' : ordered[0].document;
+  const days = [...new Set(ordered.map((c) => c.day ?? c.entry.date))].sort();
   const text = [
-    opening.replace('{day}', entry.date),
-    entry.summary[lang] ?? entry.summary.en,
-    read.replace('{url}', url),
-    applies.replace('{days}', String(APPLIES_AFTER_DAYS)).replace('{renews}', renews ? w.renews.replace('{day}', renews) : ''),
+    w.opening[kind].replace('{day}', days.join(` ${w.and} `)),
+    ...ordered.map(({ document, entry }) => `${w.name[document]}: ${entry.summary[lang] ?? entry.summary.en}\n${w.read[document].replace('{url}', `${SITE}${lang === 'en' ? '' : `/${lang}`}/${document}`)}`),
+    ...(ordered.some((c) => c.document === 'terms') ? [w.applies.replace('{days}', String(APPLIES_AFTER_DAYS)).replace('{renews}', renews ? w.renews.replace('{day}', renews) : '')] : []),
     w.why,
-  ].filter(Boolean);
-  return { subject, text: text.join('\n\n') };
+  ];
+  return { subject: w.subject[kind], text: text.join('\n\n') };
 }
 
 /// The object's side: [op]'s mail sent, where the relay binds EMAIL and
@@ -183,16 +211,38 @@ async function subscriptionOf(id, secret, fetchImpl) {
   return res.json();
 }
 
+/// The changes a notice order names, each a document's newest change
+/// with the earlier ones its summary says too ({document, date, covers:
+/// [date]}), checked against [ledger], the one this deploy published:
+/// [{document, entry, covers, day}], [day] the day of the document's
+/// newest entry, which its page says it was last updated; or null for
+/// anything else.
+function changesOf(ledger, changes) {
+  if (!Array.isArray(changes) || !changes.length || changes.length > DOCUMENTS.length) return null;
+  const out = [];
+  for (const c of changes) {
+    if (!DOCUMENTS.includes(c?.document) || out.some((o) => o.document === c.document)) return null;
+    const entry = toldEntry(ledger, c.document, c.date);
+    const covers = c.covers ?? [];
+    if (!entry || !Array.isArray(covers) || !covers.every((d) => toldEntry(ledger, c.document, d) && d < c.date)) return null;
+    out.push({ document: c.document, entry, covers, day: ledger[c.document].at(-1).date });
+  }
+  return out;
+}
+
 /// A notice order carried out ([order], as the tool wrote it): each
-/// subscription it names told by email, once. {status, body}: how many
-/// were told, had been told already, or could not be told and why; a
-/// subscription that could not be told for want of an address or a
-/// subscription is noted, so it is not asked about again, and one whose
-/// mail did not go is not, so the next order tries it again.
+/// subscription it names told by one email of each change it names that
+/// it was not told of, once. {status, body}: how many were told, had
+/// been told already, or could not be told and why; a subscription that
+/// could not be told for want of an address or a subscription is noted,
+/// so it is not asked about again, and one whose mail did not go is not,
+/// so the next order tries it again. A change is noted as told under its
+/// own day and under each earlier one it covers, which a subscription
+/// already told of keeps the day it was told.
 export async function carryOutNotice(order, store, env, { fetchImpl = fetch, send = (mail) => viaRelay(env, mail), now = Date.now() } = {}) {
   if (!(now - Date.parse(order.at) < ORDER_KEPT_S * 1000)) return { status: 410, body: { error: 'that order has run out' } };
-  const entry = toldEntry(env.OH_LEDGER, order.document, order.date);
-  if (!entry) return { status: 400, body: { error: 'no change subscribers are told of, by that document and day' } };
+  const changes = changesOf(env.OH_LEDGER, order.changes);
+  if (!changes) return { status: 400, body: { error: 'no change subscribers are told of, by those documents and days' } };
   const subs = order.subscriptions;
   if (!Array.isArray(subs) || !subs.length || subs.length > NOTICES_PER_ORDER || !subs.every((s) => typeof s === 'string' && /^sub_[A-Za-z0-9]{1,64}$/.test(s))) {
     return { status: 400, body: { error: `1 to ${NOTICES_PER_ORDER} web subscriptions` } };
@@ -200,9 +250,18 @@ export async function carryOutNotice(order, store, env, { fetchImpl = fetch, sen
   const secret = env.OH_STRIPE_SECRET;
   if (!secret) return { status: 503, body: { error: 'service not configured: OH_STRIPE_SECRET' } };
   const said = { told: 0, already: 0, unsent: {}, failed: 0 };
-  const note = async (id, row) => store.put(...noticeRow(order.document, order.date, id), { at: new Date(now).toISOString(), ...row });
+  const note = async (id, told, row) => {
+    for (const { document, entry, covers } of told) {
+      await store.put(...noticeRow(document, entry.date, id), { at: new Date(now).toISOString(), ...row });
+      for (const date of covers) {
+        if (!(await store.get(...noticeRow(document, date, id)))) await store.put(...noticeRow(document, date, id), { at: new Date(now).toISOString(), ...row, by: entry.date });
+      }
+    }
+  };
   for (const id of subs) {
-    if (await store.get(...noticeRow(order.document, order.date, id))) {
+    const untold = [];
+    for (const c of changes) if (!(await store.get(...noticeRow(c.document, c.entry.date, id)))) untold.push(c);
+    if (!untold.length) {
       said.already++;
       continue;
     }
@@ -217,19 +276,19 @@ export async function carryOutNotice(order, store, env, { fetchImpl = fetch, sen
     const why = !sub ? 'no such subscription' : typeof email !== 'string' || !email.includes('@') ? 'no address' : null;
     if (why) {
       said.unsent[why] = (said.unsent[why] ?? 0) + 1;
-      await note(id, { unsent: why });
+      await note(id, untold, { unsent: why });
       continue;
     }
     const lang = languageOf(sub);
     const end = sub.items?.data?.[0]?.current_period_end;
     const renews = !sub.cancel_at_period_end && end ? applyingRenewal(end, sub.billing_cycle_anchor, now) : null;
-    const mail = noticeMail(lang, order.document, entry, { renews });
+    const mail = noticeMail(lang, untold, { renews });
     if (!(await send({ to: email, ...mail }))) {
       said.failed++;
       continue;
     }
     said.told++;
-    await note(id, { lang });
+    await note(id, untold, { lang });
   }
-  return { status: 200, body: { act: 'notice', document: order.document, date: order.date, ...said } };
+  return { status: 200, body: { act: 'notice', changes: changes.map((c) => ({ document: c.document, date: c.entry.date })), ...said } };
 }

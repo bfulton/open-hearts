@@ -995,13 +995,33 @@
   "@liveAgreeTitle": {
     "description": "Title of the screen asking a player, once on each device, to agree to the terms before they first play live."
   },
-  "liveAgreeBody": "The other players will see your name and picture, so choose ones you'd show anyone, and play fair. The Terms of use say what isn't allowed, and what happens if you break them. By playing live, you agree to them.",
+  "liveAgreeBody": "To play live, accept the Terms of use.",
   "@liveAgreeBody": {
-    "description": "What the player agrees to before they first play live: the terms, linked by a button below."
+    "description": "What the player is asked before they first play live: to accept the terms, linked below."
   },
-  "liveAgree": "I agree",
+  "liveAgree": "Accept",
   "@liveAgree": {
-    "description": "Button: agree to the terms and go on into live play."
+    "description": "Button: accept the terms and go on into live play."
+  },
+  "changedBoth": "Our terms of use and privacy policy have changed.",
+  "@changedBoth": {
+    "description": "At the front door: the terms of use and the privacy policy have both changed since this device last dismissed a notice."
+  },
+  "changedTerms": "Our terms of use have changed.",
+  "@changedTerms": {
+    "description": "At the front door: the terms of use have changed since this device last dismissed a notice."
+  },
+  "changedPrivacy": "Our privacy policy has changed.",
+  "@changedPrivacy": {
+    "description": "At the front door: the privacy policy has changed since this device last dismissed a notice."
+  },
+  "whatChanged": "What changed",
+  "@whatChanged": {
+    "description": "Button beside a notice that the terms or the privacy policy changed, and the title of what it opens: a short summary of each change."
+  },
+  "readInFull": "Read in full",
+  "@readInFull": {
+    "description": "Link under the summary of a change to the terms or the privacy policy: opens the whole document."
   },
   "deleteAccount": "Delete account",
   "@deleteAccount": {
