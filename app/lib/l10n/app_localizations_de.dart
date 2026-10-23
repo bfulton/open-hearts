@@ -850,10 +850,26 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get liveAgreeBody =>
-      'Die anderen sehen deinen Namen und dein Bild, also wähle welche, die du jedem zeigen würdest, und spiel fair. Die Nutzungsbedingungen sagen, was nicht erlaubt ist und was passiert, wenn du dagegen verstößt. Wenn du live spielst, stimmst du ihnen zu.';
+      'Um live zu spielen, akzeptiere die Nutzungsbedingungen.';
 
   @override
-  String get liveAgree => 'Ich stimme zu';
+  String get liveAgree => 'Akzeptieren';
+
+  @override
+  String get changedBoth =>
+      'Unsere Nutzungsbedingungen und unsere Datenschutzerklärung haben sich geändert.';
+
+  @override
+  String get changedTerms => 'Unsere Nutzungsbedingungen haben sich geändert.';
+
+  @override
+  String get changedPrivacy => 'Unsere Datenschutzerklärung hat sich geändert.';
+
+  @override
+  String get whatChanged => 'Was neu ist';
+
+  @override
+  String get readInFull => 'Ganzen Text lesen';
 
   @override
   String get deleteAccount => 'Konto löschen';

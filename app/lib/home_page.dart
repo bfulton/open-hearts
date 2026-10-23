@@ -402,9 +402,16 @@ class _HomePageState extends State<HomePage> {
         final l10n = dialog.l10n;
         return AlertDialog(
           title: Text(l10n.liveAgreeTitle),
-          content: Text(l10n.liveAgreeBody),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(l10n.liveAgreeBody),
+              const SizedBox(height: 8),
+              TextButton(onPressed: () => openLink(legalPage('terms')), child: Text(l10n.termsOfUse)),
+            ],
+          ),
           actions: [
-            TextButton(onPressed: () => openLink(legalPage('terms')), child: Text(l10n.termsOfUse)),
             TextButton(onPressed: () => Navigator.of(dialog).pop(false), child: Text(l10n.notNow)),
             FilledButton(onPressed: () => Navigator.of(dialog).pop(true), child: Text(l10n.liveAgree)),
           ],
@@ -911,10 +918,48 @@ class _OperatorNotesState extends State<OperatorNotes> {
     }));
   }
 
-  Future<void> _dismiss(LegalNotice notice) async {
-    final dismissed = {...?_dismissed, notice.id};
+  Future<void> _dismiss(Iterable<LegalNotice> notices) async {
+    final dismissed = {...?_dismissed, for (final n in notices) n.id};
     setState(() => _dismissed = dismissed);
     await (await SharedPreferences.getInstance()).setStringList(_dismissedKey, dismissed.toList());
+  }
+
+  /// [changes] in a few words: which documents changed.
+  static String _changed(AppLocalizations l10n, List<LegalNotice> changes) {
+    final documents = {for (final c in changes) c.document};
+    if (documents.length > 1) return l10n.changedBoth;
+    return documents.single == 'terms' ? l10n.changedTerms : l10n.changedPrivacy;
+  }
+
+  /// What each of [changes] is, with a link to the whole document.
+  void _showChanges(List<LegalNotice> changes) {
+    unawaited(showDialog<void>(
+      context: context,
+      builder: (dialog) {
+        final l10n = dialog.l10n;
+        return AlertDialog(
+          title: Text(l10n.whatChanged),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                for (final change in changes) ...[
+                  Text(change.document == 'terms' ? l10n.termsOfUse : l10n.privacyPolicy, style: Theme.of(dialog).textTheme.titleSmall),
+                  const SizedBox(height: 4),
+                  Text(change.summary.inLanguage(l10n.localeName)),
+                  TextButton(onPressed: () => openLink(legalPage(change.document)), child: Text(l10n.readInFull)),
+                  const SizedBox(height: 8),
+                ],
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.of(dialog).pop(), child: Text(MaterialLocalizations.of(dialog).closeButtonLabel)),
+          ],
+        );
+      },
+    ));
   }
 
   // Listening for itself: it is a const widget in the door's tree, which
@@ -927,29 +972,28 @@ class _OperatorNotesState extends State<OperatorNotes> {
     final config = RemoteSettings.current.config;
     final notice = config.banner;
     final dismissed = _dismissed;
+    // The changes not dismissed here, as one line: what each says is a
+    // tap away, and one tap dismisses them all.
+    final changes = dismissed == null ? const <LegalNotice>[] : [...config.notices.where((n) => !dismissed.contains(n.id))];
     final lines = <Widget>[
       if (notice != null) _line(notice.text.inLanguage(l10n.localeName), notice.warning ? Palette.danger : Palette.gold),
       if (config.updateDue(widget.published))
         _line(config.updateText?.inLanguage(l10n.localeName) ?? (kIsWeb ? l10n.updateDueWeb : l10n.updateDueApp), Palette.gold,
             action: kIsWeb ? TextButton(onPressed: reloadPage, child: Text(l10n.reload)) : null),
-      if (dismissed != null)
-        for (final change in config.notices.where((n) => !dismissed.contains(n.id)))
-          _line(
-            change.summary.inLanguage(l10n.localeName),
-            Palette.gold,
-            action: Row(mainAxisSize: MainAxisSize.min, children: [
-              TextButton(
-                onPressed: () => openLink(legalPage(change.document)),
-                child: Text(change.document == 'terms' ? l10n.termsOfUse : l10n.privacyPolicy),
-              ),
-              IconButton(
-                icon: const Icon(Icons.close, size: 16),
-                color: Palette.chromeDim,
-                tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
-                onPressed: () => _dismiss(change),
-              ),
-            ]),
-          ),
+      if (changes.isNotEmpty)
+        _line(
+          _changed(l10n, changes),
+          Palette.gold,
+          action: Row(mainAxisSize: MainAxisSize.min, children: [
+            TextButton(onPressed: () => _showChanges(changes), child: Text(l10n.whatChanged)),
+            IconButton(
+              icon: const Icon(Icons.close, size: 16),
+              color: Palette.chromeDim,
+              tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
+              onPressed: () => _dismiss(changes),
+            ),
+          ]),
+        ),
     ];
     if (lines.isEmpty) return const SizedBox.shrink();
     return Column(children: lines);

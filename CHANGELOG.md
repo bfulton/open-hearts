@@ -141,6 +141,15 @@ squashed from a pull request, the pull request's number.
 
 ### Changed
 
+- A change to the terms of use or the privacy policy is one line at the
+  front door, "Our terms of use and privacy policy have changed", with
+  **What changed** beside it for each document's summary and one tap to
+  dismiss them all, in place of a card for each change. A web subscriber
+  is sent one email of every change they weren't told of, each
+  document's newest, dated the day it was published, in place of an
+  email for each; `oh terms notify` shows the email before it sends it.
+  Before you first play live, the app asks only that you accept the terms
+  of use. (2026-10-22, #35)
 - Web subscriptions are sold through Stripe Managed Payments: Link,
   Stripe's merchant of record, sells them worldwide, collects the tax and
   keeps to each country's rules for buying online. A refund of any

@@ -220,7 +220,7 @@ export const COMMANDS = [
     words: ['terms', 'notify'],
     group: 'terms',
     flags: ['apply'],
-    summary: 'Emails every web subscriber a published change that matters to them, once: each material or price change of the last 60 days, to the subscriptions begun before it.',
+    summary: 'Emails every web subscriber, once, one email of the published changes that matter to them: each document\'s newest material or price change of the last 60 days, to the subscriptions begun before it. Without --apply it shows the email as it reads in English.',
     more: 'No deploy runs it: run it once the change is live, and again when a notice did not go; it tells only those it has not. A change to the terms applies to a subscription from its first renewal at least 30 days after its email.',
     needs: [...CF, 'STRIPE_API_KEY'],
     howto: 'docs/how-to/change-the-terms.md#tell-subscribers',

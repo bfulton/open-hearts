@@ -56,7 +56,7 @@ Each says what it would do and changes nothing without `--apply` ([the oh comman
 
    The entry has the day, the text's fingerprint in all five languages, the kind of change and, for the terms, the price from `config/openhearts.json`.
 
-1. In `site/ledger.json`, write under the new entry's `summary` what changed, in each language: a sentence or two of plain text, at most 280 characters. It is what subscribers are emailed and what the app shows.
+1. In `site/ledger.json`, write under the new entry's `summary` what changed, in each language: a sentence or two of plain text, at most 280 characters. It is what subscribers are emailed and what the app shows. Both show only each document's newest change, so if an earlier change to the same document hasn't been published and told yet, the summary says what that one changed too.
 
 1. Run the site's tests again, and open a pull request. The reviewer sees the entry beside the text.
 
@@ -110,7 +110,7 @@ If the day has passed, date the version again in a new pull request. An entry al
 
 ## Tell subscribers
 
-For a material or price change only. Once it's published, every device shows the summary at the front door for 60 days, with a link to the document, until it's dismissed. Subscribers who bought in the App Store or Google Play are told this way, since we have no address for them.
+For a material or price change only. Once it's published, every device says at the front door, in one line, that the terms of use or the privacy policy changed, for 60 days or until it's dismissed. **What changed** beside it shows each document's summary, with a link to the whole document. Subscribers who bought in the App Store or Google Play are told this way, since we have no address for them.
 
 Web subscribers are emailed only when you send it, on the day you publish:
 
@@ -120,7 +120,7 @@ Web subscribers are emailed only when you send it, on the day you publish:
    ./oh terms notify
    ```
 
-   It names each published change of the last 60 days that matters to subscribers, with how many web subscriptions are to be told and how many were told already.
+   It names each document's newest published change of the last 60 days that matters to subscribers, with how many web subscriptions are to be told and how many were told already, and shows the email as it reads in English. Read it before you send it.
 
 1. Send it:
 
@@ -128,7 +128,7 @@ Web subscribers are emailed only when you send it, on the day you publish:
    ./oh terms notify --apply
    ```
 
-   Each web subscription that is active, on trial or overdue, and that began on or before the day of the change, is sent the summary in the language it was bought in, with a link to the document. For the terms, the email names the renewal they first apply at. Each subscription is told once: run it again after a notice didn't go, and it tells only those it hasn't. A subscription with no email address in Stripe is noted and not tried again.
+   Each web subscription that is active, on trial or overdue, and that began on or before the day of the change, is sent one email of every change it wasn't told of: each document's newest change, its summary in the language the subscription was bought in, with a link to the document, dated the day the document as it now reads was published. For the terms, the email names the renewal they first apply at. Each subscription is told once: run it again after a notice didn't go, and it tells only those it hasn't. A subscription with no email address in Stripe is noted and not tried again.
 
 1. Check that everyone was told:
 

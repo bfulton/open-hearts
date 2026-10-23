@@ -266,7 +266,7 @@ void main() {
 
     await tester.tap(find.text('Play friends'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('I agree'));
+    await tester.tap(find.text('Accept'));
     await tester.pump();
     await tester.pump();
     expect(find.descendant(of: find.widgetWithText(FilledButton, 'Play friends'), matching: find.byType(CircularProgressIndicator)),
