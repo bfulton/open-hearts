@@ -50,6 +50,9 @@ Operating:
   handlers, signed statements, limits and stored rows.
 - [Relay tags, kinds and limits](reference/relay.md)
 - [check.sh suites, tiers and CI jobs](reference/test-suites.md)
+- [What the App Store and Google Play are told](reference/store-answers.md):
+  what the phone apps collect and contain, for each store's forms and
+  review.
 - [Command-line tools](reference/tools.md)
 
 ## Explanation

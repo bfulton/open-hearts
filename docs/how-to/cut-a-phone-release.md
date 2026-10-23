@@ -77,6 +77,7 @@ A debug build on Android needs neither the libraries nor the signing key. On iOS
 
 ## Learn more
 
+- [What the App Store and Google Play are told](../reference/store-answers.md): the answers to each store's privacy, content and review questions.
 - [The fair deal](../explanation/fair-deal.md#cost-and-keeping-it-off-the-page): why every live table needs the deal's native library.
 - [The service](../explanation/service.md#licence): why a build without the service key has live play shut.
 - [Mint or rotate the service key](rotate-the-service-key.md): a new key needs a new phone release.
