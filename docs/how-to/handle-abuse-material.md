@@ -12,7 +12,7 @@ Do this once, before any report arrives:
 
 - Register Open Hearts with NCMEC as an electronic service provider, by email to [espteam@ncmec.org](mailto:espteam@ncmec.org) ([NCMEC](https://www.missingkids.org/csam)). The law requires a provider's registration to be kept current. Keep its details in your own records, not in this repository.
 - Until the registration is in place, report through the public CyberTipline at [report.cybertip.org](https://report.cybertip.org/) or on 1-800-843-5678.
-- Request an Arachnid Shield account at [projectarachnid.com](https://projectarachnid.com/) (Shield, then **Request an account**), for Bright Fulton LLC. It's free. Once it's approved, set its username and password:
+- Request an Arachnid Shield account at [projectarachnid.com](https://projectarachnid.com/) (Shield, then **Request an account**), for Bright Fulton LLC. It's free. Shield checks that its crawler is let in on Open Hearts' hosts: `site/public/robots.txt` and `app/web/robots.txt` name it, with the token Arachnid gave. Once the account is approved, set its username and password, which are kept only as the relay's secrets:
 
   ```bash
   ./oh secret set OH_ARACHNID_USERNAME --apply

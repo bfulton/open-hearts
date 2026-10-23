@@ -104,3 +104,12 @@ test('every link to a part of a page finds that part', () => {
     }
   }
 });
+
+test('robots.txt lets Project Arachnid\'s crawler in, on the site and on the app\'s host alike', () => {
+  // Arachnid Shield confirms Open Hearts runs these hosts by this line;
+  // every other crawler has no group of its own here, so is let in too.
+  const site = readFileSync(new URL('./public/robots.txt', import.meta.url), 'utf8');
+  const app = readFileSync(new URL('../app/web/robots.txt', import.meta.url), 'utf8');
+  assert.equal(app, site);
+  assert.match(site, /^User-Agent: ProjectArachnid\/E2Z7A4DOVNGNKQIUSZP4UGZACZODKBYW\nAllow: \*\n$/);
+});
