@@ -228,6 +228,12 @@ squashed from a pull request, the pull request's number.
 
 ### Fixed
 
+- `oh` tells which version of the terms or the privacy policy the site
+  serves by the day its page says it was last updated as well as by its
+  text, so an entry that publishes the same text on a later day counts
+  as live once it is. Before, the earlier entry did, and every later
+  deploy would have refused to go out until the later one was dated
+  again. (2026-10-22, #34)
 - At a table of two, a player who leaves during the pass or the deal,
   just after backing a move for a seat the jury holds, no longer stops
   the game. Their device now makes the pass the bot would make, or the

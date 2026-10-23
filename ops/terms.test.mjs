@@ -105,6 +105,27 @@ test('the site serves the version it serves: a deploy publishes what comes after
   assert.deepEqual(nothing, { problems: [], publishing: [] }, 'what is live is the newest: nothing to publish, and no date to hold to');
 });
 
+test('an entry that repeats the text of the one before it, to publish it on a later day: the live one is the one the page is dated by', async () => {
+  const ledger = ledgerWith({ date: '2026-10-19' });
+  ledger.terms.push({ ...ledger.terms[1], date: '2026-11-02', change: 'minor', summary: summary('Published later, unchanged') });
+  // The site, serving the terms as built when [newest] was their newest entry.
+  const dated = (newest) => {
+    const ctx = context({ ledger, old: false });
+    const served = ctx.fetch;
+    ctx.fetch = async (url, init) => {
+      const m = new RegExp(`^${origin}(?:/(es|pt|de|fr))?/terms$`).exec(String(url));
+      if (!m) return served(url, init);
+      const code = m[1] ?? 'en';
+      return new Response(render('terms', languages.find((l) => l.code === code), strings(code), { published: { ...ledger, terms: ledger.terms.slice(0, newest + 1) } }));
+    };
+    return ctx;
+  };
+  const before = await termsProblems(dated(1));
+  assert.deepEqual(before.problems, []);
+  assert.deepEqual(before.publishing.map(({ document, entry }) => `${document} ${entry.date} ${entry.change}`), ['terms 2026-11-02 minor']);
+  assert.deepEqual(await termsProblems(dated(2)), { problems: [], publishing: [] }, 'published: nothing left to publish');
+});
+
 test('no deploy emails anyone: a change subscribers are told of is published without Stripe, and no deploy script tells them', async () => {
   const ctx = context({ ledger: ledgerWith(), env: {} });
   assert.deepEqual((await termsProblems(ctx)).problems, []);

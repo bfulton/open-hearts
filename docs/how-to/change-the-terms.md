@@ -106,7 +106,7 @@ It says which versions it publishes. It refuses, and says why, if:
 
 It emails nobody.
 
-If the day has passed, date the entry again in a new pull request: `./oh terms record terms --date <today> --apply`.
+If the day has passed, date the version again in a new pull request. An entry already on `main` can't change, so this adds one with the same text, a minor change, that only publishes it later: `./oh terms record terms --change minor --date <today> --apply`. Its summary says so, such as "Published on 23 October 2026: the terms of 19 October 2026, unchanged." Subscribers are still told of the material change, by its own entry.
 
 ## Tell subscribers
 

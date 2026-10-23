@@ -14,7 +14,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import { Failed, Usage, root } from './env.mjs';
-import { languages, origin, render, stores, strings } from '../site/build.mjs';
+import { dayIn, languages, origin, render, stores, strings } from '../site/build.mjs';
 import { DOCUMENTS, fingerprintOf, fingerprintOfTexts, formatLedger, ledgerProblems, rewritten, textOf, told } from '../site/ledger.mjs';
 import { NOTICE_DAYS, NOTICES_PER_ORDER } from '../service/functions/notices.mjs';
 import { dayOf } from '../service/functions/rows.mjs';
@@ -43,19 +43,29 @@ function documentOf(name) {
   return name;
 }
 
+/// The line of a page as served that says when it was last updated.
+const UPDATED = /<p class="updated">([\s\S]*?)<\/p>/;
+
 /// Which entry of [ledger] each document is live at: what the site
-/// serves, in every language, fingerprinted. {document: {index, entry}
-/// or {error}}.
+/// serves, in every language, fingerprinted, and of the entries with
+/// that text, the one whose day the page says it was last updated: an
+/// entry may repeat the text of the one before it, to publish that text
+/// on a later day. {document: {index, entry} or {error}}.
 export async function liveVersions(ctx, ledger) {
+  const english = languages.find((l) => l.code === 'en');
+  const words = strings('en');
   const found = {};
   for (const doc of DOCUMENTS) {
     const texts = {};
+    let updated = null;
     for (const l of languages) {
       const url = `${origin}${l.code === 'en' ? '' : `/${l.code}`}/${doc}`;
       try {
         const res = await ctx.fetch(url, { headers: { 'cache-control': 'no-cache' } });
         if (res.status !== 200) throw new Error(`answered ${res.status}`);
-        texts[l.code] = textOf(await res.text());
+        const html = await res.text();
+        texts[l.code] = textOf(html);
+        if (l === english) updated = UPDATED.exec(html)?.[1].trim() ?? null;
       } catch (e) {
         found[doc] = { error: `${url}: ${e?.message ?? e}` };
         break;
@@ -63,7 +73,9 @@ export async function liveVersions(ctx, ledger) {
     }
     if (found[doc]) continue;
     const fingerprint = fingerprintOfTexts(texts);
-    const index = ledger[doc].findIndex((e) => e.fingerprint === fingerprint);
+    const says = (e) => words[doc].header.updated.replace(`{{updated.${doc}}}`, dayIn(english, e.date));
+    const same = ledger[doc].flatMap((e, i) => (e.fingerprint === fingerprint ? [i] : []));
+    const index = same.find((i) => says(ledger[doc][i]) === updated) ?? same[0] ?? -1;
     found[doc] = index < 0 ? { error: `the site serves a version (${fingerprint.slice(0, 12)}…) that is no entry in site/ledger.json` } : { index, entry: ledger[doc][index] };
   }
   return found;
