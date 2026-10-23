@@ -689,9 +689,14 @@
   "@accountSuspended": {
     "description": "On the Subscription page, in place of the Subscribe button: the account is suspended under the terms; solo play still works; how to ask why or appeal."
   },
-  "storeSubscriptionLater": "On a phone this will be the store's own subscription. Until the app is in the stores, live play is bought on the web.",
-  "@storeSubscriptionLater": {
-    "description": "Under the Subscribe button, on a device that cannot buy yet."
+  "storeNotAnswered": "{store, select, google{Google Play hasn't said what live play costs yet. Check that you're online, then tap Subscribe to ask it again.} other{The App Store hasn't said what live play costs yet. Check that you're online, then tap Subscribe to ask it again.}}",
+  "@storeNotAnswered": {
+    "description": "Under the Subscribe button, on a phone whose store has not said yet what the subscription costs, as when the app opened offline. store is apple or google: the App Store or Google Play.",
+    "placeholders": {
+      "store": {
+        "type": "String"
+      }
+    }
   },
   "subscriptionIsYours": "A subscription is your account, not a device's, and it plays on one device at a time. Bring another in by showing it this code — its camera is all it needs — and drop one whenever you like.",
   "@subscriptionIsYours": {

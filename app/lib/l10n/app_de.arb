@@ -109,7 +109,7 @@
   "subscribeAgrees": "Mit dem Abo stimmst du den Nutzungsbedingungen zu.",
   "accountSuspendedTitle": "Vom Live-Spiel gesperrt",
   "accountSuspended": "Dieses Konto ist nach den Nutzungsbedingungen vom Live-Spiel gesperrt. Allein spielen kannst du weiterhin. Um zu fragen, warum, oder um Einspruch einzulegen, schreib an help@openhearts.game.",
-  "storeSubscriptionLater": "Auf dem Handy wird es das Abo des jeweiligen Stores sein. Bis die App in den Stores ist, kauft man Live-Spiel im Web.",
+  "storeNotAnswered": "{store, select, google{Google Play hat noch nicht gesagt, was Live-Spiel kostet. Prüf, ob du online bist, und tippe dann auf Abonnieren, um noch einmal zu fragen.} other{Der App Store hat noch nicht gesagt, was Live-Spiel kostet. Prüf, ob du online bist, und tippe dann auf Abonnieren, um noch einmal zu fragen.}}",
   "subscriptionIsYours": "Ein Abo ist dein Konto, nicht das eines Geräts, und gespielt wird auf einem Gerät zur Zeit. Füge ein weiteres hinzu, indem du ihm diesen Code zeigst — es braucht nur seine Kamera — und entferne eines, wann du willst.",
   "yourDevices": "Deine Geräte",
   "devicesOf": "{count} von {most}",

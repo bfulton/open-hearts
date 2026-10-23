@@ -571,8 +571,13 @@ class AppLocalizationsPt extends AppLocalizations {
       'Esta conta está suspensa do jogo ao vivo, conforme os termos de uso. Jogar sozinho continua disponível para você. Para saber por quê, ou para recorrer, escreva para help@openhearts.game.';
 
   @override
-  String get storeSubscriptionLater =>
-      'No celular, será a assinatura da própria loja. Até o app chegar às lojas, o jogo ao vivo é comprado na web.';
+  String storeNotAnswered(String store) {
+    String _temp0 = intl.Intl.selectLogic(store, {
+      'google': 'O Google Play ainda não disse quanto custa o jogo ao vivo. Confira se você está conectado e toque em Assinar para perguntar de novo.',
+      'other': 'A App Store ainda não disse quanto custa o jogo ao vivo. Confira se você está conectado e toque em Assinar para perguntar de novo.',
+    });
+    return '$_temp0';
+  }
 
   @override
   String get subscriptionIsYours =>

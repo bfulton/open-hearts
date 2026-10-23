@@ -109,7 +109,7 @@
   "subscribeAgrees": "En vous abonnant, vous acceptez les Conditions d'utilisation.",
   "accountSuspendedTitle": "Suspendu du jeu en direct",
   "accountSuspended": "Ce compte est suspendu du jeu en direct en application des conditions d'utilisation. Jouer seul reste possible. Pour savoir pourquoi, ou pour faire appel, écrivez à help@openhearts.game.",
-  "storeSubscriptionLater": "Sur téléphone, ce sera l'abonnement de la boutique d'applications. En attendant que l'application y soit, le jeu en direct s'achète sur le web.",
+  "storeNotAnswered": "{store, select, google{Google Play n'a pas encore indiqué le prix du jeu en direct. Vérifiez que vous êtes connecté, puis touchez S'abonner pour lui redemander.} other{L'App Store n'a pas encore indiqué le prix du jeu en direct. Vérifiez que vous êtes connecté, puis touchez S'abonner pour lui redemander.}}",
   "subscriptionIsYours": "Un abonnement est votre compte, pas celui d'un appareil, et il se joue sur un appareil à la fois. Ajoutez-en un autre en lui montrant ce code — son appareil photo suffit — et retirez-en un quand vous voulez.",
   "yourDevices": "Vos appareils",
   "devicesOf": "{count} sur {most}",

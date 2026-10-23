@@ -574,8 +574,13 @@ class AppLocalizationsEs extends AppLocalizations {
       'Esta cuenta está suspendida del juego en vivo según las condiciones de uso. Jugar solo sigue a tu alcance. Para preguntar por qué, o para apelar, escribe a help@openhearts.game.';
 
   @override
-  String get storeSubscriptionLater =>
-      'En un teléfono será la suscripción de la propia tienda. Hasta que la app esté en las tiendas, el juego en vivo se compra en la web.';
+  String storeNotAnswered(String store) {
+    String _temp0 = intl.Intl.selectLogic(store, {
+      'google': 'Google Play aún no ha dicho cuánto cuesta el juego en vivo. Comprueba que tienes conexión y toca Suscribirse para volver a preguntarle.',
+      'other': 'El App Store aún no ha dicho cuánto cuesta el juego en vivo. Comprueba que tienes conexión y toca Suscribirse para volver a preguntarle.',
+    });
+    return '$_temp0';
+  }
 
   @override
   String get subscriptionIsYours =>

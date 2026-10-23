@@ -581,8 +581,13 @@ class AppLocalizationsDe extends AppLocalizations {
       'Dieses Konto ist nach den Nutzungsbedingungen vom Live-Spiel gesperrt. Allein spielen kannst du weiterhin. Um zu fragen, warum, oder um Einspruch einzulegen, schreib an help@openhearts.game.';
 
   @override
-  String get storeSubscriptionLater =>
-      'Auf dem Handy wird es das Abo des jeweiligen Stores sein. Bis die App in den Stores ist, kauft man Live-Spiel im Web.';
+  String storeNotAnswered(String store) {
+    String _temp0 = intl.Intl.selectLogic(store, {
+      'google': 'Google Play hat noch nicht gesagt, was Live-Spiel kostet. Prüf, ob du online bist, und tippe dann auf Abonnieren, um noch einmal zu fragen.',
+      'other': 'Der App Store hat noch nicht gesagt, was Live-Spiel kostet. Prüf, ob du online bist, und tippe dann auf Abonnieren, um noch einmal zu fragen.',
+    });
+    return '$_temp0';
+  }
 
   @override
   String get subscriptionIsYours =>

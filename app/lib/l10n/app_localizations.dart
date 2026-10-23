@@ -758,11 +758,11 @@ abstract class AppLocalizations {
   /// **'This account is suspended from live play under the terms of use. Playing alone is still open to you. To ask why, or to appeal, email help@openhearts.game.'**
   String get accountSuspended;
 
-  /// Under the Subscribe button, on a device that cannot buy yet.
+  /// Under the Subscribe button, on a phone whose store has not said yet what the subscription costs, as when the app opened offline. store is apple or google: the App Store or Google Play.
   ///
   /// In en, this message translates to:
-  /// **'On a phone this will be the store\'s own subscription. Until the app is in the stores, live play is bought on the web.'**
-  String get storeSubscriptionLater;
+  /// **'{store, select, google{Google Play hasn\'t said what live play costs yet. Check that you\'re online, then tap Subscribe to ask it again.} other{The App Store hasn\'t said what live play costs yet. Check that you\'re online, then tap Subscribe to ask it again.}}'**
+  String storeNotAnswered(String store);
 
   /// On the Live play page once it is bought, above the list of devices.
   ///

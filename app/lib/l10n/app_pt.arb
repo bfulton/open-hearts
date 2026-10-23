@@ -109,7 +109,7 @@
   "subscribeAgrees": "Ao assinar, você aceita os Termos de uso.",
   "accountSuspendedTitle": "Suspensa do jogo ao vivo",
   "accountSuspended": "Esta conta está suspensa do jogo ao vivo, conforme os termos de uso. Jogar sozinho continua disponível para você. Para saber por quê, ou para recorrer, escreva para help@openhearts.game.",
-  "storeSubscriptionLater": "No celular, será a assinatura da própria loja. Até o app chegar às lojas, o jogo ao vivo é comprado na web.",
+  "storeNotAnswered": "{store, select, google{O Google Play ainda não disse quanto custa o jogo ao vivo. Confira se você está conectado e toque em Assinar para perguntar de novo.} other{A App Store ainda não disse quanto custa o jogo ao vivo. Confira se você está conectado e toque em Assinar para perguntar de novo.}}",
   "subscriptionIsYours": "Uma assinatura é a sua conta, não a de um aparelho, e joga em um aparelho por vez. Adicione outro mostrando este código — só precisa da câmera dele — e remova um quando quiser.",
   "yourDevices": "Seus aparelhos",
   "devicesOf": "{count} de {most}",
