@@ -246,7 +246,8 @@
     },
     "children": {
       "title": "Children",
-      "p1": "Open Hearts is not made for children under 13, and the <a href=\"{{base}}/terms#age\">terms</a> do not let them play live, since it shows a name and picture to strangers. If you think a child has published something through it, tell us and we will do what we can to remove it."
+      "p1": "Open Hearts is not made for children under 13, and the <a href=\"{{base}}/terms#age\">terms</a> do not let them play live, since it shows a name and picture to strangers. If you think a child has published something through it, tell us and we will do what we can to remove it.",
+      "p2": "On a phone, before you play live or buy live play in the app, the app asks the App Store or Google Play whether you are 13 or older; Google Play also says whether a parent or guardian has approved the app's latest changes, or needs you to confirm your age. Whether a store can answer, and whether it asks you first, is up to the store. The app uses the answer only to decide whether live play is open to you, then forgets it: it is not kept on your device, and is never sent to us or to anyone else."
     },
     "changes": {
       "title": "Changes",

@@ -861,6 +861,39 @@ class AppLocalizationsDe extends AppLocalizations {
   String get liveAgree => 'Akzeptieren';
 
   @override
+  String get liveTooYoungTitle => 'Live spielen erst ab 13';
+
+  @override
+  String liveTooYoung(String store) {
+    String _temp0 = intl.Intl.selectLogic(store, {
+      'google': 'Laut Google Play bist du unter 13.',
+      'other': 'Laut deinem Apple Account bist du unter 13.',
+    });
+    return '$_temp0 Allein spielen kann jeder, so viel du willst.';
+  }
+
+  @override
+  String get liveAwaitingParentTitle => 'Warten auf Zustimmung';
+
+  @override
+  String get liveAwaitingParent =>
+      'Google Play wartet darauf, dass ein Elternteil oder Erziehungsberechtigter Änderungen an Open Hearts zustimmt. Danach kannst du live spielen. Bis dahin kannst du allein spielen.';
+
+  @override
+  String get liveParentDeclinedTitle => 'Nicht zugestimmt';
+
+  @override
+  String get liveParentDeclined =>
+      'Ein Elternteil oder Erziehungsberechtigter hat Änderungen an Open Hearts in Google Play nicht zugestimmt, deshalb ist Live-Spielen geschlossen. Allein spielen kannst du weiterhin.';
+
+  @override
+  String get liveAgeUnconfirmedTitle => 'Bestätige dein Alter';
+
+  @override
+  String get liveAgeUnconfirmed =>
+      'Google Play braucht eine Bestätigung deines Alters, bevor du live spielen kannst. Das geht in der Play Store App. Bis dahin kannst du allein spielen.';
+
+  @override
   String get changedBoth =>
       'Unsere Nutzungsbedingungen und Datenschutzerklärung haben sich geändert.';
 

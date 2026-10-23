@@ -95,15 +95,15 @@
     {
       "date": "2026-10-23",
       "revision": 2,
-      "fingerprint": "5aac5765ec137d532cc560a42eb8ee3234b2e1b76284a8f3fe6369bd5b0515d1",
+      "fingerprint": "4ff2d0cb114c34c45d26532db3ae668a53e0d85d5fb4ec33964075d2b4f4c81b",
       "change": "material",
       "storesNotified": null,
       "summary": {
-        "en": "If we can't use Project Arachnid to check pictures against known images of child sexual abuse, Microsoft's PhotoDNA may do it instead, sent only a fingerprint of the picture, never the picture. We also keep which service checked each picture, and when.",
-        "es": "Si no podemos usar Project Arachnid para comparar las imágenes con imágenes conocidas de abuso sexual infantil, PhotoDNA de Microsoft puede hacerlo en su lugar, con solo una huella, nunca la imagen. También guardamos qué servicio revisó cada imagen y cuándo.",
-        "pt": "Se não pudermos usar o Project Arachnid para comparar as imagens com imagens conhecidas de abuso sexual infantil, o PhotoDNA da Microsoft pode fazê-lo em seu lugar, só com uma impressão digital, nunca a imagem. Também guardamos qual serviço verificou cada imagem e quando.",
-        "de": "Können wir Project Arachnid nicht nutzen, um Bilder mit bekannten Bildern sexuellen Kindesmissbrauchs abzugleichen, kann PhotoDNA von Microsoft das an seiner Stelle tun, nur mit einem Fingerabdruck, nie dem Bild. Wir bewahren auch auf, welcher Dienst jedes Bild wann geprüft hat.",
-        "fr": "Faute de pouvoir utiliser Project Arachnid pour comparer les images à des images connues d'abus sexuels sur des enfants, PhotoDNA de Microsoft peut le faire à sa place, avec seulement une empreinte, jamais l'image. Nous gardons aussi quel service a vérifié chaque image, et quand."
+        "en": "If Project Arachnid can't check pictures for known images of child sexual abuse, Microsoft's PhotoDNA may, sent only a fingerprint; we note which checked each. On a phone, before live play, the app asks its store if you're 13 or older, and keeps nothing of the answer.",
+        "es": "Si Project Arachnid no puede, PhotoDNA de Microsoft puede buscar en las imágenes abuso sexual infantil conocido, solo con una huella; anotamos cuál revisó cada una. En el teléfono, antes del juego en vivo, la app pregunta a la tienda si tienes 13 años o más, sin guardar nada.",
+        "pt": "Sem o Project Arachnid, o PhotoDNA da Microsoft pode buscar nas imagens abuso sexual infantil conhecido, só com uma impressão digital; anotamos qual verificou cada uma. No celular, antes do jogo ao vivo, o app pergunta à loja se você tem 13 anos ou mais, sem guardar nada.",
+        "de": "Kann Project Arachnid es nicht, kann PhotoDNA von Microsoft Bilder auf bekannten Kindesmissbrauch prüfen, nur mit einem Fingerabdruck; wir notieren, wer jedes prüfte. Auf dem Handy fragt die App vor Live-Spielen den Store, ob du 13 oder älter bist, und speichert nichts davon.",
+        "fr": "Sans Project Arachnid, PhotoDNA de Microsoft peut repérer les images connues d'abus sexuels d'enfants, avec une simple empreinte ; nous notons qui a vérifié chacune. Sur téléphone, avant le jeu en direct, l'app demande à la boutique si vous avez 13 ans ou plus, sans rien garder."
       }
     }
   ]

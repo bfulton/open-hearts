@@ -1008,6 +1008,41 @@
   "@liveAgree": {
     "description": "Button: accept the terms and go on into live play."
   },
+  "liveTooYoungTitle": "Live play is for 13 and older",
+  "@liveTooYoungTitle": {
+    "description": "Title of the note shown, on a phone, when its store says the player is under 13: live play is closed to them."
+  },
+  "liveTooYoung": "{store, select, google{Google Play says you're under 13.} other{Your Apple Account says you're under 13.}} Playing alone is open to everyone, as much as you like.",
+  "@liveTooYoung": {
+    "description": "The note's text: which says so (the player's Apple Account, or Google Play), and that playing alone stays open.",
+    "placeholders": {
+      "store": {"type": "String"}
+    }
+  },
+  "liveAwaitingParentTitle": "Waiting for a parent",
+  "@liveAwaitingParentTitle": {
+    "description": "Title of the note shown on Android when Google Play is waiting for the player's parent or guardian to approve the app's latest significant changes."
+  },
+  "liveAwaitingParent": "Google Play is waiting for a parent or guardian to approve changes to Open Hearts. Live play opens once they do. You can play alone meanwhile.",
+  "@liveAwaitingParent": {
+    "description": "The note's text: live play opens once they approve; playing alone stays open."
+  },
+  "liveParentDeclinedTitle": "Not approved",
+  "@liveParentDeclinedTitle": {
+    "description": "Title of the note shown on Android when the player's parent or guardian declined the app's latest significant changes in Google Play."
+  },
+  "liveParentDeclined": "A parent or guardian didn't approve changes to Open Hearts in Google Play, so live play is closed. You can still play alone.",
+  "@liveParentDeclined": {
+    "description": "The note's text: live play is closed; playing alone stays open."
+  },
+  "liveAgeUnconfirmedTitle": "Confirm your age",
+  "@liveAgeUnconfirmedTitle": {
+    "description": "Title of the note shown on Android when Google Play needs the player to confirm their age, which it asks where a law requires it."
+  },
+  "liveAgeUnconfirmed": "Google Play needs you to confirm your age before you can play live. You can do it in the Play Store app. You can play alone meanwhile.",
+  "@liveAgeUnconfirmed": {
+    "description": "The note's text: confirm in the Play Store app; playing alone stays open meanwhile."
+  },
   "changedBoth": "Our terms of use and privacy policy have changed.",
   "@changedBoth": {
     "description": "At the front door: the terms of use and the privacy policy have both changed since this device last dismissed a notice."

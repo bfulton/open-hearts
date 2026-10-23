@@ -9,7 +9,8 @@ Use this guide to build a signed store release of the app for iOS or Android.
 - Install Node, Flutter and Rust. CI pins both versions in `.github/workflows/ci.yml`. Run `flutter pub get` in `app/` once.
 - Check that `config/openhearts.json` has `serviceKey` and `appOrigin`. `app/tool/defines.mjs` refuses to write the build's defines without them. For the fields, see [`config/openhearts.json`](../reference/configuration.md#configopenheartsjson).
 - Set the release's version in `app/pubspec.yaml` (`version:`, the name before the `+` and the build number after it). Each store upload needs a higher build number than the last.
-- For iOS: a Mac with Xcode, set up with the team that signs the app.
+- For iOS: a Mac with Xcode, set up with the team that signs the app. The app's App ID needs the **Declared Age Range** capability (Xcode: the Runner target, Signing & Capabilities). `app/ios/Runner/Runner.entitlements` asks for it, but automatic signing drops an entitlement the App ID lacks, and the store then gives the app no age to go by ([live play](../explanation/live-play.md#getting-to-a-table)).
+- If this release is a significant change under the app store laws (a change to what the app collects or shares, its age rating, how it makes money, or what it is for, for instance), tell the stores before it goes out, as each store's console asks. Google Play then asks a supervised player's parent to approve it, and the app holds live play closed for that player until they do. The app does not yet show Apple's own sheet for such a change (`showSignificantUpdateAcknowledgment`, iOS 26.4); what a change needs on the App Store is a question for counsel.
 - For Android: the Android SDK with the NDK that Flutter builds with. `crypto/build_android.sh` finds it through `ANDROID_NDK_HOME`, or under `ndk/` in `ANDROID_HOME`, `ANDROID_SDK_ROOT` or the SDK's usual place.
 - For Android: the release signing key, and `app/android/key.properties` naming it with `storeFile`, `storePassword`, `keyAlias` and `keyPassword` (read in `app/android/app/build.gradle.kts`). The file is ignored by git: never commit it.
 
@@ -69,6 +70,12 @@ Use this guide to build a signed store release of the app for iOS or Android.
 
    ```bash
    unzip -l app/build/ios/ipa/*.ipa | grep -E '(deal|schnorr)\.framework/(deal|schnorr)$'
+   ```
+
+1. For iOS, check that the age entitlement made it into the signed app:
+
+   ```bash
+   codesign -d --entitlements :- Runner.app | grep declared-age-range
    ```
 
 1. For iOS, check that the `ios` workflow (`.github/workflows/ios.yml`) passed for your commit. It loads the libraries on a simulator as the app loads them (`app/integration_test/native_libs_test.dart`), and checks that a release without the key is refused.

@@ -246,7 +246,8 @@
     },
     "children": {
       "title": "Enfants",
-      "p1": "Open Hearts n'est pas conçu pour les enfants de moins de 13 ans, et les <a href=\"{{base}}/terms#age\">conditions</a> ne les laissent pas jouer en direct, puisque cela montre un nom et une image à des inconnus. Si vous pensez qu'un enfant a publié quelque chose par ce biais, dites-le-nous et nous ferons notre possible pour le supprimer."
+      "p1": "Open Hearts n'est pas conçu pour les enfants de moins de 13 ans, et les <a href=\"{{base}}/terms#age\">conditions</a> ne les laissent pas jouer en direct, puisque cela montre un nom et une image à des inconnus. Si vous pensez qu'un enfant a publié quelque chose par ce biais, dites-le-nous et nous ferons notre possible pour le supprimer.",
+      "p2": "Sur un téléphone, avant que vous jouiez en direct ou achetiez le jeu en direct dans l'app, l'app demande à l'App Store ou à Google Play si vous avez 13 ans ou plus ; Google Play indique aussi si un parent ou un tuteur a approuvé les derniers changements de l'app, ou s'il faut confirmer votre âge. Qu'une boutique puisse répondre, et qu'elle vous le demande d'abord, dépend de la boutique. L'app n'utilise la réponse que pour décider si le jeu en direct vous est ouvert, puis l'oublie : elle n'est pas gardée sur votre appareil, et n'est jamais envoyée ni à nous ni à personne d'autre."
     },
     "changes": {
       "title": "Modifications",

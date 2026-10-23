@@ -17,6 +17,7 @@ import 'package:table/table.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'activate_page.dart';
+import 'age_gate.dart';
 import 'entitlement.dart';
 import 'identity.dart';
 import 'l10n/l10n.dart';
@@ -178,10 +179,13 @@ class _SubscribePageState extends State<SubscribePage> {
     }
   }
 
-  /// The store's own sheet. What comes of it arrives through the shop:
-  /// a licence, which turns this page into a subscriber's, or a reason.
+  /// The store's own sheet, once the store lets this player play live,
+  /// which is all it sells (age_gate.dart). What comes of it arrives
+  /// through the shop: a licence, which turns this page into a
+  /// subscriber's, or a reason.
   Future<void> _buyInStore() async {
     setState(() => _refusal = null);
+    if (!await storeLetsPlayLive(context) || !mounted) return;
     await StoreShop.current.buy();
   }
 

@@ -852,6 +852,39 @@ class AppLocalizationsFr extends AppLocalizations {
   String get liveAgree => 'Accepter';
 
   @override
+  String get liveTooYoungTitle => 'Le jeu en direct, c\'est à partir de 13 ans';
+
+  @override
+  String liveTooYoung(String store) {
+    String _temp0 = intl.Intl.selectLogic(store, {
+      'google': 'Selon Google Play, vous avez moins de 13 ans.',
+      'other': 'Selon votre compte Apple, vous avez moins de 13 ans.',
+    });
+    return '$_temp0 Jouer seul est ouvert à tous, autant que vous voulez.';
+  }
+
+  @override
+  String get liveAwaitingParentTitle => 'En attente d\'un parent';
+
+  @override
+  String get liveAwaitingParent =>
+      'Google Play attend qu\'un parent ou un tuteur approuve des changements d\'Open Hearts. Le jeu en direct s\'ouvrira dès qu\'il l\'aura fait. En attendant, vous pouvez jouer seul.';
+
+  @override
+  String get liveParentDeclinedTitle => 'Non approuvé';
+
+  @override
+  String get liveParentDeclined =>
+      'Un parent ou un tuteur n\'a pas approuvé des changements d\'Open Hearts dans Google Play : le jeu en direct est donc fermé. Vous pouvez toujours jouer seul.';
+
+  @override
+  String get liveAgeUnconfirmedTitle => 'Confirmez votre âge';
+
+  @override
+  String get liveAgeUnconfirmed =>
+      'Google Play doit confirmer votre âge avant que vous puissiez jouer en direct. Vous pouvez le faire dans l\'app Play Store. En attendant, vous pouvez jouer seul.';
+
+  @override
   String get changedBoth =>
       'Nos conditions d\'utilisation et notre politique de confidentialité ont changé.';
 

@@ -38,6 +38,32 @@ before anyone can publish anything; subscribing is agreeing too, but a
 device brought into an account with a code or a sign-in never saw the
 subscribe screen.
 
+On a phone, before either of those, the app asks the phone's store
+whether the player may play live (`app/lib/net/age_check.dart`, through
+the `age_range_signals` plugin), and asks again before the store's
+purchase sheet opens, since live play is all it sells. The terms let
+anyone play alone and anyone 13 or older play live. Where a law has
+the stores keep everyone's age, Texas's among them, the store tells
+the app the age range it holds, and the app is to go by it. It asks
+for the one line it draws, 13: the App Store's Declared Age Range then
+shares only whether the player is under it, and Google Play answers in
+its own bands. Live play closes, with a note saying why and that
+playing alone is open (`app/lib/age_gate.dart`), when:
+
+- the whole of the store's range is under 13;
+- Google Play is waiting for a parent or guardian to approve the app's
+  latest significant change, or one declined it;
+- Google Play needs the player to confirm their age first, which it
+  asks only where a law has it keep everyone's age.
+
+The answer is used for that and nothing else: it is not kept, on the
+device or anywhere, and never sent. Where the store has nothing to say
+(the web, an iPhone before iOS 26, a phone the store keeps no age for, a
+player who chose not to share it, a store that did not answer), the
+terms decide, as they always have. Apple gives an app no answer for a
+parent's approval withdrawn: the App Store stops the app opening at
+all.
+
 ### Matchmaking
 
 There is no matchmaker (`packages/table/lib/src/matching.dart`).

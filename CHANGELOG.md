@@ -10,6 +10,13 @@ squashed from a pull request, the pull request's number.
 
 ### Added
 
+- On a phone, live play, and buying it in the store, ask the App Store
+  or Google Play first whether the player may play live: closed, with
+  a note saying why and that playing alone is open, for a player the
+  store says is under 13, a supervised player whose parent has not
+  approved the app's latest changes in Google Play, or one Google Play
+  needs to confirm their age. The answer is not kept or sent; the
+  privacy policy says so. (2026-10-23, #37)
 - A game the player won rains confetti in red, white and pink as its
   sheet comes in, some of it behind the sheet and some in front: once,
   and not where the device asks for less motion. (2026-10-23, #37)

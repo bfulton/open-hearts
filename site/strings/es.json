@@ -246,7 +246,8 @@
     },
     "children": {
       "title": "Menores",
-      "p1": "Open Hearts no está pensado para menores de 13 años, y las <a href=\"{{base}}/terms#age\">condiciones</a> no les permiten jugar en vivo, ya que el juego en vivo muestra un nombre y una imagen a desconocidos. Si crees que un menor ha publicado algo a través de él, avísanos y haremos lo que podamos para retirarlo."
+      "p1": "Open Hearts no está pensado para menores de 13 años, y las <a href=\"{{base}}/terms#age\">condiciones</a> no les permiten jugar en vivo, ya que el juego en vivo muestra un nombre y una imagen a desconocidos. Si crees que un menor ha publicado algo a través de él, avísanos y haremos lo que podamos para retirarlo.",
+      "p2": "En un teléfono, antes de jugar en vivo o de comprar el juego en vivo en la app, la app pregunta al App Store o a Google Play si tienes 13 años o más; Google Play también dice si un padre, una madre o un tutor ha aprobado los últimos cambios de la app, o si necesita que confirmes tu edad. Si una tienda puede responder, y si te pregunta antes, depende de la tienda. La app usa la respuesta solo para decidir si el juego en vivo está abierto para ti, y luego la olvida: no se guarda en tu dispositivo y nunca se nos envía, ni a nadie más."
     },
     "changes": {
       "title": "Cambios",

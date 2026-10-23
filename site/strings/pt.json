@@ -246,7 +246,8 @@
     },
     "children": {
       "title": "Crianças",
-      "p1": "O Open Hearts não é feito para crianças com menos de 13 anos, e os <a href=\"{{base}}/terms#age\">termos</a> não as deixam jogar ao vivo, já que isso mostra um nome e uma imagem para estranhos. Se você acha que uma criança publicou algo por meio dele, avise a gente e faremos o que pudermos para remover."
+      "p1": "O Open Hearts não é feito para crianças com menos de 13 anos, e os <a href=\"{{base}}/terms#age\">termos</a> não as deixam jogar ao vivo, já que isso mostra um nome e uma imagem para estranhos. Se você acha que uma criança publicou algo por meio dele, avise a gente e faremos o que pudermos para remover.",
+      "p2": "No celular, antes de você jogar ao vivo ou comprar o jogo ao vivo no app, o app pergunta à App Store ou ao Google Play se você tem 13 anos ou mais; o Google Play também diz se um pai, uma mãe ou um responsável aprovou as últimas mudanças do app, ou se precisa que você confirme sua idade. Se uma loja pode responder, e se pergunta a você antes, depende da loja. O app usa a resposta só para decidir se o jogo ao vivo está aberto para você, e depois a esquece: ela não fica guardada no seu aparelho e nunca é enviada para nós nem para mais ninguém."
     },
     "changes": {
       "title": "Mudanças",

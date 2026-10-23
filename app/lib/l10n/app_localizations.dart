@@ -1130,6 +1130,54 @@ abstract class AppLocalizations {
   /// **'Accept'**
   String get liveAgree;
 
+  /// Title of the note shown, on a phone, when its store says the player is under 13: live play is closed to them.
+  ///
+  /// In en, this message translates to:
+  /// **'Live play is for 13 and older'**
+  String get liveTooYoungTitle;
+
+  /// The note's text: which says so (the player's Apple Account, or Google Play), and that playing alone stays open.
+  ///
+  /// In en, this message translates to:
+  /// **'{store, select, google{Google Play says you\'re under 13.} other{Your Apple Account says you\'re under 13.}} Playing alone is open to everyone, as much as you like.'**
+  String liveTooYoung(String store);
+
+  /// Title of the note shown on Android when Google Play is waiting for the player's parent or guardian to approve the app's latest significant changes.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for a parent'**
+  String get liveAwaitingParentTitle;
+
+  /// The note's text: live play opens once they approve; playing alone stays open.
+  ///
+  /// In en, this message translates to:
+  /// **'Google Play is waiting for a parent or guardian to approve changes to Open Hearts. Live play opens once they do. You can play alone meanwhile.'**
+  String get liveAwaitingParent;
+
+  /// Title of the note shown on Android when the player's parent or guardian declined the app's latest significant changes in Google Play.
+  ///
+  /// In en, this message translates to:
+  /// **'Not approved'**
+  String get liveParentDeclinedTitle;
+
+  /// The note's text: live play is closed; playing alone stays open.
+  ///
+  /// In en, this message translates to:
+  /// **'A parent or guardian didn\'t approve changes to Open Hearts in Google Play, so live play is closed. You can still play alone.'**
+  String get liveParentDeclined;
+
+  /// Title of the note shown on Android when Google Play needs the player to confirm their age, which it asks where a law requires it.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm your age'**
+  String get liveAgeUnconfirmedTitle;
+
+  /// The note's text: confirm in the Play Store app; playing alone stays open meanwhile.
+  ///
+  /// In en, this message translates to:
+  /// **'Google Play needs you to confirm your age before you can play live. You can do it in the Play Store app. You can play alone meanwhile.'**
+  String get liveAgeUnconfirmed;
+
   /// At the front door: the terms of use and the privacy policy have both changed since this device last dismissed a notice.
   ///
   /// In en, this message translates to:

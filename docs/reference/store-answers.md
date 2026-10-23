@@ -63,6 +63,8 @@ For Apple's age rating and Google's content rating (IARC):
 
 **Age.** The terms let anyone play alone, require a player to be at least 13 to play live, and let a player under 18 subscribe only with a parent or guardian's agreement. If a store's form comes to a lower rating than 13+, raise it to 13+ to match the terms. In Google Play's target audience, choose 13 and over: the app isn't designed for children, so Google's Families policy doesn't apply.
 
+**Age assurance.** Before live play, and before the store's purchase sheet, the phone apps ask the store whether the player may play live: the App Store through Declared Age Range, with the single age gate 13, and Google Play through its Age Signals ([live play](../explanation/live-play.md#getting-to-a-table)). Live play closes for a range wholly under 13, for a supervised player whose parent has not approved or has declined the app's latest significant change, and where Google Play needs the age confirmed. The answer is not kept and not sent, so it is not data the app collects: it belongs in neither Apple's App Privacy nor Google's Data safety. The privacy policy says it under *Children*.
+
 ## For the reviewers
 
 - **Getting into live play.** Live play needs a subscription.

@@ -17,6 +17,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:open_hearts/entitlement.dart';
 import 'package:open_hearts/identity.dart';
+import 'package:open_hearts/net/age_check.dart';
 import 'package:open_hearts/net/buying.dart';
 import 'package:open_hearts/net/household.dart' show askService;
 import 'package:open_hearts/net/licence.dart';
@@ -26,6 +27,7 @@ import 'package:open_hearts/theme.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:table/table.dart';
 
+import 'age_check_test.dart' show StoreSays;
 import 'household_test.dart' show Stand, signedFor, standUp;
 
 const _service = 'dff1d77f2a671c5f36183726db2341be58feae1da2deced843240f7b502ba659';
@@ -335,6 +337,28 @@ void main() {
     expect(find.text('Subscribe'), findsOneWidget, reason: 'and the way to try again is there');
     expect(store.finished, isEmpty, reason: 'the store keeps the purchase, to be shown again');
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets("the store's sheet opens only where the store lets the player play live, which is all it sells", (tester) async {
+    standUp();
+    final store = FakeStore();
+    await shopWith(store);
+    final age = StoreSays(AgeVerdict.tooYoung);
+    await _pumpPage(tester);
+    await tester.tap(find.text('Subscribe'));
+    await tester.pumpAndSettle();
+    expect(find.text('Live play is for 13 and older'), findsOneWidget);
+    await tester.tap(find.text('OK'));
+    await tester.pumpAndSettle();
+    expect(store.bought, isEmpty, reason: 'nothing sold that cannot be played');
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+    expect(find.text('Subscribe'), findsOneWidget);
+
+    age.verdict = AgeVerdict.open;
+    await tester.tap(find.text('Subscribe'));
+    await tester.pump();
+    expect(store.bought, hasLength(1));
+    expect(age.asked, 2);
   });
 
   testWidgets('a sheet that does not open, or is closed, leaves the page as it was', (tester) async {
