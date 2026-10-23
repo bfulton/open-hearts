@@ -74,6 +74,9 @@ suite_scripts() {
   local f ok=0
   for f in check.sh deploy.sh build_phone.sh oh e2e/*.sh crypto/*.sh app/ios/*.sh service/bench/build.sh; do bash -n "$f" || ok=1; done
   for f in e2e/*.mjs app/tool/*.mjs; do node --check "$f" || ok=1; done
+  # Nothing licensed to Open Hearts as confidential is committed
+  # (ops/no_private.mjs).
+  node ops/no_private.mjs || ok=1
   CHECK_PLAN=1 ./check.sh full > /dev/null || ok=1
   if python3 -c 'import yaml' 2> /dev/null; then
     python3 -c 'import sys, yaml; [yaml.safe_load(open(f)) for f in sys.argv[1:]]' .github/workflows/*.yml || ok=1

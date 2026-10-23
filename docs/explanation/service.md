@@ -388,10 +388,11 @@ request writes it. The text is taken only in the shape the app makes,
 and a test holds the worker's limits equal to the app's.
 
 **A new picture is checked and kept as it is written.** The account's
-turn, which runs in the relay worker, asks Arachnid Shield about it and
-has a model look at it before the profile keeps it, and keeps a copy of
-each picture the account sets apart, for the operator, until a year
-after it stops being the account's. A picture that matches a known image of
+turn, which runs in the relay worker, asks the checker of known images
+in use, Arachnid Shield or PhotoDNA, about it and has a model look at
+it before the profile keeps it, and keeps a copy of each picture the
+account sets apart, for the operator, until a year after it stops
+being the account's. A picture that matches a known image of
 child sexual abuse is not kept, and the profile is saved without it. The
 relay carries only the account's picture now ([an account's
 pictures](relay.md#an-accounts-pictures)).

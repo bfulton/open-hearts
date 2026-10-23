@@ -9,6 +9,7 @@ Remote config, service settings and relay settings are each one JSON row in the 
 | `config\|app` | Every device, through `/api/config` | [Remote config](../reference/configuration.md#remote-config) |
 | `config\|service` | The Pages worker and the `Household` object, never served | [Service settings](../reference/configuration.md#service-settings) |
 | `config\|relay` | The relay's presence object (tag `online`), never served | [Relay settings](../reference/configuration.md#relay-settings) |
+| `config\|known` | The relay's `KnownPictures` object and its daily run, never served | [Known images](../reference/configuration.md#known-images): which checker of known images is in use ([Switch the checker of known images](handle-abuse-material.md#switch-the-checker-of-known-images)) |
 
 ## Before you begin
 
@@ -52,7 +53,7 @@ Remote config, service settings and relay settings are each one JSON row in the 
    ./oh config set app config-app.json --apply
    ```
 
-   For service settings or relay settings, use `service` or `relay` in place of `app`.
+   For service settings, relay settings or the checker of known images, use `service`, `relay` or `known` in place of `app`.
 
 1. To go back to the defaults, delete the row:
 

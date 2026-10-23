@@ -23,13 +23,17 @@ export const PICTURES_ROW = ['config', 'pictures'];
 /// account and picture, `account/<account>/<digest>.jpg`, the picture's
 /// bytes, and in its metadata all that is known of it: when the account
 /// first set it (`at`), when it last did (`last`), what the model made
-/// of it (`check`), what Arachnid Shield said (`known`), when the operator was
-/// emailed it (`told`), and, once it is no longer the account's picture,
-/// since when (`ended`). The account's picture now is the one it set
-/// last, unless that one says it has ended: the account took it off, or
-/// was deleted, and set none since. It is the only one the relay carries
-/// for the account. Two accounts that set the same picture have a copy
-/// each. Served for the daily email at the bucket's custom domain
+/// of it (`check`), what was said of it against known images of child
+/// sexual abuse (`known`) and, once a checker said it, which one did and
+/// when, its receipt (`knownBy`, `knownAt`; service/do/checkers.mjs),
+/// when the operator was emailed it (`told`), and, once it is no longer
+/// the account's picture, since when (`ended`). A copy cleared before
+/// copies kept receipts was cleared by Arachnid Shield, the only
+/// checker there was. The account's picture now is the one it set last,
+/// unless that one says it has ended: the account took it off, or was
+/// deleted, and set none since. It is the only one the relay carries for
+/// the account. Two accounts that set the same picture have a copy each.
+/// Served for the daily email at the bucket's custom domain
 /// (infra/cloudflare.mjs; a test holds the two equal).
 export const PICTURES_ORIGIN = 'https://pictures.openhearts.game';
 export const ACCOUNT_PICTURES_PREFIX = 'account/';
@@ -66,7 +70,8 @@ export async function changePicture(bucket, key, change, { tries = 3 } = {}) {
 
 /// What the copy [o] (an object R2 listed or read, with its metadata)
 /// says: {key, account, digest, at, last, ended, told, check, known,
-/// uploaded}, or null for an object that is not a copy.
+/// knownBy, knownAt, uploaded}, or null for an object that is not a
+/// copy.
 export function copyOf(o) {
   const parts = pictureParts(o?.key);
   if (!parts) return null;
@@ -75,7 +80,12 @@ export function copyOf(o) {
 }
 
 /// A copy's metadata [m], as profile_pictures.mjs writes it.
-const flagsOf = (m) => ({ at: m.at ?? '', last: m.last ?? '', ended: m.ended ?? null, told: m.told ?? null, check: m.check ?? null, known: m.known ?? null });
+const flagsOf = (m) => ({ at: m.at ?? '', last: m.last ?? '', ended: m.ended ?? null, told: m.told ?? null, check: m.check ?? null, known: m.known ?? null, knownBy: m.knownBy ?? null, knownAt: m.knownAt ?? null });
+
+/// The flags a copy keeps of what was said of it against known images
+/// (service/do/known.mjs, knownAsker): [said], and its receipt, which
+/// checker said it and when, once one did.
+export const knownFlags = (said, { knownBy = null, knownAt = null } = {}) => ({ known: said, ...(knownBy ? { knownBy } : {}), ...(knownAt ? { knownAt } : {}) });
 
 /// [copies], of one account, the one it set last first.
 export const newestFirst = (copies) => [...copies].sort((a, b) => (a.last !== b.last ? (a.last < b.last ? 1 : -1) : a.key < b.key ? -1 : 1));

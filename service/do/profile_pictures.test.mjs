@@ -18,9 +18,10 @@ import { memoryStore } from '../functions/rows.mjs';
 const keyOf = async (account, n) => `account/${account}/${await pictureDigest(jpeg(n))}.jpg`;
 const iso = (t) => new Date(t).toISOString();
 
-/// The account's pictures over a fresh bucket and store, Shield
-/// answering [said] (a function of the picture, or a word), the model
-/// [ai], and what was asked, logged and alerted kept.
+/// The account's pictures over a fresh bucket and store, the object
+/// answering [said] (a function of the picture, or a word, or the whole
+/// answer with its receipt), the model [ai], and what was asked, logged
+/// and alerted kept.
 function setUp({ said = 'clear', ai = fakeAi(() => harmless), env = {}, start = Date.UTC(2026, 9, 20) } = {}) {
   const t = { now: start };
   const b = bucket(() => t.now);
@@ -36,7 +37,7 @@ function setUp({ said = 'clear', ai = fakeAi(() => harmless), env = {}, start = 
           asked.push(a);
           const answer = typeof said === 'function' ? said(a.jpeg) : said;
           if (answer instanceof Error) throw answer;
-          return answer;
+          return typeof answer === 'string' ? { said: answer } : answer;
         };
   const pictures = accountPictures({ OH_PICTURES: b, AI: ai, OH_ALERTS_TO: 'alerts@openhearts.game', HOUSEHOLD: household, ...env }, { now: () => t.now, log: (l) => logs.push(l), ask, store });
   const meta = async (account, n) => s.b.objects.get(await keyOf(account, n))?.customMetadata;
@@ -211,7 +212,7 @@ test("a match is never kept: neither it nor the one before is the account's, and
   assert.equal((await s.meta(BAO, 8)).known, 'off');
   s.t.now += 1000;
   const asked = [];
-  const matched = accountPictures({ OH_PICTURES: s.b }, { now: () => s.t.now, ask: async (a) => (asked.push(a), 'match'), store: s.store, log: () => {} });
+  const matched = accountPictures({ OH_PICTURES: s.b }, { now: () => s.t.now, ask: async (a) => (asked.push(a), { said: 'match' }), store: s.store, log: () => {} });
   assert.equal(await matched.set({ account: BAO, key: KEY, picture: jpeg(8) }), null);
   assert.deepEqual(asked, [{ jpeg: jpeg(8), account: BAO, key: KEY, shown: true, at: iso(first) }]);
   assert.equal((await s.meta(BAO, 8)).ended, iso(s.t.now));
@@ -246,14 +247,14 @@ test('Shield without its key, not answering, or out of reach: the picture is kep
   assert.ok(!(await s.meta(ADA, 1)).ended, 'hers all the same');
 });
 
-test('what Shield cleared stays cleared on the copy, once it has said so', async () => {
+test('what a checker cleared stays cleared on the copy, once it has said so, with its receipt', async () => {
   let said = 'off';
   const s = setUp({ said: () => said });
   await s.pictures.set({ account: ADA, picture: jpeg(1) });
-  said = 'clear';
+  said = { said: 'clear', knownBy: 'photodna', knownAt: '2026-10-20T01:02:03.000Z' };
   await s.pictures.set({ account: ADA, picture: jpeg(1) });
   const copy = s.b.objects.get(await keyOf(ADA, 1));
-  assert.equal(copy.customMetadata.known, 'clear');
+  assert.deepEqual([copy.customMetadata.known, copy.customMetadata.knownBy, copy.customMetadata.knownAt], ['clear', 'photodna', '2026-10-20T01:02:03.000Z']);
   assert.equal(copy.customMetadata.check, 'sexual=0.010 gore=0.010 hate=0.010', 'what else it said kept');
   assert.equal(copy.httpMetadata.contentType, 'image/jpeg');
   assert.deepEqual([...copy.bytes], [...Buffer.from(jpeg(1), 'base64')]);
@@ -265,6 +266,21 @@ test('what Shield cleared stays cleared on the copy, once it has said so', async
   await s.pictures.set({ account: ADA, picture: jpeg(1) });
   assert.ok(!(await s.meta(ADA, 1)).ended);
   assert.equal((await s.meta(ADA, 1)).known, 'clear');
+  // Another checker's answer later changes nothing, its receipt
+  // included.
+  said = { said: 'clear', knownBy: 'shield', knownAt: '2026-10-21T00:00:00.000Z' };
+  await s.pictures.set({ account: ADA, picture: jpeg(1) });
+  assert.equal((await s.meta(ADA, 1)).knownBy, 'photodna');
+
+  // A new picture keeps its receipt as it is first copied; one with
+  // nothing said of it, none.
+  said = { said: 'clear', knownBy: 'shield', knownAt: '2026-10-21T00:00:00.000Z' };
+  await s.pictures.set({ account: BAO, picture: jpeg(3) });
+  const bao = await s.meta(BAO, 3);
+  assert.deepEqual([bao.known, bao.knownBy, bao.knownAt], ['clear', 'shield', '2026-10-21T00:00:00.000Z']);
+  said = 'failed';
+  await s.pictures.set({ account: BAO, picture: jpeg(4) });
+  assert.deepEqual(Object.keys(await s.meta(BAO, 4)).filter((k) => k.startsWith('known')), ['known']);
 });
 
 test('a picture the model takes for nudity, gore or a hate symbol is hidden as it is set; a check or a hiding that fails is told and the picture kept', async () => {

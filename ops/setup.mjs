@@ -14,6 +14,7 @@ import { pages, relay } from '../infra/cloudflare.mjs';
 import { configOf } from '../service/functions/config.mjs';
 import { serviceSettingsOf } from '../service/functions/settings.mjs';
 import { objectLimitsOf } from '../service/do/relay.mjs';
+import { KNOWN_ROW, knownSettingsOf } from '../service/do/checkers.mjs';
 
 export async function infra(ctx, { flags }) {
   const only = flags.only ?? null;
@@ -37,11 +38,12 @@ const ROWS = {
   app: { key: ['config', 'app'], check: configOf, reader: 'every device, through /api/config' },
   service: { key: ['config', 'service'], check: serviceSettingsOf, reader: 'the Pages worker and the Household object' },
   relay: { key: ['config', 'relay'], check: objectLimitsOf, reader: 'the relay\'s presence object, when it is built' },
+  known: { key: KNOWN_ROW, check: knownSettingsOf, reader: 'the relay\'s KnownPictures object and its daily run' },
 };
 
 function rowOf(name) {
   const row = ROWS[name];
-  if (!row) throw new Usage(`no row ${name}: app, service or relay`);
+  if (!row) throw new Usage(`no row ${name}: app, service, relay or known`);
   return row;
 }
 
@@ -119,7 +121,9 @@ function placesOf(name) {
   for (const [env, def] of Object.entries(pages.environments)) {
     if (def.secrets?.includes(name)) places.push({ where: `Pages (${env})`, args: ['pages', 'secret', 'put', name, '--project-name', pages.project ?? 'open-hearts', ...(env === 'production' ? [] : ['--env', env])], cwd: root });
   }
-  if (relay.secrets?.includes(name)) places.push({ where: 'the relay worker', args: ['secret', 'put', name], cwd: join(root, 'service/do') });
+  // Its optional secrets too, such as a checker's credentials, which are
+  // set once they are issued.
+  if (relay.secrets?.includes(name) || relay.optionalSecrets?.includes(name)) places.push({ where: 'the relay worker', args: ['secret', 'put', name], cwd: join(root, 'service/do') });
   return places;
 }
 

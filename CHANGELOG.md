@@ -73,6 +73,22 @@ squashed from a pull request, the pull request's number.
   a picture too featureless to match is not asked about, and one that
   can't be decoded is refused as a match is. The privacy policy names
   the Canadian Centre for Child Protection. (2026-10-22, #34)
+- Microsoft's PhotoDNA can stand in for Arachnid Shield as the checker
+  of known images, with one command and no deploy: `./oh config set
+  known`, the run-time row `config|known`. Shield stays in use unless
+  the row names PhotoDNA. PhotoDNA is sent only a picture's PhotoDNA
+  Edge Hashes, made with the module Microsoft licenses to Open Hearts,
+  which is kept in a new private bucket, pinned in
+  `config/openhearts.json`, and fetched only to deploy the relay (`oh
+  photodna put`, `oh photodna get`); `check.sh` fails on anything of it
+  committed. What either checker said of a picture stands whichever is
+  in use, so a switch asks about nothing again. The privacy policy says
+  that PhotoDNA may stand in for Project Arachnid, in every language.
+  (2026-10-24, #37)
+- Each account's copy of a picture keeps the receipt for what was said
+  of it against known images, which checker said it and when, and so
+  does each match's case. The daily email of new pictures says it of
+  each picture, or that a picture isn't checked yet. (2026-10-24, #37)
 - Every new picture is emailed to the operator once a day, account by
   account, with the commands to take it down. The daily run does only
   what each copy says is still to do: it keeps what is kept for as long
@@ -241,6 +257,17 @@ squashed from a pull request, the pull request's number.
 
 ### Fixed
 
+- `./oh secret set` sets the relay's optional secrets, Arachnid Shield's,
+  PhotoDNA's and NCMEC's credentials, on the relay worker. It refused
+  them before, though the abuse-material guide said to use it.
+  (2026-10-24, #37)
+- A picture Arachnid Shield knew as harmful that the operator then
+  reports is acted on as a match for each account that set it: held,
+  terminated and reported. Before, each account's harmful case stood in
+  the way, and nothing more was done. (2026-10-24, #37)
+- A match found because the operator reported the picture before is
+  emailed and reported to NCMEC as that, not as Arachnid Shield's.
+  (2026-10-24, #37)
 - The app's German words in Dart are what `app_de.arb` says. Every
   build rewrote them, which left the checkout changed, and a deploy
   refuses a changed checkout. CI now fails when the words in Dart are

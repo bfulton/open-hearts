@@ -29,6 +29,13 @@ const digestOf = (n) => pictureDigest(jpeg(n));
 const withheldIn = async (store, t) => withheldOf(await store.get(...PICTURES_ROW), t);
 const iso = (t) => new Date(t).toISOString();
 
+/// The object's answer as knownAsker gives it, from [ask]'s, which is
+/// the whole answer or only what was said.
+const answering = (ask) => async (a) => {
+  const answer = await ask(a);
+  return typeof answer === 'string' ? { said: answer } : answer;
+};
+
 /// A deployment's pictures: the bucket, the store, a clock, the
 /// account's turn setting [n] as an account's picture and saving its
 /// profile with what it keeps (profile.mjs), and the day's run.
@@ -36,13 +43,13 @@ function setUp({ ai = null, ask = async () => 'clear', start = Date.UTC(2026, 9,
   const t = { now: start };
   const b = bucket(() => t.now);
   const store = memoryStore();
-  const pictures = accountPictures({ OH_PICTURES: b, AI: ai }, { now: () => t.now, ask, store, log: () => {} });
+  const pictures = accountPictures({ OH_PICTURES: b, AI: ai }, { now: () => t.now, ask: answering(ask), store, log: () => {} });
   const set = async (account, n) => {
     const picture = await pictures.set({ account, picture: n === null ? null : jpeg(n) });
     await store.put(`ACCOUNT#${account}`, 'PROFILE', { name: account.slice(0, 4), picture });
     t.now += 60 * 1000;
   };
-  const run = (sent = [], more = {}) => reviewRun({ bucket: b, store, send: async (m) => sent.push(m), now: () => t.now, ...more });
+  const run = (sent = [], more = {}) => reviewRun({ bucket: b, store, send: async (m) => sent.push(m), now: () => t.now, ...more, ...(more.ask ? { ask: answering(more.ask) } : {}) });
   const meta = async (account, n) => b.objects.get(await keyOf(account, n))?.customMetadata;
   return { t, b, store, set, run, meta };
 }
@@ -287,27 +294,29 @@ test("review: each account's copies are held to the order it set them in, whatev
   assert.ok(!(await v.meta(CY, 3)).ended);
 });
 
-test('review: a copy Arachnid Shield cannot be asked about, not decoding, is said to be, hidden, emailed as that, and not asked about again', async () => {
+test('review: a copy that cannot be decoded or hashed is said to be, with its receipt, hidden, emailed as that, and not asked about again', async () => {
   const s = setUp({ ask: async () => 'off' });
   await s.set(ADA, 1);
   await s.set(BAO, 2);
-  const ask = async (a) => (a.jpeg === jpeg(1) ? 'unreadable' : 'clear');
+  const ask = async (a) => ({ said: a.jpeg === jpeg(1) ? 'unreadable' : 'clear', knownBy: 'shield', knownAt: '2026-10-20T09:00:00.000Z' });
   const sent = [];
   assert.deepEqual(await s.run(sent, { ask }), { deleted: 0, asked: 2, sent: 2, more: 0 });
-  assert.equal((await s.meta(ADA, 1)).known, 'unreadable');
-  assert.equal((await s.meta(BAO, 2)).known, 'clear');
+  const receipt = (m) => [m.known, m.knownBy, m.knownAt];
+  assert.deepEqual(receipt(await s.meta(ADA, 1)), ['unreadable', 'shield', '2026-10-20T09:00:00.000Z']);
+  assert.deepEqual(receipt(await s.meta(BAO, 2)), ['clear', 'shield', '2026-10-20T09:00:00.000Z']);
   assert.ok(!(await s.meta(ADA, 1)).ended, 'still the account\'s, hidden');
   const withheld = await withheldIn(s.store, s.t.now);
   assert.ok(withheld.has(await digestOf(1)));
   assert.ok(!withheld.has(await digestOf(2)));
-  assert.match(sent[0].text, /hidden: it could not be decoded, so Arachnid Shield could not be asked about it/);
+  assert.match(sent[0].text, /hidden: it could not be decoded or hashed, so it could not be checked against known images/);
+  assert.match(sent[0].text, /cleared of known images by Arachnid Shield at 2026-10-20T09:00:00\.000Z/);
   assert.equal(sent[0].text.match(/could not be decoded/g).length, 1, 'only for that one');
   s.t.now += DAY;
   assert.equal((await s.run([], { ask })).asked, 0);
   assert.ok((await withheldIn(s.store, s.t.now)).has(await digestOf(1)), 'hidden still');
 });
 
-test("review: Arachnid Shield is asked again about each copy it has not cleared, for its account, whether or not the account still has it; a match is no longer theirs, from when it stopped being so, and never emailed", async () => {
+test("review: the checker is asked again about each copy no checker has cleared, for its account, whether or not the account still has it; a match is no longer theirs, from when it stopped being so, and never emailed", async () => {
   const s = setUp({ ask: async () => 'off' });
   await s.set(ADA, 1);
   await s.set(BAO, 1);
@@ -514,4 +523,27 @@ test('review: the email escapes what it shows', () => {
   const { html } = reviewEmail([{ account: '<b>', pictures: [{ digest: 'ab'.repeat(32), at: '"x"', current: false }] }]);
   assert.ok(html.includes('<code>&lt;b&gt;</code>') && !html.includes('<code><b></code>'));
   assert.ok(html.includes('&quot;x&quot;') && !html.includes('"x"'));
+});
+
+test("review: the email says of each picture what was said of it against known images, by whom and when, or that nothing has been yet", () => {
+  const picture = (n, known) => ({ digest: String(n).repeat(64), at: '2026-10-20T09:00:00.000Z', current: n === 1, check: null, allowed: false, known });
+  const { text, html } = reviewEmail([
+    {
+      account: ADA,
+      pictures: [
+        picture(1, { known: 'clear', knownBy: 'photodna', knownAt: '2026-10-20T09:00:01.000Z' }),
+        picture(2, { known: 'clear', knownBy: null, knownAt: null }),
+        picture(3, { known: 'off' }),
+        picture(4, { known: 'failed' }),
+        picture(5, { known: 'unreadable', knownBy: 'shield' }),
+      ],
+    },
+  ]);
+  const lines = text.split('\n').filter((l) => /^ {2}2026/.test(l));
+  assert.match(lines[0], /cleared of known images by PhotoDNA at 2026-10-20T09:00:01\.000Z/);
+  assert.match(lines[1], /cleared of known images by Arachnid Shield$/, 'before receipts were kept, Shield, the only checker there was');
+  assert.match(lines[2], /not yet checked against known images: asked again by the next run$/);
+  assert.match(lines[3], /not yet checked against known images/);
+  assert.match(lines[4], /hidden: it could not be decoded or hashed, so it could not be checked against known images$/);
+  assert.match(html, /cleared of known images by PhotoDNA/);
 });

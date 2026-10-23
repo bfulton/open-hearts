@@ -39,6 +39,8 @@ import { tagStore } from './tag_store.mjs';
 import { pictureScreen } from './withheld.mjs';
 import { reviewRun } from './review.mjs';
 import { KNOWN_OBJECT, KnownPictures as KnownObject, knownAsker, knownReport } from './known.mjs';
+import { jpegHasher } from './photodna.mjs';
+import { edgeHashes } from 'open-hearts-photodna';
 import { accountPictures, ownedScreen } from './profile_pictures.mjs';
 import { PICTURES_ROW } from '../functions/pictures.mjs';
 import { alertKnownProblem, alertPicturesProblem, alertsOf } from '../functions/alerts.mjs';
@@ -56,8 +58,8 @@ import config from '../../config/openhearts.json';
 // household.mjs, "one account at a time"). It lives here because a Pages
 // project cannot define a Durable Object of its own, only bind one; and
 // here it reaches what checks and keeps each picture the account sets
-// (profile_pictures.mjs): the pictures bucket, Workers AI, and Arachnid
-// Shield through KnownPictures.
+// (profile_pictures.mjs): the pictures bucket, Workers AI, and the
+// checker of known images in use, through KnownPictures.
 export class Household extends HouseholdObject {
   constructor(state, env = {}) {
     const e = withConfig(env, config);
@@ -73,11 +75,13 @@ export class Bench extends BenchObject {
   }
 }
 
-/// Where Arachnid Shield is asked about each new picture, and a match
-/// acted on (known.mjs): one object, kept in the United States.
+/// Where the checker of known images in use is asked about each new
+/// picture, and a match acted on (known.mjs): one object, kept in the
+/// United States, hashing pictures for PhotoDNA with the module the
+/// deploy adds (photodna_off.mjs), if it does.
 export class KnownPictures extends KnownObject {
   constructor(state, env = {}) {
-    super(state, withConfig(env, config));
+    super(state, withConfig(env, config), { edgeHasher: edgeHashes ? jpegHasher(edgeHashes) : null });
   }
 }
 
@@ -264,7 +268,7 @@ export default {
   /// Once a day (wrangler.toml, crons): anything left to do after a
   /// match tried again (known.mjs); and the pictures accounts set kept
   /// as long as the privacy policy says and no longer, asked about again
-  /// where Arachnid Shield has not cleared them, and emailed to the
+  /// where no checker has cleared them, and emailed to the
   /// operator since the last run, if the config asks for it
   /// (review.mjs).
   async scheduled(controller, env, ctx) {
