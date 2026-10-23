@@ -10,10 +10,17 @@ squashed from a pull request, the pull request's number.
 
 ### Added
 
-- Shooting the moon rains confetti over the table as the hand's sheet
-  comes in, or the game's when it was the last hand: once, for the
-  player's own moon only, and not where the device asks for less
-  motion. (2026-10-23, #37)
+- A game the player won rains confetti in red, white and pink as its
+  sheet comes in, some of it behind the sheet and some in front: once,
+  and not where the device asks for less motion. (2026-10-23, #37)
+- A moon, whoever shoots it, quakes the felt as the last trick reaches
+  the shooter: the table jolts away from their badge and settles, and
+  rings run out from it. It is over before the sheet comes down, and
+  there is none where the device asks for less motion. (2026-10-23,
+  #37)
+- A trick with points in it lights the taker's badge as it reaches
+  them: pink, and red half a second longer for the queen. (2026-10-23,
+  #37)
 - `robots.txt`, on openhearts.game and play.openhearts.game, names
   Project Arachnid's crawler, which Arachnid Shield checks before it
   takes Open Hearts on. Every other crawler is let in, as before.
@@ -173,7 +180,8 @@ squashed from a pull request, the pull request's number.
 - Playing alone, the Auto switch plays the rest of the hand as fast as
   its cards land: the bots stop thinking, a trick goes as soon as its
   last card has landed, and the score sheet follows the last trick's
-  sweep. Turned on while a bot thinks, the bot plays at once.
+  sweep, or after a moon, its quake. Turned on while a bot thinks, the
+  bot plays at once.
   (2026-10-23, #37)
 - `crypto/build_android.sh` links the 64-bit libraries 16 KB-aligned
   with any NDK, and refuses one that isn't, since Google Play takes no

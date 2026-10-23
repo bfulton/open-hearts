@@ -46,6 +46,11 @@ abstract final class Palette {
   /// as [danger] is the red one.
   static const win = Color(0xFF7FD69B);
 
+  /// Points taken: the glow on a seat as a trick with hearts in it
+  /// comes to it (ui/table_view.dart), as [red] is the queen's; and,
+  /// with [red] and [cardFace], the confetti of a game won.
+  static const pink = Color(0xFFF28DB2);
+
   /// The mark: the heart the app wears and the name beside it. White,
   /// because gold is what a button is.
   static const mark = chrome;

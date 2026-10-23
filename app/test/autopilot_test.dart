@@ -428,6 +428,26 @@ void _pacedAutopilot() {
     expect(now, lessThan(const Duration(milliseconds: 1300) * tricks), reason: '$tricks tricks');
   });
 
+  testWidgets('on, a hand that ends in a moon still has its beat of bare felt before the sheet, for the quake', (tester) async {
+    // A deal whose first hand, the switch on, ends with the player
+    // shooting the moon.
+    final c = await _pumpTable(tester, paced: true, seed: 24);
+    await _playToOffer(tester, c, paced: true);
+    var now = Duration.zero;
+    final plays = _timePlays(c, () => now);
+    await tester.tap(find.byType(Switch));
+    while (find.text('Next hand').evaluate().isEmpty && now < const Duration(seconds: 60)) {
+      now += step;
+      await tester.pump(step);
+    }
+    expect(c.game.moonShooter, c.mySeat);
+    expect(Pacing.sweepBeat, greaterThanOrEqualTo(Pacing.trickSweeps + Pacing.moonQuake));
+    // The last trick held until its last card landed, and then the
+    // whole beat, which the sweep and the quake fit in.
+    final lands = Pacing.cardLands.inMilliseconds, beat = Pacing.sweepBeat.inMilliseconds, tick = step.inMilliseconds;
+    expect((now - plays.last.at).inMilliseconds, inInclusiveRange(lands + beat, lands + beat + tick), reason: 'the sheet');
+  });
+
   testWidgets('turned on while a bot thinks, it thinks no longer than the card before takes to land', (tester) async {
     final c = await _pumpTable(tester, paced: true);
     await _playToOffer(tester, c, paced: true);

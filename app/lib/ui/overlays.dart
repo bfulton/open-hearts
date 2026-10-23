@@ -80,7 +80,6 @@ class HandOverSheet extends StatelessWidget {
               : l10n.shotTheMoon(names[shooter]),
       tone: shooter == null || shooter == mySeat ? Palette.chrome : Palette.danger,
       subtitle: shooter == null ? null : l10n.shotTheMoonDetail,
-      celebrate: shooter == mySeat,
       rows: [
         for (var seat = 0; seat < seatCount; seat++)
           (
@@ -172,8 +171,8 @@ class GameOverSheet extends StatelessWidget {
     return _Sheet(
       title: title,
       tone: youWon ? Palette.chrome : Palette.danger,
-      // The game's last hand was a moon the player shot.
-      celebrate: game.moonShooter == mySeat,
+      // A game won, alone or shared.
+      celebrate: youWon,
       subtitle: l10n.lowestScoreAfter(game.handNumber + 1),
       rows: [
         for (var seat = 0; seat < seatCount; seat++)
@@ -210,6 +209,10 @@ class GameOverSheet extends StatelessWidget {
 
 typedef _Row = ({String name, String iconName, String seed, Avatar? avatar, int delta, int total, bool you, Color? mark});
 
+/// The confetti of a game won, behind the sheet and in front of it.
+const confettiBehind = ValueKey('confetti behind');
+const confettiInFront = ValueKey('confetti in front');
+
 class _Sheet extends StatelessWidget {
   const _Sheet({
     required this.title,
@@ -226,8 +229,8 @@ class _Sheet extends StatelessWidget {
   final String title;
   final String? subtitle;
 
-  /// A moon the player shot: confetti falls over the table as the sheet
-  /// comes in (confetti.dart).
+  /// A game the player won: confetti falls as the sheet comes in, some
+  /// behind the sheet and some in front of it (confetti.dart).
   final bool celebrate;
 
   /// What the sheet is *about*, which is never an action: white for a
@@ -252,15 +255,21 @@ class _Sheet extends StatelessWidget {
 
     // The sheet comes in over a quarter of a second — the scrim
     // darkening, the card settling — rather than landing in a frame.
-    final sheet = TweenAnimationBuilder<double>(
+    return TweenAnimationBuilder<double>(
       tween: Tween(begin: 0, end: 1),
       duration: const Duration(milliseconds: 260),
       curve: Curves.easeOutCubic,
       builder: (context, t, child) => Container(
         color: Colors.black.withValues(alpha: 0.62 * t),
-        child: Opacity(
-          opacity: t,
-          child: Transform.scale(scale: 0.96 + 0.04 * t, child: child),
+        child: Stack(
+          children: [
+            if (celebrate) const Positioned.fill(child: Confetti(key: confettiBehind, seed: 1, pieces: 70)),
+            Opacity(
+              opacity: t,
+              child: Transform.scale(scale: 0.96 + 0.04 * t, child: child),
+            ),
+            if (celebrate) const Positioned.fill(child: Confetti(key: confettiInFront, seed: 2, pieces: 50)),
+          ],
         ),
       ),
       child: Center(
@@ -339,8 +348,6 @@ class _Sheet extends StatelessWidget {
         ),
       ),
     );
-    if (!celebrate) return sheet;
-    return Stack(children: [sheet, const Positioned.fill(child: Confetti())]);
   }
 }
 

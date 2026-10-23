@@ -1,6 +1,8 @@
-/// A shower of confetti over the table, once, for a moon the player
-/// shot (overlays.dart). Decoration only: nothing in it to read or tap,
-/// and nothing at all where the device asks for less motion.
+/// A shower of confetti, once, for a game the player won (overlays.dart):
+/// part of it behind the sheet and part in front, so it falls through
+/// the table rather than on a pane over it. Decoration only: nothing in
+/// it to read or tap, and nothing at all where the device asks for less
+/// motion.
 library;
 
 import 'dart:math' as math;
@@ -13,15 +15,15 @@ import '../theme.dart';
 /// gone.
 const confettiFalls = Duration(milliseconds: 2800);
 
-/// How many pieces fall.
-const confettiPieces = 110;
-
 class Confetti extends StatefulWidget {
-  const Confetti({super.key, this.seed = 0});
+  const Confetti({super.key, this.seed = 0, this.pieces = 60});
 
   /// Where the pieces start and how they fall, so that a screenshot or
   /// a test sees the same shower each time.
   final int seed;
+
+  /// How many pieces fall.
+  final int pieces;
 
   @override
   State<Confetti> createState() => _ConfettiState();
@@ -31,7 +33,7 @@ class _ConfettiState extends State<Confetti> with SingleTickerProviderStateMixin
   late final AnimationController _fall = AnimationController(vsync: this, duration: confettiFalls);
   late final List<_Piece> _pieces = () {
     final r = math.Random(widget.seed);
-    return List.generate(confettiPieces, (_) => _Piece(r));
+    return List.generate(widget.pieces, (_) => _Piece(r));
   }();
 
   bool get _still => MediaQuery.maybeOf(context)?.disableAnimations ?? false;
@@ -76,8 +78,8 @@ class _Piece {
         round = r.nextInt(5) == 0,
         color = _colors[r.nextInt(_colors.length)];
 
-  /// The table's own: gold, a heart's red, a card's face, a win's green.
-  static const _colors = [Palette.gold, Palette.red, Palette.cardFace, Palette.win];
+  /// A heart's red, a card's white, and points' pink.
+  static const _colors = [Palette.red, Palette.cardFace, Palette.pink];
 
   final double x;
   final double start;

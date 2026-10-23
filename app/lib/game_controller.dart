@@ -144,8 +144,10 @@ class GameController extends ChangeNotifier implements TableModel {
   /// before the others' come back: the swap is seen as a swap.
   Duration get _passBeat => paced ? const Duration(milliseconds: 900) : Duration.zero;
   /// The bare felt before the score sheet, or, with the Auto switch on,
-  /// the last trick's sweep.
-  Duration get _sweepBeat => !paced ? Duration.zero : (_auto.on ? Pacing.trickSweeps : Pacing.sweepBeat);
+  /// the last trick's sweep; and after a moon, whatever the switch, the
+  /// quake it sets off, which the sheet waits for.
+  Duration get _sweepBeat =>
+      !paced ? Duration.zero : (_auto.on && _game.moonShooter == null ? Pacing.trickSweeps : Pacing.sweepBeat);
 
   /// Whether the score sheet may show: the hand (or the game) is over
   /// and its last trick has been seen off the table.
