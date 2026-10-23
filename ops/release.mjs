@@ -12,7 +12,7 @@ import { Failed, Usage, root, wranglerVersion } from './env.mjs';
 import { releaseProblems } from './gate.mjs';
 import { MODULE_ALIAS, MODULE_DIR, fetchModule, pinsOf } from './photodna.mjs';
 import { termsProblems, untold } from './terms.mjs';
-import { told } from '../site/ledger.mjs';
+import { told, versionOf } from '../site/ledger.mjs';
 import { stripe as stripeDefinition } from '../infra/stripe.mjs';
 import { checkoutFields } from '../service/functions/stripe.mjs';
 
@@ -75,7 +75,7 @@ export async function site(ctx, { flags }) {
   ctx.log(`the site, the app and the service's handlers from ${await head(ctx)}, to ${label === 'main' ? 'production' : `the preview ${label}`}`);
   const publishing = label === 'main' ? (await termsProblems(ctx)).publishing : [];
   for (const { document, entry } of publishing) {
-    ctx.log(`  publishes the ${document} of ${entry.date}, a ${entry.change} change${told(entry) ? ': every device is shown it, and no one is emailed it until you say (./oh terms notify --apply)' : ''}`);
+    ctx.log(`  publishes the ${document} of ${versionOf(entry)}, a ${entry.change} change${told(entry) ? ': every device is shown it, and no one is emailed it until you say (./oh terms notify --apply)' : ''}`);
     if (entry.change === 'price') ctx.log(`  then make Stripe's price match the terms (./oh infra --only stripe --apply): until it does, the shop does not sell`);
   }
   const ready = label !== 'main' || (await cleared(ctx, 'site', flags.apply));
@@ -193,7 +193,7 @@ export async function verify(ctx) {
   else {
     try {
       for (const { document, entry, subscriptions, left } of await untold(ctx)) {
-        check(!left.length, `the ${document} of ${entry.date}: ${subscriptions.length - left.length} of ${subscriptions.length} web subscription(s) told${left.length ? ' (./oh terms notify --apply)' : ''}`);
+        check(!left.length, `the ${document} of ${versionOf(entry)}: ${subscriptions.length - left.length} of ${subscriptions.length} web subscription(s) told${left.length ? ' (./oh terms notify --apply)' : ''}`);
       }
     } catch (e) {
       check(false, `the notices of changes to the terms: ${e?.message ?? e}`);

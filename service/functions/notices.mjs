@@ -16,8 +16,8 @@
 // account (suspension.mjs): whoever can write an order can write the
 // store. Each subscriber's address is asked of Stripe here, and goes no
 // further than the mail; what is kept is that the notice was sent, and
-// when, under the subscription (`NOTICE#<document>@<date>|SUB#<id>`), for
-// as long as the subscription's record is kept.
+// when, under the subscription (`NOTICE#<document>@<version>|SUB#<id>`),
+// for as long as the subscription's record is kept.
 
 import { SITE } from './settings.mjs';
 import { stripeAuth } from './stripe.mjs';
@@ -40,8 +40,14 @@ export const NOTICES_PER_ORDER = 10;
 /// account's turn waits on it (alerts.mjs does the same).
 export const NOTICES_OBJECT = 'operator-notices';
 
-/// Where a subscription's notice of [document]'s [date] is kept.
-export const noticeRow = (document, date, subscription) => [`NOTICE#${document}@${date}`, `SUB#${subscription}`];
+/// Where a subscription's notice of [document]'s [version] (versionOf)
+/// is kept.
+export const noticeRow = (document, version, subscription) => [`NOTICE#${document}@${version}`, `SUB#${subscription}`];
+
+/// Which version a ledger entry is: its day, and the day's revision
+/// after its first (2026-10-23, 2026-10-23.2), as the ledger names it
+/// (site/ledger.mjs, versionOf).
+export const versionOf = (entry) => (entry.revision ? `${entry.date}.${entry.revision}` : entry.date);
 
 const LANGUAGES = ['en', 'es', 'pt', 'de', 'fr'];
 
@@ -69,22 +75,23 @@ const told = (entry) => entry?.change === 'material' || entry?.change === 'price
 /// What a device is shown at the front door on [now], from [ledger]:
 /// each document's newest change subscribers are told of, for the
 /// [NOTICE_DAYS] days from the day it was published — [{document, date,
-/// summary}], the summary in each language.
+/// revision?, summary}], the revision only after the day's first
+/// version, and the summary in each language.
 export function noticesOf(ledger, now = Date.now()) {
   const before = new Date(now - NOTICE_DAYS * DAY_MS).toISOString().slice(0, 10);
   const today = new Date(now).toISOString().slice(0, 10);
   const out = [];
   for (const document of DOCUMENTS) {
     const entry = (ledger?.[document] ?? []).filter(told).at(-1);
-    if (entry && entry.date > before && entry.date <= today) out.push({ document, date: entry.date, summary: entry.summary });
+    if (entry && entry.date > before && entry.date <= today) out.push({ document, date: entry.date, ...(entry.revision ? { revision: entry.revision } : {}), summary: entry.summary });
   }
   return out;
 }
 
-/// The ledger's entry for [document] of [date], if it is one subscribers
-/// are told of; null otherwise.
-export function toldEntry(ledger, document, date) {
-  const entry = (ledger?.[document] ?? []).find((e) => e.date === date);
+/// The ledger's entry for [document] of [version] (versionOf), if it is
+/// one subscribers are told of; null otherwise.
+export function toldEntry(ledger, document, version) {
+  const entry = (ledger?.[document] ?? []).find((e) => versionOf(e) === version);
   return told(entry) ? entry : null;
 }
 
@@ -212,8 +219,9 @@ async function subscriptionOf(id, secret, fetchImpl) {
 }
 
 /// The changes a notice order names, each a document's newest change
-/// with the earlier ones its summary says too ({document, date, covers:
-/// [date]}), checked against [ledger], the one this deploy published:
+/// with the earlier ones its summary says too ({document, version,
+/// covers: [version]}), checked against [ledger], the one this deploy
+/// published:
 /// [{document, entry, covers, day}], [day] the day of the document's
 /// newest entry, which its page says it was last updated; or null for
 /// anything else.
@@ -222,10 +230,12 @@ function changesOf(ledger, changes) {
   const out = [];
   for (const c of changes) {
     if (!DOCUMENTS.includes(c?.document) || out.some((o) => o.document === c.document)) return null;
-    const entry = toldEntry(ledger, c.document, c.date);
+    const entries = ledger?.[c.document] ?? [];
+    const index = (version) => entries.indexOf(toldEntry(ledger, c.document, version));
+    const at = index(c.version);
     const covers = c.covers ?? [];
-    if (!entry || !Array.isArray(covers) || !covers.every((d) => toldEntry(ledger, c.document, d) && d < c.date)) return null;
-    out.push({ document: c.document, entry, covers, day: ledger[c.document].at(-1).date });
+    if (at < 0 || !Array.isArray(covers) || !covers.map(index).every((i) => i >= 0 && i < at)) return null;
+    out.push({ document: c.document, entry: entries[at], covers, day: entries.at(-1).date });
   }
   return out;
 }
@@ -237,12 +247,12 @@ function changesOf(ledger, changes) {
 /// could not be told for want of an address or a subscription is noted,
 /// so it is not asked about again, and one whose mail did not go is not,
 /// so the next order tries it again. A change is noted as told under its
-/// own day and under each earlier one it covers, which a subscription
+/// own version and under each earlier one it covers, which a subscription
 /// already told of keeps the day it was told.
 export async function carryOutNotice(order, store, env, { fetchImpl = fetch, send = (mail) => viaRelay(env, mail), now = Date.now() } = {}) {
   if (!(now - Date.parse(order.at) < ORDER_KEPT_S * 1000)) return { status: 410, body: { error: 'that order has run out' } };
   const changes = changesOf(env.OH_LEDGER, order.changes);
-  if (!changes) return { status: 400, body: { error: 'no change subscribers are told of, by those documents and days' } };
+  if (!changes) return { status: 400, body: { error: 'no change subscribers are told of, by those documents and versions' } };
   const subs = order.subscriptions;
   if (!Array.isArray(subs) || !subs.length || subs.length > NOTICES_PER_ORDER || !subs.every((s) => typeof s === 'string' && /^sub_[A-Za-z0-9]{1,64}$/.test(s))) {
     return { status: 400, body: { error: `1 to ${NOTICES_PER_ORDER} web subscriptions` } };
@@ -252,15 +262,15 @@ export async function carryOutNotice(order, store, env, { fetchImpl = fetch, sen
   const said = { told: 0, already: 0, unsent: {}, failed: 0 };
   const note = async (id, told, row) => {
     for (const { document, entry, covers } of told) {
-      await store.put(...noticeRow(document, entry.date, id), { at: new Date(now).toISOString(), ...row });
-      for (const date of covers) {
-        if (!(await store.get(...noticeRow(document, date, id)))) await store.put(...noticeRow(document, date, id), { at: new Date(now).toISOString(), ...row, by: entry.date });
+      await store.put(...noticeRow(document, versionOf(entry), id), { at: new Date(now).toISOString(), ...row });
+      for (const version of covers) {
+        if (!(await store.get(...noticeRow(document, version, id)))) await store.put(...noticeRow(document, version, id), { at: new Date(now).toISOString(), ...row, by: versionOf(entry) });
       }
     }
   };
   for (const id of subs) {
     const untold = [];
-    for (const c of changes) if (!(await store.get(...noticeRow(c.document, c.entry.date, id)))) untold.push(c);
+    for (const c of changes) if (!(await store.get(...noticeRow(c.document, versionOf(c.entry), id)))) untold.push(c);
     if (!untold.length) {
       said.already++;
       continue;
@@ -290,5 +300,5 @@ export async function carryOutNotice(order, store, env, { fetchImpl = fetch, sen
     said.told++;
     await note(id, untold, { lang });
   }
-  return { status: 200, body: { act: 'notice', changes: changes.map((c) => ({ document: c.document, date: c.entry.date })), ...said } };
+  return { status: 200, body: { act: 'notice', changes: changes.map((c) => ({ document: c.document, version: versionOf(c.entry) })), ...said } };
 }

@@ -93,7 +93,8 @@
       }
     },
     {
-      "date": "2026-10-24",
+      "date": "2026-10-23",
+      "revision": 2,
       "fingerprint": "5aac5765ec137d532cc560a42eb8ee3234b2e1b76284a8f3fe6369bd5b0515d1",
       "change": "material",
       "storesNotified": null,

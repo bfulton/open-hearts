@@ -5,10 +5,13 @@
 // (docs/how-to/change-the-terms.md).
 //
 // An entry is {date, fingerprint, change, summary, storesNotified} and,
-// for the terms, the price they state:
+// for the terms, the price they state, and for a version published on
+// the day of the one before, its revision:
 //
 //   date            the day it was published, YYYY-MM-DD: the page's
 //                   "Last updated" is filled from the newest entry
+//   revision        which of its day's versions it is, from 2 for the
+//                   second: absent on a day's first (versionOf)
 //   fingerprint     what the text says in every language (fingerprintOf)
 //   change          what kind of change it is from the entry before:
 //                   first, the ledger's first entry; minor, wording that
@@ -44,6 +47,12 @@ export const formatLedger = (ledger) => `${JSON.stringify(ledger, null, 2)}\n`;
 /// Whether an entry's change is told to every subscriber.
 export const told = (entry) => entry.change === 'material' || entry.change === 'price';
 
+/// Which version [entry] is, as notices, their records and the tool name
+/// it: its day, and the day's revision after its first: 2026-10-23,
+/// 2026-10-23.2. The service names it as this does
+/// (service/functions/notices.mjs, versionOf).
+export const versionOf = (entry) => (entry.revision ? `${entry.date}.${entry.revision}` : entry.date);
+
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 const isDay = (s) => typeof s === 'string' && DAY.test(s) && new Date(`${s}T00:00:00Z`).toISOString().startsWith(s);
 
@@ -78,7 +87,11 @@ export function textsOf(document, options = {}) {
 export const fingerprintOf = (document, options = {}) => fingerprintOfTexts(textsOf(document, options));
 
 /// What is wrong with [ledger]'s shape, each as a line: every document
-/// with a first entry, dated in order, each entry whole.
+/// with a first entry, dated in order, each entry whole. A version
+/// published on the day of the one before is that day's next revision,
+/// and says something none of its day's versions before it says: the
+/// site's text and its "Last updated" day tell which is live
+/// (ops/terms.mjs, liveVersions).
 export function ledgerProblems(ledger) {
   const found = [];
   const keys = Object.keys(ledger ?? {});
@@ -90,12 +103,19 @@ export function ledgerProblems(ledger) {
       continue;
     }
     entries.forEach((e, i) => {
-      const at = `${doc} ${e?.date ?? `#${i}`}`;
-      const want = ['change', 'date', 'fingerprint', ...(doc === 'terms' ? ['price'] : []), 'storesNotified', 'summary'];
+      const at = `${doc} ${e?.date ? versionOf(e) : `#${i}`}`;
+      const revised = Object.hasOwn(e ?? {}, 'revision');
+      const want = ['change', 'date', 'fingerprint', ...(doc === 'terms' ? ['price'] : []), ...(revised ? ['revision'] : []), 'storesNotified', 'summary'];
       const have = Object.keys(e ?? {}).sort();
       if (have.join() !== want.join()) found.push(`${at}: has ${have.join(', ')}; wants ${want.join(', ')}`);
+      const before = entries[i - 1];
       if (!isDay(e?.date)) found.push(`${at}: date is not a day (YYYY-MM-DD)`);
-      else if (i > 0 && !(e.date > entries[i - 1].date)) found.push(`${at}: not after the entry before (${entries[i - 1].date})`);
+      else if (before && e.date < before.date) found.push(`${at}: not after the entry before (${versionOf(before)})`);
+      else if (before?.date === e.date) {
+        const next = (before.revision ?? 1) + 1;
+        if (e.revision !== next) found.push(`${at}: published the day of the entry before (${versionOf(before)}), so its revision is ${next}`);
+        if (entries.slice(0, i).some((b) => b.date === e.date && b.fingerprint === e.fingerprint)) found.push(`${at}: says what a version of its day before it says`);
+      } else if (revised) found.push(`${at}: the first version of its day has no revision`);
       if (!/^[0-9a-f]{64}$/.test(e?.fingerprint ?? '')) found.push(`${at}: fingerprint is not 64 hex`);
       if (!CHANGES.includes(e?.change)) found.push(`${at}: change is one of ${CHANGES.join(', ')}`);
       else if ((i === 0) !== (e.change === 'first')) found.push(`${at}: only the first entry, and always, is change "first"`);
@@ -130,9 +150,9 @@ export function rewritten(before, now) {
   for (const doc of DOCUMENTS) {
     (before?.[doc] ?? []).forEach((was, i) => {
       const is = now?.[doc]?.[i];
-      if (!is) return found.push(`${doc} ${was.date}: taken out`);
+      if (!is) return found.push(`${doc} ${versionOf(was)}: taken out`);
       const filled = was.storesNotified === null ? { ...is, storesNotified: null } : is;
-      if (JSON.stringify(filled) !== JSON.stringify(was)) found.push(`${doc} ${was.date}: changed`);
+      if (JSON.stringify(filled) !== JSON.stringify(was)) found.push(`${doc} ${versionOf(was)}: changed`);
     });
   }
   return found;

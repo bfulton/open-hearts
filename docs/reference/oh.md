@@ -239,7 +239,7 @@ Says, for the terms and the privacy policy, the newest entry in the ledger, whet
 oh terms record <document> [--apply] [--change <change>] [--date <date>]
 ```
 
-Writes the ledger entry for a change this checkout makes to the terms or the privacy policy: its day, its fingerprint, the kind of change and, for the terms, the price. --change is `minor` (nobody's rights or duties change), `material` or `price`; --date is the day it is to go live, today unless given. While the branch's own newest entry is not on main yet, it is brought up to date instead. The summary in each language is written by hand afterwards.
+Writes the ledger entry for a change this checkout makes to the terms or the privacy policy: its day, its fingerprint, the kind of change and, for the terms, the price. --change is `minor` (nobody's rights or duties change), `material` or `price`; --date is the day it is to go live, today unless given; dated the day of the entry before, it is that day's next revision. While the branch's own newest entry is not on main yet, it is brought up to date instead. The summary in each language is written by hand afterwards.
 
 - **Needs:** nothing but this checkout
 - **How-to:** [change-the-terms.md](../how-to/change-the-terms.md#record-the-change)

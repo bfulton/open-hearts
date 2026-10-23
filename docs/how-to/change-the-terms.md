@@ -24,7 +24,7 @@ Each says what it would do and changes nothing without `--apply` ([the oh comman
 
   If you're not sure, it's `material`.
 
-- Pick the day you'll publish it. The page's "Last updated" is that day, and a production deploy refuses a version dated any other day.
+- Pick the day you'll publish it. The page's "Last updated" is that day, and a production deploy refuses a version dated any other day. A day can have more than one version: one dated the day of the document's newest entry is that day's next revision.
 
 ## Make the change
 
@@ -55,6 +55,8 @@ Each says what it would do and changes nothing without `--apply` ([the oh comman
    ```
 
    The entry has the day, the text's fingerprint in all five languages, the kind of change and, for the terms, the price from `config/openhearts.json`.
+
+   If the document's entry before it has the same day, published or not, the new entry is that day's next revision: `"revision": 2` for the day's second version, 3 for its third, and so on. Its version is named `2026-11-02.2`, in `oh terms` and in the record of who was told. It is told to subscribers as a change of its own, those told of the day's first version included, and the app shows it again where the first was dismissed. Its text has to differ from every version of that day before it.
 
 1. In `site/ledger.json`, write under the new entry's `summary` what changed, in each language: a sentence or two of plain text, at most 280 characters. It is what subscribers are emailed and what the app shows. Both show only each document's newest change, so if an earlier change to the same document hasn't been published and told yet, the summary says what that one changed too.
 

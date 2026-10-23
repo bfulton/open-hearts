@@ -84,11 +84,16 @@ squashed from a pull request, the pull request's number.
   committed. What either checker said of a picture stands whichever is
   in use, so a switch asks about nothing again. The privacy policy says
   that PhotoDNA may stand in for Project Arachnid, in every language.
-  (2026-10-24, #37)
+  (2026-10-23, #37)
 - Each account's copy of a picture keeps the receipt for what was said
   of it against known images, which checker said it and when, and so
   does each match's case. The daily email of new pictures says it of
-  each picture, or that a picture isn't checked yet. (2026-10-24, #37)
+  each picture, or that a picture isn't checked yet. (2026-10-23, #37)
+- The terms or the privacy policy can change twice in a day: a ledger
+  entry dated the day of the one before is that day's next revision,
+  named `2026-10-23.2` by `oh terms` and in the record of who was told.
+  Subscribers are told of it as a change of its own, and the app shows
+  it again where the day's first was dismissed. (2026-10-23, #37)
 - Every new picture is emailed to the operator once a day, account by
   account, with the commands to take it down. The daily run does only
   what each copy says is still to do: it keeps what is kept for as long
@@ -260,14 +265,14 @@ squashed from a pull request, the pull request's number.
 - `./oh secret set` sets the relay's optional secrets, Arachnid Shield's,
   PhotoDNA's and NCMEC's credentials, on the relay worker. It refused
   them before, though the abuse-material guide said to use it.
-  (2026-10-24, #37)
+  (2026-10-23, #37)
 - A picture Arachnid Shield knew as harmful that the operator then
   reports is acted on as a match for each account that set it: held,
   terminated and reported. Before, each account's harmful case stood in
-  the way, and nothing more was done. (2026-10-24, #37)
+  the way, and nothing more was done. (2026-10-23, #37)
 - A match found because the operator reported the picture before is
   emailed and reported to NCMEC as that, not as Arachnid Shield's.
-  (2026-10-24, #37)
+  (2026-10-23, #37)
 - The app's German words in Dart are what `app_de.arb` says. Every
   build rewrote them, which left the checkout changed, and a deploy
   refuses a changed checkout. CI now fails when the words in Dart are

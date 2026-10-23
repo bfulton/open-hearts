@@ -181,7 +181,7 @@ The row `config|app` in `OH_STORE`, which the `config` handler serves to every d
 | `table` | See [Table clocks](#table-clocks). All fields pass, or none is served. | The standard table | The clocks of tables this device starts. |
 | `waits` | See the next table. | The app's own | How long the app waits on the network. |
 
-Beside the row's fields, the `config` handler serves `notices`: each document's newest material or price change in `site/ledger.json`, for 60 days from the day it was published, as `[{document, date, summary}]` with the summary in each language (`noticesOf` in `service/functions/notices.mjs`). The row can't set it.
+Beside the row's fields, the `config` handler serves `notices`: each document's newest material or price change in `site/ledger.json`, for 60 days from the day it was published, as `[{document, date, revision, summary}]` with the summary in each language and `revision` only for a day's second version or later (`noticesOf` in `service/functions/notices.mjs`). The row can't set it.
 
 The price, and where the terms and the privacy policy are, are not fields: the site publishes them, and they change only with it.
 
