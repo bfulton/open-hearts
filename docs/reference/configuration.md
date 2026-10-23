@@ -33,7 +33,7 @@ The non-secret configuration, committed and the same for every deployment.
 | `alerts.subscribed` | `OH_ALERT_SUBSCRIBED` (`on` when `true`) | none | Email the operator about each new subscription. |
 | `alerts.waiting` | `OH_ALERT_WAITING` (`on` when `true`) | none | Email the operator when a subscriber waits for a person (the `waiting` handler). |
 | `alerts.pictures` | `OH_ALERT_PICTURES` (`on` when `true`) | none | Email the operator once a day the new pictures subscribers set (`reviewRun` in `service/do/review.mjs`; [Look at the day's new pictures](../how-to/look-at-new-pictures.md)). |
-| `photodna.endpoint` | `OH_PHOTODNA_ENDPOINT` | none | The address of PhotoDNA's Match call, which checks each new picture against known images of child sexual abuse (`photoDnaMatch` in `service/functions/photodna.mjs`). `null` until it is taken from the API reference Microsoft gives with the key, and the request checked against that reference; with the key set and no address, nothing is checked and the operator is emailed. |
+| `arachnid.endpoint` | `OH_ARACHNID_ENDPOINT` | none | The address of Arachnid Shield's PDQ call, which checks each new picture's PDQ hash against known images of child sexual abuse (`shieldSays` in `service/do/arachnid.mjs`). With Shield's username set and no address, nothing is checked and the operator is emailed. |
 | `ncmec.endpoint` | `OH_NCMEC_ENDPOINT` | none | NCMEC's CyberTipline reporting service: `https://exttest.cybertip.org/ispws`, its test service, until a test report has gone through, then `https://report.cybertip.org/ispws` (`fileReport` in `service/functions/ncmec.mjs`). A report to the test service reaches nobody, and the operator is emailed to report the match by hand. |
 | `ncmec.reporter` | `OH_NCMEC_FIRST_NAME`, `OH_NCMEC_LAST_NAME`, `OH_NCMEC_EMAIL` | none | Who a report names as reporting it. The email address is required to file one. |
 
@@ -62,7 +62,7 @@ The relay worker (`open-hearts-relay`) is defined by `service/do/wrangler.toml`.
 
 | Name | Kind | Set in | What it is |
 |---|---|---|---|
-| `OH_PHOTODNA_KEY` | Optional secret | The relay worker's secrets (`relay.optionalSecrets`) | PhotoDNA's subscription key, which Microsoft issues once it has approved the service. Without it, no picture is checked against known images. |
+| `OH_ARACHNID_USERNAME`, `OH_ARACHNID_PASSWORD` | Optional secrets | The relay worker's secrets (`relay.optionalSecrets`) | Arachnid Shield's credentials, which the Canadian Centre for Child Protection issues with an account. Without them, no picture is checked against known images. |
 | `OH_NCMEC_USERNAME`, `OH_NCMEC_PASSWORD` | Optional secrets | The relay worker's secrets (`relay.optionalSecrets`) | The CyberTipline reporting service's credentials, which NCMEC issues to a registered provider. Without them, a match is acted on all the same and the operator is emailed to report it by hand. |
 | `OH_JUROR_SECRET` | Secret | The relay worker's secrets | 64 hex characters. The backup jurors derive their keys from it, and the relay checks each backup juror's mark against it (`benchMark` in `service/do/relay.mjs`). Without it, the relay admits no backup juror. |
 | `OH_MAIL_FROM` | Variable | `[vars]` in `service/do/wrangler.toml` | The sender of backup-code emails and the operator's alerts. |
@@ -96,13 +96,13 @@ From `service/do/wrangler.toml`.
 | `BENCH` | Durable Object and Cloudflare Container, class `Bench` | The backup jurors (`service/do/bench.mjs`). |
 | `OH_STORE` | Workers KV | The same namespace as production's `OH_STORE`. The `Household` object reads and writes it. Each relay object reads [relay settings](#relay-settings) and the pictures withheld from it; an account's object adds a picture the automatic check hides. |
 | `OH_PICTURES` | R2 bucket `open-hearts-pictures` | Each account's own copy of each picture it sets, `account/<account>/<sha256>.jpg`, with all that is known of it in its metadata, kept for the operator until a year after it stops being the account's; served at `pictures.openhearts.game` for the daily email (`service/do/profile_pictures.mjs`, `service/do/review.mjs`). The account's picture now is the one it set last, unless that one says it has ended, and the relay carries only that one. |
-| `KNOWN` | Durable Object, class `KnownPictures`, made in the `us` jurisdiction | Asks PhotoDNA about each new picture as an account sets it, and acts on a match (`service/do/known.mjs`). One object, named `photodna`. |
+| `KNOWN` | Durable Object, class `KnownPictures`, made in the `us` jurisdiction | Asks Arachnid Shield about each new picture as an account sets it, and acts on a match (`service/do/known.mjs`). One object, named `known`. |
 | `OH_RECORDS` | R2 bucket `open-hearts-records` | Where a hold the `KnownPictures` object places keeps the account's pictures (`heldPictureKey` in `service/functions/holds.mjs`). |
 | `AI` | Workers AI | The automatic check of each new picture as an account sets it, by `@cf/cloudflare/clef-flash` (`checkPicture` in `service/do/review.mjs`). Without it, pictures are kept and not checked. |
 | `EMAIL` | Email Sending (`send_email`) | Backup-code emails, the operator's alerts, and the day's new pictures. |
 | `OH_METRICS` | Workers Analytics Engine, dataset `open_hearts_relay` | A line of counts from each object: a minute after its last, and at once when its last socket closes, each with the seconds it covers (`tally` and `tallied` in `service/do/relay.mjs`). |
 
-Its schedule (`triggers.crons`) runs once a day at 13:00 UTC. With PhotoDNA's key set, it wakes the `KnownPictures` object to try again anything left to do after a match, such as a report waiting on NCMEC's credentials. It deletes from `OH_PICTURES` each picture a year after it stopped being an account's, asks PhotoDNA again about each picture kept that it hasn't cleared, for each account that set it, and hides any the check found should be hidden that isn't; when `alerts.pictures` is on, it also emails the operator the new ones.
+Its schedule (`triggers.crons`) runs once a day at 13:00 UTC. With Shield's credentials set, it wakes the `KnownPictures` object to try again anything left to do after a match, such as a report waiting on NCMEC's credentials. It deletes from `OH_PICTURES` each picture a year after it stopped being an account's, asks Shield again about each picture kept that it hasn't cleared, for each account that set it, and hides any the check found should be hidden that isn't; when `alerts.pictures` is on, it also emails the operator the new ones.
 
 ## Environment variables
 

@@ -453,9 +453,9 @@ test('relay: each kind of drift is said', () => {
   }
 });
 
-test("relay: PhotoDNA's and NCMEC's secrets are nothing amiss, set or not; any other undefined one is", () => {
+test("relay: Arachnid Shield's and NCMEC's secrets are nothing amiss, set or not; any other undefined one is", () => {
   const live = liveRelay();
-  live.secrets = ['OH_JUROR_SECRET', 'OH_PHOTODNA_KEY', 'OH_NCMEC_USERNAME', 'OH_NCMEC_PASSWORD'];
+  live.secrets = ['OH_JUROR_SECRET', 'OH_ARACHNID_USERNAME', 'OH_ARACHNID_PASSWORD', 'OH_NCMEC_USERNAME', 'OH_NCMEC_PASSWORD'];
   assert.deepEqual(relayProblems(wrangler, relay, live), []);
   live.secrets.push('OH_OTHER');
   assert.deepEqual(relayProblems(wrangler, relay, live), ['secret OH_OTHER is set but not defined (infra/cloudflare.mjs, relay.secrets)']);

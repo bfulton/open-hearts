@@ -33,6 +33,23 @@
         "de": "Open Hearts betreibt jetzt die Bright Fulton LLC; Link, ein Stripe-Unternehmen, verkauft Web-Abos. Eine Änderung gilt ab der Verlängerung 30 Tage nach unserer Nachricht. Streit: erst reden, dann Gerichte in Charleston (SC). Neu: melden, blockieren, Konto in der App löschen.",
         "fr": "Bright Fulton LLC exploite désormais Open Hearts ; Link, filiale de Stripe, vend les abonnements web. Un changement vaut au renouvellement 30 jours après notre avis. Litiges : d'abord à l'amiable, puis à Charleston (SC). Nouveau : signaler, bloquer, supprimer votre compte."
       }
+    },
+    {
+      "date": "2026-10-23",
+      "fingerprint": "f8f04273fdb2501e1a88ccf3a98f52bffbbc4f01324868c33733d95ec8ca9303",
+      "change": "minor",
+      "price": {
+        "amount": 599,
+        "currency": "usd"
+      },
+      "storesNotified": null,
+      "summary": {
+        "en": "Published on 23 October 2026: the terms of 19 October 2026, unchanged.",
+        "es": "Publicadas el 23 de octubre de 2026: las condiciones del 19 de octubre de 2026, sin cambios.",
+        "pt": "Publicados em 23 de outubro de 2026: os termos de 19 de outubro de 2026, sem mudanças.",
+        "de": "Am 23. Oktober 2026 veröffentlicht: die Bedingungen vom 19. Oktober 2026, unverändert.",
+        "fr": "Publiées le 23 octobre 2026 : les conditions du 19 octobre 2026, inchangées."
+      }
     }
   ],
   "privacy": [
@@ -60,6 +77,19 @@
         "pt": "Cada imagem que a sua conta escolhe é verificada, e guardamos uma cópia até um ano depois de deixar de ser sua; a que pareça violar as regras é ocultada. Denúncias chegam por e-mail. Você pode bloquear jogadores e excluir a conta no app.",
         "de": "Jedes Bild, das dein Konto wählt, wird geprüft, und wir bewahren eine Kopie bis ein Jahr, nachdem es nicht mehr deins ist; eines, das gegen die Regeln zu verstoßen scheint, wird verborgen. Meldungen kommen per E-Mail. Du kannst Spieler blockieren und dein Konto löschen.",
         "fr": "Chaque image que choisit votre compte est vérifiée, et nous en gardons une copie jusqu'à un an après qu'elle n'est plus la vôtre ; celle qui semble enfreindre les règles est masquée. Les signalements arrivent par e-mail. Vous pouvez bloquer des joueurs et supprimer votre compte."
+      }
+    },
+    {
+      "date": "2026-10-23",
+      "fingerprint": "9d724cc9e7fe90a01bf0f41112a4d5a9de2c0544af82370acb3727baf3cc094b",
+      "change": "material",
+      "storesNotified": null,
+      "summary": {
+        "en": "Each picture your account sets is checked, and a copy kept until a year after it stops being yours; Project Arachnid is sent only its fingerprint, to compare with known images of child abuse. Reports reach us by email. You can block players and delete your account in the app.",
+        "es": "Cada imagen de tu cuenta se revisa y guardamos una copia hasta un año después de que deje de ser tuya; Project Arachnid solo recibe su huella, para compararla con imágenes conocidas de abuso infantil. Las denuncias llegan por correo. Puedes bloquear jugadores y borrar tu cuenta.",
+        "pt": "Cada imagem da sua conta é verificada e guardamos uma cópia até um ano depois de deixar de ser sua; o Project Arachnid recebe só a impressão digital, comparada com imagens conhecidas de abuso infantil. Denúncias chegam por e-mail. Você pode bloquear jogadores e excluir a conta.",
+        "de": "Jedes Bild deines Kontos wird geprüft; eine Kopie bleibt bis ein Jahr, nachdem es nicht mehr deins ist. Project Arachnid erhält nur den Fingerabdruck zum Abgleich mit bekannten Kindesmissbrauchsbildern. Meldungen per E-Mail. Du kannst Spieler blockieren und dein Konto löschen.",
+        "fr": "Chaque image de votre compte est vérifiée et une copie gardée jusqu'à un an après qu'elle n'est plus la vôtre ; Project Arachnid n'en voit que l'empreinte, comparée aux images connues d'abus d'enfants. Signalements par e-mail. Vous pouvez bloquer des joueurs, supprimer le compte."
       }
     }
   ]

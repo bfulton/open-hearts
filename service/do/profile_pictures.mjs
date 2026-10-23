@@ -1,11 +1,12 @@
 // An account's pictures. A picture enters where the account sets it, as
 // its profile is saved (service/functions/profile.mjs, in the account's
-// turn), and is checked there before anyone is shown it: by Microsoft's
-// PhotoDNA, against known images of child sexual abuse, through the one
-// object that asks it from the United States (known.mjs); and by a
-// model that hides one that shows nudity or sexual content, violence or
-// gore, or a hate symbol (review.mjs). A match is never kept: the
-// profile is saved without it, and the object acts on it. Anything else
+// turn), and is checked there before anyone is shown it: by Arachnid
+// Shield, against known images of child sexual abuse, through the one
+// object kept in the United States (known.mjs); and by a model that
+// hides one that shows nudity or sexual content, violence or gore, or a
+// hate symbol (review.mjs). A match is never kept, nor is a picture
+// Shield knows as a harmful or abusive image of a child: the profile is
+// saved without it, and the object acts on it. Anything else
 // is kept as the account's own copy of it, with all that is known of it
 // (service/functions/pictures.mjs, pictureKey), and said to be set last,
 // which makes it the account's picture now; the one before it says
@@ -37,9 +38,9 @@ const COPY_HTTP = { contentType: 'image/jpeg', cacheControl: 'public, max-age=86
 /// relay worker runs it with [env]: the pictures bucket (OH_PICTURES),
 /// Workers AI (AI), [store] (the pictures withheld), and [ask], which
 /// asks the object about a picture ({jpeg, account, key, shown, at} ->
-/// 'clear', 'match', 'failed' or 'off'; knownAsker), or null while
-/// PhotoDNA has no key. Without the bucket, nothing is kept or checked,
-/// and the relay carries no picture.
+/// 'clear', 'match', 'harmful', 'failed', 'unreadable' or 'off';
+/// knownAsker), or null while Shield has no credentials. Without the
+/// bucket, nothing is kept or checked, and the relay carries no picture.
 export function accountPictures(env, { now = Date.now, log = (line) => console.log(line), ask = knownAsker(env), store = storeOf(env) } = {}) {
   const bucket = env.OH_PICTURES ?? null;
 
@@ -58,7 +59,8 @@ export function accountPictures(env, { now = Date.now, log = (line) => console.l
     /// [picture] (base64, or null for none) set as [account]'s by its
     /// device [key] (null for the operator's order): resolves the
     /// picture the profile keeps, which is [picture], or null for one
-    /// PhotoDNA matched.
+    /// Shield matched or knows as harmful, or one that could not be asked
+    /// about, being unreadable.
     async set({ account, key = null, picture }) {
       if (!bucket || !isAccount(account)) return picture;
       const theirs = await copiesOf(bucket, account);
@@ -73,8 +75,9 @@ export function accountPictures(env, { now = Date.now, log = (line) => console.l
       const mine = pictureKey(account, digest);
       const had = theirs.find((c) => c.digest === digest) ?? null;
       // Asked each time, which the object answers from what it holds
-      // once it has asked PhotoDNA; a picture set while PhotoDNA had no
-      // key, or did not answer, is asked about again by the daily run.
+      // once it has asked Shield; a picture set while Shield had no
+      // credentials, or did not answer, is asked about again by the daily
+      // run.
       // One the account had before was shown while it was.
       let said = 'off';
       if (ask) {
@@ -87,15 +90,16 @@ export function accountPictures(env, { now = Date.now, log = (line) => console.l
           await alertKnownProblem(env, store, { what: 'unreachable', error, now: now() });
         }
       }
-      if (said === 'match') {
+      if (said === 'match' || said === 'harmful' || said === 'unreadable') {
         // Never the account's, and nothing before it is, since the
-        // profile has none: a copy of it kept before, the object
-        // deletes as it acts on the match (known.mjs).
+        // profile has none: a copy of one kept before, the object
+        // deletes as it acts on it (known.mjs). One that cannot be
+        // decoded cannot be asked about, which the app's own never are.
         await settle(theirs, at);
         return null;
       }
       // Set last, unless it is the account's picture now already, as
-      // first set, and with what PhotoDNA said once it has: never taken
+      // first set, and with what Shield said once it has: never taken
       // back.
       const already = !!had && currentOf(theirs) === had;
       const kept = had

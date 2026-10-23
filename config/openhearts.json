@@ -17,7 +17,7 @@
     "playPushEmail": null
   },
   "alerts": { "to": "alerts@openhearts.game", "subscribed": true, "waiting": true, "pictures": true },
-  "photodna": { "endpoint": null },
+  "arachnid": { "endpoint": "https://shield.projectarachnid.com/v1/pdq" },
   "ncmec": {
     "endpoint": "https://exttest.cybertip.org/ispws",
     "reporter": { "firstName": "Bright", "lastName": "Fulton", "email": "help@openhearts.game" }

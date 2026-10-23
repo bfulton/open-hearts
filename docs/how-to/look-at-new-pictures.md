@@ -15,7 +15,7 @@ Do this once:
 
 If the subject begins with **Urgent**, the check hid a picture as nudity or sexual content. Look at it that day: the accounts with such a picture come first.
 
-Each account in the email has every picture it set since the last email, in order, each marked as its profile picture now or no longer its profile picture. A picture the check hid says what for, and how sure the check was, from 0 to 1. A picture whose check failed says so: look at it yourself, as with any other. Then come the commands for the account:
+Each account in the email has every picture it set since the last email, in order, each marked as its profile picture now or no longer its profile picture. A picture the check hid says what for, and how sure the check was, from 0 to 1. A picture whose check failed says so: look at it yourself, as with any other. A picture hidden because it couldn't be decoded, so Arachnid Shield couldn't be asked about it, says so too; the app never makes one. Then come the commands for the account:
 
 - `./oh account remove <account> picture --apply` takes its profile picture now off its profile and withholds it at the relay ([Take a name or picture off](suspend-an-account.md#take-a-name-or-picture-off)). It is there only when one of the pictures is its profile picture now.
 - `./oh account suspend <account> --apply` cuts the account off at the relay ([Suspend an account](suspend-an-account.md)). Use it for a picture the account no longer uses: one it set and then replaced. The relay already carries only an account's picture now.
@@ -39,7 +39,7 @@ It prints whether the picture is withheld and what it would do, and changes noth
 
 ## If no email comes
 
-No email means no account set a new picture. To check that the run happened, open the `open-hearts-relay` worker's logs in the dashboard around 13:00 UTC: each run logs how many pictures it deleted, how many it asked PhotoDNA about again, how many it emailed, and how many it left for the next email. A run that fails emails you.
+No email means no account set a new picture. To check that the run happened, open the `open-hearts-relay` worker's logs in the dashboard around 13:00 UTC: each run logs how many pictures it deleted, how many it asked Arachnid Shield about again, how many it emailed, and how many it left for the next email. A run that fails emails you.
 
 ## Learn more
 

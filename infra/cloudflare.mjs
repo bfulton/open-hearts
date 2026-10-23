@@ -132,11 +132,11 @@ export const turnKeys = [{ name: 'open-hearts-turn', uid: config.turnKeyId }];
 export const relay = {
   wrangler: 'service/do/wrangler.toml',
   secrets: ['OH_JUROR_SECRET'],
-  /// Set once each is issued, and nothing is wrong until then: PhotoDNA's
-  /// key turns on the check of each new picture against known images of
-  /// child sexual abuse, and NCMEC's credentials the reports a match
+  /// Set once each is issued, and nothing is wrong until then: Arachnid
+  /// Shield's credentials turn on the check of each new picture against
+  /// known images of child sexual abuse, and NCMEC's the reports a match
   /// files (service/do/known.mjs).
-  optionalSecrets: ['OH_PHOTODNA_KEY', 'OH_NCMEC_USERNAME', 'OH_NCMEC_PASSWORD'],
+  optionalSecrets: ['OH_ARACHNID_USERNAME', 'OH_ARACHNID_PASSWORD', 'OH_NCMEC_USERNAME', 'OH_NCMEC_PASSWORD'],
   /// workers.dev off: relay.openhearts.game is its only address.
   workersDev: false,
 };

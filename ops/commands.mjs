@@ -165,7 +165,7 @@ export const COMMANDS = [
     group: 'picture',
     args: ['picture'],
     flags: ['apply', 'account=', 'how='],
-    summary: 'Reports a picture you found and looked at as child sexual abuse material: the relay handles it as it does a PhotoDNA match.',
+    summary: 'Reports a picture you found and looked at as child sexual abuse material: the relay handles it as it does a match with a known image.',
     more: 'The relay withholds it wherever it was put out, holds and terminates each account that set it in the last year (and --account, one it was taken off), their web subscriptions ended with nothing refunded, reports it to NCMEC saying you looked at it and --how you came to, and emails you what it did. It needs a copy: an account\'s own copy of it, a hold\'s, or the picture taken off --account.',
     needs: [...CF, '(Workers R2 Storage Edit)'],
     howto: 'docs/how-to/handle-abuse-material.md#report-a-picture-you-found',

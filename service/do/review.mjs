@@ -12,7 +12,7 @@
 // worker's schedule goes over every copy kept, and does only what each
 // copy's own flags say is still to do: holds each account's copies to
 // the order it set them in; deletes what is kept no longer than
-// promised; asks PhotoDNA again about what it has not cleared;
+// promised; asks Arachnid Shield again about what it has not cleared;
 // hides again what the check found should be; and emails the operator,
 // account by account, every picture each set since the last email — the
 // ones it has since replaced too, so that swapping a picture back before
@@ -153,10 +153,11 @@ const hiddenOf = (p) => (p.check ? hiddenFor(p.check) : []);
 const urgent = (p) => !p.allowed && hiddenOf(p).includes('sexual');
 
 /// The email for [accounts], each {account, pictures: [{digest, at,
-/// current, check, allowed}]}: account by account, every picture it
-/// set, in order, which is its profile's now, what the check made of it
-/// (`check`, its scores; {} when the check failed; null when there was
-/// none), whether the operator allowed it after the check hid it, and
+/// current, check, allowed, unreadable}]}: account by account, every
+/// picture it set, in order, which is its profile's now, what the check
+/// made of it (`check`, its scores; {} when the check failed; null when
+/// there was none), whether the operator allowed it after the check hid
+/// it, whether it was hidden for not decoding ([unreadable]), and
 /// the commands that take them down — its profile's picture off, or the
 /// account suspended, for a picture it has since replaced — or put a
 /// hidden one back.
@@ -196,6 +197,7 @@ export function reviewEmail(accounts, more = 0) {
         : p.check && !Object.keys(p.check).length
           ? ['not checked: the check failed']
           : []),
+      ...(p.unreadable ? ['hidden: it could not be decoded, so Arachnid Shield could not be asked about it'] : []),
     ];
   };
   const commands = (a) => [
@@ -252,17 +254,19 @@ export function reviewEmail(accounts, more = 0) {
 ///    left in [records] (OH_RECORDS) was made;
 /// 2. a copy that has not been its account's for [PICTURE_KEPT_DAYS]
 ///    is deleted, each account's oldest first;
-/// 3. with [ask] (known.mjs, knownAsker), each copy PhotoDNA has not
-///    cleared is asked about again, for its account, whether or not the
-///    account still has it — each was shown while it did — so that a
-///    match is acted on for each account that set it, and is no longer
-///    theirs;
+/// 3. with [ask] (known.mjs, knownAsker), each copy Arachnid Shield
+///    has not cleared is asked about again, for its account, whether or
+///    not the account still has it — each was shown while it did — so
+///    that a match, or a picture Shield knows as harmful, is acted on for
+///    each account that set it, and is no longer theirs; and one that
+///    cannot be decoded is said to be;
 /// 4. every picture an account has now, or new for the email, that the
-///    check found should be hidden is hidden, unless the operator
-///    allowed it, in case hiding it as it was set did not take; and what
-///    the operator allowed stays allowed while a copy of it is kept;
+///    check found should be hidden, or that cannot be decoded, is hidden,
+///    unless the operator allowed it, in case hiding it as it was set did
+///    not take; and what the operator allowed stays allowed while a copy
+///    of it is kept;
 /// 5. with [send] ({subject, text, html}), the operator is emailed every
-///    copy not yet told of but one PhotoDNA matched, account by account,
+///    copy not yet told of but one Shield matched, account by account,
 ///    oldest account first, whole accounts up to [REVIEW_MOST] pictures,
 ///    each marked told once the email has gone.
 ///
@@ -332,11 +336,11 @@ export async function reviewRun({ bucket, store, records = null, send = null, as
   }
   const kept = copies.filter((c) => !stale.has(c));
 
-  // 3. PhotoDNA asked again.
+  // 3. Shield asked again.
   let asked = 0;
   const matched = new Set();
   for (const c of ask ? kept : []) {
-    if (c.known === 'clear') continue;
+    if (c.known === 'clear' || c.known === 'unreadable') continue;
     const copy = await bucket.get(c.key);
     if (!copy) continue;
     const jpeg = btoa(String.fromCharCode(...new Uint8Array(await copy.arrayBuffer())));
@@ -348,9 +352,11 @@ export async function reviewRun({ bucket, store, records = null, send = null, as
       break;
     }
     asked++;
-    if (said === 'clear') {
-      await changed(c, (m) => (m.known === 'clear' ? null : { ...m, known: 'clear' }));
-    } else if (said === 'match') {
+    if (said === 'clear' || said === 'unreadable') {
+      // Unreadable: no hash can be made of it, so nothing can be asked;
+      // hidden below, as the app's own pictures never are.
+      await changed(c, (m) => (m.known === said ? null : { ...m, known: said }));
+    } else if (said === 'match' || said === 'harmful') {
       // The object acts on it for this account and deletes the copy
       // (known.mjs); the account's picture now is no longer its own
       // from today, and one before keeps since when, so that its year
@@ -358,7 +364,7 @@ export async function reviewRun({ bucket, store, records = null, send = null, as
       matched.add(c.key);
       if (currentOf(byAccount.get(c.account)) === c) await settle(c.account, today);
     } else {
-      // PhotoDNA without its key, or not answering: tomorrow.
+      // Shield without its credentials, or not answering: tomorrow.
       break;
     }
   }
@@ -367,14 +373,14 @@ export async function reviewRun({ bucket, store, records = null, send = null, as
   const current = new Set([...byAccount.values()].map(currentOf).filter(Boolean));
   const untold = kept.filter((c) => !c.told && !matched.has(c.key));
   const shownNow = kept.filter((c) => current.has(c) && !matched.has(c.key));
-  const toHide = [...new Set([...shownNow, ...untold].filter((c) => hiddenFor(checkOf(c.check)).length).map((c) => c.digest))];
+  const toHide = [...new Set([...shownNow, ...untold].filter((c) => hiddenFor(checkOf(c.check)).length || c.known === 'unreadable').map((c) => c.digest))];
   const allowed = await hidePictures(store, toHide, t, new Set(kept.map((c) => c.digest)));
   if (!send) return { deleted: stale.size, asked, sent: 0, more: 0 };
 
   // 5. The email.
   const toTell = new Map();
   for (const c of untold) {
-    const use = { copy: c, digest: c.digest, at: c.at, current: current.has(c), check: checkOf(c.check), allowed: allowed.has(c.digest) };
+    const use = { copy: c, digest: c.digest, at: c.at, current: current.has(c), check: checkOf(c.check), allowed: allowed.has(c.digest), unreadable: c.known === 'unreadable' };
     toTell.set(c.account, [...(toTell.get(c.account) ?? []), use]);
   }
   const first = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
@@ -396,7 +402,7 @@ export async function reviewRun({ bucket, store, records = null, send = null, as
   }
   await send(
     reviewEmail(
-      shown.map((a) => ({ account: a.account, pictures: a.uses.map(({ digest, at, current, check, allowed: put }) => ({ digest, at, current, check, allowed: put })) })),
+      shown.map((a) => ({ account: a.account, pictures: a.uses.map(({ digest, at, current, check, allowed: put, unreadable }) => ({ digest, at, current, check, allowed: put, unreadable })) })),
       total - count,
     ),
   );

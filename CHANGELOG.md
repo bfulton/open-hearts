@@ -57,6 +57,18 @@ squashed from a pull request, the pull request's number.
   again until it is done, and any failure emails the operator. Off until
   PhotoDNA's key is set; reports are filed once NCMEC's credentials are,
   and until then the email says to file one by hand. (2026-10-19, #32)
+- Known images of child sexual abuse are found by the Canadian Centre
+  for Child Protection's Arachnid Shield instead of Microsoft's
+  PhotoDNA, and Shield is never sent a picture: the relay decodes it,
+  makes its PDQ hash with a port of Meta's reference that makes the same
+  hash bit for bit, and asks Shield about the hash. A picture Shield
+  knows as harmful or abusive material of a child, not child sexual
+  abuse material, is refused and withheld, and the operator emailed with
+  the command to suspend the account; nothing else is done by itself.
+  A match with Shield's test pictures is logged and acted on for nobody,
+  a picture too featureless to match is not asked about, and one that
+  can't be decoded is refused as a match is. The privacy policy names
+  the Canadian Centre for Child Protection. (2026-10-22, #34)
 - Every new picture is emailed to the operator once a day, account by
   account, with the commands to take it down. The daily run does only
   what each copy says is still to do: it keeps what is kept for as long
@@ -216,6 +228,12 @@ squashed from a pull request, the pull request's number.
 
 ### Fixed
 
+- `oh` tells which version of the terms or the privacy policy the site
+  serves by the day its page says it was last updated as well as by its
+  text, so an entry that publishes the same text on a later day counts
+  as live once it is. Before, the earlier entry did, and every later
+  deploy would have refused to go out until the later one was dated
+  again. (2026-10-22, #34)
 - At a table of two, a player who leaves during the pass or the deal,
   just after backing a move for a seat the jury holds, no longer stops
   the game. Their device now makes the pass the bot would make, or the

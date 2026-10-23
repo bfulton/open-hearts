@@ -56,8 +56,8 @@ import config from '../../config/openhearts.json';
 // household.mjs, "one account at a time"). It lives here because a Pages
 // project cannot define a Durable Object of its own, only bind one; and
 // here it reaches what checks and keeps each picture the account sets
-// (profile_pictures.mjs): the pictures bucket, Workers AI, and PhotoDNA
-// through KnownPictures.
+// (profile_pictures.mjs): the pictures bucket, Workers AI, and Arachnid
+// Shield through KnownPictures.
 export class Household extends HouseholdObject {
   constructor(state, env = {}) {
     const e = withConfig(env, config);
@@ -73,8 +73,8 @@ export class Bench extends BenchObject {
   }
 }
 
-/// Where PhotoDNA is asked about each new picture, and a match acted on
-/// (known.mjs): one object, kept in the United States.
+/// Where Arachnid Shield is asked about each new picture, and a match
+/// acted on (known.mjs): one object, kept in the United States.
 export class KnownPictures extends KnownObject {
   constructor(state, env = {}) {
     super(state, withConfig(env, config));
@@ -262,9 +262,9 @@ export class TagRelay {
 
 export default {
   /// Once a day (wrangler.toml, crons): anything left to do after a
-  /// PhotoDNA match tried again (known.mjs); and the pictures accounts
-  /// set kept as long as the privacy policy says and no longer, asked
-  /// about again where PhotoDNA has not cleared them, and emailed to the
+  /// match tried again (known.mjs); and the pictures accounts set kept
+  /// as long as the privacy policy says and no longer, asked about again
+  /// where Arachnid Shield has not cleared them, and emailed to the
   /// operator since the last run, if the config asks for it
   /// (review.mjs).
   async scheduled(controller, env, ctx) {

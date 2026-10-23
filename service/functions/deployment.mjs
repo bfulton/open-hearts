@@ -10,7 +10,7 @@
 /// The file's fields as the env names the handlers read. A field left
 /// null is left out, so a handler finds it missing, as before.
 export function configEnv(config) {
-  const { apple = {}, google = {}, alerts = {}, photodna = {}, ncmec = {} } = config ?? {};
+  const { apple = {}, google = {}, alerts = {}, arachnid = {}, ncmec = {} } = config ?? {};
   const on = (flag) => (flag === true ? 'on' : null);
   const named = {
     OH_SERVICE_KEY: config?.serviceKey,
@@ -34,9 +34,10 @@ export function configEnv(config) {
     OH_ALERT_PICTURES: on(alerts.pictures),
     // Where the relay orders a termination (service/do/known.mjs).
     OH_APP_ORIGIN: config?.appOrigin,
-    // PhotoDNA's Match call, and NCMEC's reporting service and who its
-    // reports name as reporting (known.mjs); the keys are secrets.
-    OH_PHOTODNA_ENDPOINT: photodna.endpoint,
+    // Arachnid Shield's PDQ call, and NCMEC's reporting service and who
+    // its reports name as reporting (known.mjs); the credentials are
+    // secrets.
+    OH_ARACHNID_ENDPOINT: arachnid.endpoint,
     OH_NCMEC_ENDPOINT: ncmec.endpoint,
     OH_NCMEC_FIRST_NAME: ncmec.reporter?.firstName,
     OH_NCMEC_LAST_NAME: ncmec.reporter?.lastName,

@@ -92,12 +92,12 @@ tag = "v3"
 new_sqlite_classes = ["Bench"]
 
 # Where each new picture is checked against known images of child
-# sexual abuse by Microsoft's PhotoDNA before it is carried, and a match
+# sexual abuse by Arachnid Shield before it is carried, and a match
 # acted on: withheld, its accounts held and terminated, and reported to
-# NCMEC (known.mjs). One object, made in the "us" jurisdiction, so that
-# PhotoDNA is asked only from the United States. Off until the secret
-# OH_PHOTODNA_KEY is set; reports are filed once OH_NCMEC_USERNAME and
-# OH_NCMEC_PASSWORD are too.
+# NCMEC (known.mjs). One object, made in the "us" jurisdiction, under
+# the US law that has a match reported. Off until the secrets
+# OH_ARACHNID_USERNAME and OH_ARACHNID_PASSWORD are set; reports are
+# filed once OH_NCMEC_USERNAME and OH_NCMEC_PASSWORD are too.
 [[durable_objects.bindings]]
 name = "KNOWN"
 class_name = "KnownPictures"
@@ -119,7 +119,7 @@ binding = "OH_PICTURES"
 bucket_name = "open-hearts-pictures"
 
 # The private bucket of kept games, where a legal hold keeps the
-# pictures of an account a PhotoDNA match held (known.mjs, holds.mjs).
+# pictures of an account a match held (known.mjs, holds.mjs).
 [[r2_buckets]]
 binding = "OH_RECORDS"
 bucket_name = "open-hearts-records"
