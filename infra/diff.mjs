@@ -6,6 +6,10 @@
 
 const isObject = (x) => x !== null && typeof x === 'object' && !Array.isArray(x);
 
+/// What sets a preview's own secrets (infra/cloudflare.mjs, ownSecrets),
+/// which are made for previews and are never production's.
+export const OWN_SECRETS_BY = './oh preview secrets --apply';
+
 /// Lists of plain values are compared as sets: the APIs answer them in
 /// orders of their own.
 const sameList = (a, b) => {
@@ -148,15 +152,19 @@ export function pagesEnvPlan(want, have, ids) {
     lines.push(h ? (h.type === 'plain_text' ? `set ${name}: ${JSON.stringify(h.value)} -> ${JSON.stringify(value)}` : `set ${name} as plain text (it is ${h.type})`) : `add ${name} = ${JSON.stringify(value)}`);
   }
   // oh sets a secret in every environment that lists it, so one command
-  // puts right a secret missing from either (docs/reference/oh.md).
+  // puts right a secret missing from either (docs/reference/oh.md); a
+  // preview's own (ownSecrets) is made for previews, and set by the
+  // command that makes it.
   const put = (name) => `\`./oh secret set ${name} --apply\``;
-  for (const name of want.secrets) {
+  const own = want.ownSecrets ?? [];
+  for (const name of [...want.secrets, ...own]) {
     const h = vars[name];
     if (h?.type === 'secret_text') continue;
-    owner.push(h ? `${name} is ${h.type}, not a secret: set it with ${put(name)}` : `secret ${name} is not set: ${put(name)}`);
+    const fix = own.includes(name) ? `\`${OWN_SECRETS_BY}\`` : put(name);
+    owner.push(h ? `${name} is ${h.type}, not a secret: set it with ${fix}` : `secret ${name} is not set: ${fix}`);
   }
   for (const [name, h] of Object.entries(vars)) {
-    if (name in want.vars || want.secrets.includes(name)) continue;
+    if (name in want.vars || want.secrets.includes(name) || own.includes(name)) continue;
     envPatch[name] = null;
     lines.push(`remove ${h.type === 'secret_text' ? 'secret' : 'variable'} ${name}, which is not defined`);
   }
@@ -350,6 +358,36 @@ function readValue(s) {
   return [v, s.slice(m[1].length)];
 }
 
+/// What an environment of a wrangler.toml does not take from the top
+/// level, as wrangler (4.130.0) has it (its `notInheritable`): each is
+/// the environment's own, or the environment has none.
+const NOT_INHERITED = new Set([
+  'vars', 'secrets', 'define', 'durable_objects', 'workflows', 'kv_namespaces', 'cloudchamber', 'containers', 'send_email', 'queues',
+  'connect', 'r2_buckets', 'd1_databases', 'vectorize', 'ai_search_namespaces', 'ai_search', 'websearch', 'agent_memory', 'hyperdrive',
+  'services', 'analytics_engine_datasets', 'dispatch_namespaces', 'mtls_certificates', 'tail_consumers', 'streaming_tail_consumers',
+  'unsafe', 'browser', 'ai', 'images', 'stream', 'media', 'pipelines', 'secrets_store_secrets', 'artifacts', 'unsafe_hello_world',
+  'flagship', 'worker_loaders', 'ratelimits', 'vpc_services', 'vpc_networks', 'version_metadata',
+]);
+
+/// A container's application name as wrangler gives it one it does not
+/// name: the worker's top-level name and the class, and the
+/// environment's name after them.
+const containerName = (top, c, env = null) => c.name ?? `${top}-${c.class_name}${env ? `-${env}` : ''}`.toLowerCase().replace(/ /g, '-');
+
+/// [toml] as wrangler deploys it with `--env [name]`: what the
+/// environment sets; the top level's for what it carries over and the
+/// environment does not set (routes, migrations, triggers, the build);
+/// the worker's name, `<name>-<env>` unless the environment says; and
+/// its containers' names. [toml] itself for no [name].
+export function wranglerEnv(toml, name) {
+  if (!name) return toml;
+  const env = toml.env?.[name];
+  if (!env) throw new Error(`wrangler.toml has no [env.${name}]`);
+  const carried = Object.entries(toml).filter(([k]) => k !== 'env' && !NOT_INHERITED.has(k));
+  const containers = env.containers?.map((c) => ({ ...c, name: containerName(toml.name, c, name) }));
+  return { ...Object.fromEntries(carried), ...env, name: env.name ?? `${toml.name}-${name}`, ...(containers ? { containers } : {}) };
+}
+
 /// The bindings a wrangler.toml declares, as the worker settings API
 /// names them: [{name, type, ...what identifies it}].
 export function wranglerBindings(toml) {
@@ -396,8 +434,13 @@ export function relayProblems(toml, relay, live) {
   for (const secret of relay.secrets) {
     if (!live.secrets.includes(secret)) out.push(`secret ${secret} is not set: \`./oh secret set ${secret} --apply\``);
   }
+  // A preview's own, never production's (infra/cloudflare.mjs, ownSecrets).
+  for (const secret of relay.ownSecrets ?? []) {
+    if (!live.secrets.includes(secret)) out.push(`secret ${secret} is not set: \`${OWN_SECRETS_BY}\``);
+  }
+  const defined = [...relay.secrets, ...(relay.optionalSecrets ?? []), ...(relay.ownSecrets ?? [])];
   for (const secret of live.secrets) {
-    if (!relay.secrets.includes(secret) && !(relay.optionalSecrets ?? []).includes(secret)) out.push(`secret ${secret} is set but not defined (infra/cloudflare.mjs, relay.secrets)`);
+    if (!defined.includes(secret)) out.push(`secret ${secret} is set but not defined (infra/cloudflare.mjs, relay${relay.env ? `.${relay.env}` : ''}.secrets)`);
   }
   // Its addresses: the routes wrangler.toml gives, as custom domains.
   const routes = (toml.routes ?? []).filter((r) => r.custom_domain);
@@ -416,7 +459,7 @@ export function relayProblems(toml, relay, live) {
     if (!live.namespaces.some((n) => n.script === name && n.class === c)) out.push(`no Durable Object namespace for ${c}`);
   }
   for (const c of toml.containers ?? []) {
-    const app = live.containers.find((x) => x.name === `${name}-${c.class_name.toLowerCase()}`);
+    const app = live.containers.find((x) => x.name === containerName(name, c));
     if (!app) out.push(`container ${c.class_name} is not deployed`);
     else if (c.max_instances != null && app.max_instances !== c.max_instances) out.push(`container ${c.class_name} max_instances is ${app.max_instances}, wrangler.toml says ${c.max_instances}`);
   }

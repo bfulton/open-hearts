@@ -2,7 +2,9 @@
 
 Use this guide to make the service's signing key pair for a new deployment, or to replace the pair in use with a new one.
 
-The public half is `serviceKey` in `config/openhearts.json`. The secret half is the Pages secret `OH_SERVICE_SECRET`, and it is kept nowhere else.
+The public half is `serviceKey` in `config/openhearts.json`. The secret half is the Pages secret `OH_SERVICE_SECRET` on the production environment, and it is kept nowhere else.
+
+Previews sign with a pair of their own, which this guide doesn't touch: to replace theirs, run `./oh preview secrets --apply` ([Play live on a preview](deploy.md#play-live-on-a-preview)).
 
 ## Where each half is used
 
@@ -40,7 +42,7 @@ Every part above checks against exactly one key, so there is no overlap between 
    ```
 
 1. Put the `OH_SERVICE_KEY` value in `config/openhearts.json` as `serviceKey`, and commit the change to `main`.
-1. Set the `OH_SERVICE_SECRET` value as a secret on both of the Pages project's environments. It asks for the value, which isn't shown as you paste it, and sets it on each environment that `infra/cloudflare.mjs` lists it in:
+1. Set the `OH_SERVICE_SECRET` value as a secret on the Pages project's production environment. It asks for the value, which isn't shown as you paste it, and sets it where `infra/cloudflare.mjs` lists it, which is production alone:
 
    ```bash
    ./oh secret set OH_SERVICE_SECRET --apply
@@ -61,7 +63,7 @@ Every part above checks against exactly one key, so there is no overlap between 
 
 1. Put the new `OH_SERVICE_KEY` value in `config/openhearts.json` as `serviceKey`, and commit the change to `main`. Do not deploy yet.
 1. Build both phone releases from this commit and submit them to the stores, but hold their release until the last step. A phone build with the new key can get no licence while the service still signs with the old secret.
-1. Set the new `OH_SERVICE_SECRET` value on both of the Pages project's environments. It asks for the value, which isn't shown as you paste it:
+1. Set the new `OH_SERVICE_SECRET` value on the Pages project's production environment. It asks for the value, which isn't shown as you paste it:
 
    ```bash
    ./oh secret set OH_SERVICE_SECRET --apply
@@ -93,7 +95,7 @@ Every part above checks against exactly one key, so there is no overlap between 
 
 ## Check it worked
 
-1. Check that both environments have the secret (names only, never values). It prints an `ok` line for each environment's secrets, or a `by hand:` line for one that is missing:
+1. Check that production has the secret, and previews theirs (names only, never values). It prints an `ok` line for each environment's secrets, or a `by hand:` line for one that is missing:
 
    ```bash
    ./oh infra --only cloudflare

@@ -5,10 +5,10 @@
 // production is in gate.mjs, which deploy.sh and the relay's build step
 // run themselves, so that deploying without oh is held to it too.
 
-import { readFile, rm } from 'node:fs/promises';
+import { rm } from 'node:fs/promises';
 import { join } from 'node:path';
 
-import { Failed, Usage, root, wranglerVersion } from './env.mjs';
+import { Failed, Usage, relayHost, relayWrangler, root, wranglerVersion } from './env.mjs';
 import { releaseProblems } from './gate.mjs';
 import { MODULE_ALIAS, MODULE_DIR, fetchModule, pinsOf } from './photodna.mjs';
 import { termsProblems, untold } from './terms.mjs';
@@ -43,6 +43,7 @@ async function cleared(ctx, target, apply) {
 }
 
 export async function relay(ctx, { flags }) {
+  if (flags.preview) return previewRelay(ctx, { flags });
   const version = await wranglerVersion();
   ctx.log(`the relay worker (service/do) from ${await head(ctx)}, with wrangler ${version}`);
   const gone = await missing(ctx, RELAY_NEEDS);
@@ -68,6 +69,29 @@ export async function relay(ctx, { flags }) {
     await rm(dir, { recursive: true, force: true });
   }
   if (code !== 0) throw new Failed(`relay: wrangler deploy exited ${code}`);
+}
+
+/// The preview relay (wrangler.toml, [env.preview]), from whatever is
+/// checked out, as a preview of the site is: it reaches nothing of
+/// production's, and checks no picture, so it is built without the
+/// PhotoDNA module. Its devices are held to the key previews have, which
+/// config/openhearts.json names (preview.serviceKey).
+async function previewRelay(ctx, { flags }) {
+  const version = await wranglerVersion();
+  const name = (await relayWrangler('preview')).name;
+  ctx.log(`the preview relay (${name}, service/do [env.preview]) from ${await head(ctx)}, with wrangler ${version}`);
+  const gone = await missing(ctx, RELAY_NEEDS);
+  for (const g of gone) ctx.log(`  not ready: needs ${g}`);
+  const key = (await ctx.config()).preview?.serviceKey;
+  if (!key) ctx.log('  not ready: config/openhearts.json has no preview.serviceKey, so the preview relay would carry nobody (./oh preview secrets --apply)');
+  const ready = !gone.length && !!key;
+  if (!flags.apply) {
+    ctx.log(ready ? 'nothing deployed; --apply deploys it' : 'nothing deployed');
+    return;
+  }
+  if (!ready) throw new Failed('preview relay: not deployed (see above)');
+  const code = await ctx.run('npx', ['--yes', `wrangler@${version}`, 'deploy', '--env', 'preview'], { cwd: join(root, 'service/do') });
+  if (code !== 0) throw new Failed(`preview relay: wrangler deploy exited ${code}`);
 }
 
 export async function site(ctx, { flags }) {
@@ -102,15 +126,6 @@ export async function prune(ctx, { flags }) {
   if (!/^\d+$/.test(keep)) throw new Usage('--keep takes a number');
   const code = await ctx.run(join(root, 'deploy.sh'), ['--prune', keep, ...(flags.apply ? [] : ['-n'])]);
   if (code !== 0) throw new Failed(`prune: deploy.sh exited ${code}`);
-}
-
-/// The relay's address, as its route in service/do/wrangler.toml names
-/// it.
-async function relayHost() {
-  const toml = await readFile(join(root, 'service/do/wrangler.toml'), 'utf8');
-  const host = /pattern = "([^"]+)", custom_domain = true/.exec(toml)?.[1];
-  if (!host) throw new Failed('no custom domain route in service/do/wrangler.toml');
-  return host;
 }
 
 async function head(ctx) {

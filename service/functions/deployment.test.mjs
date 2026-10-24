@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
-import { appDefines, configEnv, withConfig } from './deployment.mjs';
+import { appDefines, configEnv, configFor, withConfig } from './deployment.mjs';
 
 const committed = JSON.parse(readFileSync(new URL('../../config/openhearts.json', import.meta.url), 'utf8'));
 
@@ -44,6 +44,23 @@ test('a name set on the project, or by a test, wins over the file', () => {
   assert.equal(env.OH_STRIPE_PRICE, 'other');
   assert.equal(env.OH_SERVICE_KEY, 'k');
   assert.equal(env.OH_STORE, 'kv');
+});
+
+test('a preview signs with the key previews have, and never with production\'s', () => {
+  const file = { serviceKey: 'production', stripePrice: 'p', preview: { serviceKey: 'preview' } };
+  assert.equal(withConfig({}, file).OH_SERVICE_KEY, 'production');
+  assert.equal(withConfig({ OH_DEPLOYMENT: 'production' }, file).OH_SERVICE_KEY, 'production');
+  const preview = withConfig({ OH_DEPLOYMENT: 'preview' }, file);
+  assert.equal(preview.OH_SERVICE_KEY, 'preview');
+  assert.equal(preview.OH_STRIPE_PRICE, 'p', 'the rest of the file as it is');
+  // Before previews have a key of their own, a preview has none: it
+  // licenses nobody, rather than falling back on production's.
+  assert.ok(!('OH_SERVICE_KEY' in withConfig({ OH_DEPLOYMENT: 'preview' }, { serviceKey: 'production' })));
+  assert.deepEqual(configFor(file, 'production'), file);
+  assert.deepEqual(configFor(file, 'preview'), { serviceKey: 'preview', stripePrice: 'p' });
+  // The committed one has a key of its own for previews, not production's.
+  assert.match(committed.preview.serviceKey, /^[0-9a-f]{64}$/);
+  assert.notEqual(committed.preview.serviceKey, committed.serviceKey);
 });
 
 test('the price is the file\'s alone: what the terms state, which no setting on the project changes', () => {

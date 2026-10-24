@@ -10,6 +10,18 @@ squashed from a pull request, the pull request's number.
 
 ### Added
 
+- Previews play live. They have a relay of their own (`open-hearts-relay-preview`,
+  at `relay-preview.openhearts.game`), with its own households and backup
+  jurors on the previews' store, and a service key pair of their own.
+  Nothing a preview signs is good in production, and it takes nothing
+  production signed. Nobody buys anything on a preview: `oh preview invite`
+  makes an account that plays there for a year and prints one of its
+  backup codes, which a device enters under Activate subscription. `oh
+  preview secrets` makes the previews' secrets without showing them, and
+  `oh deploy relay --preview` deploys the preview relay from any branch.
+  A preview emails nobody, and its tables carry no profile pictures,
+  since only production checks them. (2026-10-24, #38)
+
 - At a live table, a bot's juror plays its card as soon as it hears the
   bot card before it, rather than waiting for the person's device to
   have seen that one: the bots between two of a person's cards take one
@@ -445,6 +457,11 @@ squashed from a pull request, the pull request's number.
 
 ### Security
 
+- Previews hold none of production's secrets. A preview runs whatever
+  branch was deployed to it, and it held production's service secret,
+  which `oh secret set` put on every environment. It now signs with a
+  pair of its own, and `oh secret set OH_SERVICE_SECRET` sets
+  production's alone. (2026-10-24, #38)
 - A kept game's record carries, with each removal, the signed word of
   everyone who backed it, and whoever opens the game counts the
   removal's majority from those signatures. Before, a record named a

@@ -104,7 +104,7 @@ export function markdown() {
     '',
     '- **Nothing changes without `--apply`.** A command that changes anything says what it would do and stops; with `--apply` it does it.',
     '- **`./oh help <command>`**, or `--help` after it, says what the command takes, what it needs and where its how-to is.',
-    '- **It prints no name, picture, code or email address.** Accounts, keys and rows only.',
+    '- **It prints no name, picture, code or email address.** Accounts, keys and rows only. The one code it prints is the invitation `oh preview invite` makes, which is yours to hand on, and opens nothing of production\'s.',
     '- **Exit status:** 0 when it did what it was asked, 1 when it could not, 2 when it was asked wrongly.',
     '',
     '## Arguments',

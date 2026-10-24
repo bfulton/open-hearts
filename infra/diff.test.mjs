@@ -29,6 +29,7 @@ import {
   settingsPlan,
   webhookPlan,
   wranglerBindings,
+  wranglerEnv,
 } from './diff.mjs';
 import { stripe } from './stripe.mjs';
 
@@ -75,6 +76,7 @@ const liveRecords = () => [
   { id: 'k2', type: 'TXT', name: 'cf-bounce._domainkey.openhearts.game', content: '"v=DKIM1; …"', meta: { email_routing: true, read_only: true } },
   { id: 'k3', type: 'TXT', name: 'cf-bounce.openhearts.game', content: '"v=spf1 include:_spf.mx.cloudflare.net ~all"', meta: { email_routing: true, read_only: true } },
   { id: 'w1', type: 'AAAA', name: 'relay.openhearts.game', content: '100::', proxied: true, meta: { origin_worker_id: 'a9c2', read_only: true } },
+  { id: 'w2', type: 'AAAA', name: 'relay-preview.openhearts.game', content: '100::', proxied: true, meta: { origin_worker_id: 'b7d1', read_only: true } },
 ];
 
 test('DNS: the zone as it is matches its definition', () => {
@@ -182,7 +184,7 @@ test('rules: a field on the live rule the definition does not set is a differenc
 
 const ids = {
   kv: { 'open-hearts-store': '5b65', 'open-hearts-store-preview': 'ab41' },
-  durableObjects: { 'open-hearts-relay/Household': 'fcae' },
+  durableObjects: { 'open-hearts-relay/Household': 'fcae', 'open-hearts-relay-preview/Household': 'pv01' },
 };
 const secret = { type: 'secret_text', value: '' };
 const plain = (value) => ({ type: 'plain_text', value });
@@ -207,25 +209,48 @@ test('Pages: production as it is matches', () => {
   assert.deepEqual(pagesEnvPlan(pages.environments.production, liveProduction(), ids), { patch: {}, lines: [], owner: [] });
 });
 
-test('Pages: preview has its own store and no household', () => {
+/// A preview as it is: its own store and bucket, the preview relay's
+/// households, a service secret of its own, and the word that it is one.
+const livePreview = () => {
   const have = liveProduction();
   for (const k of ['OH_STRIPE_SECRET', 'OH_STRIPE_WEBHOOK_SECRET', ...playSecrets]) delete have.env_vars[k];
+  have.env_vars.OH_DEPLOYMENT = plain('preview');
   have.kv_namespaces.OH_STORE.namespace_id = 'ab41';
   have.r2_buckets.OH_RECORDS.name = 'open-hearts-records-preview';
-  delete have.durable_object_namespaces;
+  have.durable_object_namespaces.HOUSEHOLD.namespace_id = 'pv01';
   delete have.analytics_engine_datasets;
-  assert.deepEqual(pagesEnvPlan(pages.environments.preview, have, ids), { patch: {}, lines: [], owner: [] });
-  // And production's store on preview is a rebinding.
-  have.kv_namespaces.OH_STORE.namespace_id = '5b65';
-  assert.deepEqual(pagesEnvPlan(pages.environments.preview, have, ids).patch, { kv_namespaces: { OH_STORE: { namespace_id: 'ab41' } } });
+  return have;
+};
+
+test("Pages: a preview has its own store, the preview relay's households and a service secret of its own", () => {
+  assert.deepEqual(pagesEnvPlan(pages.environments.preview, livePreview(), ids), { patch: {}, lines: [], owner: [] });
+  // Production's store on preview is a rebinding.
+  const store = livePreview();
+  store.kv_namespaces.OH_STORE.namespace_id = '5b65';
+  assert.deepEqual(pagesEnvPlan(pages.environments.preview, store, ids).patch, { kv_namespaces: { OH_STORE: { namespace_id: 'ab41' } } });
   // As is production's bucket: a game played on a preview is no game of record.
-  have.kv_namespaces.OH_STORE.namespace_id = 'ab41';
-  have.r2_buckets.OH_RECORDS.name = 'open-hearts-records';
-  assert.deepEqual(pagesEnvPlan(pages.environments.preview, have, ids).lines, ['rebind OH_RECORDS (r2_buckets) to open-hearts-records-preview']);
+  const bucket = livePreview();
+  bucket.r2_buckets.OH_RECORDS.name = 'open-hearts-records';
+  assert.deepEqual(pagesEnvPlan(pages.environments.preview, bucket, ids).lines, ['rebind OH_RECORDS (r2_buckets) to open-hearts-records-preview']);
+  // And production's households, which read and write production's store.
+  const households = livePreview();
+  households.durable_object_namespaces.HOUSEHOLD.namespace_id = 'fcae';
+  assert.deepEqual(pagesEnvPlan(pages.environments.preview, households, ids).lines, ['rebind HOUSEHOLD (durable_object_namespaces) to open-hearts-relay-preview/Household']);
+  // Without the word, its worker would take production's service key.
+  const unsaid = livePreview();
+  delete unsaid.env_vars.OH_DEPLOYMENT;
+  assert.deepEqual(pagesEnvPlan(pages.environments.preview, unsaid, ids).lines, ['add OH_DEPLOYMENT = "preview"']);
+  // Its service secret is its own: made by oh preview secrets, which no
+  // oh secret set of production's touches.
+  const unset = livePreview();
+  delete unset.env_vars.OH_SERVICE_SECRET;
+  assert.deepEqual(pagesEnvPlan(pages.environments.preview, unset, ids).owner, ['secret OH_SERVICE_SECRET is not set: `./oh preview secrets --apply`']);
+  assert.ok(!pages.environments.preview.secrets.includes('OH_SERVICE_SECRET'));
+  assert.ok(pages.environments.production.secrets.includes('OH_SERVICE_SECRET'));
 });
 
-// The project holds no plain variables today (config/openhearts.json);
-// the planning for one is still checked, against a definition that has one.
+// Production holds no plain variables (config/openhearts.json); the
+// planning for one is still checked, against a definition that has one.
 const withVar = { ...pages.environments.production, vars: { OH_STRIPE_PRICE: 'openhearts_annual' } };
 
 test('Pages: a plain variable is set, a stray one removed', () => {
@@ -463,6 +488,119 @@ test("relay: Arachnid Shield's, PhotoDNA's and NCMEC's secrets are nothing amiss
 
 test('relay: not deployed at all', () => {
   assert.deepEqual(relayProblems(wrangler, relay, { settings: null }), ['worker open-hearts-relay is not deployed']);
+});
+
+// ---- the preview relay ------------------------------------------------------
+
+test('toml: an environment takes what wrangler carries into it, and nothing wrangler does not', () => {
+  const t = parseToml(`
+name = "w"
+main = "m.mjs"
+routes = [{ pattern = "w.example", custom_domain = true }]
+[vars]
+A = "1"
+[[kv_namespaces]]
+binding = "KV"
+id = "1"
+[triggers]
+crons = ["0 13 * * *"]
+[env.e]
+[env.e.vars]
+B = "2"
+[env.f]
+name = "f"
+routes = []
+`);
+  assert.deepEqual(wranglerEnv(t, 'e'), {
+    name: 'w-e',
+    main: 'm.mjs',
+    routes: [{ pattern: 'w.example', custom_domain: true }],
+    triggers: { crons: ['0 13 * * *'] },
+    vars: { B: '2' },
+  });
+  assert.deepEqual(wranglerEnv(t, 'f'), { name: 'f', main: 'm.mjs', routes: [], triggers: { crons: ['0 13 * * *'] } });
+  assert.equal(wranglerEnv(t, null), t);
+  assert.throws(() => wranglerEnv(t, 'g'), /no \[env\.g\]/);
+});
+
+const preview = wranglerEnv(wrangler, 'preview');
+
+test("the preview relay is a worker of its own, at its own address, with nothing of production's", () => {
+  assert.equal(preview.name, 'open-hearts-relay-preview');
+  // Inherited, production's address would be moved to it.
+  assert.deepEqual(preview.routes, [{ pattern: 'relay-preview.openhearts.game', custom_domain: true }]);
+  assert.deepEqual(preview.triggers, { crons: [] }, "production's daily run is not a preview's");
+  assert.match(preview.build.command, /^\.\.\/bench\/build\.sh --preview$/);
+  assert.deepEqual(preview.migrations, wrangler.migrations);
+  // Its own store, and no bucket, mail, model, checker or dataset.
+  assert.deepEqual(wranglerBindings(preview).map((b) => `${b.type}:${b.name}`).sort(), [
+    'durable_object_namespace:BENCH',
+    'durable_object_namespace:HOUSEHOLD',
+    'durable_object_namespace:TABLE',
+    'kv_namespace:OH_STORE',
+    'plain_text:OH_BENCH_PRESENCE_RELAYS',
+    'plain_text:OH_BENCH_RELAYS',
+    'plain_text:OH_DEPLOYMENT',
+    'version_metadata:CF_VERSION_METADATA',
+  ]);
+  const store = (t) => t.kv_namespaces.find((k) => k.binding === 'OH_STORE').id;
+  assert.notEqual(store(preview), store(wrangler));
+  assert.equal(preview.vars.OH_DEPLOYMENT, 'preview');
+  // Its backup jurors follow tables on it, not on production's.
+  for (const v of [preview.vars.OH_BENCH_RELAYS, preview.vars.OH_BENCH_PRESENCE_RELAYS]) assert.equal(v, `wss://${preview.routes[0].pattern}/{tag}`);
+  // Named as wrangler names an environment's container: the top-level
+  // name, the class, then the environment (wrangler deploy --dry-run).
+  assert.deepEqual(preview.containers.map((c) => [c.name, c.class_name, c.max_instances]), [['open-hearts-relay-bench-preview', 'Bench', 1]]);
+});
+
+test("infra: the preview relay's address is checked for, and rate limited as production's is", () => {
+  for (const host of [wrangler.routes[0].pattern, preview.routes[0].pattern]) {
+    assert.ok(game.cloudflareDns.some((r) => r.type === 'AAAA' && r.name === host), host);
+    assert.ok(game.rules.http_ratelimit[0].expression.includes(`"${host}"`), host);
+  }
+});
+
+const livePreviewRelay = () => ({
+  settings: {
+    compatibility_date: wrangler.compatibility_date,
+    compatibility_flags: [],
+    observability: { enabled: true },
+    bindings: [
+      { class_name: 'Bench', name: 'BENCH', namespace_id: 'c1', type: 'durable_object_namespace' },
+      { name: 'CF_VERSION_METADATA', type: 'version_metadata' },
+      { class_name: 'Household', name: 'HOUSEHOLD', namespace_id: 'c2', type: 'durable_object_namespace' },
+      { name: 'OH_BENCH_PRESENCE_RELAYS', text: 'wss://relay-preview.openhearts.game/{tag}', type: 'plain_text' },
+      { name: 'OH_BENCH_RELAYS', text: 'wss://relay-preview.openhearts.game/{tag}', type: 'plain_text' },
+      { name: 'OH_DEPLOYMENT', text: 'preview', type: 'plain_text' },
+      { name: 'OH_JUROR_SECRET', type: 'secret_text' },
+      { name: 'OH_STORE', namespace_id: 'ab416db4ab31420c83b8e2bc212a8a05', type: 'kv_namespace' },
+      { class_name: 'TagRelay', name: 'TABLE', namespace_id: 'c3', type: 'durable_object_namespace' },
+    ],
+  },
+  secrets: ['OH_JUROR_SECRET'],
+  domains: [{ hostname: 'relay-preview.openhearts.game', service: 'open-hearts-relay-preview', enabled: true }],
+  subdomain: { enabled: false },
+  namespaces: ['TagRelay', 'Household', 'Bench', 'KnownPictures'].map((c) => ({ script: 'open-hearts-relay-preview', class: c })),
+  containers: [{ name: 'open-hearts-relay-bench-preview', max_instances: 1 }],
+});
+
+test('the preview relay: as deployed it matches, and its secret is its own', () => {
+  assert.deepEqual(relayProblems(preview, relay.preview, livePreviewRelay()), []);
+  const unset = livePreviewRelay();
+  unset.secrets = [];
+  assert.deepEqual(relayProblems(preview, relay.preview, unset), ['secret OH_JUROR_SECRET is not set: `./oh preview secrets --apply`']);
+  // The checkers' credentials are production's: a preview checks no picture.
+  const credentials = livePreviewRelay();
+  credentials.secrets.push('OH_ARACHNID_USERNAME');
+  assert.deepEqual(relayProblems(preview, relay.preview, credentials), ['secret OH_ARACHNID_USERNAME is set but not defined (infra/cloudflare.mjs, relay.preview.secrets)']);
+  // A binding of production's on it is said.
+  const pictures = livePreviewRelay();
+  pictures.settings.bindings.push({ bucket_name: 'open-hearts-pictures', name: 'OH_PICTURES', type: 'r2_bucket' });
+  assert.match(relayProblems(preview, relay.preview, pictures).join('\n'), /OH_PICTURES \(r2_bucket\) is on the worker but not in wrangler.toml/);
+  // As is production's address.
+  const address = livePreviewRelay();
+  address.domains.push({ hostname: 'relay.openhearts.game', service: 'open-hearts-relay-preview', enabled: true });
+  assert.match(relayProblems(preview, relay.preview, address).join('\n'), /relay\.openhearts\.game serves open-hearts-relay-preview but is not in wrangler.toml/);
 });
 
 // ---- Email Routing --------------------------------------------------------

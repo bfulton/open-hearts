@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import { readFile } from 'node:fs/promises';
 import { languages, origin } from '../../site/build.mjs';
 import worker from './worker.mjs';
-import { claimWith, devicesOn, entitlementOf, ticketFor } from './accounts.mjs';
+import { accountFor, claimWith, devicesOn, entitlementOf, makeBackups, redeemBackup, ticketFor } from './accounts.mjs';
 import { activate, activeInStore, dropDevice, householdOp } from './household.mjs';
 import { allowedOrigin, askedBy, requestStatement } from './http.mjs';
 import { licence, licenceFor, signerOn } from './licence.mjs';
@@ -1147,6 +1147,23 @@ test('a device leaves a subscription by dropping itself, and one that has ended 
   const code = await ticketFor(THIRD, local, { now });
   assert.equal((await claimWith(OTHER, code.body.ticket, local, { now })).status, 200);
   assert.equal((await entitlementOf(local, OTHER, { now })).account, await accountOfKey(local, THIRD));
+
+  // Nor does a preview's invitation (ops/preview.mjs): an account the
+  // operator made, its backup code handed on. A device of one moves to
+  // another with the second's code, as a tester handed two would.
+  const previews = memoryStore();
+  const invited = async (subscription) => {
+    await previews.put(`SUB#${subscription}`, 'META', { source: 'invited', txn_ref: null, renews_at: dayAfter(now, 365), cancelled_at: null });
+    const account = await accountFor(previews, subscription, { make: true, now });
+    return { account, code: (await makeBackups(previews, account, { now })).codes[0].code };
+  };
+  const first = await invited('invited-1');
+  const second = await invited('invited-2');
+  assert.equal((await redeemBackup(OTHER, first.code, previews, { now })).status, 200);
+  assert.equal((await entitlementOf(previews, OTHER, { now })).licensed_until, dayAfter(now, 365), 'licensed for the year the invitation runs');
+  assert.equal((await redeemBackup(OTHER, second.code, previews, { now })).status, 200);
+  assert.equal((await entitlementOf(previews, OTHER, { now })).account, second.account);
+  assert.deepEqual(await devicesOn(previews, first.account), [], 'gone from the first');
 });
 
 test('a code\'s row is let go by the store, spent or not, rather than kept for ever', async () => {

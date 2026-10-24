@@ -6,7 +6,7 @@ Use this guide to publish the site, the web app and the service's handlers to Cl
 
 ## Before you begin
 
-- Production is built from `main` as it was reviewed: `HEAD` must be `origin/main`, with nothing uncommitted. `deploy.sh` and the relay's build step check this themselves (`ops/gate.mjs`), so it holds whether or not you deploy through `oh`. A preview can be deployed from any branch.
+- Production is built from `main` as it was reviewed: `HEAD` must be `origin/main`, with nothing uncommitted. `deploy.sh` and the relay's build step check this themselves (`ops/gate.mjs`), so it holds whether or not you deploy through `oh`. A preview, and the preview relay, can be deployed from any branch.
 - A production deploy of the site also holds the terms and the privacy policy to `site/ledger.json`. It emails nobody: after publishing a change that matters to subscribers, [tell them](change-the-terms.md#tell-subscribers) yourself. See [Change the terms](change-the-terms.md#publish-it).
 - Make sure the commit passes CI, or run `./check.sh full`.
 - Install Node, git, Python 3 (for pruning) and Flutter. CI pins the Flutter version in `.github/workflows/ci.yml`. The web build needs no Rust: the wasm is committed.
@@ -51,6 +51,55 @@ From any branch:
 ```
 
 Without `--label`, the label is `dev` on a working branch. A preview is published to `https://<label>.open-hearts.pages.dev/`, and is not held to the checks production is.
+
+## Play live on a preview
+
+A preview plays live too, on the preview relay, with the people you invite. Previews are a deployment of their own:
+
+- their own store, and their own relay worker, `open-hearts-relay-preview` at `relay-preview.openhearts.game`, with its own households and backup jurors
+- secrets of their own, none of them production's, since a preview runs whatever branch was deployed to it. Nothing a preview signs is good in production, and a preview takes nothing production signed.
+- no email: a preview sends none
+- no profile pictures at its tables. Pictures are checked against known images before anyone is shown one, and only production checks them. Your own picture still shows on your own device.
+
+There is one preview relay for every preview. It runs the branch it was last deployed from, so deploy it again from the branch you're trying when that branch changes the relay.
+
+### Set it up once
+
+1. Make the secrets previews keep for themselves:
+
+   ```bash
+   ./oh preview secrets --apply
+   ```
+
+   It sets the previews' service secret on the Pages project's preview environment and the preview relay's backup-juror secret, and shows neither. It writes the previews' public key to `config/openhearts.json` as `preview.serviceKey`: commit it.
+
+1. Deploy the preview relay, from the branch you're on:
+
+   ```bash
+   ./oh deploy relay --preview --apply
+   ```
+
+   It needs what a relay deploy needs ([Before you begin](#before-you-begin)), and it refuses until `config/openhearts.json` has the previews' key.
+
+1. Bind the Pages project's preview environment to the preview relay's households, and mark it as a preview (`OH_DEPLOYMENT`):
+
+   ```bash
+   ./oh infra --apply
+   ```
+
+1. Deploy each preview again (`./oh deploy site --label <label> --apply`). A preview builds the previews' key into its app, and points its app at the preview relay.
+
+To replace the previews' secrets, run `./oh preview secrets --apply` again, commit, and deploy the preview relay and the previews again.
+
+### Invite someone to play
+
+```bash
+./oh preview invite --apply
+```
+
+It makes an account on the previews' store and prints one of its backup codes. Nobody buys anything on a preview. On the device, open the preview's app (`https://<label>.open-hearts.pages.dev/play/`), choose **Activate subscription** from the menu, and enter the code. The account plays live on every preview for a year.
+
+Give each person their own invitation, since an account plays on one device at a time. The account's other four codes are shown on any of its devices, to bring another device of the same person in.
 
 ## Sweep up old previews
 

@@ -27,7 +27,8 @@ its host ([where the app is](service.md#where-the-app-is)): in
 production, `openhearts.game` serves the site, and
 `play.openhearts.game` serves the app at its root with the handlers at
 `/api/`. A preview has no play host, so it serves the same build at
-`/play/`.
+`/play/`, and plays live on the preview relay with the people the
+operator invites ([previews](service.md#previews)).
 
 Every Pages branch gets a stable alias. A working branch publishes to
 `dev`, so the latest push is always at the same address, and `main`

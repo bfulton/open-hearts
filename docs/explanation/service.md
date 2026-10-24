@@ -31,7 +31,8 @@ the app, at the root, with the handlers. `openhearts.game` is the site
 alone: it answers no handler, and serves nothing of the app, since the
 build served from there would be the app at another origin, with no
 device in it. A preview serves the site at its root and the app under
-`/play/`, and never sends anyone to production.
+`/play/`, never sends anyone to production, and plays live on a relay
+of its own ([previews](#previews)).
 
 **The app calls the handlers on its own origin.** Every address the app
 makes for the service is its page's origin plus `/api/<name>`
@@ -279,9 +280,9 @@ use) goes through one **Household** Durable Object per account, which
 handles them one at a time. A subscription has a turn of its own, the
 object named `sub:` and its id, where its account is found or made
 exactly once. The class is exported from the relay worker and bound to
-the Pages project as `HOUSEHOLD` (production only) and to the relay
-worker under the same name. Without the binding, as in the tests and
-previews, an in-memory queue in the isolate does the same. Each kind of
+the Pages project as `HOUSEHOLD` (a preview's to the preview relay's)
+and to the relay worker under the same name. Without the binding, as in
+the tests, an in-memory queue in the isolate does the same. Each kind of
 operation has an hourly allowance per account, counted in that queue
 ([service settings](../reference/configuration.md#service-settings)).
 
@@ -800,12 +801,39 @@ answers 400, and the app asks again later.
 
 Secrets are set by hand and checked only by name. Everything else that
 is not secret is in `config/openhearts.json`, committed: the service's
-public key, the TURN key's id, the Stripe price, and the store and
-sign-in identifiers. `deploy.sh` compiles the build's from it and ships
-the file to the worker, which reads it beneath the project's settings
+public keys (production's, and the one previews have), the TURN key's
+id, the Stripe price, and the store and sign-in identifiers. `deploy.sh`
+compiles the build's from it and ships the file to the worker, which
+reads it beneath the project's settings
 (`service/functions/deployment.mjs`): a variable of the same name set on
 the project wins, as one set by a test does. A field left null is a
 feature left off ([configuration](../reference/configuration.md)).
+
+### Previews
+
+A preview is a deployment of its own, which plays live like production
+but reaches nothing of it ([deploy](../how-to/deploy.md#play-live-on-a-preview)).
+The Pages project's preview environment binds the previews' store and
+bucket, and the households of the preview relay: the same relay worker's
+code deployed as `open-hearts-relay-preview` (`[env.preview]` in
+`service/do/wrangler.toml`), at its own address, with tags, households
+and backup jurors of its own on that store. Both environments say they
+are a preview (`OH_DEPLOYMENT`), and each worker then takes the
+config as a preview has it (`configFor`): with the service key previews
+have, `preview.serviceKey`, and none while there is none, never
+production's. Every preview build is made with the same key, and talks
+to the preview relay (`deploy.sh`).
+
+A preview runs whatever branch was deployed to it, so its secrets are
+its own ([secrets](security-model.md#secrets)). Nobody buys anything on
+a preview: the operator invites the people who play there (`oh preview
+invite`), each invitation an account on the previews' store that is
+nobody's purchase, good for a year, which a device joins with one of
+its backup codes. A preview emails nobody: the preview relay has no
+mail binding. Nor does it carry profile pictures: it has no pictures
+bucket and no checker, and a picture is carried only once it has been
+checked against known images ([pictures](#the-accounts-profile)), which
+only production does.
 
 ### What is defined in code
 

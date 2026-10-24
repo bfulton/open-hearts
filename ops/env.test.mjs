@@ -7,7 +7,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { picturesBucket, recordsBucket } from './env.mjs';
+import { picturesBucket, previewStore, productionStore, recordsBucket, relayHost } from './env.mjs';
 
 const env = { CLOUDFLARE_API_TOKEN: 'token', CLOUDFLARE_ACCOUNT_ID: 'acct' };
 const objects = (bucket) => `https://api.cloudflare.com/client/v4/accounts/acct/r2/buckets/${bucket}/objects`;
@@ -59,4 +59,14 @@ test('the records bucket: a record at its path, and its bytes as any object', as
   assert.equal(calls[0].url, `${objects('open-hearts-records')}/tables/t%201.json`);
   await records.write('held/a/ab.jpg', Uint8Array.from([1]), 'image/jpeg');
   assert.equal(calls[1].url, `${objects('open-hearts-records')}/held/a/ab.jpg`);
+});
+
+test("the stores and relays: production's, and the previews' apart from them, each as wrangler.toml binds it", async () => {
+  const { calls, fetchImpl } = asked(new Response('', { status: 404 }), new Response('', { status: 404 }));
+  assert.equal(await (await productionStore(env, fetchImpl)).get('KEY#k', 'ENTITLEMENT'), null);
+  assert.equal(await (await previewStore(env, fetchImpl)).get('KEY#k', 'ENTITLEMENT'), null);
+  const namespaces = calls.map((c) => /\/namespaces\/([0-9a-f]+)\//.exec(c.url)[1]);
+  assert.deepEqual(namespaces, ['5b65151de63341dc9f7a9d417c9b6a4e', 'ab416db4ab31420c83b8e2bc212a8a05'], "the previews' never production's");
+  assert.equal(await relayHost(), 'relay.openhearts.game');
+  assert.equal(await relayHost('preview'), 'relay-preview.openhearts.game');
 });

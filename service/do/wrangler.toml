@@ -159,3 +159,68 @@ OH_MAIL_FROM = "noreply@openhearts.game"
 [[analytics_engine_datasets]]
 binding = "OH_METRICS"
 dataset = "open_hearts_relay"
+
+# ---- the preview relay ---------------------------------------------------
+# What previews of the app play on (docs/how-to/deploy.md): this code as
+# a worker of its own, open-hearts-relay-preview, at its own address,
+# with objects of its own (tags, households, its own backup jurors) on
+# the previews' store. It reaches nothing of production's: no
+# production store, bucket or object, no email (a preview emails
+# nobody), and no pictures bucket, so it carries no profile picture
+# (profile_pictures.mjs, ownedScreen): pictures are checked against
+# known images before anyone is shown one, and only production checks
+# them. Deployed from any branch, as a preview of the site is:
+#
+#   ./oh deploy relay --preview --apply
+#
+# What wrangler does not carry into an environment is named again here
+# (bindings, vars, the container, version_metadata); what it does carry
+# but production's alone is set for the preview: its address (inherited,
+# it would take relay.openhearts.game from production), its daily run
+# (none) and its build (the preview's, which any branch may deploy).
+# The migrations and the PhotoDNA stand-in are carried as they are.
+[env.preview]
+routes = [{ pattern = "relay-preview.openhearts.game", custom_domain = true }]
+
+[env.preview.triggers]
+crons = []
+
+[env.preview.build]
+command = "../bench/build.sh --preview"
+cwd = "."
+
+[env.preview.version_metadata]
+binding = "CF_VERSION_METADATA"
+
+[[env.preview.durable_objects.bindings]]
+name = "TABLE"
+class_name = "TagRelay"
+
+[[env.preview.durable_objects.bindings]]
+name = "HOUSEHOLD"
+class_name = "Household"
+
+[[env.preview.durable_objects.bindings]]
+name = "BENCH"
+class_name = "Bench"
+
+[[env.preview.containers]]
+class_name = "Bench"
+image = "../bench/Dockerfile"
+max_instances = 1
+instance_type = "standard-1"
+
+# The previews' store, the one the Pages project's preview environment
+# binds as OH_STORE (infra/cloudflare.mjs).
+[[env.preview.kv_namespaces]]
+binding = "OH_STORE"
+id = "ab416db4ab31420c83b8e2bc212a8a05"
+
+# Which deployment this is: a preview's relay holds devices to the
+# service key previews have (service/functions/deployment.mjs,
+# configFor), and its backup jurors follow tables here, not on
+# production's relay.
+[env.preview.vars]
+OH_DEPLOYMENT = "preview"
+OH_BENCH_RELAYS = "wss://relay-preview.openhearts.game/{tag}"
+OH_BENCH_PRESENCE_RELAYS = "wss://relay-preview.openhearts.game/{tag}"

@@ -10,7 +10,8 @@ The non-secret configuration, committed and the same for every deployment.
 
 - The Pages worker reads it beneath its own settings: `service/functions/entry.mjs` passes the file to `withConfig` in `service/functions/deployment.mjs`, which maps each field to an `OH_` name (`configEnv`). A variable of the same name that is set on the project or by a test wins, except `OH_PRICE`: the price is the file's alone. The entry also hands the worker `site/ledger.json` as `OH_LEDGER` (see [Change the terms](../how-to/change-the-terms.md)).
 - The relay worker reads it the same way (`service/do/worker.mjs`).
-- `deploy.sh` compiles `serviceKey`, `google.webClientId` and `apple.servicesId` into the web build.
+- Where the environment says it is a preview (`OH_DEPLOYMENT` is `preview`), the file is read as a preview has it (`configFor`): `serviceKey` is `preview.serviceKey`, or none while there is none, never production's.
+- `deploy.sh` compiles `serviceKey` (a preview's: `preview.serviceKey`), `google.webClientId` and `apple.servicesId` into the web build.
 - `app/tool/defines.mjs` writes the phone build's `--dart-define-from-file` from it (`appDefines`).
 - A field that is `null` is left out, so the feature that needs it stays off.
 
@@ -18,6 +19,7 @@ The non-secret configuration, committed and the same for every deployment.
 |---|---|---|---|
 | `appOrigin` | `OH_APP_ORIGIN`, which the relay orders a termination at (`service/do/known.mjs`) | `OH_APP_ORIGIN` | The app's origin. A phone build calls the service there and builds shared links on it (`app/lib/net/address_io.dart`). `app/tool/defines.mjs` refuses a file without it. |
 | `serviceKey` | `OH_SERVICE_KEY` | `OH_SERVICE_KEY` | The service's public key, 64 hex characters. Licences and activations are checked against it. A production deploy and a phone build refuse to run without it. |
+| `preview.serviceKey` | `OH_SERVICE_KEY`, on a preview | `OH_SERVICE_KEY`, in a preview's build | The public key previews sign with, which is never production's: licences and activations on previews are checked against it. `./oh preview secrets` writes it ([Play live on a preview](../how-to/deploy.md#play-live-on-a-preview)). A preview without it licenses nobody, and the preview relay refuses to deploy. |
 | `turnKeyId` | `OH_TURN_KEY_ID` | none | The Cloudflare Realtime TURN key that the worker mints credentials with. `infra/cloudflare.mjs` (`turnKeys`) defines the same key. |
 | `stripePrice` | `OH_STRIPE_PRICE` | none | The Stripe price, as a price ID or lookup key, that a checkout sells. A checkout sells it only when it is a year at `price`. |
 | `price` | `OH_PRICE` (`"599 usd"`), which no project setting overrides | none | What a year costs on the web: `{"amount": <cents>, "currency": "usd"}`. The terms and the front page state it (`{{price}}`, `site/build.mjs`), Stripe's price is made at it (`infra/stripe.mjs`), and a checkout sells at it and no other. `priceAmount` in `app/lib/net/buying.dart` is held to it by `site/ledger.test.mjs`. Changed only as [Change the terms](../how-to/change-the-terms.md#change-the-price) says. |
@@ -45,11 +47,11 @@ The app also reads `OH_PLAY_PACKAGE` as a build define (`app/lib/net/store_buyin
 
 ### Pages project secrets
 
-Defined by name in `pages.environments` in `infra/cloudflare.mjs`. `./oh infra` checks that each one is set, and never reads a value; `./oh secret set` sets one.
+Defined by name in `pages.environments` in `infra/cloudflare.mjs`. `./oh infra` checks that each one is set, and never reads a value. `./oh secret set` sets one in each environment that lists it (`secrets`); a preview's own, which is never production's (`ownSecrets`), is made by `./oh preview secrets`.
 
 | Secret | Production | Preview | Read by | Without it |
 |---|---|---|---|---|
-| `OH_SERVICE_SECRET` | Yes | Yes | `serviceSigned` in `service/functions/licence.mjs`: signs licences (`licenceFor`) and activations (`activationFor`) | Handlers that sign answer 503. A secret that does not match `OH_SERVICE_KEY` also answers 503. |
+| `OH_SERVICE_SECRET` | Yes | Its own, the secret half of `preview.serviceKey` (`./oh preview secrets`) | `serviceSigned` in `service/functions/licence.mjs`: signs licences (`licenceFor`) and activations (`activationFor`) | Handlers that sign answer 503. A secret that does not match `OH_SERVICE_KEY` also answers 503. |
 | `OH_ID_HMAC` | Yes | Yes | `loginRow`: the HMAC key a sign-in's subject is stored under | `attest`, `supersede` and `apple-id` answer 503. |
 | `OH_STRIPE_SECRET` | Yes | No | `checkout`, `manage`, `payerLookup`, `endRefunded`, `healthOf` | `checkout` and `manage` answer 503. `health` reports Stripe as not configured. Backup codes are not emailed. A refund's webhook answers 503, so Stripe sends it again. |
 | `OH_STRIPE_WEBHOOK_SECRET` | Yes | No | `webhookSigned` | The `stripe` webhook answers 400 to every delivery. |
@@ -57,6 +59,14 @@ Defined by name in `pages.environments` in `infra/cloudflare.mjs`. `./oh infra` 
 | `OH_PLAY_SERVICE_ACCOUNT` | When the config names Play (`playSecrets`) | No | `playToken`: the Google service account's JSON key for the Play Developer API | `store` answers 503 for a Play purchase. `play` answers a subscription notification with 200 and records nothing. |
 
 The worker calls these Stripe endpoints, in the API version `STRIPE_VERSION` in `service/functions/stripe.mjs` names, which is the webhook's, so `OH_STRIPE_SECRET` needs access to each: `GET /v1/prices` and `GET /v1/prices/{id}`, `POST /v1/checkout/sessions`, `GET /v1/subscriptions/{id}` (with its customer expanded, for a notice of a change to the terms), `POST /v1/billing_portal/sessions`, `GET /v1/customers/{id}`, and, to end a refunded subscription, `GET /v1/invoice_payments`, `GET /v1/invoices/{id}` and `DELETE /v1/subscriptions/{id}`. As a restricted key: Prices, Products, Customers and Invoices read; Checkout Sessions, Customer Portal and Subscriptions write.
+
+### Pages project variables
+
+Plain variables, defined in `pages.environments` in `infra/cloudflare.mjs` and set by `./oh infra`. Everything else that is not secret is in [`config/openhearts.json`](#configopenheartsjson).
+
+| Variable | Production | Preview | What it is |
+|---|---|---|---|
+| `OH_DEPLOYMENT` | Not set | `preview` | Which deployment this is. A preview reads the config as a preview has it (`configFor` in `service/functions/deployment.mjs`): with the key previews sign with. |
 
 ### Relay worker secret and variables
 
@@ -69,9 +79,11 @@ The relay worker (`open-hearts-relay`) is defined by `service/do/wrangler.toml`.
 | `OH_NCMEC_USERNAME`, `OH_NCMEC_PASSWORD` | Optional secrets | The relay worker's secrets (`relay.optionalSecrets`) | The CyberTipline reporting service's credentials, which NCMEC issues to a registered provider. Without them, a match is acted on all the same and the operator is emailed to report it by hand. |
 | `OH_JUROR_SECRET` | Secret | The relay worker's secrets | 64 hex characters. The backup jurors derive their keys from it, and the relay checks each backup juror's mark against it (`benchMark` in `service/do/relay.mjs`). Without it, the relay admits no backup juror. |
 | `OH_MAIL_FROM` | Variable | `[vars]` in `service/do/wrangler.toml` | The sender of backup-code emails and the operator's alerts. |
-| `OH_SERVICE_KEY` | From the config file | `config/openhearts.json` (`serviceKey`) | The key every activation must be signed by. `wrangler.toml` does not set it. Without a valid key, the relay carries no device. |
-| `OH_BENCH_RELAYS` | Optional variable | Not set | Overrides the relays the backup jurors' container follows tables on. The default is `OH_RELAYS` in `service/bench/Dockerfile`. |
-| `OH_BENCH_PRESENCE_RELAYS` | Optional variable | Not set | Overrides the relays the backup jurors' container announces presence on. The default is `OH_PRESENCE_RELAYS` in `service/bench/Dockerfile`. |
+| `OH_SERVICE_KEY` | From the config file | `config/openhearts.json` (`serviceKey`, and `preview.serviceKey` on the preview relay) | The key every activation must be signed by. `wrangler.toml` does not set it. Without a valid key, the relay carries no device. |
+| `OH_BENCH_RELAYS` | Optional variable | The preview relay's `[env.preview.vars]` | Overrides the relays the backup jurors' container follows tables on. The default is `OH_RELAYS` in `service/bench/Dockerfile`. |
+| `OH_BENCH_PRESENCE_RELAYS` | Optional variable | The preview relay's `[env.preview.vars]` | Overrides the relays the backup jurors' container announces presence on. The default is `OH_PRESENCE_RELAYS` in `service/bench/Dockerfile`. |
+
+The preview relay (`open-hearts-relay-preview`, `[env.preview]` in the same file, `relay.preview` in `infra/cloudflare.mjs`) has one secret, its own `OH_JUROR_SECRET`, made by `./oh preview secrets`, and none of the checkers' or NCMEC's: it checks no picture. Its `OH_DEPLOYMENT` is `preview`, as the Pages project's preview environment's is ([variables](#pages-project-variables)).
 
 ## Bindings
 
@@ -83,7 +95,7 @@ From `pages.environments` in `infra/cloudflare.mjs`. Pages also provides `ASSETS
 |---|---|---|---|---|
 | `OH_STORE` | Workers KV | `open-hearts-store` | `open-hearts-store-preview` | Every row the service keeps. See [Storage](service-api.md#storage). |
 | `OH_RECORDS` | R2 bucket | `open-hearts-records` | `open-hearts-records-preview` | Finished games' records (`service/functions/records.mjs`), and the pictures a legal hold keeps (`service/functions/holds.mjs`). |
-| `HOUSEHOLD` | Durable Object (script `open-hearts-relay`, class `Household`) | Bound | Not bound | Runs each account's operations one at a time, and sends the operator's alerts. |
+| `HOUSEHOLD` | Durable Object, class `Household` | Script `open-hearts-relay` | Script `open-hearts-relay-preview`, whose households read and write the previews' store | Runs each account's operations one at a time, and sends the operator's alerts. The preview relay has no mail, so a preview's go nowhere. |
 | `OH_METRICS` | Workers Analytics Engine | Dataset `open_hearts_api` | Not bound | One line per request, sampled for `config` and `health` (`measure` and `SAMPLED` in `service/functions/metrics.mjs`). |
 
 Without `HOUSEHOLD`, the worker runs each account's operations in a queue in its own isolate (`inHousehold`), sends no alerts, and neither checks nor keeps the pictures accounts set.
@@ -104,6 +116,8 @@ From `service/do/wrangler.toml`.
 | `AI` | Workers AI | The automatic check of each new picture as an account sets it, by `@cf/cloudflare/clef-flash` (`checkPicture` in `service/do/review.mjs`). Without it, pictures are kept and not checked. |
 | `EMAIL` | Email Sending (`send_email`) | Backup-code emails, the operator's alerts, and the day's new pictures. |
 | `OH_METRICS` | Workers Analytics Engine, dataset `open_hearts_relay` | A line of counts from each object: a minute after its last, and at once when its last socket closes, each with the seconds it covers (`tally` and `tallied` in `service/do/relay.mjs`). |
+
+The preview relay (`[env.preview]`) binds `TABLE`, `HOUSEHOLD` and `BENCH` as objects of its own, `OH_STORE` to the previews' store (`open-hearts-store-preview`), and `CF_VERSION_METADATA`, and nothing else: no pictures bucket, so it carries no profile picture; no `KNOWN`, `AI` or `OH_RECORDS`; no `EMAIL`, so it sends no email; and no `OH_METRICS`. It has no schedule.
 
 Its schedule (`triggers.crons`) runs once a day at 13:00 UTC. With a checker's credentials set, it wakes the `KnownPictures` object to try again anything left to do after a match, such as a report waiting on NCMEC's credentials. It deletes from `OH_PICTURES` each picture a year after it stopped being an account's, asks the checker in use again about each picture kept that no checker has cleared, for each account that set it, and hides any the check found should be hidden that isn't; when `alerts.pictures` is on, it also emails the operator the new ones.
 
@@ -163,7 +177,7 @@ Compile-time values the app reads with `String.fromEnvironment`. They are not en
 | `OH_APP_ORIGIN` | `app/lib/net/address_io.dart` | `app/tool/defines.mjs` |
 | `OH_GOOGLE_CLIENT_ID`, `OH_APPLE_SERVICE_ID` | `app/lib/net/provider_tokens.dart` | `deploy.sh`, `app/tool/defines.mjs` |
 | `OH_APPLE_PRODUCT`, `OH_PLAY_PRODUCT`, `OH_PLAY_PACKAGE` | `app/lib/net/store_buying.dart` | `app/tool/defines.mjs` (not `OH_PLAY_PACKAGE`) |
-| `OH_RELAYS` | `app/lib/net/relays.dart` | `deploy.sh` (empty). A comma list replaces the build's relays. |
+| `OH_RELAYS` | `app/lib/net/relays.dart` | `deploy.sh`: empty for production, and the preview relay for a preview. A comma list replaces the build's relays, and the remote config's. |
 
 ## Remote config
 

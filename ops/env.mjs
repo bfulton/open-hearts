@@ -1,8 +1,9 @@
 // What an oh command reads from the machine it runs on: the credentials
-// in the environment, the production store and bucket, the deployment's
-// config, Stripe, and the programs it starts. Each is made only when a
-// command asks for it, so `oh help` needs nothing, and a test hands a
-// command fakes in their place (context, below).
+// in the environment, the production store and bucket (and the
+// previews' store), the deployment's config, Stripe, and the programs it
+// starts. Each is made only when a command asks for it, so `oh help`
+// needs nothing, and a test hands a command fakes in their place
+// (context, below).
 
 import { spawn as spawnChild } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
@@ -10,6 +11,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { PRIVATE_BUCKET, pages } from '../infra/cloudflare.mjs';
+import { parseToml, wranglerEnv } from '../infra/diff.mjs';
 import { stripe as stripeDefinition } from '../infra/stripe.mjs';
 import { restStore } from '../service/tool/kv.mjs';
 import { restBucket, restObjects } from '../service/tool/r2.mjs';
@@ -56,16 +58,30 @@ export async function wranglerVersion() {
   return version;
 }
 
-/// The production store, OH_STORE, as its namespace is bound in the
-/// relay worker's wrangler.toml (the Pages project's production
-/// environment binds the same one).
-export async function productionStore(env, fetchImpl = fetch) {
+/// The relay worker's wrangler.toml, as wrangler deploys it for
+/// [deployment]: production's (the top level), or the previews'
+/// ([env.preview]).
+export async function relayWrangler(deployment = 'production') {
+  const toml = parseToml(await readFile(join(root, 'service/do/wrangler.toml'), 'utf8'));
+  return wranglerEnv(toml, deployment === 'production' ? null : deployment);
+}
+
+/// The store [deployment] keeps, OH_STORE, as its namespace is bound in
+/// its relay worker's wrangler.toml (the Pages project's environment of
+/// the same deployment binds the same one).
+async function storeOf(env, deployment, fetchImpl) {
   const [token, account] = need(env, 'CLOUDFLARE_API_TOKEN', 'CLOUDFLARE_ACCOUNT_ID');
-  const toml = await readFile(join(root, 'service/do/wrangler.toml'), 'utf8');
-  const namespace = /binding = "OH_STORE"\s*\nid = "([0-9a-f]+)"/.exec(toml)?.[1];
-  if (!namespace) throw new Failed('no OH_STORE namespace id in service/do/wrangler.toml');
+  const namespace = (await relayWrangler(deployment)).kv_namespaces?.find((k) => k.binding === 'OH_STORE')?.id;
+  if (!namespace) throw new Failed(`no OH_STORE namespace id for ${deployment} in service/do/wrangler.toml`);
   return restStore({ token, account, namespace, fetchImpl });
 }
+
+/// The production store, OH_STORE.
+export const productionStore = (env, fetchImpl = fetch) => storeOf(env, 'production', fetchImpl);
+
+/// The previews' store, which every preview and the preview relay read
+/// and write, and nothing of production's does.
+export const previewStore = (env, fetchImpl = fetch) => storeOf(env, 'preview', fetchImpl);
 
 /// The production bucket of kept games, OH_RECORDS, where a legal hold
 /// keeps its pictures too.
@@ -74,21 +90,22 @@ export function recordsBucket(env, fetchImpl = fetch) {
   return restBucket({ token, account, bucket: pages.environments.production.r2.OH_RECORDS, fetchImpl });
 }
 
-/// The relay worker's address, the custom domain its wrangler.toml
-/// routes to it.
-export async function relayOrigin() {
-  const toml = await readFile(join(root, 'service/do/wrangler.toml'), 'utf8');
-  const host = /routes = \[\{ pattern = "([^"]+)", custom_domain = true \}\]/.exec(toml)?.[1];
-  if (!host) throw new Failed('no custom domain in service/do/wrangler.toml routes');
-  return `https://${host}`;
+/// [deployment]'s relay worker's host, the custom domain its
+/// wrangler.toml routes to it.
+export async function relayHost(deployment = 'production') {
+  const host = (await relayWrangler(deployment)).routes?.find((r) => r.custom_domain)?.pattern;
+  if (!host) throw new Failed(`no custom domain for ${deployment} in service/do/wrangler.toml routes`);
+  return host;
 }
+
+/// The relay worker's address.
+export const relayOrigin = async () => `https://${await relayHost()}`;
 
 /// The bucket of the pictures subscribers set, OH_PICTURES, as the
 /// relay worker's wrangler.toml binds it.
 export async function picturesBucket(env, fetchImpl = fetch) {
   const [token, account] = need(env, 'CLOUDFLARE_API_TOKEN', 'CLOUDFLARE_ACCOUNT_ID');
-  const toml = await readFile(join(root, 'service/do/wrangler.toml'), 'utf8');
-  const bucket = /binding = "OH_PICTURES"\s*\nbucket_name = "([^"]+)"/.exec(toml)?.[1];
+  const bucket = (await relayWrangler()).r2_buckets?.find((b) => b.binding === 'OH_PICTURES')?.bucket_name;
   if (!bucket) throw new Failed('no OH_PICTURES bucket in service/do/wrangler.toml');
   return restObjects({ token, account, bucket, fetchImpl });
 }
@@ -160,6 +177,7 @@ export function context(overrides = {}) {
     log: (line) => console.log(line),
     warn: (line) => console.error(`oh: ${line}`),
     store: () => productionStore(env, fetchImpl),
+    previewStore: () => previewStore(env, fetchImpl),
     bucket: () => recordsBucket(env, fetchImpl),
     pictures: () => picturesBucket(env, fetchImpl),
     privateFiles: () => privateBucket(env, fetchImpl),

@@ -51,6 +51,7 @@ The definitions are `infra/cloudflare.mjs`, `infra/stripe.mjs` and `observabilit
    - **The relay worker differs from `service/do/wrangler.toml`.** Deploy the relay worker, as [Deploy the site, app and service](deploy.md) shows.
    - **A Pages secret is not set.** Run the `./oh secret set` command that the line gives. It asks for the value, which isn't shown, and sets it in every environment that `infra/cloudflare.mjs` lists it in.
    - **The relay's `OH_JUROR_SECRET` is not set.** Run `./oh secret set OH_JUROR_SECRET --apply` and paste 64 hex characters, such as the output of `openssl rand -hex 32`. The backup jurors derive their keys from it, so a new value gives them new keys.
+   - **A preview's own secret is not set, or the preview relay is not deployed.** Previews keep secrets of their own, never production's: the line gives `./oh preview secrets --apply`, or `./oh deploy relay --preview --apply` ([Play live on a preview](deploy.md#play-live-on-a-preview)).
    - **No Stripe webhook, or one on another API version.** See [Register the payment and sign-in webhooks](set-up-webhooks.md#register-the-stripe-webhook).
    - **A spend alert or an email forward that needs an address.** Set `OH_ALERT_EMAIL` or `OH_HELP_FORWARD`, and run the script again.
    - **A DNS record that a Cloudflare feature makes is missing**, such as Email Routing's. Turn that feature on again in the dashboard.
