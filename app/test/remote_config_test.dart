@@ -276,7 +276,7 @@ void main() {
     expect(find.text('Play live'), findsOneWidget, reason: 'what was bought stays bought');
   });
 
-  test('a change to the terms: a document the site has, a day, and what changed in English at least; two at most', () {
+  test('a change to the terms: a document the site has, a day and its revision, and what changed in English at least; two at most', () {
     final notice = LegalNotice.parse({
       'document': 'terms',
       'date': '2026-11-02',
@@ -285,10 +285,19 @@ void main() {
     expect(notice.id, 'terms@2026-11-02');
     expect(notice.summary.inLanguage('de'), 'Eine Erstattung beendet das Abo.');
     expect(notice.summary.inLanguage('fr'), 'Refunds end the subscription.');
+    final revised = LegalNotice.parse({
+      'document': 'terms',
+      'date': '2026-11-02',
+      'revision': 2,
+      'summary': {'en': 'Refunds end the subscription at once.'},
+    })!;
+    expect(revised.id, 'terms@2026-11-02.2', reason: 'the day\'s second version is news after the first was dismissed');
     for (final bad in [
       {'document': 'cookies', 'date': '2026-11-02', 'summary': {'en': 'x'}},
       {'document': 'terms', 'date': '2 November', 'summary': {'en': 'x'}},
       {'document': 'terms', 'date': '2026-11-02', 'summary': {'de': 'nur Deutsch'}},
+      {'document': 'terms', 'date': '2026-11-02', 'revision': 1, 'summary': {'en': 'x'}},
+      {'document': 'terms', 'date': '2026-11-02', 'revision': '2', 'summary': {'en': 'x'}},
       'terms',
     ]) {
       expect(LegalNotice.parse(bad), isNull, reason: '$bad');
@@ -335,6 +344,16 @@ void main() {
     expect(find.text('Our terms of use have changed.'), findsOneWidget);
     RemoteSettings.current.adopt(RemoteConfig.parse({
       'notices': [terms, {...privacy, 'date': '2026-12-01'}],
+    }));
+    await tester.pumpAndSettle();
+    expect(find.text('Our privacy policy has changed.'), findsOneWidget);
+
+    // A second version the day of one dismissed is news too.
+    await tester.tap(find.byTooltip('Close'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('changed.'), findsNothing);
+    RemoteSettings.current.adopt(RemoteConfig.parse({
+      'notices': [terms, {...privacy, 'date': '2026-12-01', 'revision': 2}],
     }));
     await tester.pumpAndSettle();
     expect(find.text('Our privacy policy has changed.'), findsOneWidget);

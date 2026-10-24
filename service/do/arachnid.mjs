@@ -1,7 +1,8 @@
 // Arachnid Shield, the Canadian Centre for Child Protection's free
 // service for finding known images of child sexual abuse
 // (https://projectarachnid.com/): whether a picture matches one, asked
-// once for each new picture as an account first sets it (known.mjs).
+// once for each new picture as an account first sets it, as PhotoDNA
+// is, or in its place (checkers.mjs, known.mjs).
 // Shield is never sent the picture: the relay decodes it (jpeg.mjs),
 // makes its PDQ hash (pdq.mjs), and asks Shield about the hash.
 

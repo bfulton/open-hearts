@@ -1,12 +1,14 @@
 // An account's pictures. A picture enters where the account sets it, as
 // its profile is saved (service/functions/profile.mjs, in the account's
-// turn), and is checked there before anyone is shown it: by Arachnid
-// Shield, against known images of child sexual abuse, through the one
-// object kept in the United States (known.mjs); and by a model that
-// hides one that shows nudity or sexual content, violence or gore, or a
-// hate symbol (review.mjs). A match is never kept, nor is a picture
-// Shield knows as a harmful or abusive image of a child: the profile is
-// saved without it, and the object acts on it. Anything else
+// turn), and is checked there before anyone is shown it: by the
+// checker in use, Arachnid Shield or PhotoDNA (checkers.mjs), against
+// known images of child sexual abuse, through the one object kept in
+// the United States (known.mjs); and by a model that hides one that
+// shows nudity or
+// sexual content, violence or gore, or a hate symbol (review.mjs). A
+// match is never kept, nor is a picture Shield knows as a harmful or
+// abusive image of a child: the profile is saved without it, and the
+// object acts on it. Anything else
 // is kept as the account's own copy of it, with all that is known of it
 // (service/functions/pictures.mjs, pictureKey), and said to be set last,
 // which makes it the account's picture now; the one before it says
@@ -23,7 +25,7 @@
 // runtime.
 
 import { alertKnownProblem } from '../functions/alerts.mjs';
-import { NOT_THEIRS_WHY, changePicture, copiesOf, currentOf, pictureDigest, pictureIn, pictureKey, settleCopies } from '../functions/pictures.mjs';
+import { NOT_THEIRS_WHY, changePicture, copiesOf, currentOf, knownFlags, pictureDigest, pictureIn, pictureKey, settleCopies } from '../functions/pictures.mjs';
 import { isAccount, storeOf } from '../functions/rows.mjs';
 import { knownAsker } from './known.mjs';
 import { checkOf, checkPicture, checkText, hiddenFor, hidePictures } from './review.mjs';
@@ -38,9 +40,10 @@ const COPY_HTTP = { contentType: 'image/jpeg', cacheControl: 'public, max-age=86
 /// relay worker runs it with [env]: the pictures bucket (OH_PICTURES),
 /// Workers AI (AI), [store] (the pictures withheld), and [ask], which
 /// asks the object about a picture ({jpeg, account, key, shown, at} ->
-/// 'clear', 'match', 'harmful', 'failed', 'unreadable' or 'off';
-/// knownAsker), or null while Shield has no credentials. Without the
-/// bucket, nothing is kept or checked, and the relay carries no picture.
+/// {said, knownBy, knownAt}, [said] 'clear', 'match', 'harmful',
+/// 'failed', 'unreadable' or 'off', and the receipt for it; knownAsker),
+/// or null while no checker has credentials. Without the bucket, nothing
+/// is kept or checked, and the relay carries no picture.
 export function accountPictures(env, { now = Date.now, log = (line) => console.log(line), ask = knownAsker(env), store = storeOf(env) } = {}) {
   const bucket = env.OH_PICTURES ?? null;
 
@@ -58,9 +61,9 @@ export function accountPictures(env, { now = Date.now, log = (line) => console.l
   return {
     /// [picture] (base64, or null for none) set as [account]'s by its
     /// device [key] (null for the operator's order): resolves the
-    /// picture the profile keeps, which is [picture], or null for one
-    /// Shield matched or knows as harmful, or one that could not be asked
-    /// about, being unreadable.
+    /// picture the profile keeps, which is [picture], or null for one a
+    /// checker matched or Shield knows as harmful, or one that could not
+    /// be asked about, being unreadable.
     async set({ account, key = null, picture }) {
       if (!bucket || !isAccount(account)) return picture;
       const theirs = await copiesOf(bucket, account);
@@ -75,21 +78,22 @@ export function accountPictures(env, { now = Date.now, log = (line) => console.l
       const mine = pictureKey(account, digest);
       const had = theirs.find((c) => c.digest === digest) ?? null;
       // Asked each time, which the object answers from what it holds
-      // once it has asked Shield; a picture set while Shield had no
-      // credentials, or did not answer, is asked about again by the daily
-      // run.
+      // once a checker has said; a picture set while no checker had
+      // credentials, or the checker did not answer, is asked about again
+      // by the daily run.
       // One the account had before was shown while it was.
-      let said = 'off';
+      let answer = { said: 'off' };
       if (ask) {
         try {
-          said = await ask({ jpeg: picture, account, key, ...(had ? { shown: true, at: had.at || null } : {}) });
+          answer = await ask({ jpeg: picture, account, key, ...(had ? { shown: true, at: had.at || null } : {}) });
         } catch (e) {
-          said = 'unreachable';
+          answer = { said: 'unreachable' };
           const error = `a picture was set unchecked, to be asked about again by the daily run: ${e?.message ?? e}`;
           log(error);
           await alertKnownProblem(env, store, { what: 'unreachable', error, now: now() });
         }
       }
+      const { said } = answer;
       if (said === 'match' || said === 'harmful' || said === 'unreadable') {
         // Never the account's, and nothing before it is, since the
         // profile has none: a copy of one kept before, the object
@@ -99,15 +103,15 @@ export function accountPictures(env, { now = Date.now, log = (line) => console.l
         return null;
       }
       // Set last, unless it is the account's picture now already, as
-      // first set, and with what Shield said once it has: never taken
-      // back.
+      // first set, and with what a checker said once one has, and its
+      // receipt: never taken back.
       const already = !!had && currentOf(theirs) === had;
       const kept = had
         ? await changePicture(bucket, mine, (m) => {
             const known = said === 'clear' && m.known !== 'clear';
             if (already && !known) return null;
             const { ended: _, ...rest } = m;
-            return { ...rest, ...(already ? {} : { last: at }), ...(known ? { known: 'clear' } : {}) };
+            return { ...rest, ...(already ? {} : { last: at }), ...(known ? knownFlags('clear', answer) : {}) };
           })
         : null;
       let hidden;
@@ -126,7 +130,7 @@ export function accountPictures(env, { now = Date.now, log = (line) => console.l
             check = 'failed';
           }
         }
-        await bucket.put(mine, bytesOf(picture), { httpMetadata: COPY_HTTP, customMetadata: { at, last: at, ...(check ? { check } : {}), known: said } });
+        await bucket.put(mine, bytesOf(picture), { httpMetadata: COPY_HTTP, customMetadata: { at, last: at, ...(check ? { check } : {}), ...knownFlags(said, answer) } });
       }
       // The one before says from now that it is no longer the account's;
       // its own copy as it was listed stays in the order, so that one

@@ -17,6 +17,7 @@ import 'package:table/table.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'activate_page.dart';
+import 'age_gate.dart';
 import 'entitlement.dart';
 import 'identity.dart';
 import 'l10n/l10n.dart';
@@ -84,6 +85,9 @@ class _SubscribePageState extends State<SubscribePage> {
     StoreShop.current.addListener(_changed);
     _lifecycle;
     unawaited(_load());
+    // A store that has not said what it sells is asked again here,
+    // where it is wanted.
+    unawaited(StoreShop.current.ask());
   }
 
   @override
@@ -175,11 +179,22 @@ class _SubscribePageState extends State<SubscribePage> {
     }
   }
 
-  /// The store's own sheet. What comes of it arrives through the shop:
-  /// a licence, which turns this page into a subscriber's, or a reason.
+  /// The store's own sheet, once the store lets this player play live,
+  /// which is all it sells (age_gate.dart). What comes of it arrives
+  /// through the shop: a licence, which turns this page into a
+  /// subscriber's, or a reason.
   Future<void> _buyInStore() async {
     setState(() => _refusal = null);
+    if (!await storeLetsPlayLive(context) || !mounted) return;
     await StoreShop.current.buy();
+  }
+
+  /// The phone's store asked again what it sells, and its sheet opened
+  /// once it says.
+  Future<void> _askStore() async {
+    setState(() => _refusal = null);
+    await StoreShop.current.ask();
+    if (mounted && StoreShop.current.ready) await _buyInStore();
   }
 
   Future<void> _restore() async {
@@ -458,6 +473,8 @@ class _SubscribePageState extends State<SubscribePage> {
     // A store build buys in its store, and a store's purchase is still
     // being made while the sheet is up or the service is being shown it.
     final inStore = shop.ready;
+    // A phone whose store has not said what it sells, or what it costs.
+    final unanswered = shop.store != null && !inStore;
     final waiting = _leaving || shop.busy;
     final refusal = _refusal ?? shop.refusal?.say(l10n);
     return Scaffold(
@@ -479,14 +496,16 @@ class _SubscribePageState extends State<SubscribePage> {
                 children: [
                   Text(l10n.subscription, style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w700, color: Palette.mark)),
                   const SizedBox(height: 6),
-                  Text(
-                    suspended
-                        ? l10n.accountSuspendedTitle
-                        : licence == null
-                        ? l10n.pricePerYear(priceShown)
-                        : l10n.openUntil(Licence.dayOf(licence.until)),
-                    style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: Palette.chrome, letterSpacing: 0.2),
-                  ),
+                  // No price until the store says its own.
+                  if (suspended || licence != null || !unanswered)
+                    Text(
+                      suspended
+                          ? l10n.accountSuspendedTitle
+                          : licence == null
+                          ? l10n.pricePerYear(priceShown)
+                          : l10n.openUntil(Licence.dayOf(licence.until)),
+                      style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: Palette.chrome, letterSpacing: 0.2),
+                    ),
                   const SizedBox(height: 22),
                   if (suspended)
                     Text(l10n.accountSuspended, style: const TextStyle(fontSize: 13.5, height: 1.5, color: Palette.chrome))
@@ -501,9 +520,9 @@ class _SubscribePageState extends State<SubscribePage> {
                     ),
                     const SizedBox(height: 26),
                     FilledButton(
-                      onPressed: waiting ? null : (inStore ? _buyInStore : _buy),
+                      onPressed: waiting || shop.asking ? null : (inStore ? _buyInStore : unanswered ? _askStore : _buy),
                       style: _gold(),
-                      child: waiting
+                      child: waiting || shop.asking
                           ? const SizedBox(
                               width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2.2, color: Felt.dark))
                           : Text(l10n.subscribe, style: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.w700)),
@@ -538,9 +557,14 @@ class _SubscribePageState extends State<SubscribePage> {
                     ] else ...[
                       // The same four on the web, where Stripe takes the
                       // payment: California's automatic renewal law asks
-                      // for them beside the button.
+                      // for them beside the button. Anywhere else, why
+                      // there is nothing to buy yet.
                       Text(
-                        canBuyHere ? l10n.webRenewal(priceShown) : l10n.storeSubscriptionLater,
+                        canBuyHere
+                            ? l10n.webRenewal(priceShown)
+                            : unanswered
+                            ? l10n.storeNotAnswered(shop.store!.kind.name)
+                            : l10n.buyingNotOpen,
                         textAlign: TextAlign.center,
                         style: const TextStyle(fontSize: 11.5, height: 1.45, color: Palette.chromeDim),
                       ),

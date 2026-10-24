@@ -89,7 +89,14 @@ class JurorDuty {
       return;
     }
     if (t == null) {
-      final lane = RelayTransport(relays: relays, signer: signer, table: s.spec.id, log: log, pinned: pinned);
+      // Each line of a table's client and its lane headed by the table,
+      // the first eight of its id, as the relay's own lines name it:
+      // one process serves several tables at once, and its log is read
+      // a table at a time (`oh table`, docs/how-to/look-into-a-lost-game.md).
+      final id = s.spec.id;
+      final said = log;
+      final here = said == null ? null : (String line) => said('${id.length > 8 ? id.substring(0, 8) : id} $line');
+      final lane = RelayTransport(relays: relays, signer: signer, table: id, log: here, pinned: pinned);
       final transport = dial?.call(s.spec, lane) ?? lane;
       if (s.spec.sealed && crypto == null) {
         log?.call('duty: summoned to a sealed table without the deal\'s cryptography; cannot serve');
@@ -101,7 +108,7 @@ class JurorDuty {
       }
       final client =
           TableClient(spec: s.spec, signer: signer, transport: transport, clock: clock, crypto: crypto, dealWorker: dealWorker);
-      client.log = log;
+      client.log = here;
       t = _tables[s.spec.id] = (client: client, transport: transport);
       client.changes.listen((_) {
         verdicts = _tables.values.fold(0, (n, t) => n + t.client.record.where((d) => d.verdict?.author == signer.publicKey).length);

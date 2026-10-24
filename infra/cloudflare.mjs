@@ -89,7 +89,12 @@ export const kv = ['open-hearts-store', 'open-hearts-store-preview'];
 /// is named by its account and its SHA-256, so nobody finds one without
 /// both the account and the picture, or the email. The records bucket
 /// also keeps what a legal hold keeps of an account's pictures
-/// (service/functions/holds.mjs), where no address serves it.
+/// (service/functions/holds.mjs), where no address serves it. The
+/// private bucket keeps what this repository must not: the PhotoDNA
+/// module Microsoft licenses to Open Hearts as confidential, which only
+/// the operator's tool reaches, to deploy the relay with it
+/// (ops/photodna.mjs).
+export const PRIVATE_BUCKET = 'open-hearts-private';
 export const r2 = [
   {
     name: 'open-hearts-pictures',
@@ -107,6 +112,13 @@ export const r2 = [
   },
   {
     name: 'open-hearts-records-preview',
+    location: 'ENAM',
+    storageClass: 'Standard',
+    publicDevUrl: false,
+    customDomains: [],
+  },
+  {
+    name: PRIVATE_BUCKET,
     location: 'ENAM',
     storageClass: 'Standard',
     publicDevUrl: false,
@@ -133,10 +145,11 @@ export const relay = {
   wrangler: 'service/do/wrangler.toml',
   secrets: ['OH_JUROR_SECRET'],
   /// Set once each is issued, and nothing is wrong until then: Arachnid
-  /// Shield's credentials turn on the check of each new picture against
-  /// known images of child sexual abuse, and NCMEC's the reports a match
-  /// files (service/do/known.mjs).
-  optionalSecrets: ['OH_ARACHNID_USERNAME', 'OH_ARACHNID_PASSWORD', 'OH_NCMEC_USERNAME', 'OH_NCMEC_PASSWORD'],
+  /// Shield's credentials and PhotoDNA's key each turn on a check of
+  /// each new picture against known images of child sexual abuse
+  /// (service/do/checkers.mjs), and NCMEC's credentials the reports a
+  /// match files (service/do/known.mjs).
+  optionalSecrets: ['OH_ARACHNID_USERNAME', 'OH_ARACHNID_PASSWORD', 'OH_PHOTODNA_KEY', 'OH_NCMEC_USERNAME', 'OH_NCMEC_PASSWORD'],
   /// workers.dev off: relay.openhearts.game is its only address.
   workersDev: false,
 };

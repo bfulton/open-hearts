@@ -564,19 +564,21 @@ class Lobby extends ChangeNotifier {
     final relays = _relays;
     final relay = RelayTransport(relays: relays, signer: signer, table: spec.id, log: _relayLog, pinned: pinnedRelays(relays));
     final peers = [for (final h in spec.seats) if (h is HumanSeat) h.key];
+    final mesh = MeshTransport(
+      relay: relay,
+      peers: peers,
+      iceServers: _iceServers ?? const [],
+      log: _debugging ? (l) => debugPrint('mesh: $l') : null,
+    );
     final ledger = _standing?.ledger ?? Ledger();
     final controller = LiveController(
       spec: spec,
       seatNames: seatNames,
       seatAvatars: seatAvatars,
       signer: signer,
-      transport: MeshTransport(
-        relay: relay,
-        peers: peers,
-        iceServers: _iceServers ?? const [],
-        log: _debugging ? (l) => debugPrint('mesh: $l') : null,
-      ),
+      transport: mesh,
       relay: relay,
+      lineHealth: () => mesh.health,
       // The players' reactions ride the table's own tag, beside its
       // events and outside them (packages/table, reactions.dart).
       reactions: relay,

@@ -284,4 +284,53 @@ void main() {
     }
     t.stop();
   }, timeout: const Timeout(Duration(minutes: 10)));
+
+  // A side that gives the hand up after the one whose place it is to
+  // propose the next jury has the proposal already, held for a hand it
+  // had not reached. It looks at it once it gives its own hand up, as
+  // it does when a hand finishes: the proposer says it again unchanged,
+  // and a proposal said again is the one already held, so nothing else
+  // would bring it back, and the two of them would wait on each other
+  // for good.
+  test('a jury proposed for the next hand before this side gave its hand up undealt is backed once it has', () {
+    final t = SimTable(humans: 2, seed: 9, crypto: crypto, jurors: jurySize + 4);
+    t.start();
+    // The proposer is the lowest key among the people.
+    final keys = [for (final c in t.clients) c.signer.publicKey]..sort();
+    final a = t.clients.firstWhere((c) => c.signer.publicKey == keys.first);
+    final b = t.clients.firstWhere((c) => c != a);
+    t.clock.runUntil(() => a.botHolders(a.game.handNumber).isNotEmpty, limitMs: 5 * 60 * 1000);
+    final hand = a.game.handNumber;
+    final held = a.botHolders(hand);
+    expect(a.game.phase, Phase.dealing);
+    t.net.goOffline(held[held.keys.first]!);
+    // The claims for the escrow, and the witnesses to them, kept from b
+    // until a has been at the next hand for five seconds — long enough
+    // for a's proposal of the next jury to reach b first.
+    final claims = <String>{};
+    int? until;
+    var proposedEarly = false;
+    t.net.steer = (from, to, message) {
+      final kind = message['kind'];
+      final body = message['body'] as Map<String, Object?>;
+      if (kind == 'jury' && to == b.signer.publicKey && b.game.handNumber == hand && (body['hand'] as int) > hand) {
+        proposedEarly = true;
+      }
+      if (kind == 'escrow') {
+        claims.add(message['id'] as String);
+      } else if (kind != 'witness' || !claims.contains(body['event'])) {
+        return null;
+      }
+      if (to != b.signer.publicKey || from == b.signer.publicKey) return null;
+      if (a.game.handNumber > hand) until ??= t.clock.nowMs + 5000;
+      return until == null || t.clock.nowMs < until! ? -1 : null;
+    };
+    expect(t.clock.runUntil(() => b.game.handNumber > hand, limitMs: 5 * 60 * 1000), isTrue, reason: b.describe());
+    expect(proposedEarly, isTrue, reason: 'the next jury reached b while it was still at the hand given up');
+    t.net.steer = null;
+    expect(t.clock.runUntil(() => b.game.phase == Phase.playing, limitMs: 5 * 60 * 1000), isTrue,
+        reason: 'the next hand dealt:\n${a.describe()}\n${b.describe()}');
+    expect(b.deferred, 0, reason: 'nothing left held');
+    t.stop();
+  }, timeout: const Timeout(Duration(minutes: 10)));
 }

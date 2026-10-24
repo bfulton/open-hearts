@@ -29,6 +29,7 @@ import 'package:table/table.dart';
 
 import '../avatar.dart';
 import '../l10n/l10n.dart';
+import '../net/report_error.dart';
 import '../pacing.dart';
 import '../pictures.dart';
 import '../reaction_mute.dart';
@@ -42,6 +43,7 @@ class LiveController extends ChangeNotifier implements TableModel {
     required Signer signer,
     required Transport transport,
     RelayTransport? relay,
+    String Function()? lineHealth,
     Clock? clock,
     Presence? presence,
     DealCrypto? crypto,
@@ -56,6 +58,7 @@ class LiveController extends ChangeNotifier implements TableModel {
     ValueListenable<bool>? reactionMute,
     int Function()? reactionClock,
   })  : _lane = reactions,
+        _lineHealth = lineHealth ?? (() => relay?.health ?? ''),
         _mute = reactionMute ?? ReactionMute.current,
         _reactionRules = ReactionRules(now: reactionClock),
         client = TableClient(
@@ -179,7 +182,45 @@ class LiveController extends ChangeNotifier implements TableModel {
     return since >= _cardBeat.inMilliseconds ? Duration.zero : Duration(milliseconds: _cardBeat.inMilliseconds - since);
   }
 
+  /// The transport's line in a few words, for a report of it: the
+  /// mesh's (net/mesh_transport.dart, health), or the relays'
+  /// ([RelayTransport.health]).
+  final String Function() _lineHealth;
+
+  /// Since when the line has been down, while it is; and what has been
+  /// told of it ([_watchLine]).
+  int? _cutOffSince;
+  bool _toldLost = false, _toldDown = false;
+
+  /// How long a line may be down at a live table before it is told of:
+  /// past anything a train's tunnel or a lift does, and well short of
+  /// the minutes a player waits before giving up.
+  static const downTooLongMs = 2 * 60 * 1000;
+
+  /// Tells the operator of a game this device lost — the line down or
+  /// the jury gone, which the account says — and of a line down for
+  /// [downTooLongMs] at a game it waits on: each once a table, and
+  /// with what the device saw of it (report_error.dart, reportLine).
+  void _watchLine() {
+    final failure = client.failure;
+    if (failure != null) {
+      if (_toldLost) return;
+      _toldLost = true;
+      return reportLine('game lost: ${failure.label}', table: client.spec.id, account: client.lineAccount, line: _lineHealth());
+    }
+    if (!client.cutOff) {
+      _cutOffSince = null;
+      return;
+    }
+    final now = client.clock.nowMs;
+    final since = _cutOffSince ??= now;
+    if (_toldDown || now - since < downTooLongMs) return;
+    _toldDown = true;
+    reportLine('line down ${(now - since) ~/ 1000} s', table: client.spec.id, account: client.lineAccount, line: _lineHealth());
+  }
+
   void _onChange() {
+    _watchLine();
     if (client.done && !_reported) {
       _reported = true;
       _report(GameResult.of(client.spec, client.holders, client.game.totals));

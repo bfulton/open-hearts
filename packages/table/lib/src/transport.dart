@@ -11,6 +11,21 @@ library;
 
 import 'signing.dart';
 
+/// How long a device may hear nothing at all, with something it sent
+/// waiting on an answer, before its transport takes itself for cut off
+/// ([Transport.cutOff]). Our relay answers everything it is sent, and a
+/// table's heartbeats go out every five seconds, so ten seconds of
+/// nothing is the line down — found inside the fifteen a juror is given
+/// to play a bot seat's move, and well inside the half minute a juror is
+/// given before a table stops counting it.
+const unansweredMs = 10000;
+
+/// How long an answer may take on a slow line: something sent waits
+/// this long before its going unanswered counts at all, so that a
+/// relay quiet only because there was nothing to say — every peer on a
+/// channel of its own — is not a line down the moment a word goes out.
+const answerMs = 3000;
+
 abstract class Transport {
   /// Sends [message] to every other peer at the table. [everywhere],
   /// by every path the transport has — over relays, to every relay
@@ -38,6 +53,16 @@ abstract class Transport {
 
   /// Peers whose connection the transport has seen close.
   Stream<PublicKey> get disconnected;
+
+  /// Whether this device is cut off itself: it has heard nothing at all
+  /// for [unansweredMs] while something it sent waits on an answer, or
+  /// has no way out.
+  /// What it does not hear then is its own line down, not the table
+  /// gone — a juror heard from by everyone else is not one to give up
+  /// on — and the client waits for its line rather than ending the
+  /// game for want of a jury it cannot hear (client.dart,
+  /// _judgeQuorum).
+  bool get cutOff;
 
   /// Who is at the table to be reached directly, as the protocol comes
   /// to know them: the seats at the start, and the hand's jurors as

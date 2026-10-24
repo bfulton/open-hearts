@@ -569,8 +569,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'This account is suspended from live play under the terms of use. Playing alone is still open to you. To ask why, or to appeal, email help@openhearts.game.';
 
   @override
-  String get storeSubscriptionLater =>
-      'On a phone this will be the store\'s own subscription. Until the app is in the stores, live play is bought on the web.';
+  String storeNotAnswered(String store) {
+    String _temp0 = intl.Intl.selectLogic(store, {
+      'google': 'Google Play hasn\'t said what live play costs yet. Check that you\'re online, then tap Subscribe to ask it again.',
+      'other': 'The App Store hasn\'t said what live play costs yet. Check that you\'re online, then tap Subscribe to ask it again.',
+    });
+    return '$_temp0';
+  }
 
   @override
   String get subscriptionIsYours =>
@@ -842,6 +847,39 @@ class AppLocalizationsEn extends AppLocalizations {
   String get liveAgree => 'Accept';
 
   @override
+  String get liveTooYoungTitle => 'Live play is for 13 and older';
+
+  @override
+  String liveTooYoung(String store) {
+    String _temp0 = intl.Intl.selectLogic(store, {
+      'google': 'Google Play says you\'re under 13.',
+      'other': 'Your Apple Account says you\'re under 13.',
+    });
+    return '$_temp0 Playing alone is open to everyone, as much as you like.';
+  }
+
+  @override
+  String get liveAwaitingParentTitle => 'Waiting for a parent';
+
+  @override
+  String get liveAwaitingParent =>
+      'Google Play is waiting for a parent or guardian to approve changes to Open Hearts. Live play opens once they do. You can play alone meanwhile.';
+
+  @override
+  String get liveParentDeclinedTitle => 'Not approved';
+
+  @override
+  String get liveParentDeclined =>
+      'A parent or guardian didn\'t approve changes to Open Hearts in Google Play, so live play is closed. You can still play alone.';
+
+  @override
+  String get liveAgeUnconfirmedTitle => 'Confirm your age';
+
+  @override
+  String get liveAgeUnconfirmed =>
+      'Google Play needs you to confirm your age before you can play live. You can do it in the Play Store app. You can play alone meanwhile.';
+
+  @override
   String get changedBoth => 'Our terms of use and privacy policy have changed.';
 
   @override
@@ -878,6 +916,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get waitingToReconnect => 'Waiting for the others to reconnect';
+
+  @override
+  String get connectionDown => 'Your connection is down — reconnecting';
 
   @override
   String get askingTheJury => 'Asking the jury';

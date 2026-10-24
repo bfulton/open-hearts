@@ -65,7 +65,7 @@ class Notice {
 /// front door, with a link to the document, until it is dismissed.
 @immutable
 class LegalNotice {
-  const LegalNotice({required this.document, required this.date, required this.summary});
+  const LegalNotice({required this.document, required this.date, this.revision, required this.summary});
 
   /// `terms` or `privacy`: the site's page it is about.
   final String document;
@@ -73,12 +73,17 @@ class LegalNotice {
   /// The day it was published, YYYY-MM-DD.
   final String date;
 
+  /// Which of its day's versions it is, from 2 for the second; null for
+  /// the day's first.
+  final int? revision;
+
   /// What changed, in each language the ledger has it in.
   final Saying summary;
 
   /// Which change this is, so one dismissed stays dismissed and the next
-  /// is news.
-  String get id => '$document@$date';
+  /// is news, a second the same day too: the ledger's name for the
+  /// version (site/ledger.mjs, versionOf).
+  String get id => revision == null ? '$document@$date' : '$document@$date.$revision';
 
   static final _day = RegExp(r'^\d{4}-\d{2}-\d{2}$');
 
@@ -86,9 +91,11 @@ class LegalNotice {
     if (json is! Map) return null;
     final document = json['document'];
     final date = json['date'];
+    final revision = json['revision'];
     final summary = Saying.parse(json['summary']);
     if ((document != 'terms' && document != 'privacy') || date is! String || !_day.hasMatch(date) || summary == null) return null;
-    return LegalNotice(document: document as String, date: date, summary: summary);
+    if (revision != null && (revision is! int || revision < 2)) return null;
+    return LegalNotice(document: document as String, date: date, revision: revision as int?, summary: summary);
   }
 }
 

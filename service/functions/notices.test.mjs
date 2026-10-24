@@ -10,7 +10,7 @@ import { test } from 'node:test';
 
 import worker from './worker.mjs';
 import { Household } from './household.mjs';
-import { APPLIES_AFTER_DAYS, NOTICES_OBJECT, NOTICES_PER_ORDER, applyingRenewal, carryOutNotice, languageOf, noticeMail, noticeRow, noticesOf, sendNotice } from './notices.mjs';
+import { APPLIES_AFTER_DAYS, NOTICES_OBJECT, NOTICES_PER_ORDER, applyingRenewal, carryOutNotice, languageOf, noticeMail, noticeRow, noticesOf, sendNotice, versionOf } from './notices.mjs';
 import { memoryStore } from './rows.mjs';
 import { orderRow } from './suspension.mjs';
 
@@ -32,6 +32,8 @@ test('the front door shows each document\'s newest change subscribers are told o
   assert.deepEqual(noticesOf(undefined, now), []);
   const priced = { ...LEDGER, terms: [...LEDGER.terms, { ...entry('2026-11-15', 'price'), price: { amount: 699, currency: 'usd' } }] };
   assert.equal(noticesOf(priced, now)[0].date, '2026-11-15', 'a new price is told too');
+  const revised = { ...LEDGER, terms: [...LEDGER.terms, { ...entry('2026-11-10', 'material', 'Refunds end it at once'), revision: 2 }] };
+  assert.deepEqual(noticesOf(revised, now), [{ document: 'terms', date: '2026-11-10', revision: 2, summary: summary('Refunds end it at once') }], "the day's second version, as itself");
 });
 
 test('the config route serves the notices of the ledger this deploy published', async () => {
@@ -128,8 +130,8 @@ function stripeWith(subs) {
   return fetchImpl;
 }
 
-const order = (subscriptions, more = {}) => ({ act: 'notice', changes: [{ document: 'terms', date: '2026-11-01', covers: [] }], subscriptions, at: new Date(now).toISOString(), ...more });
-const termsOf = [{ document: 'terms', date: '2026-11-01' }];
+const order = (subscriptions, more = {}) => ({ act: 'notice', changes: [{ document: 'terms', version: '2026-11-01', covers: [] }], subscriptions, at: new Date(now).toISOString(), ...more });
+const termsOf = [{ document: 'terms', version: '2026-11-01' }];
 const env = { OH_LEDGER: LEDGER, OH_STRIPE_SECRET: 'rk_live_x' };
 
 test('an order tells each subscription once; one with no address is noted, and one whose mail did not go is tried again', async () => {
@@ -185,7 +187,7 @@ test('one email tells a subscriber every change they were not told of; the earli
   };
   const both = {
     act: 'notice',
-    changes: [{ document: 'privacy', date: '2026-11-01', covers: ['2026-10-20'] }, { document: 'terms', date: '2026-11-01', covers: [] }],
+    changes: [{ document: 'privacy', version: '2026-11-01', covers: ['2026-10-20'] }, { document: 'terms', version: '2026-11-01', covers: [] }],
     subscriptions: ['sub_old', 'sub_half', 'sub_new', 'sub_none'],
     at: new Date(now).toISOString(),
   };
@@ -194,7 +196,7 @@ test('one email tells a subscriber every change they were not told of; the earli
   const said = await carryOutNotice(both, store, e, { fetchImpl: stripeWith(subs), send: async (m) => (sent.push(m), true), now });
   assert.deepEqual(said.body, {
     act: 'notice',
-    changes: [{ document: 'privacy', date: '2026-11-01' }, { document: 'terms', date: '2026-11-01' }],
+    changes: [{ document: 'privacy', version: '2026-11-01' }, { document: 'terms', version: '2026-11-01' }],
     told: 3,
     already: 0,
     unsent: { 'no address': 1 },
@@ -221,21 +223,52 @@ test('one email tells a subscriber every change they were not told of; the earli
   assert.equal(again.body.already, 4);
 });
 
+test("a day's second version is told as itself: to those told of the day's first, and saying it too", async () => {
+  const ledger = {
+    terms: [entry('2026-10-16', 'first')],
+    privacy: [entry('2026-10-13', 'first'), entry('2026-11-01', 'material', 'Pictures are checked'), { ...entry('2026-11-01', 'material', 'Pictures are checked, and by whom'), revision: 2 }],
+  };
+  assert.deepEqual(ledger.privacy.map(versionOf), ['2026-10-13', '2026-11-01', '2026-11-01.2']);
+  const store = memoryStore();
+  await store.put(...noticeRow('privacy', '2026-11-01', 'sub_first'), { at: '2026-11-01T10:00:00.000Z', lang: 'en' });
+  const subs = { sub_first: { customer: { email: 'a@example.com' } }, sub_new: { customer: { email: 'b@example.com' } } };
+  const revised = {
+    act: 'notice',
+    changes: [{ document: 'privacy', version: '2026-11-01.2', covers: ['2026-11-01'] }],
+    subscriptions: ['sub_first', 'sub_new'],
+    at: new Date(now).toISOString(),
+  };
+  const e = { OH_LEDGER: ledger, OH_STRIPE_SECRET: 'rk_live_x' };
+  const sent = [];
+  const said = await carryOutNotice(revised, store, e, { fetchImpl: stripeWith(subs), send: async (m) => (sent.push(m), true), now });
+  assert.deepEqual(said.body, { act: 'notice', changes: [{ document: 'privacy', version: '2026-11-01.2' }], told: 2, already: 0, unsent: {}, failed: 0 }, 'one told of the first is told of the second');
+  assert.ok(sent.every((m) => /^We have changed the Open Hearts privacy policy, on 2026-11-01\.\n\nPrivacy policy: Pictures are checked, and by whom\./.test(m.text)));
+  const at = new Date(now).toISOString();
+  assert.deepEqual(await store.get(...noticeRow('privacy', '2026-11-01.2', 'sub_first')), { at, lang: 'en' });
+  assert.deepEqual(await store.get(...noticeRow('privacy', '2026-11-01', 'sub_first')), { at: '2026-11-01T10:00:00.000Z', lang: 'en' }, 'told of the first when it was');
+  assert.deepEqual(await store.get(...noticeRow('privacy', '2026-11-01', 'sub_new')), { at, lang: 'en', by: '2026-11-01.2' });
+
+  const refused = async (changes) => (await carryOutNotice({ ...revised, changes }, memoryStore(), e, { fetchImpl: stripeWith(subs), send: async () => assert.fail('nothing is sent'), now })).status;
+  assert.equal(await refused([{ document: 'privacy', version: '2026-11-01', covers: ['2026-11-01.2'] }]), 400, 'the first covering the second, which comes after it');
+  assert.equal(await refused([{ document: 'privacy', version: '2026-11-01.3' }]), 400, 'no such version');
+  assert.equal(await refused([{ document: 'privacy', date: '2026-11-01.2' }]), 400, 'a version is named as one');
+});
+
 test('an order for a change nobody is told of, run out, or naming anything but a few web subscriptions, is refused', async () => {
   const store = memoryStore();
   const fetchImpl = stripeWith({});
   const send = async () => assert.fail('nothing is sent');
   const refused = async (o, e = env) => (await carryOutNotice(o, store, e, { fetchImpl, send, now })).status;
   const changes = (...c) => ({ changes: c });
-  assert.equal(await refused(order(['sub_1'], changes({ document: 'terms', date: '2026-11-10' }))), 400, 'a minor change');
-  assert.equal(await refused(order(['sub_1'], changes({ document: 'terms', date: '2026-10-16' }))), 400, 'the first entry');
-  assert.equal(await refused(order(['sub_1'], changes({ document: 'cookies', date: '2026-11-01' }))), 400);
+  assert.equal(await refused(order(['sub_1'], changes({ document: 'terms', version: '2026-11-10' }))), 400, 'a minor change');
+  assert.equal(await refused(order(['sub_1'], changes({ document: 'terms', version: '2026-10-16' }))), 400, 'the first entry');
+  assert.equal(await refused(order(['sub_1'], changes({ document: 'cookies', version: '2026-11-01' }))), 400);
   assert.equal(await refused(order(['sub_1'], changes())), 400, 'no change');
   assert.equal(await refused(order(['sub_1'], { changes: undefined })), 400);
-  assert.equal(await refused(order(['sub_1'], changes({ document: 'terms', date: '2026-11-01' }, { document: 'terms', date: '2026-11-01' }))), 400, 'a document twice');
-  assert.equal(await refused(order(['sub_1'], changes({ document: 'terms', date: '2026-11-01', covers: ['2026-11-10'] }))), 400, 'covering a minor change');
-  assert.equal(await refused(order(['sub_1'], changes({ document: 'terms', date: '2026-11-01', covers: ['2026-11-01'] }))), 400, 'covering itself');
-  assert.equal(await refused(order(['sub_1'], changes({ document: 'terms', date: '2026-11-01', covers: '2026-11-01' }))), 400);
+  assert.equal(await refused(order(['sub_1'], changes({ document: 'terms', version: '2026-11-01' }, { document: 'terms', version: '2026-11-01' }))), 400, 'a document twice');
+  assert.equal(await refused(order(['sub_1'], changes({ document: 'terms', version: '2026-11-01', covers: ['2026-11-10'] }))), 400, 'covering a minor change');
+  assert.equal(await refused(order(['sub_1'], changes({ document: 'terms', version: '2026-11-01', covers: ['2026-11-01'] }))), 400, 'covering itself');
+  assert.equal(await refused(order(['sub_1'], changes({ document: 'terms', version: '2026-11-01', covers: '2026-11-01' }))), 400);
   assert.equal(await refused(order(['sub_1'], { at: new Date(now - 11 * 60000).toISOString() })), 410);
   assert.equal(await refused(order([])), 400);
   assert.equal(await refused(order(['apple:1000'])), 400, 'a store\'s subscription has no address of ours');

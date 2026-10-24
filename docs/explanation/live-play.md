@@ -38,6 +38,32 @@ before anyone can publish anything; subscribing is agreeing too, but a
 device brought into an account with a code or a sign-in never saw the
 subscribe screen.
 
+On a phone, before either of those, the app asks the phone's store
+whether the player may play live (`app/lib/net/age_check.dart`, through
+the `age_range_signals` plugin), and asks again before the store's
+purchase sheet opens, since live play is all it sells. The terms let
+anyone play alone and anyone 13 or older play live. Where a law has
+the stores keep everyone's age, Texas's among them, the store tells
+the app the age range it holds, and the app is to go by it. It asks
+for the one line it draws, 13: the App Store's Declared Age Range then
+shares only whether the player is under it, and Google Play answers in
+its own bands. Live play closes, with a note saying why and that
+playing alone is open (`app/lib/age_gate.dart`), when:
+
+- the whole of the store's range is under 13;
+- Google Play is waiting for a parent or guardian to approve the app's
+  latest significant change, or one declined it;
+- Google Play needs the player to confirm their age first, which it
+  asks only where a law has it keep everyone's age.
+
+The answer is used for that and nothing else: it is not kept, on the
+device or anywhere, and never sent. Where the store has nothing to say
+(the web, an iPhone before iOS 26, a phone the store keeps no age for, a
+player who chose not to share it, a store that did not answer), the
+terms decide, as they always have. Apple gives an app no answer for a
+parent's approval withdrawn: the App Store stops the app opening at
+all.
+
 ### Matchmaking
 
 There is no matchmaker (`packages/table/lib/src/matching.dart`).
@@ -291,6 +317,35 @@ how it learns of departures it never received. Catching up is budgeted:
 
 A removed seat still sending is carried only to the turn that removed
 it.
+
+### A device cut off from the table
+
+A device can stop hearing the table while the table goes on hearing
+it: a satellite link on a plane, say, whose way in stalls while its
+way out still carries. To the device, everyone has gone quiet; to
+everyone else, it is still there. Alone at a table of bots, it hears
+most of the table whatever happens, since there is nobody else to
+count, so silence alone cannot tell it which side is gone.
+
+Our relay answers everything it is sent, so the device asks its own
+line. When it has heard nothing at all for `unansweredMs` (ten
+seconds) while something it sent has waited longer than an answer
+takes, it takes itself for cut off (`Transport.cutOff`), makes its
+socket afresh, and says "Your connection is down — reconnecting"
+under the felt. While it is cut off, and for the time it was, nobody
+is silent on its word: a juror's half minute, a bot seat's turn, and
+a person's silence before a lost quorum are counted from no earlier
+than the line's return. So it neither gives a seat up to the escrow
+for a move it could not hear, nor ends the game for a jury that was
+playing on all along. Once the line is back, the table carries it
+forward as it would anyone behind, and a jury really gone is found
+out then, a half minute and `quorumLostMs` on.
+
+The `botActsMs` and `jurorSilenceMs` clocks are kept above ten seconds
+for this ([configuration](../reference/configuration.md#table-clocks)).
+A device that loses a game, or whose line is down for two minutes,
+tells the operator what it saw
+([look into a lost game](../how-to/look-into-a-lost-game.md)).
 
 ## Clocks
 
@@ -555,7 +610,8 @@ says "Connection failure" over "Juror quorum lost" and offers the way home
 A side ends the game only while it hears most of the table, or after
 everyone it cannot hear has been silent for `silenceMs`, so a device
 that has lost its own connection does not blame the jury: the rest
-remove it for silence. Ending costs the innocent players their game,
+remove it for silence. Nor while it is cut off itself
+([a device cut off from the table](#a-device-cut-off-from-the-table)). Ending costs the innocent players their game,
 but lets nobody choose which hand to keep. The most a losing player
 gains is an unrated game, and only if the jurors holding the pieces,
 strangers drawn at random, leave together.

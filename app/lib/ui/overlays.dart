@@ -11,6 +11,7 @@ import 'package:table/table.dart' show Rating;
 import '../avatar.dart';
 import '../l10n/l10n.dart';
 import '../theme.dart';
+import 'confetti.dart';
 import 'player_icon.dart';
 
 class HandOverSheet extends StatelessWidget {
@@ -170,6 +171,8 @@ class GameOverSheet extends StatelessWidget {
     return _Sheet(
       title: title,
       tone: youWon ? Palette.chrome : Palette.danger,
+      // A game won, alone or shared.
+      celebrate: youWon,
       subtitle: l10n.lowestScoreAfter(game.handNumber + 1),
       rows: [
         for (var seat = 0; seat < seatCount; seat++)
@@ -206,6 +209,10 @@ class GameOverSheet extends StatelessWidget {
 
 typedef _Row = ({String name, String iconName, String seed, Avatar? avatar, int delta, int total, bool you, Color? mark});
 
+/// The confetti of a game won, behind the sheet and in front of it.
+const confettiBehind = ValueKey('confetti behind');
+const confettiInFront = ValueKey('confetti in front');
+
 class _Sheet extends StatelessWidget {
   const _Sheet({
     required this.title,
@@ -216,10 +223,15 @@ class _Sheet extends StatelessWidget {
     this.subtitle,
     this.note,
     this.quiet = const [],
+    this.celebrate = false,
   });
 
   final String title;
   final String? subtitle;
+
+  /// A game the player won: confetti falls as the sheet comes in, some
+  /// behind the sheet and some in front of it (confetti.dart).
+  final bool celebrate;
 
   /// What the sheet is *about*, which is never an action: white for a
   /// hand that ended or a game you won, red for one that went against
@@ -249,9 +261,15 @@ class _Sheet extends StatelessWidget {
       curve: Curves.easeOutCubic,
       builder: (context, t, child) => Container(
         color: Colors.black.withValues(alpha: 0.62 * t),
-        child: Opacity(
-          opacity: t,
-          child: Transform.scale(scale: 0.96 + 0.04 * t, child: child),
+        child: Stack(
+          children: [
+            if (celebrate) const Positioned.fill(child: Confetti(key: confettiBehind, seed: 1, pieces: 70)),
+            Opacity(
+              opacity: t,
+              child: Transform.scale(scale: 0.96 + 0.04 * t, child: child),
+            ),
+            if (celebrate) const Positioned.fill(child: Confetti(key: confettiInFront, seed: 2, pieces: 50)),
+          ],
         ),
       ),
       child: Center(

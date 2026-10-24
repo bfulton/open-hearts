@@ -38,6 +38,16 @@ void main() {
       }
     });
 
+    // A device whose way in has stalled knows it only once it has heard
+    // nothing for unansweredMs (transport.dart); a juror judged by it
+    // before then would be judged on a move it could not hear
+    // (cut_off_test.dart). The standard gives every juror's clock longer.
+    test('the standard gives a juror longer than a device takes to find its own line down', () {
+      const s = TableTiming.standard;
+      expect(s.botActsMs, greaterThan(unansweredMs));
+      expect(s.jurorSilenceMs, greaterThan(unansweredMs));
+    });
+
     test('the fields said are taken, the rest are the standard', () {
       final t = TableTiming.parse({'graceMs': 3000, 'botActsMs': 8000, 'later': 'a later build\'s'});
       expect(t.bank.graceMs, 3000);

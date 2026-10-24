@@ -24,6 +24,23 @@ abstract final class Pacing {
   /// unseen, and the score it is about unexplained.
   static const sweepBeat = Duration(milliseconds: 1200);
 
+  /// A card coming down onto its place in the trick, and the player's
+  /// own leaving the hand for it (ui/table_view.dart, ui/hand_fan.dart).
+  static const cardLands = Duration(milliseconds: 240);
+
+  /// A finished trick swept off to whoever took it (ui/table_view.dart).
+  static const trickSweeps = Duration(milliseconds: 300);
+
+  /// A moon's quake, from the moment the last trick reaches whoever
+  /// shot it (ui/table_view.dart): over within the beat of bare felt
+  /// after a hand, [sweepBeat], so the sheet comes down on a still table.
+  static const moonQuake = Duration(milliseconds: 900);
+
+  /// A seat's glow as the cards of a trick with points reach it: pink,
+  /// and the queen's red half a second longer (ui/table_view.dart).
+  static const pointsGlow = Duration(milliseconds: 900);
+  static const queenGlow = Duration(milliseconds: 1400);
+
   /// How long [persona]'s bot appears to think: a draw from its rhythm.
   static Duration think(Persona persona, Random rhythm) {
     final pace = persona.pace;

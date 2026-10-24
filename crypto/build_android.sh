@@ -45,16 +45,32 @@ TARGETS=(
   "armv7-linux-androideabi armeabi-v7a armv7a-linux-androideabi"
   "x86_64-linux-android x86_64 x86_64-linux-android"
 )
+# Google Play takes a 64-bit library only if every segment of it is
+# aligned to 16 KB, so that it loads on a device with 16 KB pages. NDK
+# r28 and later link so anyway; the flag makes an older NDK do it too,
+# and each library is read back to be sure.
+PAGE=16384
 for t in "${TARGETS[@]}"; do
   read -r target abi clang <<<"$t"
   upper=$(echo "$target" | tr 'a-z-' 'A-Z_')
   export "CARGO_TARGET_${upper}_LINKER=$BIN/${clang}${API}-clang"
   export "CC_${target//-/_}=$BIN/${clang}${API}-clang"
   export "AR_${target//-/_}=$BIN/llvm-ar"
+  case $abi in
+    arm64-v8a | x86_64) wide=1; export "CARGO_TARGET_${upper}_RUSTFLAGS=-C link-arg=-Wl,-z,max-page-size=$PAGE" ;;
+    *) wide= ;;
+  esac
   mkdir -p "$OUT/$abi"
   for crate in deal schnorr; do
     (cd "$crate" && cargo build --release --locked --target "$target")
-    "$BIN/llvm-strip" --strip-unneeded -o "$OUT/$abi/lib$crate.so" "$crate/target/$target/release/lib$crate.so"
+    lib="$OUT/$abi/lib$crate.so"
+    "$BIN/llvm-strip" --strip-unneeded -o "$lib" "$crate/target/$target/release/lib$crate.so"
+    [[ -n $wide ]] || continue
+    aligns=$("$BIN/llvm-readelf" -lW "$lib" | awk '$1 == "LOAD" { print $NF }')
+    [[ -n $aligns ]] || { echo "build_android: no segments read from $lib" >&2; exit 1; }
+    for align in $aligns; do
+      (( align >= PAGE )) || { echo "build_android: $lib has a segment aligned to $align bytes, and Google Play takes a 64-bit library only aligned to $PAGE" >&2; exit 1; }
+    done
   done
 done
 ls -la "$OUT"/*/

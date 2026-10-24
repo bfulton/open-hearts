@@ -5,13 +5,14 @@
 // production is in gate.mjs, which deploy.sh and the relay's build step
 // run themselves, so that deploying without oh is held to it too.
 
-import { readFile } from 'node:fs/promises';
+import { readFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import { Failed, Usage, root, wranglerVersion } from './env.mjs';
 import { releaseProblems } from './gate.mjs';
+import { MODULE_ALIAS, MODULE_DIR, fetchModule, pinsOf } from './photodna.mjs';
 import { termsProblems, untold } from './terms.mjs';
-import { told } from '../site/ledger.mjs';
+import { told, versionOf } from '../site/ledger.mjs';
 import { stripe as stripeDefinition } from '../infra/stripe.mjs';
 import { checkoutFields } from '../service/functions/stripe.mjs';
 
@@ -47,12 +48,25 @@ export async function relay(ctx, { flags }) {
   const gone = await missing(ctx, RELAY_NEEDS);
   for (const g of gone) ctx.log(`  not ready: needs ${g}`);
   const ready = (await cleared(ctx, 'relay', flags.apply)) && !gone.length;
+  const pinned = pinsOf(await ctx.config());
+  ctx.log(pinned ? `  with the PhotoDNA module config/openhearts.json pins, from the private bucket (${Object.keys(pinned).length} files)` : '  without a PhotoDNA module: config/openhearts.json pins none, so the relay asks PhotoDNA nothing');
   if (!flags.apply) {
     ctx.log(ready ? 'nothing deployed; --apply deploys it' : 'nothing deployed');
     return;
   }
   if (gone.length) throw new Failed(`relay: needs ${gone.join(', ')}`);
-  const code = await ctx.run('npx', ['--yes', `wrangler@${version}`, 'deploy'], { cwd: join(root, 'service/do') });
+  // Fetched now, into the folder git ignores, built in the stand-in's
+  // place (service/do/photodna_off.mjs), and on this computer only
+  // while it is built.
+  const dir = ctx.moduleDir ?? MODULE_DIR;
+  await rm(dir, { recursive: true, force: true });
+  let code;
+  try {
+    const withModule = (await fetchModule(ctx, dir)) !== null;
+    code = await ctx.run('npx', ['--yes', `wrangler@${version}`, 'deploy', ...(withModule ? ['--alias', MODULE_ALIAS] : [])], { cwd: join(root, 'service/do') });
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
   if (code !== 0) throw new Failed(`relay: wrangler deploy exited ${code}`);
 }
 
@@ -61,7 +75,7 @@ export async function site(ctx, { flags }) {
   ctx.log(`the site, the app and the service's handlers from ${await head(ctx)}, to ${label === 'main' ? 'production' : `the preview ${label}`}`);
   const publishing = label === 'main' ? (await termsProblems(ctx)).publishing : [];
   for (const { document, entry } of publishing) {
-    ctx.log(`  publishes the ${document} of ${entry.date}, a ${entry.change} change${told(entry) ? ': every device is shown it, and no one is emailed it until you say (./oh terms notify --apply)' : ''}`);
+    ctx.log(`  publishes the ${document} of ${versionOf(entry)}, a ${entry.change} change${told(entry) ? ': every device is shown it, and no one is emailed it until you say (./oh terms notify --apply)' : ''}`);
     if (entry.change === 'price') ctx.log(`  then make Stripe's price match the terms (./oh infra --only stripe --apply): until it does, the shop does not sell`);
   }
   const ready = label !== 'main' || (await cleared(ctx, 'site', flags.apply));
@@ -179,7 +193,7 @@ export async function verify(ctx) {
   else {
     try {
       for (const { document, entry, subscriptions, left } of await untold(ctx)) {
-        check(!left.length, `the ${document} of ${entry.date}: ${subscriptions.length - left.length} of ${subscriptions.length} web subscription(s) told${left.length ? ' (./oh terms notify --apply)' : ''}`);
+        check(!left.length, `the ${document} of ${versionOf(entry)}: ${subscriptions.length - left.length} of ${subscriptions.length} web subscription(s) told${left.length ? ' (./oh terms notify --apply)' : ''}`);
       }
     } catch (e) {
       check(false, `the notices of changes to the terms: ${e?.message ?? e}`);

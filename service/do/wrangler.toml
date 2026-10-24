@@ -14,6 +14,12 @@ compatibility_date = "2025-01-01"
 # Where the apps find it (app/lib/net/relays.dart, ourRelay).
 routes = [{ pattern = "relay.openhearts.game", custom_domain = true }]
 
+# The PhotoDNA module, which is not in the repository: this stand-in
+# here, and Microsoft's licensed module only as the relay is deployed
+# (photodna_off.mjs; `oh deploy relay` passes --alias in its place).
+[alias]
+"open-hearts-photodna" = "./photodna_off.mjs"
+
 # The backup jurors' image is built from the repo on every
 # deploy (service/bench/build.sh): the juror compiled from the table
 # code as it is now, never a stage left over from an earlier deploy, so
@@ -92,12 +98,14 @@ tag = "v3"
 new_sqlite_classes = ["Bench"]
 
 # Where each new picture is checked against known images of child
-# sexual abuse by Arachnid Shield before it is carried, and a match
-# acted on: withheld, its accounts held and terminated, and reported to
-# NCMEC (known.mjs). One object, made in the "us" jurisdiction, under
-# the US law that has a match reported. Off until the secrets
-# OH_ARACHNID_USERNAME and OH_ARACHNID_PASSWORD are set; reports are
-# filed once OH_NCMEC_USERNAME and OH_NCMEC_PASSWORD are too.
+# sexual abuse, by Arachnid Shield, PhotoDNA or both, before it is
+# carried, and a match acted on: withheld, its accounts held and
+# terminated, and reported to NCMEC (known.mjs, checkers.mjs). One
+# object, made in the "us" jurisdiction, under the US law that has a
+# match reported. Shield is on once the secrets OH_ARACHNID_USERNAME
+# and OH_ARACHNID_PASSWORD are set, and PhotoDNA once OH_PHOTODNA_KEY
+# is and the relay is deployed with its module; reports are filed once
+# OH_NCMEC_USERNAME and OH_NCMEC_PASSWORD are set too.
 [[durable_objects.bindings]]
 name = "KNOWN"
 class_name = "KnownPictures"

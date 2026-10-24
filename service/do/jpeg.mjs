@@ -1,10 +1,11 @@
-// A picture's pixels, for its PDQ hash (arachnid.mjs, pdq.mjs): the
-// JPEG an account set, decoded by jpeg-js (vendor/jpeg-js), as plain RGB.
+// A picture's pixels, for its PDQ hash (arachnid.mjs, pdq.mjs) and its
+// PhotoDNA Edge Hashes (photodna.mjs): the JPEG an account set, decoded
+// by jpeg-js (vendor/jpeg-js), as plain RGB.
 
 import decode from './vendor/jpeg-js/decoder.js';
 
-/// A picture that cannot be decoded: nothing can be asked of Arachnid
-/// Shield about it, so it is never shown (known.mjs).
+/// A picture that cannot be decoded, or hashed: nothing can be asked
+/// about it, so it is never shown (known.mjs).
 export class Unreadable extends Error {}
 
 /// The most a picture may have to be decoded, in millions of pixels:

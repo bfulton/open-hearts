@@ -15,7 +15,7 @@ import { join } from 'node:path';
 
 import { Failed, Usage, root } from './env.mjs';
 import { dayIn, languages, origin, render, stores, strings } from '../site/build.mjs';
-import { DOCUMENTS, fingerprintOf, fingerprintOfTexts, formatLedger, ledgerProblems, rewritten, textOf, told } from '../site/ledger.mjs';
+import { DOCUMENTS, fingerprintOf, fingerprintOfTexts, formatLedger, ledgerProblems, rewritten, textOf, told, versionOf } from '../site/ledger.mjs';
 import { NOTICE_DAYS, NOTICES_PER_ORDER, noticeMail } from '../service/functions/notices.mjs';
 import { dayOf } from '../service/functions/rows.mjs';
 import { placeOrder } from '../service/tool/suspend.mjs';
@@ -50,7 +50,8 @@ const UPDATED = /<p class="updated">([\s\S]*?)<\/p>/;
 /// serves, in every language, fingerprinted, and of the entries with
 /// that text, the one whose day the page says it was last updated: an
 /// entry may repeat the text of the one before it, to publish that text
-/// on a later day. {document: {index, entry} or {error}}.
+/// on a later day, and no two versions of a day say the same
+/// (ledgerProblems). {document: {index, entry} or {error}}.
 export async function liveVersions(ctx, ledger) {
   const english = languages.find((l) => l.code === 'en');
   const words = strings('en');
@@ -115,7 +116,7 @@ export async function termsProblems(ctx, { now = ctx.now() } = {}) {
       problems.push(`the ${doc} would go live today (${today}) saying they were last updated ${date}: date their newest entry today (./oh terms record ${doc} --date ${today})`);
     }
     for (const e of newer.filter(told)) {
-      if (listed() && !e.storesNotified) problems.push(`the ${doc} of ${e.date} are a ${e.change} change: tell the App Store and Google Play first, and record the day (./oh terms notified ${doc})`);
+      if (listed() && !e.storesNotified) problems.push(`the ${doc} of ${versionOf(e)} are a ${e.change} change: tell the App Store and Google Play first, and record the day (./oh terms notified ${doc})`);
     }
     publishing.push(...newer.map((entry) => ({ document: doc, entry })));
   }
@@ -123,7 +124,7 @@ export async function termsProblems(ctx, { now = ctx.now() } = {}) {
 }
 
 /// [entry] in a few words.
-const said = (doc, e) => `${doc} ${e.date} (${e.change}${told(e) ? `; stores ${e.storesNotified ? `told ${e.storesNotified}` : 'not told'}` : ''})`;
+const said = (doc, e) => `${doc} ${versionOf(e)} (${e.change}${told(e) ? `; stores ${e.storesNotified ? `told ${e.storesNotified}` : 'not told'}` : ''})`;
 
 export async function status(ctx) {
   const ledger = await readLedger(ctx);
@@ -139,10 +140,10 @@ export async function status(ctx) {
       ctx.log(`  live: unknown; ${live[doc].error}`);
       continue;
     }
-    ctx.log(`  live: ${live[doc].entry.date}`);
+    ctx.log(`  live: ${versionOf(live[doc].entry)}`);
     for (const e of ledger[doc].slice(live[doc].index + 1)) ctx.log(`  to publish: ${said(doc, e)}`);
     for (const e of ledger[doc].slice(0, live[doc].index + 1).filter(told)) {
-      const sent = store ? `${(await store.under(`NOTICE#${doc}@${e.date}`, 'SUB#')).length} web subscription(s) told` : 'notices sent: unknown without CLOUDFLARE_API_TOKEN';
+      const sent = store ? `${(await store.under(`NOTICE#${doc}@${versionOf(e)}`, 'SUB#')).length} web subscription(s) told` : 'notices sent: unknown without CLOUDFLARE_API_TOKEN';
       ctx.log(`  published: ${said(doc, e)}; ${sent}`);
     }
   }
@@ -150,7 +151,8 @@ export async function status(ctx) {
 
 /// The ledger's entry for a change to [document] that this checkout
 /// makes: added, or, while this branch's own newest entry is not on main
-/// yet, that entry brought up to date.
+/// yet, that entry brought up to date. One dated the day of the entry
+/// before it is that day's next revision.
 export async function record(ctx, { args, flags }) {
   const doc = documentOf(args.document);
   const ledger = await readLedger(ctx);
@@ -167,10 +169,12 @@ export async function record(ctx, { args, flags }) {
   if (fingerprint === newest.fingerprint && !flags.change && !flags.date) return ctx.log(`the ${doc} are as their newest entry (${newest.date}) says: nothing to record`);
   if (!change) throw new Usage('say what kind of change this is: --change minor (no one\'s rights or duties change), material, or price');
   const before = own ? entries.at(-2) : newest;
-  if (!(date > before.date)) throw new Failed(`the entry would be dated ${date}, not after the one before it (${before.date}): --date`);
+  if (date < before.date) throw new Failed(`the entry would be dated ${date}, before the one it follows (${versionOf(before)}): --date`);
+  const revision = date === before.date ? (before.revision ?? 1) + 1 : null;
   const price = doc === 'terms' ? (await ctx.config()).price : undefined;
   const entry = {
     date,
+    ...(revision ? { revision } : {}),
     fingerprint,
     change,
     ...(price ? { price } : {}),
@@ -178,7 +182,7 @@ export async function record(ctx, { args, flags }) {
     summary: own ? newest.summary : Object.fromEntries(languages.map((l) => [l.code, ''])),
   };
   const next = { ...ledger, [doc]: [...(own ? entries.slice(0, -1) : entries), entry] };
-  ctx.log(`${own ? 'would bring up to date' : 'would add'} the ${doc === 'terms' ? "terms'" : "privacy policy's"} entry of ${date}: ${change}, ${fingerprint.slice(0, 12)}…${price ? `, ${price.amount} ${price.currency}` : ''}`);
+  ctx.log(`${own ? 'would bring up to date' : 'would add'} the ${doc === 'terms' ? "terms'" : "privacy policy's"} entry of ${versionOf(entry)}${revision ? ` (the day's revision ${revision})` : ''}: ${change}, ${fingerprint.slice(0, 12)}…${price ? `, ${price.amount} ${price.currency}` : ''}`);
   const problems = ledgerProblems(next).filter((p) => !/ no summary in /.test(p));
   for (const p of problems) ctx.warn(p);
   if (!flags.apply) return ctx.log('nothing changed; --apply writes it');
@@ -193,15 +197,16 @@ export async function record(ctx, { args, flags }) {
 export async function notified(ctx, { args, flags }) {
   const doc = documentOf(args.document);
   const ledger = await readLedger(ctx);
-  const entry = ledger[doc].filter(told).at(-1);
+  const index = ledger[doc].findLastIndex(told);
+  const entry = ledger[doc][index];
   if (!entry) throw new Failed(`the ${doc} have no material or price change to have told the stores of`);
-  if (entry.storesNotified) return ctx.log(`the stores were told of the ${doc} of ${entry.date} on ${entry.storesNotified} already`);
+  if (entry.storesNotified) return ctx.log(`the stores were told of the ${doc} of ${versionOf(entry)} on ${entry.storesNotified} already`);
   const day = flags.on ?? dayOf(ctx.now());
   if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || day > dayOf(ctx.now())) throw new Usage('--on is the day they were told, YYYY-MM-DD, not later than today');
   const next = structuredClone(ledger);
-  next[doc].find((e) => e.date === entry.date).storesNotified = day;
+  next[doc][index].storesNotified = day;
   if (rewritten(ledger, next).length) throw new Failed('that would rewrite the ledger');
-  ctx.log(`would record that the App Store and Google Play were told of the ${doc} of ${entry.date} on ${day}`);
+  ctx.log(`would record that the App Store and Google Play were told of the ${doc} of ${versionOf(entry)} on ${day}`);
   if (!flags.apply) return ctx.log('nothing changed; --apply writes it');
   await writeFile(ledgerFile(ctx), formatLedger(next));
   ctx.log('written to site/ledger.json');
@@ -247,15 +252,15 @@ export async function untold(ctx, ledger = null) {
   const stripe = ctx.stripe();
   for (const d of due) {
     d.subscriptions = await subscribersBefore(stripe, d.entry.date);
-    const done = new Set((await store.under(`NOTICE#${d.document}@${d.entry.date}`, 'SUB#')).map((sk) => sk.slice('SUB#'.length)));
+    const done = new Set((await store.under(`NOTICE#${d.document}@${versionOf(d.entry)}`, 'SUB#')).map((sk) => sk.slice('SUB#'.length)));
     d.left = d.subscriptions.filter((id) => !done.has(id));
   }
   return due;
 }
 
-/// [due] in a few words: "the terms of 2026-10-23 (material), saying
+/// [due] in a few words: "the terms of 2026-10-23.2 (material), saying
 /// what changed on 2026-10-19 too".
-const changeSaid = ({ document, entry, covers }) => `the ${document} of ${entry.date} (${entry.change})${covers.length ? `, saying what changed on ${covers.map((e) => e.date).join(' and ')} too` : ''}`;
+const changeSaid = ({ document, entry, covers }) => `the ${document} of ${versionOf(entry)} (${entry.change})${covers.length ? `, saying what changed on ${covers.map(versionOf).join(' and ')} too` : ''}`;
 
 /// Every web subscriber told, by one email, of each published change
 /// that matters to them in the last [NOTICE_DAYS] days that they were
@@ -278,7 +283,7 @@ export async function notify(ctx, { flags }) {
   }
   const groups = new Map();
   for (const [id, changes] of owed) {
-    const key = changes.map((c) => `${c.document}@${c.entry.date}`).join(' ');
+    const key = changes.map((c) => `${c.document}@${versionOf(c.entry)}`).join(' ');
     groups.set(key, { changes, subscriptions: [...(groups.get(key)?.subscriptions ?? []), id] });
   }
   if (!flags.apply) {
@@ -292,7 +297,7 @@ export async function notify(ctx, { flags }) {
   const config = await ctx.config();
   let failed = 0;
   for (const { changes, subscriptions } of groups.values()) {
-    const named = changes.map((c) => ({ document: c.document, date: c.entry.date, covers: c.covers.map((e) => e.date) }));
+    const named = changes.map((c) => ({ document: c.document, version: versionOf(c.entry), covers: c.covers.map(versionOf) }));
     for (let i = 0; i < subscriptions.length; i += NOTICES_PER_ORDER) {
       const batch = subscriptions.slice(i, i + NOTICES_PER_ORDER);
       const answer = await placeOrder(store, { act: 'notice', changes: named, subscriptions: batch, at: new Date(ctx.now()).toISOString() }, { origin: config.appOrigin, fetchImpl: ctx.fetch, ...(ctx.carryOptions ?? {}) });

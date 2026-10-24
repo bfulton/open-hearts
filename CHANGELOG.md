@@ -10,6 +10,31 @@ squashed from a pull request, the pull request's number.
 
 ### Added
 
+- `oh table <id>`: what the backup jurors, the relay and the player's
+  device each said of one live table, in one timeline. The relay now
+  logs each socket's coming and going, and the backup jurors' object
+  what it did with them, by the table's first eight characters and
+  nothing about anybody; a device on the web tells New Relic of a game
+  it lost, or a line down for two minutes, with what it saw.
+  (2026-10-24, #37)
+- On a phone, live play, and buying it in the store, ask the App Store
+  or Google Play first whether the player may play live: closed, with
+  a note saying why and that playing alone is open, for a player the
+  store says is under 13, a supervised player whose parent has not
+  approved the app's latest changes in Google Play, or one Google Play
+  needs to confirm their age. The answer is not kept or sent; the
+  privacy policy says so. (2026-10-23, #37)
+- A game the player won rains confetti in red, white and pink as its
+  sheet comes in, some of it behind the sheet and some in front: once,
+  and not where the device asks for less motion. (2026-10-23, #37)
+- A moon, whoever shoots it, quakes the felt as the last trick reaches
+  the shooter: the table jolts away from their badge and settles, and
+  rings run out from it. It is over before the sheet comes down, and
+  there is none where the device asks for less motion. (2026-10-23,
+  #37)
+- A trick with points in it lights the taker's badge as it reaches
+  them: pink, and red half a second longer for the queen. (2026-10-23,
+  #37)
 - `robots.txt`, on openhearts.game and play.openhearts.game, names
   Project Arachnid's crawler, which Arachnid Shield checks before it
   takes Open Hearts on. Every other crawler is let in, as before.
@@ -73,6 +98,27 @@ squashed from a pull request, the pull request's number.
   a picture too featureless to match is not asked about, and one that
   can't be decoded is refused as a match is. The privacy policy names
   the Canadian Centre for Child Protection. (2026-10-22, #34)
+- Microsoft's PhotoDNA can stand in for Arachnid Shield as the checker
+  of known images, with one command and no deploy: `./oh config set
+  known`, the run-time row `config|known`. Shield stays in use unless
+  the row names PhotoDNA. PhotoDNA is sent only a picture's PhotoDNA
+  Edge Hashes, made with the module Microsoft licenses to Open Hearts,
+  which is kept in a new private bucket, pinned in
+  `config/openhearts.json`, and fetched only to deploy the relay (`oh
+  photodna put`, `oh photodna get`); `check.sh` fails on anything of it
+  committed. What either checker said of a picture stands whichever is
+  in use, so a switch asks about nothing again. The privacy policy says
+  that PhotoDNA may stand in for Project Arachnid, in every language.
+  (2026-10-23, #37)
+- Each account's copy of a picture keeps the receipt for what was said
+  of it against known images, which checker said it and when, and so
+  does each match's case. The daily email of new pictures says it of
+  each picture, or that a picture isn't checked yet. (2026-10-23, #37)
+- The terms or the privacy policy can change twice in a day: a ledger
+  entry dated the day of the one before is that day's next revision,
+  named `2026-10-23.2` by `oh terms` and in the record of who was told.
+  Subscribers are told of it as a change of its own, and the app shows
+  it again where the day's first was dismissed. (2026-10-23, #37)
 - Every new picture is emailed to the operator once a day, account by
   account, with the commands to take it down. The daily run does only
   what each copy says is still to do: it keeps what is kept for as long
@@ -145,6 +191,15 @@ squashed from a pull request, the pull request's number.
 
 ### Changed
 
+- Playing alone, the Auto switch plays the rest of the hand as fast as
+  its cards land: the bots stop thinking, a trick goes as soon as its
+  last card has landed, and the score sheet follows the last trick's
+  sweep, or after a moon, its quake. Turned on while a bot thinks, the
+  bot plays at once.
+  (2026-10-23, #37)
+- `crypto/build_android.sh` links the 64-bit libraries 16 KB-aligned
+  with any NDK, and refuses one that isn't, since Google Play takes no
+  other. (2026-10-23, #37)
 - A change to the terms of use or the privacy policy is one line at the
   front door, "Our terms of use and privacy policy have changed", with
   **What changed** beside it for each document's summary and one tap to
@@ -241,6 +296,34 @@ squashed from a pull request, the pull request's number.
 
 ### Fixed
 
+- A live game no longer ends for a device's own line going down. A
+  satellite link on a plane let one player's heartbeats out and nothing
+  in: alone at a table of bots, the device took the jurors it could not
+  hear for gone, gave a bot seat up for a move it never saw, and ended
+  the game as "juror quorum lost" while the jurors played on. Now a
+  device that hears nothing back from the relay for ten seconds takes
+  itself for cut off, makes its socket afresh, says "Your connection is
+  down — reconnecting", and judges nobody silent for the time it could
+  not hear. (2026-10-24, #37)
+- A jury proposed for the next hand before a side gave its own hand up
+  undealt is now backed once it has; the table could wait on it for
+  good. (2026-10-24, #37)
+- On a phone whose store hasn't said what live play costs, opened
+  offline say, the subscription page asks the store again when it opens
+  and on Subscribe, shows no price until the store gives its own, and no
+  longer says that live play is bought on the web. Before, the store was
+  asked once, at launch. (2026-10-23, #37)
+- `./oh secret set` sets the relay's optional secrets, Arachnid Shield's,
+  PhotoDNA's and NCMEC's credentials, on the relay worker. It refused
+  them before, though the abuse-material guide said to use it.
+  (2026-10-23, #37)
+- A picture Arachnid Shield knew as harmful that the operator then
+  reports is acted on as a match for each account that set it: held,
+  terminated and reported. Before, each account's harmful case stood in
+  the way, and nothing more was done. (2026-10-23, #37)
+- A match found because the operator reported the picture before is
+  emailed and reported to NCMEC as that, not as Arachnid Shield's.
+  (2026-10-23, #37)
 - The app's German words in Dart are what `app_de.arb` says. Every
   build rewrote them, which left the checkout changed, and a deploy
   refuses a changed checkout. CI now fails when the words in Dart are

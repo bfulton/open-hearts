@@ -226,3 +226,24 @@ test('the relay tells its host of an event it took, and not of one it refused', 
   assert.equal(heard.length, 1);
   assert.equal(callIn(heard[0]), 'tbl1');
 });
+
+test('what it does with the backup jurors is said, a table by the first eight of its id', async () => {
+  const c = container();
+  const s = state(c);
+  const lines = [];
+  const bench = new Bench(s, { OH_JUROR_SECRET: 'ab'.repeat(32) }, { log: (line) => lines.push(line) });
+  const table = '83167bb6681da6f1b6f4ab8931028fbb';
+  await wake(bench, table);
+  assert.deepEqual(
+    lines.map((l) => l.bench),
+    ['start', 'woken'],
+  );
+  assert.equal(lines[0].table, 'table:83167bb6');
+  assert.equal(lines[1].status, 200);
+  assert.ok(lines[1].waitedMs >= 0);
+  c.bench.online = false;
+  await bench.alarm();
+  assert.deepEqual(lines.slice(2), [{ bench: 'look', online: false, serving: 0 }, { bench: 'stop', why: 'quiet' }]);
+  assert.ok(!JSON.stringify(lines).includes(table), 'not the whole of the id');
+  assert.ok(!JSON.stringify(lines).includes('ab'.repeat(32)), 'nor the secret');
+});

@@ -87,8 +87,10 @@ changes hands travels the way the table is laid out
 
 Arrivals decelerate, departures accelerate, and moves within the screen
 ease both in and out (Flutter's `Easing`). Each movement is a fraction
-of a second, a pass a little longer than a play; the durations are in
-`app/lib/ui/hand_fan.dart` and `app/lib/ui/table_view.dart`. Animations
+of a second, a pass a little longer than a play; a card's landing and a
+trick's sweep are `Pacing.cardLands` and `Pacing.trickSweeps`
+(`app/lib/pacing.dart`), and the rest are in `app/lib/ui/hand_fan.dart`
+and `app/lib/ui/table_view.dart`. Animations
 that a tap triggers begin one frame in, so the first drawn frame is never
 a frame of nothing. With `MediaQuery.disableAnimations` the table is
 identical, just with nothing in flight.
@@ -97,7 +99,37 @@ At the end of a hand the last trick is named and swept, there is a beat
 of bare felt, and then the score sheet comes down. At a live table the
 next hand is already being dealt underneath. The beat is a step of the
 screen's walk through the record, not a separate timer, so incoming
-events cannot cut it short.
+events cannot cut it short. Alone, with the Auto switch on, nobody waits
+on anybody: each card comes as the one before it lands, a trick goes as
+its last card lands, and the sheet follows the sweep. After a moon the
+beat is kept, switch or not, for the quake below.
+
+A trick with points in it lights up the badge of whoever took it as the
+sweep reaches them: pink, the colour of points taken, and red, the
+game's own, half a second longer when the queen is in it
+(`app/lib/ui/table_view.dart`). The glow is drawn round the badge and
+never across it, so what the badge says reads as always. A trick the
+table never showed, because the screen caught up past it, lights
+nothing.
+
+Shooting the moon is taking every heart and the queen in one hand: all
+26 points, which the rule turns round, so that everyone else takes 26
+and the shooter none. Whoever shoots it, the felt quakes as the last
+trick reaches them. The table jolts away from the shooter's badge and
+settles, and rings run out from that badge under everything on the
+felt. It is over within the beat of bare felt (`Pacing.moonQuake`
+within `Pacing.sweepBeat`), so the sheet comes down on a still table,
+and a moon already over when the screen opens does not quake again.
+
+A game the player won rains confetti in red, white and pink as its
+sheet comes in, once, for under three seconds
+(`app/lib/ui/confetti.dart`). Some of it falls behind the sheet and
+some in front of it, so it falls through the table rather than on a
+pane over it. A game shared at the top counts as won.
+
+None of these can be touched or heard: taps go through them, and screen
+readers never meet them. With `MediaQuery.disableAnimations` there is no
+quake and no confetti, and a glow comes at once, as nothing is swept.
 
 The heart on the front door folds and opens, then holds still for a
 while (`app/lib/ui/folding_heart.dart`). It requests no frames between

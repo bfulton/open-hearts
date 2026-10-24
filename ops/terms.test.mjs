@@ -81,7 +81,7 @@ function context({ ledger, old = true, oldPrivacy = false, subs = [], answer = n
         const order = await store.get(`ORDER#${id}`, 'META');
         orders.push(order);
         for (const s of order.subscriptions) {
-          for (const c of order.changes) for (const date of [c.date, ...c.covers]) await store.put(`NOTICE#${c.document}@${date}`, `SUB#${s}`, { at: 'now' });
+          for (const c of order.changes) for (const version of [c.version, ...c.covers]) await store.put(`NOTICE#${c.document}@${version}`, `SUB#${s}`, { at: 'now' });
         }
         return Response.json(answer ?? { act: 'notice', told: order.subscriptions.length, already: 0, unsent: {}, failed: 0 });
       }
@@ -228,13 +228,41 @@ test('record: says what is missing, and never dates an entry before the one it f
   ledger.terms[1].fingerprint = 'c'.repeat(64);
   const ctx = context({ ledger, mainLedger: ledger });
   assert.equal(await main(['terms', 'record', 'terms'], ctx), 2, 'no kind of change');
-  assert.equal(await main(['terms', 'record', 'terms', '--change', 'material'], ctx), 1, 'the same day as the one before');
-  assert.match(ctx.said.join('\n'), /not after the one before it \(2026-11-02\): --date/);
+  assert.equal(await main(['terms', 'record', 'terms', '--change', 'material', '--date', '2026-11-01'], ctx), 1, 'the day before the one before');
+  assert.match(ctx.said.join('\n'), /the entry would be dated 2026-11-01, before the one it follows \(2026-11-02\): --date/);
   assert.equal(await main(['terms', 'record', 'terms', '--change', 'big'], ctx), 2);
   assert.equal(await main(['terms', 'record', 'cookies', '--change', 'minor'], ctx), 2);
   const same = context({ ledger: ledgerWith(), mainLedger: ledgerWith() });
   assert.equal(await main(['terms', 'record', 'privacy'], same), 0);
   assert.match(same.said.join('\n'), /the privacy are as their newest entry \(2026-10-13\) says: nothing to record/);
+});
+
+test("record: a second version the same day is the day's next revision, on main's entry or on this branch's own", async () => {
+  const before = ledgerWith({ change: 'minor' });
+  before.terms[1].fingerprint = 'c'.repeat(64);
+  const ctx = context({ ledger: before, mainLedger: before });
+  assert.equal(await main(['terms', 'record', 'terms', '--change', 'material'], ctx), 0);
+  assert.match(ctx.said.join('\n'), /would add the terms' entry of 2026-11-02\.2 \(the day's revision 2\): material/);
+  assert.equal(await main(['terms', 'record', 'terms', '--change', 'material', '--apply'], ctx), 0);
+  const written = JSON.parse(readFileSync(ctx.file, 'utf8'));
+  assert.deepEqual(written.terms.slice(0, 2), before.terms, 'the day\'s first kept as main has it');
+  assert.deepEqual(written.terms[2], { date: '2026-11-02', revision: 2, fingerprint: fingerprintOf('terms'), change: 'material', price, storesNotified: null, summary: Object.fromEntries(languages.map((l) => [l.code, ''])) });
+
+  // This branch's own entry, of a later day, dated again to the day of
+  // main's newest: brought up to date as that day's revision.
+  const later = structuredClone(before);
+  later.terms.push({ date: '2026-11-03', fingerprint: fingerprintOf('terms'), change: 'material', price, storesNotified: null, summary: summary('Refunds end the subscription') });
+  const own = context({ ledger: later, mainLedger: before });
+  assert.equal(await main(['terms', 'record', 'terms', '--date', '2026-11-02', '--apply'], own), 0);
+  const kept = JSON.parse(readFileSync(own.file, 'utf8'));
+  assert.equal(kept.terms.length, 3);
+  assert.deepEqual([kept.terms[2].date, kept.terms[2].revision, kept.terms[2].change], ['2026-11-02', 2, 'material']);
+  assert.deepEqual(kept.terms[2].summary, summary('Refunds end the subscription'), 'what was written of it kept');
+
+  // And the day's next after that one is on main.
+  const third = context({ ledger: { ...written, terms: [...written.terms.slice(0, 2), { ...written.terms[2], fingerprint: 'd'.repeat(64) }] }, mainLedger: written });
+  assert.equal(await main(['terms', 'record', 'terms', '--change', 'minor'], third), 0);
+  assert.match(third.said.join('\n'), /would add the terms' entry of 2026-11-02\.3 \(the day's revision 3\): minor/);
 });
 
 test('notified: the stores\' day on the newest material change, once, and never a day to come', async () => {
@@ -244,6 +272,13 @@ test('notified: the stores\' day on the newest material change, once, and never 
   assert.equal(await main(['terms', 'notified', 'terms', '--on', '2026-11-02', '--apply'], context({ ledger: JSON.parse(readFileSync(ctx.file, 'utf8')) })), 0);
   assert.equal(await main(['terms', 'notified', 'terms', '--on', '2026-11-03', '--apply'], context({ ledger: ledgerWith() })), 2, 'not yet');
   assert.equal(await main(['terms', 'notified', 'privacy', '--apply'], context({ ledger: ledgerWith() })), 1, 'nothing material to tell of');
+  const revised = ledgerWith();
+  revised.terms[1].fingerprint = 'c'.repeat(64);
+  revised.terms.push({ ...revised.terms[1], revision: 2, fingerprint: fingerprintOf('terms') });
+  const day = context({ ledger: revised });
+  assert.equal(await main(['terms', 'notified', 'terms', '--on', '2026-11-01', '--apply'], day), 0);
+  assert.match(day.said.join('\n'), /told of the terms of 2026-11-02\.2 on 2026-11-01/);
+  assert.deepEqual(JSON.parse(readFileSync(day.file, 'utf8')).terms.map((e) => e.storesNotified), [null, null, '2026-11-01'], "on the day's newest version, not its first");
 });
 
 /// Stripe's subscriptions: [id, status, start (days before the change)].
@@ -272,7 +307,7 @@ test('notify: each subscription begun before a published change is told once, a 
   assert.ok(named.includes('sub_trial') && named.includes('sub_late'));
   assert.deepEqual(Object.keys(ctx.orders[0]).sort(), ['act', 'at', 'changes', 'subscriptions']);
   assert.equal(ctx.orders[0].act, 'notice');
-  assert.deepEqual(ctx.orders[0].changes, [{ document: 'terms', date: '2026-11-02', covers: [] }]);
+  assert.deepEqual(ctx.orders[0].changes, [{ document: 'terms', version: '2026-11-02', covers: [] }]);
 
   const twice = context({ ledger: ledgerWith(), old: false, subs, store });
   assert.equal(await main(['terms', 'notify', '--apply'], twice), 0);
@@ -301,17 +336,57 @@ test('notify: one email to each subscriber, of every change they are owed, each 
   assert.match(said, /the email to 1 of them, as it reads in English .*\n\nSubject: Changes to the Open Hearts privacy policy\n/, 'told of the terms already');
 
   assert.equal(await main(['terms', 'notify', '--apply'], ctx), 0);
-  const privacy = { document: 'privacy', date: '2026-11-02', covers: ['2026-10-20'] };
+  const privacy = { document: 'privacy', version: '2026-11-02', covers: ['2026-10-20'] };
   assert.deepEqual(
     ctx.orders.map((o) => [o.changes, o.subscriptions]),
     [
-      [[{ document: 'terms', date: '2026-11-02', covers: [] }, privacy], ['sub_a', 'sub_b']],
+      [[{ document: 'terms', version: '2026-11-02', covers: [] }, privacy], ['sub_a', 'sub_b']],
       [[privacy], ['sub_t']],
     ],
   );
   const twice = context({ ledger, old: false, subs, store });
   assert.equal(await main(['terms', 'notify', '--apply'], twice), 0);
   assert.deepEqual(twice.orders, [], 'run again, nobody is told twice');
+});
+
+test("notify: a day's later version is told to everyone, those told of the day's first too, saying what the earlier ones did", async () => {
+  const ledger = ledgerWith({ change: 'minor' });
+  ledger.privacy = [
+    { date: '2026-10-13', fingerprint: fingerprintServed('privacy', true), change: 'first', storesNotified: null, summary: summary('Where it begins') },
+    { date: '2026-11-02', fingerprint: 'c'.repeat(64), change: 'material', storesNotified: null, summary: summary('Pictures are checked') },
+    { date: '2026-11-02', revision: 2, fingerprint: 'd'.repeat(64), change: 'material', storesNotified: null, summary: summary('Pictures are checked, and kept') },
+    { date: '2026-11-02', revision: 3, fingerprint: fingerprintOf('privacy'), change: 'material', storesNotified: null, summary: summary('Pictures are checked, and by whom') },
+  ];
+  const store = memoryStore();
+  await store.put('NOTICE#privacy@2026-11-02', 'SUB#sub_first', { at: 'before' });
+  const subs = subscriptions(['sub_first', 'active', 30], ['sub_new', 'active', 30]);
+  const ctx = context({ ledger, old: false, subs, store });
+  assert.equal(await main(['terms', 'notify'], ctx), 0);
+  const said = ctx.said.join('\n');
+  assert.match(said, /the privacy of 2026-11-02\.3 \(material\), saying what changed on 2026-11-02 and 2026-11-02\.2 too: 2 web subscription\(s\) to tell, 0 told already/);
+  assert.match(said, /the email to 2 of them, as it reads in English .*\n\nSubject: Changes to the Open Hearts privacy policy\n\nWe have changed the Open Hearts privacy policy, on 2026-11-02\.\n\nPrivacy policy: Pictures are checked, and by whom \(en\)\./);
+  assert.equal(await main(['terms', 'notify', '--apply'], ctx), 0);
+  assert.deepEqual(ctx.orders.map((o) => [o.changes, o.subscriptions]), [[[{ document: 'privacy', version: '2026-11-02.3', covers: ['2026-11-02', '2026-11-02.2'] }], ['sub_first', 'sub_new']]]);
+  const twice = context({ ledger, old: false, subs, store });
+  assert.equal(await main(['terms', 'notify', '--apply'], twice), 0);
+  assert.deepEqual(twice.orders, [], 'run again, nobody is told twice');
+});
+
+test("status: each version as it stands, and how many were told of each, a day's second apart from its first", async () => {
+  const ledger = ledgerWith({ change: 'minor' });
+  ledger.privacy = [
+    { date: '2026-10-13', fingerprint: fingerprintServed('privacy', true), change: 'first', storesNotified: null, summary: summary('Where it begins') },
+    { date: '2026-11-02', fingerprint: 'c'.repeat(64), change: 'material', storesNotified: null, summary: summary('Pictures are checked') },
+    { date: '2026-11-02', revision: 2, fingerprint: fingerprintOf('privacy'), change: 'material', storesNotified: null, summary: summary('Pictures are checked, and by whom') },
+  ];
+  const store = memoryStore();
+  for (const s of ['sub_1', 'sub_2']) await store.put('NOTICE#privacy@2026-11-02', `SUB#${s}`, { at: 'before' });
+  await store.put('NOTICE#privacy@2026-11-02.2', 'SUB#sub_1', { at: 'now' });
+  const ctx = context({ ledger, old: false, store });
+  assert.equal(await main(['terms', 'status'], ctx), 0);
+  const said = ctx.said.join('\n');
+  assert.match(said, /privacy\n  newest entry: privacy 2026-11-02\.2 \(material; stores not told\)\n  this checkout: as the newest entry says\n  live: 2026-11-02\.2\n/);
+  assert.match(said, /  published: privacy 2026-11-02 \(material; stores not told\); 2 web subscription\(s\) told\n  published: privacy 2026-11-02\.2 \(material; stores not told\); 1 web subscription\(s\) told/);
 });
 
 test('notify: nothing published to tell of is no failure; a notice that did not go is', async () => {

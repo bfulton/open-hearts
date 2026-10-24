@@ -17,6 +17,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:open_hearts/entitlement.dart';
 import 'package:open_hearts/identity.dart';
+import 'package:open_hearts/net/age_check.dart';
 import 'package:open_hearts/net/buying.dart';
 import 'package:open_hearts/net/household.dart' show askService;
 import 'package:open_hearts/net/licence.dart';
@@ -26,6 +27,7 @@ import 'package:open_hearts/theme.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:table/table.dart';
 
+import 'age_check_test.dart' show StoreSays;
 import 'household_test.dart' show Stand, signedFor, standUp;
 
 const _service = 'dff1d77f2a671c5f36183726db2341be58feae1da2deced843240f7b502ba659';
@@ -38,11 +40,14 @@ class FakeStore implements PhoneStore {
   @override
   final StoreKind kind;
 
-  /// Whether it takes payments here.
-  final bool open;
+  /// Whether it takes payments here: not while offline, say.
+  bool open;
 
   /// The product's price, or null for a store with no such product.
-  final String? price;
+  String? price;
+
+  /// How many times it was asked what it sells.
+  int asked = 0;
 
   final _purchases = StreamController<List<StorePurchase>>.broadcast();
 
@@ -63,8 +68,10 @@ class FakeStore implements PhoneStore {
   Future<bool> available() async => open;
 
   @override
-  Future<StoreProduct?> product(String id) async =>
-      price == null || id != kind.product ? null : StoreProduct(id: id, price: price!);
+  Future<StoreProduct?> product(String id) async {
+    asked++;
+    return price == null || id != kind.product ? null : StoreProduct(id: id, price: price!);
+  }
 
   @override
   Stream<List<StorePurchase>> get purchases => _purchases.stream;
@@ -332,6 +339,28 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets("the store's sheet opens only where the store lets the player play live, which is all it sells", (tester) async {
+    standUp();
+    final store = FakeStore();
+    await shopWith(store);
+    final age = StoreSays(AgeVerdict.tooYoung);
+    await _pumpPage(tester);
+    await tester.tap(find.text('Subscribe'));
+    await tester.pumpAndSettle();
+    expect(find.text('Live play is for 13 and older'), findsOneWidget);
+    await tester.tap(find.text('OK'));
+    await tester.pumpAndSettle();
+    expect(store.bought, isEmpty, reason: 'nothing sold that cannot be played');
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+    expect(find.text('Subscribe'), findsOneWidget);
+
+    age.verdict = AgeVerdict.open;
+    await tester.tap(find.text('Subscribe'));
+    await tester.pump();
+    expect(store.bought, hasLength(1));
+    expect(age.asked, 2);
+  });
+
   testWidgets('a sheet that does not open, or is closed, leaves the page as it was', (tester) async {
     standUp();
     final store = FakeStore()..sheetOpens = false;
@@ -424,20 +453,69 @@ void main() {
     expect(find.text('Terms of use'), findsOneWidget, reason: 'what the suspension is under, a tap away');
   });
 
-  testWidgets('with no store, or a store without the product, the page is the web\'s', (tester) async {
+  testWidgets("a phone whose store has not said what it sells shows no price and no web, and asks the store again", (tester) async {
+    standUp();
+    final offline = FakeStore(open: false);
+    final shop = await shopWith(offline);
+    expect(canBuyHere, isFalse);
+    expect(offline.asked, 0, reason: 'not available: not asked for the product');
+    await _pumpPage(tester);
+    expect(find.textContaining(r'$5.99'), findsNothing, reason: 'no price until the store says its own');
+    expect(find.textContaining('a year'), findsNothing);
+    expect(find.textContaining('web'), findsNothing);
+    expect(find.text("The App Store hasn't said what live play costs yet. Check that you're online, then tap Subscribe to ask it again."), findsOneWidget);
+    expect(find.text('Restore purchases'), findsNothing);
+    expect(find.textContaining('By subscribing'), findsNothing, reason: 'nothing is bought here');
+
+    // Back online: Subscribe asks again, and the store's own sheet opens
+    // at the store's price.
+    offline.open = true;
+    await tester.tap(find.text('Subscribe'));
+    // The sheet's spinner turns until the store says: pumped, not settled.
+    await tester.pump();
+    await tester.pump();
+    expect(shop.ready, isTrue);
+    expect(offline.bought, hasLength(1), reason: 'the sheet opened once the store said');
+    expect(find.text('£4.99 a year'), findsOneWidget);
+    expect(find.textContaining("hasn't said"), findsNothing);
+    // Once it has said, it is not asked again.
+    final asked = offline.asked;
+    await tester.pumpWidget(const SizedBox());
+    // The sheet still up, its spinner turning: pumped, not settled.
+    await tester.pumpWidget(MaterialApp(theme: buildTheme(), home: const SubscribePage()));
+    await tester.pump();
+    expect(offline.asked, asked);
+    expect(shop.ready, isTrue);
+
+    // A store without the product, as Google Play: asked again when the
+    // page opens, and said as itself.
+    await tester.pumpWidget(const SizedBox());
+    final productless = FakeStore(kind: StoreKind.google, price: null);
+    await shopWith(productless);
+    expect(productless.asked, 1);
+    await _pumpPage(tester);
+    expect(productless.asked, 2, reason: 'the page asks again');
+    expect(find.text("Google Play hasn't said what live play costs yet. Check that you're online, then tap Subscribe to ask it again."), findsOneWidget);
+    // Then the product comes: opening the page is enough.
+    productless.price = '4,99 €';
+    await tester.pumpWidget(const SizedBox());
+    await _pumpPage(tester);
+    expect(find.text('4,99 € a year'), findsOneWidget);
+    expect(productless.bought, isEmpty, reason: 'opening the page buys nothing');
+  });
+
+  testWidgets('with no store, a build that cannot leave for Stripe sells nothing, and the web goes to Stripe', (tester) async {
     final stand = standUp();
-    await shopWith(FakeStore(open: false));
+    StoreShop.current = StoreShop(null);
+    addTearDown(() => StoreShop.current = StoreShop(null));
     expect(canBuyHere, isFalse);
     expect(priceShown, r'$5.99');
     await _pumpPage(tester);
+    expect(find.text(r'$5.99 a year'), findsOneWidget);
     expect(find.text('Restore purchases'), findsNothing);
     expect(find.textContaining('renews automatically'), findsNothing);
     expect(find.textContaining('By subscribing'), findsNothing, reason: 'nothing is bought here');
-    expect(find.textContaining('Until the app is in the stores'), findsOneWidget);
-
-    final productless = FakeStore(price: null);
-    await shopWith(productless);
-    expect(canBuyHere, isFalse);
+    expect(find.text('Buying is not open on this device yet.'), findsOneWidget);
 
     // And the web goes to Stripe, not to a store: here, first to a
     // checkout handler the stand-in service has no answer for.
@@ -465,7 +543,6 @@ void main() {
     expect(find.text('Restore purchases'), findsNothing);
     await tester.tap(find.text('Subscribe'));
     await tester.pumpAndSettle();
-    expect(productless.bought, isEmpty);
     expect(find.text('The shop is not open yet.'), findsOneWidget);
     expect(sentTo, isEmpty);
     // Asked in the app's language, which Stripe's page and the terms it

@@ -15,6 +15,7 @@ import { root } from './env.mjs';
 import { releaseProblems } from './gate.mjs';
 import { commandOf, main, markdown, parse } from './oh.mjs';
 import { rejected, reshaped } from './setup.mjs';
+import { KNOWN_ROW } from '../service/do/checkers.mjs';
 import { configOf } from '../service/functions/config.mjs';
 import { memoryStore } from '../service/functions/rows.mjs';
 import { config as committed, languages, origin, render, strings } from '../site/build.mjs';
@@ -180,6 +181,19 @@ test('a run-time row is checked as the service checks it before it is written', 
   );
 });
 
+test('the checker of known images in use is the run-time row known, written where the relay reads it, and only as a checker it knows', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'known-'));
+  const file = (name, row) => (writeFileSync(join(dir, name), JSON.stringify(row)), join(dir, name));
+  const ctx = fake();
+  assert.equal(await main(['config', 'set', 'known', file('photodna.json', { checker: 'photodna' }), '--apply'], ctx), 0);
+  const store = await ctx.store();
+  assert.equal(store.rows.get(KNOWN_ROW.join('|')), JSON.stringify({ checker: 'photodna' }));
+  assert.equal(await main(['config', 'set', 'known', file('typo.json', { checker: 'photdna' }), '--apply'], ctx), 1);
+  assert.equal(store.rows.get(KNOWN_ROW.join('|')), JSON.stringify({ checker: 'photodna' }), 'nothing written');
+  assert.equal(await main(['config', 'clear', 'known', '--apply'], ctx), 0);
+  assert.equal(store.rows.has(KNOWN_ROW.join('|')), false, 'back to Shield');
+});
+
 test('a secret is set wherever its definition says it lives, from what is typed', async () => {
   const ctx = fake({ readSecret: async () => 's3cret' });
   assert.equal(await main(['secret', 'set', 'OH_SERVICE_SECRET', '--apply'], ctx), 0);
@@ -195,5 +209,12 @@ test('a secret is set wherever its definition says it lives, from what is typed'
   const relay = fake({ readSecret: async () => 'x' });
   assert.equal(await main(['secret', 'set', 'OH_JUROR_SECRET', '--apply'], relay), 0);
   assert.deepEqual(relay.started.map((s) => s.args.slice(2)), [['secret', 'put', 'OH_JUROR_SECRET']]);
+  // One set only once it is issued, as a checker's credentials are: the
+  // relay's too, and only the relay's.
+  for (const name of ['OH_ARACHNID_USERNAME', 'OH_ARACHNID_PASSWORD', 'OH_PHOTODNA_KEY', 'OH_NCMEC_USERNAME', 'OH_NCMEC_PASSWORD']) {
+    const optional = fake({ readSecret: async () => 'x' });
+    assert.equal(await main(['secret', 'set', name, '--apply'], optional), 0, name);
+    assert.deepEqual(optional.started.map((s) => [s.args.slice(2), s.cwd.endsWith('service/do')]), [[['secret', 'put', name], true]], name);
+  }
   assert.equal(await main(['secret', 'set', 'OH_NOT_A_SECRET', '--apply'], fake()), 2);
 });

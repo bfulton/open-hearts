@@ -581,8 +581,13 @@ class AppLocalizationsDe extends AppLocalizations {
       'Dieses Konto ist nach den Nutzungsbedingungen vom Live-Spiel gesperrt. Allein spielen kannst du weiterhin. Um zu fragen, warum, oder um Einspruch einzulegen, schreib an help@openhearts.game.';
 
   @override
-  String get storeSubscriptionLater =>
-      'Auf dem Handy wird es das Abo des jeweiligen Stores sein. Bis die App in den Stores ist, kauft man Live-Spiel im Web.';
+  String storeNotAnswered(String store) {
+    String _temp0 = intl.Intl.selectLogic(store, {
+      'google': 'Google Play hat noch nicht gesagt, was Live-Spiel kostet. Prüf, ob du online bist, und tippe dann auf Abonnieren, um noch einmal zu fragen.',
+      'other': 'Der App Store hat noch nicht gesagt, was Live-Spiel kostet. Prüf, ob du online bist, und tippe dann auf Abonnieren, um noch einmal zu fragen.',
+    });
+    return '$_temp0';
+  }
 
   @override
   String get subscriptionIsYours =>
@@ -856,6 +861,39 @@ class AppLocalizationsDe extends AppLocalizations {
   String get liveAgree => 'Akzeptieren';
 
   @override
+  String get liveTooYoungTitle => 'Live spielen erst ab 13';
+
+  @override
+  String liveTooYoung(String store) {
+    String _temp0 = intl.Intl.selectLogic(store, {
+      'google': 'Laut Google Play bist du unter 13.',
+      'other': 'Laut deinem Apple Account bist du unter 13.',
+    });
+    return '$_temp0 Allein spielen kann jeder, so viel du willst.';
+  }
+
+  @override
+  String get liveAwaitingParentTitle => 'Warten auf Zustimmung';
+
+  @override
+  String get liveAwaitingParent =>
+      'Google Play wartet darauf, dass ein Elternteil oder Erziehungsberechtigter Änderungen an Open Hearts zustimmt. Danach kannst du live spielen. Bis dahin kannst du allein spielen.';
+
+  @override
+  String get liveParentDeclinedTitle => 'Nicht zugestimmt';
+
+  @override
+  String get liveParentDeclined =>
+      'Ein Elternteil oder Erziehungsberechtigter hat Änderungen an Open Hearts in Google Play nicht zugestimmt, deshalb ist Live-Spielen geschlossen. Allein spielen kannst du weiterhin.';
+
+  @override
+  String get liveAgeUnconfirmedTitle => 'Bestätige dein Alter';
+
+  @override
+  String get liveAgeUnconfirmed =>
+      'Google Play braucht eine Bestätigung deines Alters, bevor du live spielen kannst. Das geht in der Play Store App. Bis dahin kannst du allein spielen.';
+
+  @override
   String get changedBoth =>
       'Unsere Nutzungsbedingungen und Datenschutzerklärung haben sich geändert.';
 
@@ -894,6 +932,10 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get waitingToReconnect =>
       'Warte, bis die anderen wieder verbunden sind';
+
+  @override
+  String get connectionDown =>
+      'Deine Verbindung ist unterbrochen — verbinde neu';
 
   @override
   String get askingTheJury => 'Frage die Jury';

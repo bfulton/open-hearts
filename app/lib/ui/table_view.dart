@@ -9,6 +9,7 @@ import 'package:flutter/semantics.dart';
 
 import '../avatar.dart';
 import '../l10n/l10n.dart';
+import '../pacing.dart';
 import '../table_model.dart';
 import '../theme.dart';
 import 'card_view.dart';
@@ -135,6 +136,15 @@ class TableView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final shooter = controller.game.moonShooter;
+    return _MoonQuake(
+      shooter: shooter == null ? null : controller.positionOf(shooter),
+      builder: (context, badges) => _felt(context, badges),
+    );
+  }
+
+  /// The felt, its badges keyed by position for the quake to find.
+  Widget _felt(BuildContext context, List<GlobalKey> badges) {
     return LayoutBuilder(
       builder: (context, constraints) {
         final at = _FeltLayout(context, constraints.biggest, corner);
@@ -149,7 +159,7 @@ class TableView extends StatelessWidget {
         final wide = at.wide;
         final note = corner;
 
-        Widget seat(int position) => _Seat(view: this, at: at, position: position);
+        Widget seat(int position) => _Seat(view: this, at: at, position: position, badgeKey: badges[position]);
         Widget? bubble(int position, AxisDirection tail) => _bubble(controller, position, tail, scale);
 
         // The player's own corner: the button, or their reaction.
@@ -487,11 +497,14 @@ class _FeltLayout {
 /// ghost of the other, which takes up its room and draws nothing:
 /// whichever name is the longer, the pair come out one size.
 class _Seat extends StatelessWidget {
-  const _Seat({required this.view, required this.at, required this.position});
+  const _Seat({required this.view, required this.at, required this.position, required this.badgeKey});
 
   final TableView view;
   final _FeltLayout at;
   final int position;
+
+  /// The badge's own, not its ghosts': where a moon's quake starts.
+  final GlobalKey badgeKey;
 
   /// A badge is laid out at a phone's scale and drawn at the table's, so
   /// the room it is given here is in a phone's points.
@@ -527,12 +540,23 @@ class _Seat extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final game = view.controller.game;
+    final seat = view.controller.seatAt(position);
+    final pending = game.pendingTrick;
     final pair = Stack(
       children: [
         // The two ghosts make the box; the badge fills it.
         BadgeGhost(child: _badge(position)),
         BadgeGhost(child: _badge((position + 2) % seatCount)),
-        Positioned.fill(child: _badge(position)),
+        Positioned.fill(
+          child: _PointsGlow(
+            key: badgeKey,
+            position: position,
+            taken: game.taken[seat],
+            trick: pending?.winner == seat ? [for (final p in pending!.plays) p.card] : null,
+            child: _badge(position),
+          ),
+        ),
       ],
     );
     // A side badge is anchored by its inner edge, a gap out from
@@ -548,6 +572,267 @@ class _Seat extends StatelessWidget {
           : ConstrainedBox(constraints: BoxConstraints(maxHeight: at.trickBox.height / at.scale), child: pair),
     );
   }
+}
+
+/// Where a seat's badge glows: what paints round the badge at
+/// [position].
+@visibleForTesting
+Key pointsGlowAt(int position) => ValueKey('points glow $position');
+
+/// A seat's badge, glowing as a trick it took with points in it comes
+/// to it: pink, for points taken (theme.dart), and red, the game's own,
+/// half a second longer for a trick with the queen in it. From when the
+/// sweep reaches the badge (_Trick), or at once where the device asks
+/// for less motion and nothing is swept. A trick that was never seen on
+/// the table, as when it catches up with itself, glows nowhere.
+class _PointsGlow extends StatefulWidget {
+  const _PointsGlow({super.key, required this.position, required this.taken, required this.trick, required this.child});
+
+  final int position;
+
+  /// The points the seat has taken this hand.
+  final int taken;
+
+  /// The finished trick's cards, while it is on the table and the
+  /// seat's; null at every other moment.
+  final List<Card>? trick;
+
+  final Widget child;
+
+  @override
+  State<_PointsGlow> createState() => _PointsGlowState();
+}
+
+class _PointsGlowState extends State<_PointsGlow> with SingleTickerProviderStateMixin {
+  late final AnimationController _glow = AnimationController(vsync: this);
+
+  /// The glow's colour, how long it waits for the sweep, and how long it
+  /// lasts once the cards are in.
+  Color _colour = Palette.pink;
+  Duration _waits = Duration.zero;
+  Duration _lasts = Pacing.pointsGlow;
+
+  @override
+  void dispose() {
+    _glow.dispose();
+    super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(_PointsGlow old) {
+    super.didUpdateWidget(old);
+    // The trick that was on the table as this seat's is gone from it,
+    // and the seat's points have gone up: it has been taken.
+    final took = old.trick;
+    if (took == null || widget.trick != null || widget.taken <= old.taken) return;
+    final queen = took.contains(queenOfSpades);
+    final still = MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+    _colour = queen ? Palette.red : Palette.pink;
+    _waits = still ? Duration.zero : Pacing.trickSweeps;
+    _lasts = queen ? Pacing.queenGlow : Pacing.pointsGlow;
+    _glow
+      ..duration = _waits + _lasts
+      ..forward(from: 0);
+  }
+
+  /// How strong the glow is: up quickly as the cards come in, held, and
+  /// gone over its second half. Nothing once it has run, which is the
+  /// moment it reaches its end.
+  double get _strength {
+    if (!_glow.isAnimating) return 0;
+    final total = _glow.duration!;
+    final g = (_glow.value * total.inMicroseconds - _waits.inMicroseconds) / _lasts.inMicroseconds;
+    if (g <= 0) return 0;
+    if (g < 0.15) return Curves.easeOut.transform(g / 0.15);
+    if (g < 0.5) return 1;
+    return Curves.easeInOut.transform((1 - g) / 0.5);
+  }
+
+  @override
+  Widget build(BuildContext context) => CustomPaint(key: pointsGlowAt(widget.position), painter: _Glow(this), child: widget.child);
+}
+
+/// A glow round a badge, as strong as [glow] says: bright against its
+/// edge, and wide and soft beyond, which a dark red needs to be seen on
+/// the felt at all. Round the badge and not through it, so what it says
+/// is read as it always is.
+class _Glow extends CustomPainter {
+  _Glow(this.glow) : super(repaint: glow._glow);
+
+  final _PointsGlowState glow;
+
+  /// The blur of the bright edge and of the soft glow beyond it, and how
+  /// far out each is drawn from the badge at full strength.
+  static const _edge = (sigma: 4.0, out: 2.0);
+  static const _soft = (sigma: 15.0, out: 8.0);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final s = glow._strength;
+    if (s == 0) return;
+    final badge = RRect.fromRectAndRadius(Offset.zero & size, const Radius.circular(13));
+    final reach = _soft.out + 3 * _soft.sigma;
+    final paint = Paint();
+    canvas
+      ..save()
+      ..clipPath(Path()
+        ..fillType = PathFillType.evenOdd
+        ..addRect((Offset.zero & size).inflate(reach))
+        ..addRRect(badge))
+      ..drawRRect(
+          badge.inflate(_edge.out * s),
+          paint
+            ..color = glow._colour.withValues(alpha: s)
+            ..maskFilter = MaskFilter.blur(BlurStyle.normal, _edge.sigma))
+      ..drawRRect(
+          badge.inflate(_soft.out * s),
+          paint
+            ..color = glow._colour.withValues(alpha: 0.75 * s)
+            ..maskFilter = MaskFilter.blur(BlurStyle.normal, _soft.sigma))
+      ..restore();
+  }
+
+  @override
+  bool shouldRepaint(_Glow old) => old.glow != glow;
+
+  /// Decoration: what is under it is touched, not it.
+  @override
+  bool hitTest(Offset position) => false;
+}
+
+/// The felt, shaken when a hand ends with a moon, whoever shot it: the
+/// moment the last trick reaches the seat that took every point, the
+/// table jolts away from it and settles, and rings run out across the
+/// felt from that seat's badge, under everything on it. Over within the
+/// beat of bare felt before the sheet (Pacing.moonQuake). Nothing at all
+/// where the device asks for less motion; the sheet says who shot it.
+class _MoonQuake extends StatefulWidget {
+  const _MoonQuake({required this.shooter, required this.builder});
+
+  /// The position of the seat that shot the moon in the hand just over;
+  /// null while there is none.
+  final int? shooter;
+
+  /// The felt, given a key for each position's badge.
+  final Widget Function(BuildContext context, List<GlobalKey> badges) builder;
+
+  @override
+  State<_MoonQuake> createState() => _MoonQuakeState();
+}
+
+class _MoonQuakeState extends State<_MoonQuake> with SingleTickerProviderStateMixin {
+  final _badges = List.generate(seatCount, (_) => GlobalKey());
+
+  /// The felt inside the shake, which is where it is at rest.
+  final _felt = GlobalKey();
+
+  /// The sweep to the shooter, and then the quake.
+  late final AnimationController _quake = AnimationController(vsync: this, duration: Pacing.trickSweeps + Pacing.moonQuake);
+
+  /// The position that shot the moon, and which way the felt jolts
+  /// first: from it towards the middle.
+  int _shooter = 0;
+  Offset _away = Offset.zero;
+
+  @override
+  void dispose() {
+    _quake.dispose();
+    super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(_MoonQuake old) {
+    super.didUpdateWidget(old);
+    // A moon that has just been shot, not one already on the felt when
+    // it was opened.
+    final shooter = widget.shooter;
+    if (shooter == null || old.shooter != null) return;
+    if (MediaQuery.maybeOf(context)?.disableAnimations ?? false) return;
+    _shooter = shooter;
+    _away = -seatDirection[shooter]!;
+    _quake.forward(from: 0);
+  }
+
+  /// The middle of the shooter's badge, where the felt has it at rest:
+  /// asked while the felt is painted, once it has been laid out.
+  Offset? get _epicentre {
+    final badge = _badges[_shooter].currentContext?.findRenderObject() as RenderBox?;
+    final felt = _felt.currentContext?.findRenderObject() as RenderBox?;
+    if (badge == null || felt == null || !badge.attached || !badge.hasSize) return null;
+    return badge.localToGlobal(badge.size.center(Offset.zero), ancestor: felt);
+  }
+
+  /// How far into the quake: zero through the sweep, then up to one.
+  double get _t {
+    final waits = Pacing.trickSweeps.inMicroseconds / _quake.duration!.inMicroseconds;
+    return ((_quake.value - waits) / (1 - waits)).clamp(0.0, 1.0);
+  }
+
+  /// Where the felt is shaken to: back and forth along the line from the
+  /// shooter, a little across it, dying away; still at either end.
+  Offset _shake(Size size) {
+    final t = _t;
+    final most = size.shortestSide * 0.02 * math.pow(1 - t, 2);
+    final across = Offset(-_away.dy, _away.dx);
+    return _away * most * math.sin(t * math.pi * 10) + across * most * 0.35 * math.sin(t * math.pi * 14);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      painter: _Rings(this),
+      child: AnimatedBuilder(
+        animation: _quake,
+        builder: (context, child) => LayoutBuilder(
+          builder: (context, room) => Transform.translate(offset: _shake(room.biggest), child: child),
+        ),
+        child: KeyedSubtree(key: _felt, child: widget.builder(context, _badges)),
+      ),
+    );
+  }
+}
+
+/// The quake's rings, from the shooter's badge to past the felt's
+/// furthest corner.
+class _Rings extends CustomPainter {
+  _Rings(this.quake) : super(repaint: quake._quake);
+
+  final _MoonQuakeState quake;
+
+  /// When each ring sets out, and how long it takes to run its course,
+  /// as shares of the quake.
+  static const _starts = [0.0, 0.14, 0.28];
+  static const _runs = 0.6;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final t = quake._t;
+    if (t == 0 || t == 1) return;
+    final from = quake._epicentre;
+    if (from == null) return;
+    final reach = [
+      Offset.zero,
+      Offset(size.width, 0),
+      Offset(0, size.height),
+      Offset(size.width, size.height),
+    ].map((corner) => (corner - from).distance).reduce(math.max);
+    final ring = Paint()..style = PaintingStyle.stroke;
+    for (final start in _starts) {
+      final p = (t - start) / _runs;
+      if (p <= 0 || p >= 1) continue;
+      ring
+        ..color = Palette.chrome.withValues(alpha: 0.5 * math.pow(1 - p, 1.5))
+        ..strokeWidth = size.shortestSide * 0.012 * (1 - p) + 1;
+      canvas.drawCircle(from, reach * Curves.easeOut.transform(p), ring);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_Rings old) => old.quake != quake;
+
+  /// Decoration: what is under it is touched, not it.
+  @override
+  bool hitTest(Offset position) => false;
 }
 
 /// A seat's reaction while it shows (ui/reactions.dart), beside its
@@ -759,7 +1044,7 @@ class _Trick extends StatefulWidget {
 class _TrickState extends State<_Trick> with SingleTickerProviderStateMixin {
   late final AnimationController _sweep = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 300),
+    duration: Pacing.trickSweeps,
   )..addStatusListener((status) {
       if (status == AnimationStatus.completed && mounted) setState(() => _taken = const []);
     });
@@ -898,7 +1183,7 @@ class _TrickSlot extends StatelessWidget {
             ? l10n.seatLed(name, l10n.cardInSentence(card!))
             : l10n.seatPlayed(name, l10n.cardInSentence(card!));
     return AnimatedSwitcher(
-      duration: const Duration(milliseconds: 240),
+      duration: Pacing.cardLands,
       // What leaves a slot is carried off by the sweep above, so there
       // is nothing here to play backwards.
       reverseDuration: Duration.zero,

@@ -21,7 +21,7 @@ import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { chromium } from './browser.mjs';
-import { act, agreedToTerms, click, freePort, has, labelOf, licensed, log, root, serveApp, sleep, texts, type, waitFor } from './drive.mjs';
+import { act, agreedToTerms, click, freePort, has, labelOf, licensed, log, playUntil, root, serveApp, sleep, texts, type, waitFor, waitGone } from './drive.mjs';
 import { flowRelay, runFlows } from './pool.mjs';
 
 const phone = { width: 390, height: 844 };
@@ -333,7 +333,7 @@ flow('the update check, with nothing to say', async ({ context, open }) => {
   return newer;
 });
 
-flow('the network gone at a live table', async ({ context, open, relay }) => {
+flow('the network gone at a live table, and back', async ({ context, open, relay }) => {
   await relay();
   const page = await open();
   await name(page);
@@ -345,18 +345,34 @@ flow('the network gone at a live table', async ({ context, open, relay }) => {
     await sleep(400);
   }
   await context.setOffline(true);
-  // The jurors holding the bot seats cannot be heard, the table pauses
-  // for them and says so, and with none to be had it ends, unscored.
+  // The device hears nothing back from the relay, which answers
+  // everything, so it is its own line that is down and not the jurors,
+  // who play on: it says so, and waits for the line rather than ending
+  // the game (docs/explanation/live-play.md, a device cut off from the
+  // table).
+  const down = /^Your connection is down — reconnecting$/;
   const began = Date.now();
-  const until = began + 90000;
-  while (Date.now() < until && !(await has(page, /^Connection failure$/))) {
-    await act(page);
-    await sleep(500);
+  await waitFor(page, down, { timeout: 30000, what: 'the device to say its own connection is down' });
+  log(`      said its connection is down: ${((Date.now() - began) / 1000).toFixed(0)} s`);
+  // Well past when it would have ended the game before, for a jury it
+  // could not hear: the operator's word here is ten seconds' silence
+  // and ten more (setUp).
+  const until = Date.now() + 40000;
+  while (Date.now() < until) {
+    if (await has(page, /^Connection failure$/)) throw new Error('the game ended for the device\'s own connection');
+    await sleep(1000);
   }
-  await waitFor(page, /^Connection failure$/, { timeout: 1000, what: 'the table to end' });
-  log(`      the table ended, and said why: ${((Date.now() - began) / 1000).toFixed(0)} s`);
-  await click(page, /^Home$/);
-  await waitFor(page, /^Play solo$/, { what: 'the door' });
+  await context.setOffline(false);
+  const back = Date.now();
+  await waitGone(page, down, { timeout: 60000, what: 'the line back' });
+  log(`      the line back: ${((Date.now() - back) / 1000).toFixed(0)} s`);
+  // And the game goes on where it was: the hand is played out and the
+  // next one dealt, with nothing ended.
+  await playUntil([page], async (p) => {
+    if (await has(p, /^Connection failure$/)) throw new Error('the game ended once the line was back');
+    return has(p, /^Hand 2 /);
+  }, { timeout: 180000 });
+  log(`      played on to the next hand: ${((Date.now() - back) / 1000).toFixed(0)} s`);
   return page;
 });
 

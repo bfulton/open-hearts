@@ -26,6 +26,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:table/table.dart';
 
 import 'activate_page.dart';
+import 'age_gate.dart';
 import 'avatar.dart';
 import 'build_info.dart' show buildDate, reloadPage;
 import 'entitlement.dart';
@@ -129,7 +130,7 @@ class _HomePageState extends State<HomePage> {
     _lobby = Lobby(
       who: () => (name: _name, avatar: _avatar),
       options: () => _options.copyWith(target: _playsTo),
-      named: () async => await _named() != null && await _agreed(),
+      named: () async => await _storeLets() && await _named() != null && await _agreed(),
       words: () => context.l10n,
       seat: (controller) => context.push<bool>(located(livePath), extra: controller),
       addressChanged: _showAddress,
@@ -376,6 +377,11 @@ class _HomePageState extends State<HomePage> {
     await showProfile(context, stats: statsOnThisDevice(standing: _lobby.standing, online: widget.online));
     if (mounted) await _back();
   }
+
+  /// Whether the phone's store lets this player play live
+  /// (age_gate.dart): asked first, so that a player it does not let is
+  /// asked for neither a name nor the terms.
+  Future<bool> _storeLets() => storeLetsPlayLive(context);
 
   /// The name the others will see, asked for if this device has none:
   /// nothing is played live without one, and the place to give it is

@@ -35,11 +35,15 @@ void main() {
     final spec = TableSpec(id: 'follow-relay', seed: 6, sealed: true, seats: [for (final s in signers) HumanSeat(s.publicKey)]);
     // Every client's trace, the juror's included, at a known path.
     final sink = (File('${Directory.current.path}/build/logs/juror.log')..parent.createSync(recursive: true)).openWrite();
+    final said = <String>[];
     final juror = LastResortJuror(
         relays: [relay.url],
         signer: SchnorrSigner.generate(),
         crypto: crypto,
-        log: (l) => sink.writeln('juror $l'))
+        log: (l) {
+          said.add(l);
+          sink.writeln('juror $l');
+        })
       ..start();
     final startedAt = DateTime.now();
     final presences = [for (final s in signers) RelayPresence(relays: [relay.url], signer: s)];
@@ -78,6 +82,12 @@ void main() {
     // a half of the players.
     final following = juror.duty.clients[spec.id];
     expect(following, isNotNull, reason: 'summoned, it follows the table');
+    // One process serves several tables at once, and its log is read a
+    // table at a time (oh table): each line of the table's client is
+    // headed by the table, the first eight of its id.
+    final trace = RegExp(r'^\s*\d+ [0-9a-f]{4}/');
+    expect(said.where((l) => l.startsWith('follow-r ') && l.contains(' open h')), isNotEmpty, reason: 'its turns, by its table');
+    expect(said.where(trace.hasMatch), isEmpty, reason: 'and no line of a table\'s client without it');
     final deadline = DateTime.now().add(const Duration(seconds: 90));
     while (following!.game.handNumber < 1 && DateTime.now().isBefore(deadline)) {
       await Future<void>.delayed(const Duration(seconds: 1));

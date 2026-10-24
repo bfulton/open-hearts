@@ -12,7 +12,8 @@
 // worker's schedule goes over every copy kept, and does only what each
 // copy's own flags say is still to do: holds each account's copies to
 // the order it set them in; deletes what is kept no longer than
-// promised; asks Arachnid Shield again about what it has not cleared;
+// promised; asks the checker of known images in use (checkers.mjs)
+// again about what no checker has cleared;
 // hides again what the check found should be; and emails the operator,
 // account by account, every picture each set since the last email — the
 // ones it has since replaced too, so that swapping a picture back before
@@ -20,9 +21,10 @@
 // down or put it back. Apart from worker.mjs so it can be tested without
 // the runtime.
 
+import { CHECKERS, SHIELD } from './checkers.mjs';
 import { HOLD_DAYS } from '../functions/holds.mjs';
 import { forgottenKey } from '../functions/records.mjs';
-import { ACCOUNT_PICTURES_PREFIX, PICTURES_ORIGIN, PICTURES_ROW, allowedOf, changePicture, copyOf, currentOf, newestFirst, pictureUrl, settleCopies, stillAllowing, withheldOf, withholding } from '../functions/pictures.mjs';
+import { ACCOUNT_PICTURES_PREFIX, PICTURES_ORIGIN, PICTURES_ROW, allowedOf, changePicture, copyOf, currentOf, knownFlags, newestFirst, pictureUrl, settleCopies, stillAllowing, withheldOf, withholding } from '../functions/pictures.mjs';
 
 /// Where the copies are served (service/functions/pictures.mjs).
 export { PICTURES_ORIGIN };
@@ -147,17 +149,30 @@ async function forgottenIn(records) {
 
 const escape = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 
+/// What a picture in the email says of what was said of it against known
+/// images, from its copy's flags [known] ({known, knownBy, knownAt}): a
+/// copy cleared before copies kept receipts was cleared by Arachnid
+/// Shield.
+const knownNote = ({ known, knownBy, knownAt } = {}) =>
+  known === 'clear'
+    ? `cleared of known images by ${CHECKERS[knownBy ?? SHIELD]?.name ?? knownBy}${knownAt ? ` at ${knownAt}` : ''}`
+    : known === 'unreadable'
+      ? 'hidden: it could not be decoded or hashed, so it could not be checked against known images'
+      : 'not yet checked against known images: asked again by the next run';
+
 /// What the check made of [p], a picture in the email: the questions
 /// it was hidden for, and whether the operator has put it back since.
 const hiddenOf = (p) => (p.check ? hiddenFor(p.check) : []);
 const urgent = (p) => !p.allowed && hiddenOf(p).includes('sexual');
 
 /// The email for [accounts], each {account, pictures: [{digest, at,
-/// current, check, allowed, unreadable}]}: account by account, every
-/// picture it set, in order, which is its profile's now, what the check
-/// made of it (`check`, its scores; {} when the check failed; null when
-/// there was none), whether the operator allowed it after the check hid
-/// it, whether it was hidden for not decoding ([unreadable]), and
+/// current, check, allowed, known}]}: account by account, every picture
+/// it set, in order, which is its profile's now, what the check made of
+/// it (`check`, its scores; {} when the check failed; null when there
+/// was none), whether the operator allowed it after the check hid it,
+/// what was said of it against known images ([known], the copy's
+/// {known, knownBy, knownAt}: which checker cleared it and when, that it
+/// was hidden for not decoding, or that it is not yet checked), and
 /// the commands that take them down — its profile's picture off, or the
 /// account suspended, for a picture it has since replaced — or put a
 /// hidden one back.
@@ -197,7 +212,7 @@ export function reviewEmail(accounts, more = 0) {
         : p.check && !Object.keys(p.check).length
           ? ['not checked: the check failed']
           : []),
-      ...(p.unreadable ? ['hidden: it could not be decoded, so Arachnid Shield could not be asked about it'] : []),
+      knownNote(p.known),
     ];
   };
   const commands = (a) => [
@@ -254,19 +269,20 @@ export function reviewEmail(accounts, more = 0) {
 ///    left in [records] (OH_RECORDS) was made;
 /// 2. a copy that has not been its account's for [PICTURE_KEPT_DAYS]
 ///    is deleted, each account's oldest first;
-/// 3. with [ask] (known.mjs, knownAsker), each copy Arachnid Shield
-///    has not cleared is asked about again, for its account, whether or
-///    not the account still has it — each was shown while it did — so
-///    that a match, or a picture Shield knows as harmful, is acted on for
-///    each account that set it, and is no longer theirs; and one that
-///    cannot be decoded is said to be;
+/// 3. with [ask] (known.mjs, knownAsker), each copy no checker has
+///    cleared is asked about again, for its account, whether or not the
+///    account still has it — each was shown while it did — so that a
+///    match, or a picture Shield knows as harmful, is acted on for each
+///    account that set it, and is no longer theirs; and one that cannot
+///    be decoded or hashed is said to be; and each answer is kept with
+///    its receipt, which checker said it and when;
 /// 4. every picture an account has now, or new for the email, that the
 ///    check found should be hidden, or that cannot be decoded, is hidden,
 ///    unless the operator allowed it, in case hiding it as it was set did
 ///    not take; and what the operator allowed stays allowed while a copy
 ///    of it is kept;
 /// 5. with [send] ({subject, text, html}), the operator is emailed every
-///    copy not yet told of but one Shield matched, account by account,
+///    copy not yet told of but one a checker matched, account by account,
 ///    oldest account first, whole accounts up to [REVIEW_MOST] pictures,
 ///    each marked told once the email has gone.
 ///
@@ -336,7 +352,7 @@ export async function reviewRun({ bucket, store, records = null, send = null, as
   }
   const kept = copies.filter((c) => !stale.has(c));
 
-  // 3. Shield asked again.
+  // 3. The checkers asked again.
   let asked = 0;
   const matched = new Set();
   for (const c of ask ? kept : []) {
@@ -344,18 +360,19 @@ export async function reviewRun({ bucket, store, records = null, send = null, as
     const copy = await bucket.get(c.key);
     if (!copy) continue;
     const jpeg = btoa(String.fromCharCode(...new Uint8Array(await copy.arrayBuffer())));
-    let said;
+    let answer;
     try {
-      said = await ask({ jpeg, account: c.account, key: null, shown: true, at: c.at || null });
+      answer = await ask({ jpeg, account: c.account, key: null, shown: true, at: c.at || null });
     } catch {
       // The object out of reach: asked again tomorrow.
       break;
     }
     asked++;
+    const { said } = answer;
     if (said === 'clear' || said === 'unreadable') {
       // Unreadable: no hash can be made of it, so nothing can be asked;
       // hidden below, as the app's own pictures never are.
-      await changed(c, (m) => (m.known === said ? null : { ...m, known: said }));
+      await changed(c, (m) => (m.known === said ? null : { ...m, ...knownFlags(said, answer) }));
     } else if (said === 'match' || said === 'harmful') {
       // The object acts on it for this account and deletes the copy
       // (known.mjs); the account's picture now is no longer its own
@@ -364,7 +381,7 @@ export async function reviewRun({ bucket, store, records = null, send = null, as
       matched.add(c.key);
       if (currentOf(byAccount.get(c.account)) === c) await settle(c.account, today);
     } else {
-      // Shield without its credentials, or not answering: tomorrow.
+      // No checker on, or one not answering: tomorrow.
       break;
     }
   }
@@ -380,7 +397,7 @@ export async function reviewRun({ bucket, store, records = null, send = null, as
   // 5. The email.
   const toTell = new Map();
   for (const c of untold) {
-    const use = { copy: c, digest: c.digest, at: c.at, current: current.has(c), check: checkOf(c.check), allowed: allowed.has(c.digest), unreadable: c.known === 'unreadable' };
+    const use = { copy: c, digest: c.digest, at: c.at, current: current.has(c), check: checkOf(c.check), allowed: allowed.has(c.digest), known: { known: c.known, knownBy: c.knownBy, knownAt: c.knownAt } };
     toTell.set(c.account, [...(toTell.get(c.account) ?? []), use]);
   }
   const first = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
@@ -402,7 +419,7 @@ export async function reviewRun({ bucket, store, records = null, send = null, as
   }
   await send(
     reviewEmail(
-      shown.map((a) => ({ account: a.account, pictures: a.uses.map(({ digest, at, current, check, allowed: put, unreadable }) => ({ digest, at, current, check, allowed: put, unreadable })) })),
+      shown.map((a) => ({ account: a.account, pictures: a.uses.map(({ digest, at, current, check, allowed: put, known }) => ({ digest, at, current, check, allowed: put, known })) })),
       total - count,
     ),
   );

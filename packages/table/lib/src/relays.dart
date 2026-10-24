@@ -22,6 +22,7 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 import 'nostr.dart';
 import 'relay_policy.dart';
 import 'signing.dart';
+import 'transport.dart' show answerMs, unansweredMs;
 
 /// What a device shows a relay that asks who it is (NIP-42), as tags
 /// beside the relay's challenge in an event its key signs: the
@@ -93,13 +94,24 @@ abstract final class Relays {
 
 /// One socket to one relay. Connects, sends its subscriptions, hands
 /// every message up; reconnects with a growing pause when dropped;
-/// remakes itself when told to, and when a subscription looks dead —
-/// nothing at all for [quietMs] after publishing, when this client's
-/// own events should be coming back on it.
+/// remakes itself when told to, and when its line looks down ([cutOff]):
+/// nothing at all heard for [unansweredMs] with something sent waiting
+/// on an answer, from a relay that answers everything it is sent — an
+/// event with OK, a subscription with the end of what it holds.
 class RelayConnection {
-  RelayConnection({required this.url, required this.subscriptions, required this.onMessage, this.log, this.auth}) {
+  RelayConnection(
+      {required this.url,
+      required this.subscriptions,
+      required this.onMessage,
+      this.log,
+      this.auth,
+      this.cutOffMs = unansweredMs,
+      this.answerWaitMs = answerMs}) {
     _connect();
   }
+
+  /// [unansweredMs] and [answerMs], shorter in a test.
+  final int cutOffMs, answerWaitMs;
 
   final Uri url;
 
@@ -118,14 +130,18 @@ class RelayConnection {
   final void Function(RelayConnection from, List<Object?> message) onMessage;
   final void Function(String line)? log;
 
-  static const quietMs = 25000;
-
   WebSocketChannel? _channel;
   bool _closed = false;
   bool _open = false;
   int _retryMs = 500;
-  int _lastMessageMs = 0;
-  int _lastPublishMs = 0;
+
+  /// When the relay last said anything, the opening of a socket
+  /// included; 0 before it ever has.
+  int _heardMs = 0;
+
+  /// When the oldest of what this connection has sent since the relay
+  /// last said anything went; null while nothing is waiting on it.
+  int? _unansweredSince;
   Timer? _liveness;
   final _ready = Completer<void>();
 
@@ -133,6 +149,29 @@ class RelayConnection {
 
   /// Up and subscribed.
   bool get connected => _open;
+
+  /// Whether this connection is down, or as good as: not open, or open
+  /// with nothing heard for [cutOffMs] while what it sent has waited
+  /// longer than an answer takes ([answerWaitMs]). A relay answers
+  /// everything, so that silence is the line, not the table — and on a
+  /// line whose way in has stalled while its way out still carries, the
+  /// socket looks open for as long as the stall lasts.
+  bool get cutOff {
+    if (!_open) return true;
+    final since = _unansweredSince;
+    final now = _nowMs;
+    return since != null && now - since >= answerWaitMs && now - _heardMs >= cutOffMs;
+  }
+
+  /// How long since the relay last said anything; null if it never has.
+  int? get heardAgoMs => _heardMs == 0 ? null : _nowMs - _heardMs;
+
+  /// How often the socket has dropped, and how often of those this
+  /// connection dropped it itself for a relay gone silent ([cutOff]):
+  /// for the account of a game lost to the line.
+  int get drops => _drops;
+  int get silences => _silences;
+  int _drops = 0, _silences = 0;
 
   /// Resolves the first time the relay acknowledges the subscriptions.
   Future<void> get ready => _ready.future;
@@ -142,7 +181,7 @@ class RelayConnection {
     if (ch == null || !_open) return;
     try {
       ch.sink.add(jsonEncode(['EVENT', e.toJson()]));
-      _lastPublishMs = _nowMs;
+      _unansweredSince ??= _nowMs;
     } on StateError catch (err) {
       // The socket closed under it; the drop reconnects, and what was
       // not sent is said again by whoever is waiting on it.
@@ -161,10 +200,9 @@ class RelayConnection {
 
   void _checkLiveness() {
     final ch = _channel;
-    if (ch == null || _closed || !_open) return;
-    final now = _nowMs;
-    if (now - _lastPublishMs > quietMs || now - _lastMessageMs < quietMs) return;
-    log?.call('$url: nothing heard back for ${quietMs ~/ 1000} s; reconnecting');
+    if (ch == null || _closed || !_open || !cutOff) return;
+    log?.call('$url: nothing heard for ${(_nowMs - _heardMs) ~/ 1000} s, with what was sent unanswered; reconnecting');
+    _silences++;
     remake();
   }
 
@@ -176,12 +214,15 @@ class RelayConnection {
     ch.ready.then((_) {
       if (_channel != ch) return; // dropped, or replaced, before it was ready
       _retryMs = 500;
-      _lastMessageMs = _nowMs;
+      _heardMs = _nowMs;
       _open = true;
+      // Each subscription is answered with the end of what the relay
+      // holds for it: the first answer this socket waits on.
+      _unansweredSince = subscriptions.isEmpty ? null : _nowMs;
       for (final s in subscriptions.entries) {
         ch.sink.add(jsonEncode(['REQ', s.key, ...s.value]));
       }
-      _liveness ??= Timer.periodic(const Duration(seconds: 5), (_) => _checkLiveness());
+      _liveness ??= Timer.periodic(Duration(milliseconds: cutOffMs ~/ 5), (_) => _checkLiveness());
       log?.call('connected to $url');
     }).catchError((Object e) {
       log?.call('$url: connect failed: $e');
@@ -192,7 +233,8 @@ class RelayConnection {
     if (_closed || ch != _channel) return; // an old socket's last word
     _channel = null;
     _open = false;
-    _lastMessageMs = _nowMs;
+    _unansweredSince = null;
+    _drops++;
     log?.call('$url: dropped; retrying in $_retryMs ms');
     Future<void>.delayed(Duration(milliseconds: _retryMs), _connect);
     _retryMs = (_retryMs * 2).clamp(500, 10000);
@@ -200,7 +242,8 @@ class RelayConnection {
 
   void _onMessage(WebSocketChannel ch, Object? raw) {
     if (ch != _channel) return;
-    _lastMessageMs = _nowMs;
+    _heardMs = _nowMs;
+    _unansweredSince = null;
     if (raw is! String) return;
     final Object? decoded;
     try {
@@ -264,10 +307,24 @@ class RelayConnection {
 /// events written to one.
 class RelayGroup {
   RelayGroup(
-      {required List<Uri> urls, required this.subscriptions, required this.onEvent, this.log, this.refusalMs = defaultRefusalMs, this.auth}) {
+      {required List<Uri> urls,
+      required this.subscriptions,
+      required this.onEvent,
+      this.log,
+      this.refusalMs = defaultRefusalMs,
+      this.auth,
+      int cutOffMs = unansweredMs,
+      int answerWaitMs = answerMs}) {
     if (urls.isEmpty) throw ArgumentError('a relay group needs a relay');
     for (final u in urls) {
-      connections.add(RelayConnection(url: u, subscriptions: subscriptions, onMessage: _onMessage, log: log, auth: auth));
+      connections.add(RelayConnection(
+          url: u,
+          subscriptions: subscriptions,
+          onMessage: _onMessage,
+          log: log,
+          auth: auth,
+          cutOffMs: cutOffMs,
+          answerWaitMs: answerWaitMs));
     }
     ready = Future.any([for (final c in connections) c.ready]);
     allReady = Future.wait([for (final c in connections) c.ready]);
@@ -326,6 +383,27 @@ class RelayGroup {
   static int get _nowMs => DateTime.now().millisecondsSinceEpoch;
 
   bool get connected => connections.any((c) => c.connected);
+
+  /// Whether this client is cut off from every relay
+  /// ([RelayConnection.cutOff]): what it does not hear then is its own
+  /// line, not the table.
+  bool get cutOff => connections.every((c) => c.cutOff);
+
+  /// The line as it stands, in a few words for an account of a game
+  /// lost to it: how many relays are open of how many, when one was
+  /// last heard, and how often the sockets dropped and of those were
+  /// dropped for silence.
+  String get health {
+    final open = connections.where((c) => c.connected).length;
+    final heard = [for (final c in connections) c.heardAgoMs].whereType<int>();
+    final last = heard.isEmpty ? 'never heard' : 'heard ${heard.reduce((a, b) => a < b ? a : b)} ms ago';
+    var drops = 0, silences = 0;
+    for (final c in connections) {
+      drops += c.drops;
+      silences += c.silences;
+    }
+    return '$open of ${connections.length} open${cutOff ? ', cut off' : ''}; $last; dropped $drops, for silence $silences';
+  }
 
   /// The reason the last relay gave when every relay refused this
   /// client's latest event; null once one takes an event again.

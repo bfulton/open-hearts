@@ -18,6 +18,7 @@ import 'package:open_hearts/game_options.dart';
 import 'package:open_hearts/home_page.dart';
 import 'package:open_hearts/identity.dart';
 import 'package:open_hearts/live/lobby.dart';
+import 'package:open_hearts/net/age_check.dart';
 import 'package:open_hearts/net/network.dart';
 import 'package:open_hearts/net/room.dart';
 import 'package:open_hearts/pictures.dart';
@@ -30,6 +31,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:table/table.dart';
 import 'package:table_sim/table_sim.dart';
 
+import 'age_check_test.dart' show StoreSays;
 import 'household_test.dart' show signedFor, standUp;
 import 'room_test.dart' show Bus;
 
@@ -283,6 +285,31 @@ void main() {
         findsOneWidget);
     await tester.pump(stopWaiting + const Duration(seconds: 2));
     await tester.pumpAndSettle();
+  });
+
+  testWidgets("live play goes only where the phone's store lets it: told why, and asked for nothing more", (tester) async {
+    final store = StoreSays(AgeVerdict.tooYoung);
+    await pumpHome(tester);
+    await tester.tap(find.text('Play friends'));
+    await tester.pumpAndSettle();
+    expect(find.text('Live play is for 13 and older'), findsOneWidget);
+    await tester.tap(find.text('OK'));
+    await tester.pump();
+    await tester.pump();
+    expect(find.byType(CircularProgressIndicator), findsNothing, reason: 'nothing opened');
+    await tester.pumpAndSettle();
+    expect(find.text('My initials'), findsNothing, reason: 'no name asked for');
+    expect(find.text('Before you play live'), findsNothing, reason: 'nor the terms');
+    expect(find.text('Share the link'), findsNothing, reason: 'and no room');
+
+    // The store says otherwise later, a birthday or a parent's approval
+    // on: asked again, and on to the name, as ever.
+    store.verdict = AgeVerdict.open;
+    await tester.tap(find.text('Play friends'));
+    await tester.pumpAndSettle();
+    expect(find.text('Live play is for 13 and older'), findsNothing);
+    expect(find.text('My initials'), findsOneWidget);
+    expect(store.asked, 2);
   });
 
   testWidgets('the options line says what the next game is; the sheet changes it and the device keeps it', (tester) async {

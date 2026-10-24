@@ -200,6 +200,7 @@ class StoreShop extends ChangeNotifier {
   Future<void> _queue = Future.value();
 
   StoreProduct? _product;
+  Future<void>? _asking;
   bool _busy = false;
   bool _pending = false;
   bool _bought = false;
@@ -212,6 +213,9 @@ class StoreShop extends ChangeNotifier {
   /// Whether this build buys in a store: there is one, it can take a
   /// payment, and it has the product.
   bool get ready => store != null && _product != null;
+
+  /// The store being asked what it sells.
+  bool get asking => _asking != null;
 
   /// A sheet open, a restore asked for, or a proof with the service.
   bool get busy => _busy;
@@ -248,12 +252,30 @@ class StoreShop extends ChangeNotifier {
         reportError(error, stack, where: 'store purchases');
       });
     });
-    try {
-      if (await store.available()) _product = await store.product(store.kind.product);
-    } catch (_) {
-      _product = null;
-    }
+    await ask();
+  }
+
+  /// Asks the store what it sells, while it has not said: a phone that
+  /// opened offline, or before its store was signed in to, has nothing
+  /// to buy until the store is asked again. Asked while it is being
+  /// asked, it waits for that answer.
+  Future<void> ask() {
+    final store = this.store;
+    if (store == null || _product != null) return Future.value();
+    if (_asking case final asking?) return asking;
+    final asking = _asking = () async {
+      try {
+        if (await store.available()) _product = await store.product(store.kind.product);
+      } catch (_) {
+        _product = null;
+      }
+    }()
+        .whenComplete(() {
+      _asking = null;
+      notifyListeners();
+    });
     notifyListeners();
+    return asking;
   }
 
   /// Opens the store's sheet. What comes of it arrives as a purchase.

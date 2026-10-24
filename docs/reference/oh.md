@@ -20,12 +20,14 @@ Development tools, such as `./check.sh`, the chaos walk and the bot benchmarks, 
 | `<account>` | an account (32 hex characters) or one of its devices' keys (64 hex characters) |
 | `<query>` | a name the account plays under (or had taken off), the email address its web subscription was paid with, or a picture it set: its SHA-256, or the address of its copy |
 | `<what>` | `name`, `picture`, or `name,picture` |
-| `<row>` | `app` (remote config), `service` (service settings) or `relay` (relay settings) |
+| `<row>` | `app` (remote config), `service` (service settings), `relay` (relay settings) or `known` (the checker of known images in use) |
 | `<file>` | a JSON file holding the whole row |
 | `<name>` | a secret's name, as `infra/cloudflare.mjs` lists it |
 | `<platform>` | `ios` or `android` |
 | `<document>` | `terms` (the terms of use) or `privacy` (the privacy policy) |
 | `<picture>` | a picture's SHA-256 (64 hex characters), as the daily email of new pictures gives it, or the address of its copy |
+| `<dir>` | a folder outside this repository holding the PhotoDNA module's files, edge.mjs among them |
+| `<table>` | a table's id (32 hex characters, the end of its /table/<id> address), or its first eight |
 
 ## Credentials
 
@@ -33,11 +35,11 @@ Each command reads what it needs from the environment, and says which are missin
 
 | Variable | What it is |
 |---|---|
-| `CLOUDFLARE_API_TOKEN` | A Cloudflare API token. Accounts: Workers KV Storage Edit, and Workers R2 Storage Edit to find an account by a picture, take a name off kept games, and hold or release an account. Deploys and infrastructure: what docs/how-to/apply-infrastructure.md lists. |
+| `CLOUDFLARE_API_TOKEN` | A Cloudflare API token. Accounts: Workers KV Storage Edit, and Workers R2 Storage Edit to find an account by a picture, take a name off kept games, hold or release an account, and keep or fetch the PhotoDNA module. Deploys and infrastructure: what docs/how-to/apply-infrastructure.md lists. Looking into a table (oh table): Workers Observability Read. |
 | `CLOUDFLARE_ACCOUNT_ID` | The Cloudflare account the project is in. |
 | `STRIPE_API_KEY` | A live-mode Stripe secret or restricted key. Finding an account by email: Customers and Subscriptions read. Refunds and terminations: Subscriptions write, Refunds write, and Invoices read. oh verify: Prices read and Checkout Sessions write, to make a checkout through Link and expire it. Infrastructure: what docs/how-to/apply-infrastructure.md lists. |
-| `NEW_RELIC_API_KEY` | A New Relic User key, for the monitors (oh infra). |
-| `NEW_RELIC_ACCOUNT_ID` | The New Relic account the monitors are in. |
+| `NEW_RELIC_API_KEY` | A New Relic User key, for the monitors (oh infra), and to read what devices reported of a table (oh table). |
+| `NEW_RELIC_ACCOUNT_ID` | The New Relic account the monitors and the browser agent are in. |
 | `NEW_RELIC_REGION` | US or EU. |
 
 ## Accounts
@@ -238,7 +240,7 @@ Says, for the terms and the privacy policy, the newest entry in the ledger, whet
 oh terms record <document> [--apply] [--change <change>] [--date <date>]
 ```
 
-Writes the ledger entry for a change this checkout makes to the terms or the privacy policy: its day, its fingerprint, the kind of change and, for the terms, the price. --change is `minor` (nobody's rights or duties change), `material` or `price`; --date is the day it is to go live, today unless given. While the branch's own newest entry is not on main yet, it is brought up to date instead. The summary in each language is written by hand afterwards.
+Writes the ledger entry for a change this checkout makes to the terms or the privacy policy: its day, its fingerprint, the kind of change and, for the terms, the price. --change is `minor` (nobody's rights or duties change), `material` or `price`; --date is the day it is to go live, today unless given; dated the day of the entry before, it is that day's next revision. While the branch's own newest entry is not on main yet, it is brought up to date instead. The summary in each language is written by hand afterwards.
 
 - **Needs:** nothing but this checkout
 - **How-to:** [change-the-terms.md](../how-to/change-the-terms.md#record-the-change)
@@ -344,6 +346,22 @@ Checks production: the live build is origin/main, the service is healthy, the re
 - **How-to:** [deploy.md](../how-to/deploy.md#check-it-worked)
 - **Example:** `oh verify`
 
+## Looking into a game
+
+What happened at a live table, from what each side of it said.
+
+### oh table
+
+```bash
+oh table <table> [--days <days>]
+```
+
+Prints, in one timeline, what the backup jurors, the relay and the device each said of one table: the jurors' traces, the relay's sockets coming and going, what was done with the backup jurors, and the device's own report of a game lost or a line down. --days says how far back to look (3 unless it says, at most 30; Workers Logs keeps what it keeps). Without New Relic's credentials the device's side is left out, and said so.
+
+- **Needs:** `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, (Workers Observability Read), NEW_RELIC_API_KEY and NEW_RELIC_ACCOUNT_ID (for the device's side)
+- **How-to:** [look-into-a-lost-game.md](../how-to/look-into-a-lost-game.md)
+- **Example:** `oh table 83167bb6`
+
 ## Setting up
 
 What the deployment is made of: its accounts' definitions, its run-time rows, its secrets, and the phone builds.
@@ -395,6 +413,30 @@ Deletes a run-time row, so every field goes back to its default.
 - **Needs:** `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`
 - **How-to:** [change-remote-config.md](../how-to/change-remote-config.md)
 - **Example:** `oh config clear app --apply`
+
+### oh photodna put
+
+```bash
+oh photodna put <dir> [--apply]
+```
+
+Keeps the PhotoDNA module in the private bucket, every file in <dir> named by its SHA-256, and pins them in config/openhearts.json. The module is Microsoft's, licensed to Open Hearts as confidential, and the relay's code that calls it; never put it in this repository. Commit config/openhearts.json, and the relay deployed from main is built with exactly the files it pins.
+
+- **Needs:** `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, (Workers R2 Storage Edit)
+- **How-to:** [update-the-photodna-module.md](../how-to/update-the-photodna-module.md)
+- **Example:** `oh photodna put ~/photodna-module --apply`
+
+### oh photodna get
+
+```bash
+oh photodna get <dir>
+```
+
+Fetches the PhotoDNA module config/openhearts.json pins, from the private bucket into <dir>, to change it. Each file is checked against its pin. Keep <dir> outside this repository.
+
+- **Needs:** `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, (Workers R2 Storage Edit)
+- **How-to:** [update-the-photodna-module.md](../how-to/update-the-photodna-module.md)
+- **Example:** `oh photodna get ~/photodna-module`
 
 ### oh secret set
 

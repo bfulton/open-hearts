@@ -571,8 +571,13 @@ class AppLocalizationsFr extends AppLocalizations {
       'Ce compte est suspendu du jeu en direct en application des conditions d\'utilisation. Jouer seul reste possible. Pour savoir pourquoi, ou pour faire appel, écrivez à help@openhearts.game.';
 
   @override
-  String get storeSubscriptionLater =>
-      'Sur téléphone, ce sera l\'abonnement de la boutique d\'applications. En attendant que l\'application y soit, le jeu en direct s\'achète sur le web.';
+  String storeNotAnswered(String store) {
+    String _temp0 = intl.Intl.selectLogic(store, {
+      'google': 'Google Play n\'a pas encore indiqué le prix du jeu en direct. Vérifiez que vous êtes connecté, puis touchez S\'abonner pour lui redemander.',
+      'other': 'L\'App Store n\'a pas encore indiqué le prix du jeu en direct. Vérifiez que vous êtes connecté, puis touchez S\'abonner pour lui redemander.',
+    });
+    return '$_temp0';
+  }
 
   @override
   String get subscriptionIsYours =>
@@ -847,6 +852,39 @@ class AppLocalizationsFr extends AppLocalizations {
   String get liveAgree => 'Accepter';
 
   @override
+  String get liveTooYoungTitle => 'Le jeu en direct, c\'est à partir de 13 ans';
+
+  @override
+  String liveTooYoung(String store) {
+    String _temp0 = intl.Intl.selectLogic(store, {
+      'google': 'Selon Google Play, vous avez moins de 13 ans.',
+      'other': 'Selon votre compte Apple, vous avez moins de 13 ans.',
+    });
+    return '$_temp0 Jouer seul est ouvert à tous, autant que vous voulez.';
+  }
+
+  @override
+  String get liveAwaitingParentTitle => 'En attente d\'un parent';
+
+  @override
+  String get liveAwaitingParent =>
+      'Google Play attend qu\'un parent ou un tuteur approuve des changements d\'Open Hearts. Le jeu en direct s\'ouvrira dès qu\'il l\'aura fait. En attendant, vous pouvez jouer seul.';
+
+  @override
+  String get liveParentDeclinedTitle => 'Non approuvé';
+
+  @override
+  String get liveParentDeclined =>
+      'Un parent ou un tuteur n\'a pas approuvé des changements d\'Open Hearts dans Google Play : le jeu en direct est donc fermé. Vous pouvez toujours jouer seul.';
+
+  @override
+  String get liveAgeUnconfirmedTitle => 'Confirmez votre âge';
+
+  @override
+  String get liveAgeUnconfirmed =>
+      'Google Play doit confirmer votre âge avant que vous puissiez jouer en direct. Vous pouvez le faire dans l\'app Play Store. En attendant, vous pouvez jouer seul.';
+
+  @override
   String get changedBoth =>
       'Nos conditions d\'utilisation et notre politique de confidentialité ont changé.';
 
@@ -884,6 +922,9 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get waitingToReconnect => 'En attente de la reconnexion des autres';
+
+  @override
+  String get connectionDown => 'Votre connexion est coupée — reconnexion';
 
   @override
   String get askingTheJury => 'Consultation du jury';

@@ -91,6 +91,20 @@
         "de": "Jedes Bild deines Kontos wird geprüft; eine Kopie bleibt bis ein Jahr, nachdem es nicht mehr deins ist. Project Arachnid erhält nur den Fingerabdruck zum Abgleich mit bekannten Kindesmissbrauchsbildern. Meldungen per E-Mail. Du kannst Spieler blockieren und dein Konto löschen.",
         "fr": "Chaque image de votre compte est vérifiée et une copie gardée jusqu'à un an après qu'elle n'est plus la vôtre ; Project Arachnid n'en voit que l'empreinte, comparée aux images connues d'abus d'enfants. Signalements par e-mail. Vous pouvez bloquer des joueurs, supprimer le compte."
       }
+    },
+    {
+      "date": "2026-10-23",
+      "revision": 2,
+      "fingerprint": "4ff2d0cb114c34c45d26532db3ae668a53e0d85d5fb4ec33964075d2b4f4c81b",
+      "change": "material",
+      "storesNotified": null,
+      "summary": {
+        "en": "If Project Arachnid can't check pictures for known images of child sexual abuse, Microsoft's PhotoDNA may, sent only a fingerprint; we note which checked each. On a phone, before live play, the app asks its store if you're 13 or older, and keeps nothing of the answer.",
+        "es": "Si Project Arachnid no puede, PhotoDNA de Microsoft puede buscar en las imágenes abuso sexual infantil conocido, solo con una huella; anotamos cuál revisó cada una. En el teléfono, antes del juego en vivo, la app pregunta a la tienda si tienes 13 años o más, sin guardar nada.",
+        "pt": "Sem o Project Arachnid, o PhotoDNA da Microsoft pode buscar nas imagens abuso sexual infantil conhecido, só com uma impressão digital; anotamos qual verificou cada uma. No celular, antes do jogo ao vivo, o app pergunta à loja se você tem 13 anos ou mais, sem guardar nada.",
+        "de": "Kann Project Arachnid es nicht, kann PhotoDNA von Microsoft Bilder auf bekannten Kindesmissbrauch prüfen, nur mit einem Fingerabdruck; wir notieren, wer jedes prüfte. Auf dem Handy fragt die App vor Live-Spielen den Store, ob du 13 oder älter bist, und speichert nichts davon.",
+        "fr": "Sans Project Arachnid, PhotoDNA de Microsoft peut repérer les images connues d'abus sexuels d'enfants, avec une simple empreinte ; nous notons qui a vérifié chacune. Sur téléphone, avant le jeu en direct, l'app demande à la boutique si vous avez 13 ans ou plus, sans rien garder."
+      }
     }
   ]
 }

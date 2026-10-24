@@ -9,7 +9,7 @@ import { readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { pages } from '../infra/cloudflare.mjs';
+import { PRIVATE_BUCKET, pages } from '../infra/cloudflare.mjs';
 import { stripe as stripeDefinition } from '../infra/stripe.mjs';
 import { restStore } from '../service/tool/kv.mjs';
 import { restBucket, restObjects } from '../service/tool/r2.mjs';
@@ -26,11 +26,11 @@ export class Failed extends Error {}
 /// Every credential an oh command can need, and what it has to allow.
 /// The reference (docs/reference/oh.md) lists them from here.
 export const CREDENTIALS = {
-  CLOUDFLARE_API_TOKEN: 'A Cloudflare API token. Accounts: Workers KV Storage Edit, and Workers R2 Storage Edit to find an account by a picture, take a name off kept games, and hold or release an account. Deploys and infrastructure: what docs/how-to/apply-infrastructure.md lists.',
+  CLOUDFLARE_API_TOKEN: 'A Cloudflare API token. Accounts: Workers KV Storage Edit, and Workers R2 Storage Edit to find an account by a picture, take a name off kept games, hold or release an account, and keep or fetch the PhotoDNA module. Deploys and infrastructure: what docs/how-to/apply-infrastructure.md lists. Looking into a table (oh table): Workers Observability Read.',
   CLOUDFLARE_ACCOUNT_ID: 'The Cloudflare account the project is in.',
   STRIPE_API_KEY: 'A live-mode Stripe secret or restricted key. Finding an account by email: Customers and Subscriptions read. Refunds and terminations: Subscriptions write, Refunds write, and Invoices read. oh verify: Prices read and Checkout Sessions write, to make a checkout through Link and expire it. Infrastructure: what docs/how-to/apply-infrastructure.md lists.',
-  NEW_RELIC_API_KEY: 'A New Relic User key, for the monitors (oh infra).',
-  NEW_RELIC_ACCOUNT_ID: 'The New Relic account the monitors are in.',
+  NEW_RELIC_API_KEY: 'A New Relic User key, for the monitors (oh infra), and to read what devices reported of a table (oh table).',
+  NEW_RELIC_ACCOUNT_ID: 'The New Relic account the monitors and the browser agent are in.',
   NEW_RELIC_REGION: 'US or EU.',
 };
 
@@ -91,6 +91,13 @@ export async function picturesBucket(env, fetchImpl = fetch) {
   const bucket = /binding = "OH_PICTURES"\s*\nbucket_name = "([^"]+)"/.exec(toml)?.[1];
   if (!bucket) throw new Failed('no OH_PICTURES bucket in service/do/wrangler.toml');
   return restObjects({ token, account, bucket, fetchImpl });
+}
+
+/// The private bucket, where what this repository must not hold is kept
+/// (infra/cloudflare.mjs): the PhotoDNA module (ops/photodna.mjs).
+export function privateBucket(env, fetchImpl = fetch) {
+  const [token, account] = need(env, 'CLOUDFLARE_API_TOKEN', 'CLOUDFLARE_ACCOUNT_ID');
+  return restObjects({ token, account, bucket: PRIVATE_BUCKET, fetchImpl });
 }
 
 /// Stripe's API with STRIPE_API_KEY, in the shape the service's webhook
@@ -155,6 +162,7 @@ export function context(overrides = {}) {
     store: () => productionStore(env, fetchImpl),
     bucket: () => recordsBucket(env, fetchImpl),
     pictures: () => picturesBucket(env, fetchImpl),
+    privateFiles: () => privateBucket(env, fetchImpl),
     relay: relayOrigin,
     stripe: () => stripeApi(env, fetchImpl),
     config: readConfig,

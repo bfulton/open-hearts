@@ -11,7 +11,8 @@ import { join } from 'node:path';
 import { test } from 'node:test';
 
 import { config, dayIn, languages, ledger, priceIn, render, strings } from './build.mjs';
-import { DOCUMENTS, fingerprintOf, formatLedger, ledgerProblems, rewritten, textOf } from './ledger.mjs';
+import { DOCUMENTS, fingerprintOf, formatLedger, ledgerProblems, rewritten, textOf, versionOf } from './ledger.mjs';
+import { versionOf as serviceVersionOf } from '../service/functions/notices.mjs';
 
 const root = new URL('..', import.meta.url).pathname;
 const english = languages.find((l) => l.code === 'en');
@@ -117,7 +118,7 @@ test('an entry out of order, or not whole, or mislabelled, is said', () => {
     l[doc][i] = { ...l[doc][i], ...more };
     return ledgerProblems(l);
   };
-  assert.match(spoilt('terms', 1, { date: '2026-10-16' }).join(), /not after the entry before/);
+  assert.match(spoilt('terms', 1, { date: '2026-10-15' }).join(), /terms 2026-10-15: not after the entry before \(2026-10-16\)/);
   assert.match(spoilt('terms', 1, { date: '2026-02-30' }).join(), /not a day/);
   assert.match(spoilt('terms', 1, { change: 'first' }).join(), /only the first entry/);
   assert.match(spoilt('terms', 0, { change: 'minor' }).join(), /only the first entry/);
@@ -139,6 +140,34 @@ test('an entry out of order, or not whole, or mislabelled, is said', () => {
   assert.match(ledgerProblems({ ...good, cookies: [] }).join(), /no such document as cookies/);
 });
 
+test("a version published the day of the one before is the day's next revision, and says what none of the day's versions before it says", () => {
+  const revised = (...more) => ({
+    terms: [entry('2026-10-16', 'first'), ...more.map(([date, extra]) => entry(date, 'material', extra))],
+    privacy: [privacyEntry('2026-10-13', 'first')],
+  });
+  const good = revised(['2026-11-01', { fingerprint: 'b'.repeat(64) }], ['2026-11-01', { revision: 2, fingerprint: 'c'.repeat(64) }], ['2026-11-01', { revision: 3, fingerprint: 'd'.repeat(64), change: 'minor' }], ['2026-11-02', { fingerprint: 'c'.repeat(64) }]);
+  assert.deepEqual(ledgerProblems(good), []);
+  assert.deepEqual(good.terms.map(versionOf), ['2026-10-16', '2026-11-01', '2026-11-01.2', '2026-11-01.3', '2026-11-02']);
+  assert.deepEqual(good.terms.map(serviceVersionOf), good.terms.map(versionOf), 'the service names each version as the ledger does');
+  const said = (...more) => ledgerProblems(revised(...more)).join('\n');
+  assert.match(said(['2026-11-01', { fingerprint: 'b'.repeat(64) }], ['2026-11-01', { fingerprint: 'c'.repeat(64) }]), /terms 2026-11-01: published the day of the entry before \(2026-11-01\), so its revision is 2/, 'a second version without its revision');
+  assert.match(said(['2026-11-01', { fingerprint: 'b'.repeat(64) }], ['2026-11-01', { revision: 3, fingerprint: 'c'.repeat(64) }]), /terms 2026-11-01\.3: published the day of the entry before \(2026-11-01\), so its revision is 2/);
+  assert.match(said(['2026-11-01', { fingerprint: 'b'.repeat(64) }], ['2026-11-01', { revision: '2', fingerprint: 'c'.repeat(64) }]), /so its revision is 2/, 'a number, not words');
+  assert.match(said(['2026-11-01', { fingerprint: 'b'.repeat(64) }], ['2026-11-01', { revision: 2, fingerprint: 'c'.repeat(64) }], ['2026-11-01', { revision: 2, fingerprint: 'd'.repeat(64) }]), /terms 2026-11-01\.2: published the day of the entry before \(2026-11-01\.2\), so its revision is 3/);
+  assert.match(said(['2026-11-01', { revision: 2, fingerprint: 'b'.repeat(64) }]), /terms 2026-11-01\.2: the first version of its day has no revision/);
+  assert.match(ledgerProblems({ ...good, privacy: [privacyEntry('2026-10-13', 'first', { revision: 2 })] }).join(), /privacy 2026-10-13\.2: the first version of its day has no revision/, 'nor the first entry');
+  assert.match(said(['2026-11-01', { fingerprint: 'b'.repeat(64) }], ['2026-11-01', { revision: 2, fingerprint: 'b'.repeat(64) }]), /terms 2026-11-01\.2: says what a version of its day before it says/);
+  assert.match(said(['2026-11-01', { fingerprint: 'b'.repeat(64) }], ['2026-11-01', { revision: 2, fingerprint: 'c'.repeat(64) }], ['2026-11-01', { revision: 3, fingerprint: 'b'.repeat(64) }]), /terms 2026-11-01\.3: says what a version of its day before it says/, 'any version of the day');
+  assert.deepEqual(ledgerProblems(revised(['2026-11-01', { fingerprint: 'a'.repeat(64) }])), [], 'the text of the day before, on a day of its own');
+  assert.deepEqual(ledgerProblems(revised(['2026-11-01', { fingerprint: 'b'.repeat(64) }], ['2026-11-01', { revision: 2, fingerprint: 'a'.repeat(64) }])), [], 'or as a revision: only its own day is held apart');
+  assert.match(said(['2026-11-01', { fingerprint: 'b'.repeat(64) }], ['2026-11-01', { revision: 2, fingerprint: 'c'.repeat(64) }], ['2026-10-31', { fingerprint: 'd'.repeat(64) }]), /terms 2026-10-31: not after the entry before \(2026-11-01\.2\)/);
+  const privacyRevised = { ...good, privacy: [privacyEntry('2026-10-13', 'first'), privacyEntry('2026-10-13', 'material', { revision: 2, fingerprint: 'b'.repeat(64) })] };
+  assert.deepEqual(ledgerProblems(privacyRevised), [], 'its revision is part of an entry');
+  const unrevised = structuredClone(privacyRevised);
+  unrevised.privacy[1].revision = undefined;
+  assert.match(ledgerProblems(unrevised).join(), /so its revision is 2/);
+});
+
 test('the ledger only grows: an entry may be added, and a store notice filled in once, and nothing else', () => {
   const main = { terms: [entry('2026-10-16', 'first'), entry('2026-11-01', 'material')], privacy: [privacyEntry('2026-10-13', 'first')] };
   const now = structuredClone(main);
@@ -156,4 +185,10 @@ test('the ledger only grows: an entry may be added, and a store notice filled in
   const shortened = structuredClone(main);
   shortened.terms.pop();
   assert.deepEqual(rewritten(main, shortened), ['terms 2026-11-01: taken out']);
+  const revised = structuredClone(main);
+  revised.terms.push(entry('2026-11-01', 'material', { revision: 2 }));
+  const unrevised = structuredClone(revised);
+  delete unrevised.terms[2].revision;
+  assert.deepEqual(rewritten(revised, unrevised), ['terms 2026-11-01.2: changed'], 'a revision is part of its entry');
+  assert.deepEqual(rewritten(revised, main), ['terms 2026-11-01.2: taken out']);
 });
