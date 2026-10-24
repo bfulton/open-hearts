@@ -296,6 +296,12 @@ squashed from a pull request, the pull request's number.
 
 ### Fixed
 
+- Choosing which part of a photograph is your picture, a drag moves the
+  photograph with the finger all the way. Before, each step of a drag
+  was laid on where the drag began, so the photograph moved by the last
+  few pixels and no further, and only pinching did anything. A pinch
+  now keeps what is under the fingers under them as they move.
+  (2026-10-24, #38)
 - A live game no longer ends for a device's own line going down. A
   satellite link on a plane let one player's heartbeats out and nothing
   in: alone at a table of bots, the device took the jurors it could not

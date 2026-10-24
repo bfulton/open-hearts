@@ -173,6 +173,108 @@ void main() {
       expect(kept, const Rect.fromLTWH(0, 0, 200, 200), reason: 'the picture pulled right shows its left');
     });
 
+    // A finger moves a few pixels a frame, and the picture goes the whole
+    // way with it, not just the last few pixels.
+    testWidgets('dragged a little at a time, the picture follows the finger all the way', (tester) async {
+      final kept = await crop(tester, _halves(), const Size(400, 200), (tester) async {
+        final finger = await tester.startGesture(tester.getCenter(find.byType(Image)));
+        for (var i = 0; i < 12; i++) {
+          await finger.moveBy(const Offset(5, 0));
+          await tester.pump();
+        }
+        await finger.up();
+        await tester.pumpAndSettle();
+      });
+      expect(kept, const Rect.fromLTWH(40, 0, 200, 200), reason: '60 pixels right, of the 100 the picture has room for');
+    });
+
+    // The picture stops at its edge however far the finger goes, and
+    // starts back the moment the finger does.
+    testWidgets('dragged past the edge and back, it comes back as soon as the finger does', (tester) async {
+      final kept = await crop(tester, _halves(), const Size(400, 200), (tester) async {
+        final finger = await tester.startGesture(tester.getCenter(find.byType(Image)));
+        for (var i = 0; i < 30; i++) {
+          await finger.moveBy(const Offset(5, 0));
+          await tester.pump();
+        }
+        for (var i = 0; i < 6; i++) {
+          await finger.moveBy(const Offset(-5, 0));
+          await tester.pump();
+        }
+        await finger.up();
+        await tester.pumpAndSettle();
+      });
+      expect(kept, const Rect.fromLTWH(30, 0, 200, 200), reason: 'held at 100 pixels right, then 30 back');
+    });
+
+    // Two fingers spreading to twice as far apart while both move 30
+    // pixels right: what was under them at the start, the picture's
+    // middle, is under them at the end. The outer finger moves first,
+    // so the pinch never closes below where it began, where the picture
+    // is as small as it goes.
+    testWidgets('pinched while moving, what was under the fingers stays under them', (tester) async {
+      final kept = await crop(tester, _halves(), const Size(400, 200), (tester) async {
+        final middle = tester.getCenter(find.byType(Image));
+        final one = await tester.startGesture(middle - const Offset(20, 0), pointer: 1);
+        final two = await tester.startGesture(middle + const Offset(20, 0), pointer: 2);
+        for (var i = 0; i < 10; i++) {
+          await two.moveBy(const Offset(5, 0));
+          await one.moveBy(const Offset(1, 0));
+          await tester.pump();
+        }
+        await one.up();
+        await two.up();
+        await tester.pumpAndSettle();
+      });
+      expect(kept, rectMoreOrLessEquals(const Rect.fromLTWH(135, 50, 100, 100)), reason: 'twice as big, the middle 30 pixels right');
+    });
+
+    /// Two fingers either side of the middle, [from] apart, spread to
+    /// [to] apart a step at a time and lifted.
+    Future<void> pinch(WidgetTester tester, double from, double to) async {
+      final middle = tester.getCenter(find.byType(ClipRRect).last);
+      final one = await tester.startGesture(middle - Offset(from / 2, 0), pointer: 1);
+      final two = await tester.startGesture(middle + Offset(from / 2, 0), pointer: 2);
+      for (var i = 0; i < 10; i++) {
+        await two.moveBy(Offset((to - from) / 20, 0));
+        await one.moveBy(Offset(-(to - from) / 20, 0));
+        await tester.pump();
+      }
+      await one.up();
+      await two.up();
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('pinched twice, the second takes up where the first left off', (tester) async {
+      final kept = await crop(tester, _halves(), const Size(400, 200), (tester) async {
+        await pinch(tester, 40, 80);
+        await pinch(tester, 40, 60);
+      });
+      expect(
+        kept,
+        rectMoreOrLessEquals(Rect.fromCenter(center: const Offset(200, 100), width: 200 / 3, height: 200 / 3)),
+        reason: 'twice, then half as big again',
+      );
+    });
+
+    testWidgets('fingers pinched together to one point leave it as small as it goes, not broken', (tester) async {
+      final kept = await crop(tester, _halves(), const Size(400, 200), (tester) async {
+        final middle = tester.getCenter(find.byType(ClipRRect).last);
+        final one = await tester.startGesture(middle - const Offset(20, 0), pointer: 1);
+        final two = await tester.startGesture(middle + const Offset(20, 0), pointer: 2);
+        await one.moveBy(const Offset(20, 0));
+        await two.moveBy(const Offset(-20, 0));
+        await tester.pump();
+        await one.moveBy(Offset.zero);
+        await two.moveBy(Offset.zero);
+        await tester.pump();
+        await one.up();
+        await two.up();
+        await tester.pumpAndSettle();
+      });
+      expect(kept, const Rect.fromLTWH(100, 0, 200, 200));
+    });
+
     testWidgets('and what it hands back is what ends up on the badge', (tester) async {
       final bytes = _halves();
       final kept = await crop(tester, bytes, const Size(400, 200), (tester) async {
