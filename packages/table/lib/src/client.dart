@@ -343,6 +343,46 @@ class TableClient {
   Pause? get pause => _pause;
   Pause? _pause;
 
+  /// Whether this device is cut off itself ([Transport.cutOff]): its
+  /// own line down, so that what it does not hear says nothing of the
+  /// table. A view says so over whatever the table seems to wait on.
+  bool get cutOff => transport.cutOff;
+
+  /// What [cutOff] was at the last tick, to say when it changes.
+  bool _wasCutOff = false;
+
+  /// How many times this side has found itself cut off, at a tick, for
+  /// [lineAccount].
+  int _cutOffs = 0;
+
+  /// What a report of this side's line says of the table, for the
+  /// operator to read beside the jurors' own traces: where it stands,
+  /// whom it hears and since when, and its line — with no key, card or
+  /// name in it, so that it can go where errors go (the app's
+  /// report_error.dart).
+  String get lineAccount {
+    final at = _failedAt;
+    final where = at == null ? 'hand ${game.handNumber} ${game.phase.name}' : 'at ${at.turn}, seat ${at.seat}';
+    final hand = game.handNumber;
+    final heard = [for (final j in _jurorsOf(hand)) if (_jurorHeard[j] case final t?) clock.nowMs - t];
+    final others = participants.where((k) => k != signer.publicKey).length;
+    final heardOthers = heardLately.where((k) => k != signer.publicKey).length;
+    return '${_failure?.label ?? 'playing'} $where; '
+        'hears $heardOthers of $others other people; '
+        'jury ${_jurorsOf(hand).length} drawn, ${_liveJurors(hand).length} live, '
+        '${heard.isEmpty ? 'none heard' : 'last heard ${heard.reduce(min) ~/ 1000} s ago'}; '
+        '${transport.cutOff ? 'cut off now' : 'line up'}, cut off $_cutOffs times';
+  }
+
+  /// The last tick this side found itself cut off at; [_never] until it
+  /// has been. Whatever it did not hear until then is its own line's
+  /// silence, not anybody's at the table, so a juror's quiet and a bot
+  /// seat's turn are counted from no earlier than this ([_jurorSilentSince],
+  /// [_outOfTime]). Once the line is back the table has the whole of
+  /// each allowance again to be heard in, and is: its heartbeats come
+  /// every few seconds, and what this side missed comes with them.
+  int _cutOffAt = _never;
+
   /// Receives a line for every transition, for traces. Off by default.
   void Function(String line)? log;
 
@@ -691,7 +731,7 @@ class TableClient {
       b.writeln('  proposed jury ${e.key.substring(0, 6)} by ${e.value.forAction.map((k) => k.substring(0, 4))}');
     }
     if (_juror.summoned) b.writeln('  serving as juror for hands ${_juror.hands.toList()}; appeals ${_juror.appeals}');
-    b.writeln('  connected ${connectedToMajority ? 'yes' : 'no'}; heard '
+    b.writeln('  connected ${connectedToMajority ? 'yes' : 'no'}${transport.cutOff ? ', cut off' : ''}; heard '
         '${_humans.where((k) => k != signer.publicKey).map((k) => '${k.substring(0, 4)} '
             '${_lastHeard[k] == null ? 'never' : '${clock.nowMs - _lastHeard[k]!} ms ago'}').join(', ')}');
     return b.toString();
@@ -1397,6 +1437,12 @@ class TableClient {
     _stalled.removeWhere((t, _) => t.hand == game.handNumber);
     game.abandonHand();
     _openHand();
+    // And what was held for the next hand, as a hand that finishes
+    // takes it up ([_closeTurn]): a jury proposed for it before this
+    // side gave this one up is otherwise held for good, since the
+    // proposer says it again unchanged and a proposal said again is
+    // looked at only where it was taken up ([_reconsiderJury]).
+    _drainFuture();
   }
 
   /// Every audit turn settled — and none of them stalled: a seat
@@ -1888,7 +1934,17 @@ class TableClient {
     if (mySeat == null) _juror.relayIfAppealed(event);
   }
 
-  bool _jurorRecent(PublicKey j) => clock.nowMs - (_jurorHeard[j] ?? _never) < timing.jurorSilenceMs;
+  bool _jurorRecent(PublicKey j) => clock.nowMs - (_jurorSilentSince(j) ?? _never) < timing.jurorSilenceMs;
+
+  /// Since when [j] has been silent as far as this side can tell: since
+  /// it was last heard, or since this side was last cut off, whichever
+  /// is later ([_cutOffAt]); null for a juror never heard, with this
+  /// side never cut off.
+  int? _jurorSilentSince(PublicKey j) {
+    final heard = _jurorHeard[j];
+    if (_cutOffAt == _never) return heard;
+    return heard == null || heard < _cutOffAt ? _cutOffAt : heard;
+  }
 
   void _onAction(TableEvent event) {
     _relayIfAppealed(event);
@@ -2740,7 +2796,9 @@ class TableClient {
       _botTurnSince.remove(key);
       return false;
     }
-    final since = _botTurnSince.putIfAbsent(key, () => clock.nowMs);
+    // Nor for the time this side could not have heard the move
+    // ([_cutOffAt]).
+    final since = max(_botTurnSince.putIfAbsent(key, () => clock.nowMs), _cutOffAt);
     return clock.nowMs - since >= (turn.isDeal || turn.isAudit ? timing.botDealsMs : timing.botActsMs);
   }
 
@@ -2862,6 +2920,14 @@ class TableClient {
   /// those two minutes counts, not only in the last half: one cut off
   /// from this side for less may already have ruled, and its ruling be
   /// on its way — though not one that could not open the seat anyway.
+  ///
+  /// Nor for a jury this side could not hear for its own line being down
+  /// ([cutOff]): the jury may be playing on — as one was while a plane's
+  /// satellite link let this side's heartbeats out and nothing in — and
+  /// alone at the table this side hears most of it whatever happens, so
+  /// nothing above would stop it. Its jurors are not quiet for the time
+  /// it was cut off ([_cutOffAt]); a jury really gone ends the game once
+  /// the line is back and the jury has had its half minute to be heard.
   void _judgeQuorum() {
     final seat = _unopenable();
     final at = seat ?? _unruled();
@@ -2881,8 +2947,11 @@ class TableClient {
   /// silent as long as a person is given before the table removes
   /// them — and no juror heard in that time could move the turn it is
   /// stopped at: open [seat], where it waits on one, or else rule.
+  /// Silent as this side could have heard it: not for the time it was
+  /// cut off itself ([_cutOffAt]), when the rest may have been playing
+  /// on all along.
   bool _unheardAreGone(({TurnId turn, int seat})? seat) {
-    if (!participants.every((k) => k == signer.publicKey || _recent(k) || _silent(k))) return false;
+    if (!participants.every((k) => k == signer.publicKey || _recent(k) || _silentHeard(k))) return false;
     final heard = _liveJurors(game.handNumber, withinMs: timing.silenceMs);
     return seat == null ? heard.isEmpty : !_escrow.openableBy(game.handNumber, seat.seat, heard.contains);
   }
@@ -3524,6 +3593,13 @@ class TableClient {
 
   bool _silent(PublicKey key) => clock.nowMs - (_lastHeard[key] ?? clock.nowMs) >= timing.silenceMs;
 
+  /// [_silent], counting none of the time this side was cut off
+  /// ([_cutOffAt]) as [key]'s.
+  bool _silentHeard(PublicKey key) {
+    final heard = _lastHeard[key];
+    return heard != null && clock.nowMs - max(heard, _cutOffAt) >= timing.silenceMs;
+  }
+
   // ---- silence -----------------------------------------------------------
   //
   // A seat silent past timing.silenceMs is booted at its own turn
@@ -3608,6 +3684,13 @@ class TableClient {
     _forgetSaidAgain();
     _escrow.topUp();
     _timers.add(clock.schedule(1000, _tick));
+    final off = transport.cutOff;
+    if (off) _cutOffAt = clock.nowMs;
+    if (off != _wasCutOff) {
+      _wasCutOff = off;
+      if (off) _cutOffs++;
+      _trace(off ? 'cut off: nothing heard back for ${unansweredMs ~/ 1000} s; waiting for the line' : 'the line is back');
+    }
     if (amSeated && !_left && !done) {
       _repeat();
       // Cut off from the table? Say so, rather than claim anything.
@@ -3923,7 +4006,7 @@ class TableClient {
     void consider(Iterable<PublicKey> jurors, int drawn) {
       for (final j in jurors) {
         if (live.contains(j)) continue;
-        final heard = _jurorHeard[j];
+        final heard = _jurorSilentSince(j);
         if ((heard != null && clock.nowMs - heard < within) || clock.nowMs - drawn < within) live.add(j);
       }
     }

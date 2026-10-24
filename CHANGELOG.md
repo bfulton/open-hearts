@@ -10,6 +10,13 @@ squashed from a pull request, the pull request's number.
 
 ### Added
 
+- `oh table <id>`: what the backup jurors, the relay and the player's
+  device each said of one live table, in one timeline. The relay now
+  logs each socket's coming and going, and the backup jurors' object
+  what it did with them, by the table's first eight characters and
+  nothing about anybody; a device on the web tells New Relic of a game
+  it lost, or a line down for two minutes, with what it saw.
+  (2026-10-24, #37)
 - On a phone, live play, and buying it in the store, ask the App Store
   or Google Play first whether the player may play live: closed, with
   a note saying why and that playing alone is open, for a player the
@@ -289,6 +296,18 @@ squashed from a pull request, the pull request's number.
 
 ### Fixed
 
+- A live game no longer ends for a device's own line going down. A
+  satellite link on a plane let one player's heartbeats out and nothing
+  in: alone at a table of bots, the device took the jurors it could not
+  hear for gone, gave a bot seat up for a move it never saw, and ended
+  the game as "juror quorum lost" while the jurors played on. Now a
+  device that hears nothing back from the relay for ten seconds takes
+  itself for cut off, makes its socket afresh, says "Your connection is
+  down — reconnecting", and judges nobody silent for the time it could
+  not hear. (2026-10-24, #37)
+- A jury proposed for the next hand before a side gave its own hand up
+  undealt is now backed once it has; the table could wait on it for
+  good. (2026-10-24, #37)
 - On a phone whose store hasn't said what live play costs, opened
   offline say, the subscription page asks the store again when it opens
   and on Subscribe, shows no price until the store gives its own, and no

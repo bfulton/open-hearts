@@ -191,6 +191,7 @@
   "accountDeleted": "Votre compte est supprimé",
   "accountDeletedClose": "Fermez Open Hearts et rouvrez-le pour repartir de zéro.",
   "waitingToReconnect": "En attente de la reconnexion des autres",
+  "connectionDown": "Votre connexion est coupée — reconnexion",
   "askingTheJury": "Consultation du jury",
   "noJurorOnline": "Personne en ligne pour former un jury — en attente",
   "waitingForTheJury": "En attente du jury",

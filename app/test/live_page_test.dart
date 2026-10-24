@@ -17,6 +17,7 @@ import 'package:go_router/go_router.dart';
 import 'package:open_hearts/avatar.dart';
 import 'package:open_hearts/live/live_controller.dart';
 import 'package:open_hearts/live/live_page.dart';
+import 'package:open_hearts/net/report_error.dart' show noticed;
 import 'package:open_hearts/pictures.dart';
 import 'package:open_hearts/report.dart';
 import 'package:open_hearts/theme.dart';
@@ -369,6 +370,95 @@ void main() {
     }
     expect(live.controller.personaAt(1), isNotNull, reason: 'a bot holds seat 1');
     expect(tester.takeException(), isNull);
+  });
+
+  // A line whose way in has stalled while its way out still carries, as
+  // a plane's satellite link did: the table is still there, and this
+  // device is the one not hearing it (packages/table, transport.dart).
+  testWidgets('a device that hears nothing back says its own connection is down, and no more once it is back', (tester) async {
+    final live = await pumpLive(tester);
+    await act(tester, live);
+    await live.advance(tester, 2000);
+    const down = 'Your connection is down — reconnecting';
+    expect(find.text(down), findsNothing);
+    final lines = <(String, Map<String, String>)>[];
+    noticed = (message, attributes) => lines.add((message, attributes));
+    addTearDown(() => noticed = null);
+
+    live.net.deafen(live.keys[harnessSeat]);
+    for (var s = 0; s < 15 && find.text(down).evaluate().isEmpty; s++) {
+      await live.advance(tester, 1000);
+    }
+    expect(live.controller.client.cutOff, isTrue);
+    expect(find.text(down), findsOneWidget, reason: 'said under the felt, over whatever the table seems to wait on');
+    expect(lines, isEmpty, reason: 'a minute or two down is not told of');
+
+    live.net.hearAgain(live.keys[harnessSeat]);
+    for (var s = 0; s < 15 && find.text(down).evaluate().isNotEmpty; s++) {
+      await act(tester, live);
+      await live.advance(tester, 1000);
+    }
+    expect(find.text(down), findsNothing, reason: 'back, and the note gone');
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('a line down for two minutes at a live table is told of, once, with what the device saw', (tester) async {
+    final live = await pumpLive(tester);
+    await act(tester, live);
+    await live.advance(tester, 2000);
+    final lines = <(String, Map<String, String>)>[];
+    noticed = (message, attributes) => lines.add((message, attributes));
+    addTearDown(() => noticed = null);
+
+    live.net.deafen(live.keys[harnessSeat]);
+    for (var s = 0; s < 200 && lines.isEmpty; s++) {
+      await live.advance(tester, 1000);
+    }
+    expect(lines, hasLength(1), reason: 'told of once it had been down two minutes');
+    final (message, attributes) = lines.single;
+    expect(message, startsWith('live: line down 1'));
+    expect(attributes['table'], 'widget');
+    expect(attributes['seen'], contains('cut off now'));
+    expect(attributes['line'], isNotNull);
+    expect(attributes['build'], isNotNull);
+    for (final k in live.keys) {
+      expect('$attributes', isNot(contains(k.substring(0, 6))), reason: 'no key in it');
+    }
+    for (var s = 0; s < 60; s++) {
+      await live.advance(tester, 1000);
+    }
+    expect(lines, hasLength(1), reason: 'and once only');
+    live.net.hearAgain(live.keys[harnessSeat]);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('a game lost with the line up is told of, once, as lost and not as a line down', (tester) async {
+    final live = await pumpLive(tester);
+    await act(tester, live);
+    await live.advance(tester, 2000);
+    final lines = <(String, Map<String, String>)>[];
+    noticed = (message, attributes) => lines.add((message, attributes));
+    addTearDown(() => noticed = null);
+
+    // Everyone else gone at once, this device's own line fine: the
+    // last person at the table, who ends the game once the rest have
+    // been silent as long as a person is given.
+    for (final s in [0, 1, 3]) {
+      live.net.goOffline(live.keys[s]);
+    }
+    for (var s = 0; s < 300 && live.controller.client.failure == null; s++) {
+      await live.advance(tester, 1000);
+    }
+    expect(live.controller.client.failure, isNotNull, reason: live.controller.client.describe());
+    await live.advance(tester, 1000);
+    expect(lines, hasLength(1));
+    final (message, attributes) = lines.single;
+    expect(message, 'live: game lost: juror quorum lost');
+    expect(attributes['seen'], contains('line up, cut off 0 times'));
+    for (var s = 0; s < 10; s++) {
+      await live.advance(tester, 1000);
+    }
+    expect(lines, hasLength(1), reason: 'once');
   });
 
   testWidgets('holding a badge hides that player\'s picture on this device, and nothing else', (tester) async {

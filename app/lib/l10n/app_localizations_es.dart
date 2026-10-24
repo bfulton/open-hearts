@@ -926,6 +926,9 @@ class AppLocalizationsEs extends AppLocalizations {
   String get waitingToReconnect => 'Esperando a que los demás se reconecten';
 
   @override
+  String get connectionDown => 'Tu conexión se ha caído — reconectando';
+
+  @override
   String get askingTheJury => 'Consultando al jurado';
 
   @override

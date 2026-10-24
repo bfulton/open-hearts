@@ -924,6 +924,9 @@ class AppLocalizationsFr extends AppLocalizations {
   String get waitingToReconnect => 'En attente de la reconnexion des autres';
 
   @override
+  String get connectionDown => 'Votre connexion est coupée — reconnexion';
+
+  @override
   String get askingTheJury => 'Consultation du jury';
 
   @override

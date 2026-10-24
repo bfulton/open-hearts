@@ -25,7 +25,9 @@ import {
   reactionMost,
   reactionRefusal,
   schnorrVerifier,
+  socketLine,
   tableLimits,
+  tagLabel,
   tagOf,
 } from './relay.mjs';
 import { wasmPath } from './host.mjs';
@@ -574,4 +576,25 @@ test("a flood of reactions is held to the table's rate like anything else a sock
   await Promise.all(events.map((e) => relay.message(a, JSON.stringify(['EVENT', e]))));
   assert.equal(a.of('OK').filter((m) => m[2]).length, tableLimits.burst);
   assert.match(a.of('OK').at(-1)[3], /^rate-limited: /);
+});
+
+test("a socket's line says what kind of tag, as what, how it closed and how long it was open, and nobody's key", () => {
+  const table = '83167bb6681da6f1b6f4ab8931028fbb';
+  assert.equal(tagLabel('online'), 'presence');
+  assert.equal(tagLabel('queue:open:100'), 'queue');
+  assert.equal(tagLabel(table), 'table:83167bb6', 'a table by the first eight of its id: its id is its address');
+  assert.equal(tagLabel('ABCD2345'), 'room', 'a room code lets anybody in: none of it');
+  assert.equal(tagLabel(undefined), 'unknown');
+
+  const device = { account: 'a'.repeat(32), key: 'b'.repeat(64), epoch: 3, until: 9 };
+  const juror = { account: null, key: 'c'.repeat(64), epoch: 0, until: 9 };
+  assert.deepEqual(socketLine('open', { tag: table, sockets: 3 }), { relay: 'open', tag: 'table:83167bb6', as: 'unanswered', sockets: 3 });
+  const closed = socketLine('close', { tag: table, who: device, code: 1006, clean: false, why: '', openedAt: 1000, now: 62400, sockets: 2 });
+  assert.deepEqual(closed, { relay: 'close', tag: 'table:83167bb6', as: 'device', code: 1006, clean: false, openS: 61, sockets: 2 });
+  assert.equal(socketLine('close', { tag: table, who: juror, code: 1000, clean: true, sockets: 0 }).as, 'juror');
+  assert.equal(socketLine('error', { tag: 'online', why: 'x'.repeat(200), sockets: 0 }).why.length, 80);
+  for (const line of [closed, socketLine('close', { tag: table, who: juror, sockets: 0 })]) {
+    const text = JSON.stringify(line);
+    for (const secret of [device.account, device.key, juror.key, table]) assert.ok(!text.includes(secret), text);
+  }
 });

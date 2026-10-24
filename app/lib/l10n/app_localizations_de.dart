@@ -934,6 +934,10 @@ class AppLocalizationsDe extends AppLocalizations {
       'Warte, bis die anderen wieder verbunden sind';
 
   @override
+  String get connectionDown =>
+      'Deine Verbindung ist unterbrochen — verbinde neu';
+
+  @override
   String get askingTheJury => 'Frage die Jury';
 
   @override

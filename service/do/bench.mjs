@@ -18,6 +18,8 @@
 // set for everyone, named `bench`: four jurors in one process, which
 // is what one quiet night needs, and one container to pay for.
 
+import { tagLabel } from './relay.mjs';
+
 /// The backup jurors' port (service/bin/juror.dart, `--port`).
 export const BENCH_PORT = 8080;
 
@@ -44,9 +46,15 @@ async function digestOf(env) {
 }
 
 export class Bench {
-  constructor(state, env = {}) {
+  /// [log] takes a line for the operator's logs: what this object did
+  /// with the backup jurors and when, as JSON for Workers Logs — laid
+  /// beside the jurors' own traces and the relay's sockets when a game
+  /// is lost (docs/how-to/look-into-a-lost-game.md). A table by the
+  /// first eight of its id; nothing about anybody.
+  constructor(state, env = {}, { log = (line) => console.log(JSON.stringify(line)) } = {}) {
     this.state = state;
     this.env = env;
+    this.log = log;
   }
 
   get container() {
@@ -73,6 +81,7 @@ export class Bench {
   async wake(table) {
     const c = this.container;
     if (!c) return false;
+    const at = tagLabel(table);
     await c.setInactivityTimeout?.(INACTIVITY_MS);
     const env = {
       ...(this.env.OH_JUROR_SECRET ? { OH_JUROR_SECRET: this.env.OH_JUROR_SECRET } : {}),
@@ -90,19 +99,29 @@ export class Bench {
     // with another environment, or under another deploy
     // (CF_VERSION_METADATA, wrangler.toml), is stopped and started again.
     const started = await digestOf({ env, version: this.env.CF_VERSION_METADATA?.id ?? null });
-    if (c.running && (await this.state.storage.get(STARTED_WITH)) !== started) await c.destroy();
+    if (c.running && (await this.state.storage.get(STARTED_WITH)) !== started) {
+      this.log({ bench: 'restart', table: at, why: 'started under another deploy or environment' });
+      await c.destroy();
+    }
     if (!c.running) {
+      this.log({ bench: 'start', table: at });
       c.start({ enableInternet: true, env });
       await this.state.storage.put(STARTED_WITH, started);
       // A fresh container gets its minute's grace (alarm), whatever the
       // one before it had missed.
       await this.state.storage.delete('unanswered');
     }
-    if (!(await this.ready())) return false;
+    const waited = Date.now();
+    if (!(await this.ready())) {
+      this.log({ bench: 'not up', table: at, waitedMs: Date.now() - waited });
+      return false;
+    }
     try {
       const said = await this.port().fetch(`http://bench/wake?table=${encodeURIComponent(table)}`, { method: 'POST' });
+      this.log({ bench: 'woken', table: at, status: said.status, waitedMs: Date.now() - waited });
       if (!said.ok) return false;
-    } catch {
+    } catch (e) {
+      this.log({ bench: 'not woken', table: at, why: String(e?.message ?? e).slice(0, 80) });
       return false;
     }
     if ((await this.state.storage.getAlarm()) === null) await this.state.storage.setAlarm(Date.now() + LOOK_EVERY_MS);
@@ -144,7 +163,9 @@ export class Bench {
     const s = await this.status();
     const quiet = !s.unanswered && !s.online && s.serving === 0;
     const silent = s.unanswered && (await this.state.storage.get('unanswered')) === true;
+    this.log({ bench: 'look', online: s.online, serving: s.serving, ...(s.unanswered ? { unanswered: true } : {}) });
     if (quiet || silent) {
+      this.log({ bench: 'stop', why: quiet ? 'quiet' : 'not answering' });
       await this.state.storage.delete('unanswered');
       c.signal(15);
       return;

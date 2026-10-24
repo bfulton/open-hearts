@@ -191,6 +191,7 @@
   "accountDeleted": "Dein Konto ist gelöscht",
   "accountDeletedClose": "Schließe Open Hearts und öffne es wieder, um neu anzufangen.",
   "waitingToReconnect": "Warte, bis die anderen wieder verbunden sind",
+  "connectionDown": "Deine Verbindung ist unterbrochen — verbinde neu",
   "askingTheJury": "Frage die Jury",
   "noJurorOnline": "Niemand online für eine Jury — warte auf jemanden",
   "waitingForTheJury": "Warte auf die Jury",

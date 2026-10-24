@@ -118,6 +118,12 @@ class RelayTransport implements Transport, ReactionLane {
   @override
   Stream<PublicKey> get disconnected => _disconnected.stream;
 
+  @override
+  bool get cutOff => _group.cutOff;
+
+  /// The line to the relays, in a few words ([RelayGroup.health]).
+  String get health => _group.health;
+
   /// Offers, answers and candidates addressed to this peer.
   Stream<Signal> get signals => _signals.stream;
 

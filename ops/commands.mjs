@@ -20,6 +20,7 @@ export const ARGUMENTS = {
   document: '`terms` (the terms of use) or `privacy` (the privacy policy)',
   picture: 'a picture\'s SHA-256 (64 hex characters), as the daily email of new pictures gives it, or the address of its copy',
   dir: 'a folder outside this repository holding the PhotoDNA module\'s files, edge.mjs among them',
+  table: 'a table\'s id (32 hex characters, the end of its /table/<id> address), or its first eight',
 };
 
 /// The groups the commands are listed in, in order.
@@ -28,6 +29,7 @@ export const GROUPS = [
   ['picture', 'Pictures', 'Pictures at the relay, wherever they were put out: one the automatic check hid, put back; one withheld; or one reported as child sexual abuse material.'],
   ['terms', 'Terms and price', 'Changing the terms of use, the privacy policy or the price, as site/ledger.json records them, and telling subscribers.'],
   ['release', 'Releasing', 'Putting the relay worker and the site into production, and checking production afterwards.'],
+  ['look', 'Looking into a game', 'What happened at a live table, from what each side of it said.'],
   ['setup', 'Setting up', 'What the deployment is made of: its accounts\' definitions, its run-time rows, its secrets, and the phone builds.'],
 ];
 
@@ -302,6 +304,18 @@ export const COMMANDS = [
     howto: 'docs/how-to/deploy.md#check-it-worked',
     example: 'oh verify',
     run: lazy('./release.mjs', 'verify'),
+  },
+  {
+    words: ['table'],
+    group: 'look',
+    args: ['table'],
+    flags: ['days='],
+    summary: 'Prints, in one timeline, what the backup jurors, the relay and the device each said of one table: the jurors\' traces, the relay\'s sockets coming and going, what was done with the backup jurors, and the device\'s own report of a game lost or a line down.',
+    more: '--days says how far back to look (3 unless it says, at most 30; Workers Logs keeps what it keeps). Without New Relic\'s credentials the device\'s side is left out, and said so.',
+    needs: [...CF, '(Workers Observability Read)', 'NEW_RELIC_API_KEY and NEW_RELIC_ACCOUNT_ID (for the device\'s side)'],
+    howto: 'docs/how-to/look-into-a-lost-game.md',
+    example: 'oh table 83167bb6',
+    run: lazy('./table.mjs', 'table'),
   },
   {
     words: ['infra'],

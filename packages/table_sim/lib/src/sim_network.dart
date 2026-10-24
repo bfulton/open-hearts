@@ -151,6 +151,20 @@ class SimNetwork {
   void goOffline(PublicKey key) => _offline.add(key);
   void comeOnline(PublicKey key) => _offline.remove(key);
 
+  /// The peer's way in stalls while its way out still carries — what a
+  /// satellite link on a plane did to a game: everyone goes on hearing
+  /// it, and it hears nobody. Its transport takes itself for cut off
+  /// ([SimTransport.cutOff]), as a real one does when what it sends goes
+  /// unanswered.
+  void deafen(PublicKey key) => _deaf.add(key);
+  void hearAgain(PublicKey key) => _deaf.remove(key);
+  final Set<PublicKey> _deaf = {};
+
+  /// Whether what [key] says is answered, as a relay answers everything
+  /// it is sent — a write it refuses with the refusal: the peer's line
+  /// up both ways, and some relay in its reach, where there are relays.
+  bool _answers(PublicKey key) => isUp(key) && !_deaf.contains(key) && (relays.isEmpty || reachOf(key).isNotEmpty);
+
   /// A peer that is heard and does nothing: its heartbeats go out,
   /// and everything it would otherwise say is dropped where it is
   /// said. Not a network fault — it is what a device looks like from
@@ -221,6 +235,7 @@ class SimNetwork {
   bool _reachable(PublicKey from, PublicKey to) {
     if (_dead.contains(from) || _dead.contains(to)) return false;
     if (_offline.contains(from) || _offline.contains(to)) return false;
+    if (_deaf.contains(to)) return false;
     if (_cuts.any((c) => c.contains(from) && c.contains(to))) return false;
     for (final side in _partition) {
       if (side.contains(from) != side.contains(to)) return false;
@@ -345,10 +360,44 @@ class SimTransport implements Transport {
   /// running until then.
   final Map<String, int> _refusedUntil = {};
 
+  /// Since when what this peer said has gone unanswered, and when it
+  /// was last answered, as the real relay connection reckons them: a
+  /// send nothing answers sets the one, and a send that is answered —
+  /// the answer taken to arrive at once, well inside [answerMs] —
+  /// clears it and sets the other. The real connection counts anything
+  /// it hears as an answer; here nothing is heard by a peer whose own
+  /// sends go unanswered, so its sends are all there is to go by.
+  int? _unansweredSince;
+  int _answeredAt = 0;
+
+  @override
+  bool get cutOff {
+    final since = _unansweredSince;
+    final now = _net.clock.nowMs;
+    return since != null && now - since >= answerMs && now - _answeredAt >= unansweredMs;
+  }
+
+  /// What this peer said went to [targets], or nowhere where they are
+  /// none: every relay it reaches refusing it lately, so that nothing
+  /// was sent to be answered — unless it reaches no relay at all, its
+  /// every way out down.
+  void _sent(Set<String> targets) {
+    if (targets.isEmpty && _net.reachOf(key).isNotEmpty) return;
+    if (_net._answers(key)) {
+      _unansweredSince = null;
+      _answeredAt = _net.clock.nowMs;
+    } else {
+      _unansweredSince ??= _net.clock.nowMs;
+    }
+  }
+
   @override
   void broadcast(Map<String, Object?> message, {bool everywhere = false}) {
     _net.onSend?.call(key, message);
-    if (_net.relays.isEmpty) return _net._broadcastAll(key, message);
+    if (_net.relays.isEmpty) {
+      _sent(const {''});
+      return _net._broadcastAll(key, message);
+    }
     final now = _net.clock.nowMs;
     final reach = _net.reachOf(key);
     final up = {
@@ -363,6 +412,7 @@ class SimTransport implements Transport {
       final one = firstTarget(_net.relays, up, readBy);
       targets = one == null ? const {} : {one};
     }
+    _sent(targets);
     if (targets.isEmpty) return;
     _net._deliverVia(key, message, targets);
   }

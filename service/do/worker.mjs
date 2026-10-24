@@ -34,7 +34,7 @@
 
 import wasm from '../../app/web/schnorr.wasm';
 
-import { limitsFrom, objectRelay, presenceTag, schnorrVerifier, serviceGate, tagOf, tally } from './relay.mjs';
+import { limitsFrom, objectRelay, presenceTag, schnorrVerifier, serviceGate, socketLine, tagOf, tally } from './relay.mjs';
 import { tagStore } from './tag_store.mjs';
 import { pictureScreen } from './withheld.mjs';
 import { reviewRun } from './review.mjs';
@@ -234,9 +234,27 @@ export class TagRelay {
     const pair = new WebSocketPair();
     const [client, server] = Object.values(pair);
     this.state.acceptWebSocket(server);
+    // When it opened, which comes back with it from hibernation as its
+    // subscriptions do, for the line it gets as it goes.
+    server.serializeAttachment({ v: 2, subs: {}, auth: null, at: Date.now() });
     relay.open(server);
     this.tally.count('opened');
+    this.say('open', server, relay);
     return new Response(null, { status: 101, webSocket: client });
+  }
+
+  /// A socket's coming and going, as a line of JSON for Workers Logs
+  /// (relay.mjs, socketLine): read beside a device's own account of its
+  /// line when a game is lost (docs/how-to/look-into-a-lost-game.md).
+  say(what, socket, relay, end = {}) {
+    let openedAt;
+    try {
+      openedAt = socket.deserializeAttachment()?.at;
+    } catch {
+      // A socket with nothing kept on it.
+    }
+    const sockets = this.state.getWebSockets().filter((s) => what === 'open' || s !== socket).length;
+    console.log(JSON.stringify(socketLine(what, { tag: this.tag, who: relay.authOf(socket), openedAt, sockets, ...end })));
   }
 
   async webSocketMessage(socket, message) {
@@ -246,20 +264,26 @@ export class TagRelay {
     await relay.message(socket, message);
     // What this socket must remember if the object is evicted before
     // its next message: its subscriptions, bounded by the relay itself,
-    // which holds a client to a few, and who it answered as.
-    socket.serializeAttachment({ v: 2, subs: relay.subscriptionsOf(socket), auth: relay.authOf(socket) });
+    // which holds a client to a few, who it answered as, and when it
+    // opened.
+    const at = socket.deserializeAttachment()?.at;
+    socket.serializeAttachment({ v: 2, subs: relay.subscriptionsOf(socket), auth: relay.authOf(socket), at });
   }
 
-  async webSocketClose(socket) {
-    await this.gone(socket);
+  async webSocketClose(socket, code, reason, wasClean) {
+    await this.gone(socket, 'close', { code, clean: wasClean, why: reason });
   }
 
-  async webSocketError(socket) {
-    await this.gone(socket);
+  async webSocketError(socket, error) {
+    await this.gone(socket, 'error', { why: error?.message ?? error });
   }
 
-  async gone(socket) {
-    (await this.ready()).close(socket);
+  async gone(socket, what, end) {
+    const relay = await this.ready();
+    // Said before the relay lets go of it, while it still knows who
+    // the socket answered as.
+    this.say(what, socket, relay, end);
+    relay.close(socket);
     this.tally.closed(this.state.getWebSockets().filter((s) => s !== socket).length);
   }
 }

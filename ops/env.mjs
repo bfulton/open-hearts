@@ -26,11 +26,11 @@ export class Failed extends Error {}
 /// Every credential an oh command can need, and what it has to allow.
 /// The reference (docs/reference/oh.md) lists them from here.
 export const CREDENTIALS = {
-  CLOUDFLARE_API_TOKEN: 'A Cloudflare API token. Accounts: Workers KV Storage Edit, and Workers R2 Storage Edit to find an account by a picture, take a name off kept games, hold or release an account, and keep or fetch the PhotoDNA module. Deploys and infrastructure: what docs/how-to/apply-infrastructure.md lists.',
+  CLOUDFLARE_API_TOKEN: 'A Cloudflare API token. Accounts: Workers KV Storage Edit, and Workers R2 Storage Edit to find an account by a picture, take a name off kept games, hold or release an account, and keep or fetch the PhotoDNA module. Deploys and infrastructure: what docs/how-to/apply-infrastructure.md lists. Looking into a table (oh table): Workers Observability Read.',
   CLOUDFLARE_ACCOUNT_ID: 'The Cloudflare account the project is in.',
   STRIPE_API_KEY: 'A live-mode Stripe secret or restricted key. Finding an account by email: Customers and Subscriptions read. Refunds and terminations: Subscriptions write, Refunds write, and Invoices read. oh verify: Prices read and Checkout Sessions write, to make a checkout through Link and expire it. Infrastructure: what docs/how-to/apply-infrastructure.md lists.',
-  NEW_RELIC_API_KEY: 'A New Relic User key, for the monitors (oh infra).',
-  NEW_RELIC_ACCOUNT_ID: 'The New Relic account the monitors are in.',
+  NEW_RELIC_API_KEY: 'A New Relic User key, for the monitors (oh infra), and to read what devices reported of a table (oh table).',
+  NEW_RELIC_ACCOUNT_ID: 'The New Relic account the monitors and the browser agent are in.',
   NEW_RELIC_REGION: 'US or EU.',
 };
 

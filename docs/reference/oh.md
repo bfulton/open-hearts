@@ -27,6 +27,7 @@ Development tools, such as `./check.sh`, the chaos walk and the bot benchmarks, 
 | `<document>` | `terms` (the terms of use) or `privacy` (the privacy policy) |
 | `<picture>` | a picture's SHA-256 (64 hex characters), as the daily email of new pictures gives it, or the address of its copy |
 | `<dir>` | a folder outside this repository holding the PhotoDNA module's files, edge.mjs among them |
+| `<table>` | a table's id (32 hex characters, the end of its /table/<id> address), or its first eight |
 
 ## Credentials
 
@@ -34,11 +35,11 @@ Each command reads what it needs from the environment, and says which are missin
 
 | Variable | What it is |
 |---|---|
-| `CLOUDFLARE_API_TOKEN` | A Cloudflare API token. Accounts: Workers KV Storage Edit, and Workers R2 Storage Edit to find an account by a picture, take a name off kept games, hold or release an account, and keep or fetch the PhotoDNA module. Deploys and infrastructure: what docs/how-to/apply-infrastructure.md lists. |
+| `CLOUDFLARE_API_TOKEN` | A Cloudflare API token. Accounts: Workers KV Storage Edit, and Workers R2 Storage Edit to find an account by a picture, take a name off kept games, hold or release an account, and keep or fetch the PhotoDNA module. Deploys and infrastructure: what docs/how-to/apply-infrastructure.md lists. Looking into a table (oh table): Workers Observability Read. |
 | `CLOUDFLARE_ACCOUNT_ID` | The Cloudflare account the project is in. |
 | `STRIPE_API_KEY` | A live-mode Stripe secret or restricted key. Finding an account by email: Customers and Subscriptions read. Refunds and terminations: Subscriptions write, Refunds write, and Invoices read. oh verify: Prices read and Checkout Sessions write, to make a checkout through Link and expire it. Infrastructure: what docs/how-to/apply-infrastructure.md lists. |
-| `NEW_RELIC_API_KEY` | A New Relic User key, for the monitors (oh infra). |
-| `NEW_RELIC_ACCOUNT_ID` | The New Relic account the monitors are in. |
+| `NEW_RELIC_API_KEY` | A New Relic User key, for the monitors (oh infra), and to read what devices reported of a table (oh table). |
+| `NEW_RELIC_ACCOUNT_ID` | The New Relic account the monitors and the browser agent are in. |
 | `NEW_RELIC_REGION` | US or EU. |
 
 ## Accounts
@@ -344,6 +345,22 @@ Checks production: the live build is origin/main, the service is healthy, the re
 - **Needs:** `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `STRIPE_API_KEY`, `NEW_RELIC_API_KEY`, `NEW_RELIC_ACCOUNT_ID`, `NEW_RELIC_REGION`
 - **How-to:** [deploy.md](../how-to/deploy.md#check-it-worked)
 - **Example:** `oh verify`
+
+## Looking into a game
+
+What happened at a live table, from what each side of it said.
+
+### oh table
+
+```bash
+oh table <table> [--days <days>]
+```
+
+Prints, in one timeline, what the backup jurors, the relay and the device each said of one table: the jurors' traces, the relay's sockets coming and going, what was done with the backup jurors, and the device's own report of a game lost or a line down. --days says how far back to look (3 unless it says, at most 30; Workers Logs keeps what it keeps). Without New Relic's credentials the device's side is left out, and said so.
+
+- **Needs:** `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, (Workers Observability Read), NEW_RELIC_API_KEY and NEW_RELIC_ACCOUNT_ID (for the device's side)
+- **How-to:** [look-into-a-lost-game.md](../how-to/look-into-a-lost-game.md)
+- **Example:** `oh table 83167bb6`
 
 ## Setting up
 

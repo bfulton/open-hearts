@@ -1091,6 +1091,10 @@
   "@waitingToReconnect": {
     "description": "Under the table while the game is paused."
   },
+  "connectionDown": "Your connection is down — reconnecting",
+  "@connectionDown": {
+    "description": "Under the table while this device hears nothing back from the relay: its own internet connection is down or stalled, and it is reconnecting. The game waits for it."
+  },
   "askingTheJury": "Asking the jury",
   "@askingTheJury": {
     "description": "Under the table while other devices online settle a stuck turn."

@@ -831,6 +831,37 @@ export function objectRelay(verify, { tag = presenceTag, now = Date.now, count =
 /// The one tag presence rides on (packages/table, presence_relay.dart).
 export const presenceTag = 'online';
 
+/// What a log says of [tag]: presence, a pool's queue, a room, or a
+/// table by the first eight of its id. A table's id is its address (the
+/// table's spec.dart, newTableId), so not all of it; a room's code lets
+/// anybody in, so none of it.
+export function tagLabel(tag) {
+  if (tag === presenceTag) return 'presence';
+  if (typeof tag !== 'string') return 'unknown';
+  if (tag.startsWith('queue:')) return 'queue';
+  if (/^[0-9a-f]{32}$/.test(tag)) return `table:${tag.slice(0, 8)}`;
+  return 'room';
+}
+
+/// One line for the operator's logs as a socket on [tag] comes and goes
+/// ([what]: open, close, error), for laying a device's account of its
+/// line beside the relay's (docs/how-to/look-into-a-lost-game.md): the
+/// kind of tag, whether the socket answered as a device or a backup
+/// juror ([who], the gate's answer), how it closed, how long it was
+/// open, and how many sockets the tag has left. Nothing about who:
+/// presence is not kept, and neither is anybody's coming and going.
+export function socketLine(what, { tag, who = null, code, clean, why, openedAt, sockets, now = Date.now() }) {
+  return {
+    relay: what,
+    tag: tagLabel(tag),
+    as: who ? (who.account ? 'device' : 'juror') : 'unanswered',
+    ...(code === undefined ? {} : { code, clean: clean === true }),
+    ...(why ? { why: String(why).slice(0, 80) } : {}),
+    ...(typeof openedAt === 'number' ? { openS: Math.round((now - openedAt) / 1000) } : {}),
+    sockets,
+  };
+}
+
 /// The one kind this relay stores: the lobby — a room announced, a
 /// pool's seating, a table started, a player's picture, a game's result
 /// (packages/table, nostr.dart, TableKinds.lobby; docs/explanation/relay.md).

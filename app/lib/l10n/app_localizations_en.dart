@@ -918,6 +918,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get waitingToReconnect => 'Waiting for the others to reconnect';
 
   @override
+  String get connectionDown => 'Your connection is down — reconnecting';
+
+  @override
   String get askingTheJury => 'Asking the jury';
 
   @override

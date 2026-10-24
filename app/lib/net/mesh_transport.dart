@@ -119,6 +119,18 @@ class MeshTransport implements Transport {
   /// Peers with an open data channel right now.
   Iterable<PublicKey> get connected => _links.entries.where((e) => e.value.open).map((e) => e.key);
 
+  /// Cut off when the relays are and no channel is open. A channel that
+  /// is open is a peer heard directly — a line that fails takes the
+  /// channel down within seconds, and the relay lane carries everything
+  /// from then on — and with every channel up the relay lane says
+  /// nothing, so has nothing to go unanswered.
+  @override
+  bool get cutOff => relay.cutOff && connected.isEmpty;
+
+  /// The line, in a few words: the relays' ([RelayTransport.health]),
+  /// and the channels open of those dialled.
+  String get health => '${relay.health}; channels ${connected.length} of ${peers.where((p) => p != relay.signer.publicKey).length}';
+
   @override
   void broadcast(Map<String, Object?> message, {bool everywhere = false}) {
     // Bytes down the channel, JSON to the relay: the relay is a

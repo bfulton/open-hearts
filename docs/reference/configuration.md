@@ -273,12 +273,12 @@ Bounds: `TableTiming.bounds` in `packages/table/lib/src/timing.dart`, and the sa
 | `passGraceMs` | `TimeBank` | A person's grace for the pass. |
 | `bankMs` | `TimeBank` | A person's thinking time per hand, beyond the graces. |
 | `fixedMs` | `TimeBank` | A person's deal steps and audit, which their device answers by itself. |
-| `botActsMs` | `TableTiming` in `packages/table/lib/src/timing.dart` | A held bot seat's card or pass. |
+| `botActsMs` | `TableTiming` in `packages/table/lib/src/timing.dart` | A held bot seat's card or pass. Keep it above ten seconds: a device whose own line stalls takes up to that long to know it (`unansweredMs` in `packages/table/lib/src/transport.dart`), and until it does, a juror's move it never heard looks like a juror sitting on its turn. |
 | `botDealsMs` | `TableTiming` | A held bot seat's deal steps and audit. |
 | `quorumLostMs` | `TableTiming` | How long a table stopped for a lost quorum waits before the game ends. |
 | `silenceMs` | `TableTiming` | How long a person may be silent before a peer may boot them at their turn. |
-| `jurorSilenceMs` | `TableTiming` | How long a juror may be silent before the table stops counting it. |
+| `jurorSilenceMs` | `TableTiming` | How long a juror may be silent before the table stops counting it. Above ten seconds, for the same reason as `botActsMs`. |
 
-One more clock is fixed in code and is not in remote config: `reloadGraceMs` in `TableClient` (`packages/table/lib/src/client.dart`), how long a seat whose connection closed has to come back before it counts as silent.
+Three more clocks are fixed in code and are not in remote config: `reloadGraceMs` in `TableClient` (`packages/table/lib/src/client.dart`), how long a seat whose connection closed has to come back before it counts as silent; and `unansweredMs` and `answerMs` (`packages/table/lib/src/transport.dart`), how long a device may hear nothing, with something it sent waiting longer than an answer takes, before it takes itself for cut off ([a device cut off from the table](../explanation/live-play.md#a-device-cut-off-from-the-table)).
 
 For how the clocks are used, see [live play](../explanation/live-play.md) and [the table's states](../explanation/table-states.md).

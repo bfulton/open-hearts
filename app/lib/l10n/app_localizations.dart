@@ -1250,6 +1250,12 @@ abstract class AppLocalizations {
   /// **'Waiting for the others to reconnect'**
   String get waitingToReconnect;
 
+  /// Under the table while this device hears nothing back from the relay: its own internet connection is down or stalled, and it is reconnecting. The game waits for it.
+  ///
+  /// In en, this message translates to:
+  /// **'Your connection is down — reconnecting'**
+  String get connectionDown;
+
   /// Under the table while other devices online settle a stuck turn.
   ///
   /// In en, this message translates to:
