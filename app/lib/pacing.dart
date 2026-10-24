@@ -36,8 +36,10 @@ abstract final class Pacing {
   /// after a hand, [sweepBeat], so the sheet comes down on a still table.
   static const moonQuake = Duration(milliseconds: 900);
 
-  /// A seat's glow as the cards of a trick with points reach it: pink,
-  /// and the queen's red half a second longer (ui/table_view.dart).
+  /// How long a seat's glow for a trick with points it won lasts once
+  /// the cards are in: pink, and the queen's red half a second longer.
+  /// It comes up as the trick is won and holds until then
+  /// (ui/table_view.dart).
   static const pointsGlow = Duration(milliseconds: 900);
   static const queenGlow = Duration(milliseconds: 1400);
 

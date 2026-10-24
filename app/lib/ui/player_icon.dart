@@ -8,6 +8,8 @@ library;
 import 'package:flutter/material.dart';
 
 import '../avatar.dart';
+import '../l10n/l10n.dart';
+import '../table_model.dart' show SeatLook;
 import '../theme.dart';
 
 class PlayerIcon extends StatelessWidget {
@@ -113,6 +115,86 @@ class PlayerIcon extends StatelessWidget {
                 color: Felt.dark,
               ),
             ),
+    );
+  }
+}
+
+/// A seat's icon as the table draws it, on the felt and on the score
+/// sheets: the player's icon, with a bot's mark where a bot plays it.
+class SeatIcon extends StatelessWidget {
+  const SeatIcon({super.key, required this.look, required this.size});
+
+  final SeatLook look;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final face = PlayerIcon(name: look.iconName, seed: look.seed, avatar: look.avatar, size: size);
+    return look.bot ? BotMark(size: size, child: face) : face;
+  }
+}
+
+/// A bot's icon, marked as one: a small robot at the icon's lower
+/// right, over its edge only a little, so the face or the picture stays
+/// whole. Touched, it says what it means. It is the icon's size
+/// whatever the reader's text size, and a screen reader is told in
+/// words instead (ui/table_view.dart).
+class BotMark extends StatelessWidget {
+  const BotMark({super.key, required this.size, required this.child});
+
+  /// The icon's size, which the mark is in proportion to.
+  final double size;
+
+  /// The icon.
+  final Widget child;
+
+  /// A finger's room round the mark, which is too small to aim at.
+  static const _reach = 28.0;
+
+  @override
+  Widget build(BuildContext context) {
+    final mark = (size * 0.4).clamp(11.0, 16.0);
+    // On the diagonal, its centre half its radius past the icon's rim:
+    // a quarter of it over the icon, the rest beside it.
+    final centre = size / 2 + (size / 2 + mark / 4) * 0.7071;
+    return SizedBox(
+      width: size,
+      height: size,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Positioned.fill(child: child),
+          Positioned(
+            left: centre - _reach / 2,
+            top: centre - _reach / 2,
+            width: _reach,
+            height: _reach,
+            child: Tooltip(
+              message: context.l10n.botTag,
+              triggerMode: TooltipTriggerMode.tap,
+              // The felt's own, solid: it is read over cards.
+              decoration: BoxDecoration(
+                color: Felt.dark,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Palette.chrome.withValues(alpha: 0.85)),
+              ),
+              textStyle: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 13, fontWeight: FontWeight.w600, color: Palette.chrome),
+              child: Center(
+                child: Container(
+                  width: mark,
+                  height: mark,
+                  decoration: BoxDecoration(
+                    color: Felt.dark,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Palette.chrome.withValues(alpha: 0.85)),
+                  ),
+                  child: Icon(Icons.smart_toy, size: mark * 0.64, color: Palette.chrome),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

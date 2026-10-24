@@ -9,6 +9,7 @@
 /// card. A bubble draws itself into whatever room it is given.
 library;
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:table/table.dart' show Reaction;
@@ -16,6 +17,13 @@ import 'package:table/table.dart' show Reaction;
 import '../l10n/l10n.dart';
 import '../reaction_mute.dart';
 import '../theme.dart';
+
+/// The font the reactions' emoji are drawn in on the web: the six, come
+/// with the app (fonts/README.md). The web's own font has none, and the
+/// engine would fetch them from Google's font servers the first time
+/// one is drawn, drawing empty boxes until they came. A phone draws its
+/// own system's emoji.
+const String? reactionEmojiFont = kIsWeb ? 'ReactionEmoji' : null;
 
 /// What [reaction] is called in this screen's language: "Nice".
 String reactionWord(AppLocalizations l10n, Reaction reaction) => l10n.reaction(reaction.code);
@@ -40,7 +48,7 @@ class ReactionBubble extends StatefulWidget {
   final AxisDirection tail;
 
   static const _padding = EdgeInsets.symmetric(horizontal: 9, vertical: 4);
-  static const _emoji = TextStyle(fontSize: 17, height: 1.15);
+  static const _emoji = TextStyle(fontSize: 17, height: 1.15, fontFamily: reactionEmojiFont);
   static const _word = TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: Felt.dark, height: 1.15);
 
   /// How far the tail stands out from the bubble.
@@ -248,7 +256,7 @@ class ReactionPicker extends StatelessWidget {
                         children: [
                           // A picture, the size of one whatever the
                           // type: the word under it is what grows.
-                          Text(r.emoji, style: const TextStyle(fontSize: 24), textScaler: TextScaler.noScaling),
+                          Text(r.emoji, style: const TextStyle(fontSize: 24, fontFamily: reactionEmojiFont), textScaler: TextScaler.noScaling),
                           const SizedBox(height: 2),
                           Text(reactionWord(l10n, r), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
                         ],

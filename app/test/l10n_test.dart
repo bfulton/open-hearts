@@ -138,8 +138,10 @@ void main() {
       expect(english.stillOut(13, 'true'), '13 hearts and the queen still out');
       expect(english.waitedLine(4, 0), '4 s — bots fill any seat still empty at ten');
       expect(english.waitedLine(4, 1), '4 s, 1 other waiting — bots fill any seat still empty at ten');
-      expect(english.youAreRated(1512, 'true', 1), 'You are rated 1512, provisionally, from 1 rated game.');
-      expect(english.playLiveSpoken(1), 'Play live, nobody else online');
+      expect(english.onlineCount(0), '0 online');
+      expect(english.onlineCount(5), '5 online');
+      expect(english.playLiveSpoken(0), 'Play live, nobody else online');
+      expect(english.playLiveSpoken(1), 'Play live, 1 online');
       expect(english.playLiveSpoken(7), 'Play live, 7 online');
       expect(english.together(['Ada', 'Bao', 'Cy']), 'Ada and Bao and Cy');
     });
@@ -163,7 +165,7 @@ void main() {
           words.cardInSentence(engine.Card.parse('QS')),
           words.stillOut(3, 'true'),
           words.waitedLine(12, 2),
-          words.youAreRated(1500, 'false', 3),
+          words.onlineCount(5),
           words.gameLine(50, 'rated'),
           words.hereCount(3, 4, 'unrated'),
         ]) {

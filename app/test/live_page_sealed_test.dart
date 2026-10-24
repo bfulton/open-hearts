@@ -223,6 +223,32 @@ void main() {
     expect(tester.takeException(), isNull);
   }, timeout: const Timeout(Duration(minutes: 5)));
 
+  testWidgets('a hand waiting for a jury to hold its bots says so, not that it is dealing', (tester) async {
+    // The table stuck at "Dealing" (table 64cf65a3): after its first
+    // hand it could draw no jury that held the bot seats, and the screen
+    // read the first hand's finished deal for the second's.
+    final crypto = await rememberedCrypto();
+    final live = await pumpLive(tester, crypto: crypto, botSeats: const {1, 3}, jurors: juryToHoldBots);
+    final c = live.controller;
+    for (var guard = 0; guard < 200 && c.client.botHolders(0).isEmpty; guard++) {
+      await live.advance(tester, 500);
+    }
+    final held = c.client.botHolders(0);
+    expect(held, isNotEmpty, reason: 'a jury holds the bot seats');
+    // One of them gone with a step of the deal owed: the hand is given
+    // up, and the next has one juror too few to hold its bots.
+    live.net.goOffline(held.values.first);
+    for (var guard = 0; guard < 400 && !(c.client.game.handNumber == 1 && c.client.shortOfJurors); guard++) {
+      await live.advance(tester, 500);
+    }
+    expect(c.client.shortOfJurors, isTrue, reason: c.client.describe());
+    expect(c.client.game.phase, engine.Phase.dealing);
+    expect(c.dealNote, 'Waiting for jury…');
+    expect(find.text('Waiting for jury…'), findsOneWidget);
+    expect(find.text('Dealing'), findsNothing);
+    expect(tester.takeException(), isNull);
+  }, timeout: const Timeout(Duration(minutes: 5)));
+
   testWidgets('a hand that ends while the others play on gives way to the next', (tester) async {
     final live = await pumpLive(tester);
     final c = live.controller;

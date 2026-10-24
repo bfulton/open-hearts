@@ -10,6 +10,17 @@ squashed from a pull request, the pull request's number.
 
 ### Added
 
+- At a live table, a bot's juror plays its card as soon as it hears the
+  bot card before it, rather than waiting for the person's device to
+  have seen that one: the bots between two of a person's cards take one
+  round trip of the person's line, not one each. With the line 300 ms
+  each way, the wait from a person's card to their next turn fell from
+  1.3–1.9 seconds to 0.7–0.9. (2026-10-24, #38)
+
+- A bot's icon wears a small robot at its lower right, over the icon's
+  edge only a little; touched, it says "Bot". On the felt and on the
+  score sheets, alone and at a live table. A screen reader says "a bot"
+  after the seat's name. (2026-10-24, #38)
 - `oh table <id>`: what the backup jurors, the relay and the player's
   device each said of one live table, in one timeline. The relay now
   logs each socket's coming and going, and the backup jurors' object
@@ -191,6 +202,32 @@ squashed from a pull request, the pull request's number.
 
 ### Changed
 
+- The front door's top corner has your rating, the number alone, just
+  left of your picture, from your first rated game; the sentence under
+  the game options that said it is gone. A screen reader hears it as
+  "rated", then the profile button as before. How many other people
+  are online follows the game line once it is known, "50 points ·
+  rated · 3 online", and is 0 when nobody else is; nothing is said
+  while it is on its way. (2026-10-24, #38)
+- A picture of your own is cut down to 192 by 192 pixels, not 64 by 64:
+  sharp at the size the profile page shows it on a phone, where a
+  64-pixel picture was blurred to three times over. A photograph that
+  size is still a JPEG under 12,000 bytes, so nothing the relay or the
+  service carries grows past what they take. The image check's line of
+  0.5 was tried again at the new size and holds; PhotoDNA matches
+  Microsoft's test pictures at it as at 64; the privacy policy says the
+  new size, in every language, as a minor change. Pictures already set
+  stay as they are until set again. (2026-10-24, #38)
+- Names that would pass for Open Hearts itself or for the people who
+  run it are refused, as a name on the word lists is: the game's own
+  name, and admin, moderator, support, staff, official, operator and
+  the like, in the app's five languages, matched as whole words so
+  that Staffan and Supporter are names like any other. (2026-10-24, #38)
+- A trick with points in it is told by one glow, not two: the pink or
+  red glow comes up round the winner's badge as the trick is won, in
+  place of the white border a trick without points still gives its
+  winner, holds while the trick is on the table and swept, and fades
+  once the cards are in, as before. (2026-10-24, #38)
 - Playing alone, the Auto switch plays the rest of the hand as fast as
   its cards land: the bots stop thinking, a trick goes as soon as its
   last card has landed, and the score sheet follows the last trick's
@@ -296,6 +333,37 @@ squashed from a pull request, the pull request's number.
 
 ### Fixed
 
+- A live table that stopped for good when the person's connection
+  dropped as the bots passed (table 64cf65a3). Back sixteen seconds
+  later, their device gave each bot fifteen seconds and took all three
+  seats off their jurors at the end of them, a second before the
+  jurors' next repeat was due; and with those jurors left out of every
+  later draw, the next hand could find no jury to hold its bots, while
+  the screen said "Dealing". Now a juror says its card again the moment
+  a person's heartbeat shows they lack it, a juror let go is drawn
+  again once when nobody else can be, and a table waiting for a jury
+  says "Waiting for jury…" in every hand, not only the first.
+  (2026-10-24, #38)
+- A bot seat given to the escrow while the person's device could not
+  reach the jury left the table waiting for good once it could: the
+  jurors never heard of it, and went on waiting for the seat's own
+  juror. The device now says the claim again until the seat's card is
+  played. (2026-10-24, #38)
+- On the web, the reactions' emoji are there the first time the picker
+  opens, and the first time a reaction shows. They were empty boxes for
+  a second or two while the web's engine fetched them from Google's
+  font servers; the six now come with the app, cut from the same font,
+  and nothing is fetched to draw them. (2026-10-24, #38)
+- The count of who is online counts people. The backup jurors, online
+  while a table needs them and for ten minutes after, were counted too:
+  one player back from a game with bots read "5 online", the four
+  backup jurors and themselves. (2026-10-24, #38)
+- `oh table` finds the relay's lines and the backup jurors' object's.
+  Workers Logs keeps a line of JSON as its fields, with no message, so
+  looking for the table in the message found only the jurors' own
+  traces. It asks for the relay's lines by their `tag` and the object's
+  by their `table` now, and its tests answer as Workers Logs does.
+  (2026-10-24, #38)
 - Choosing which part of a photograph is your picture, a drag moves the
   photograph with the finger all the way. Before, each step of a drag
   was laid on where the drag began, so the photograph moved by the last

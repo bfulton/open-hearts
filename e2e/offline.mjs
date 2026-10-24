@@ -373,6 +373,14 @@ flow('the network gone at a live table, and back', async ({ context, open, relay
     return has(p, /^Hand 2 /);
   }, { timeout: 180000 });
   log(`      played on to the next hand: ${((Date.now() - back) / 1000).toFixed(0)} s`);
+  // The backup jurors who held the bots' seats are online still, and
+  // nobody to play with: the door counts people (presence_relay.dart,
+  // `people`), and here that is this device alone.
+  await click(page, /^Menu$/);
+  await waitFor(page, /^Leave the table$/, { what: 'the menu' });
+  await click(page, /^Leave the table$/);
+  await waitFor(page, /^Play live, /, { timeout: 20000, what: 'the door, counting' });
+  await within(page, /^Play live, nobody else online$/, 10, 'the count, the backup jurors left out');
   return page;
 });
 

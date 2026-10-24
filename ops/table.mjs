@@ -19,10 +19,12 @@ import { Failed, Usage, need } from './env.mjs';
 /// that fills it is split in two and asked again.
 const PAGE = 2000;
 
-/// The Workers Logs events in [from, to) whose message holds [text], in
-/// [dataset], oldest first: halved and asked again where a window is
-/// full, down to a minute.
-async function logs(ctx, { token, account }, dataset, text, from, to) {
+/// The Workers Logs events in [from, to) in [dataset] that [filter]
+/// picks, oldest first: halved and asked again where a window is full,
+/// down to a minute. A line of text is found by what its message holds;
+/// a line of JSON has no message, its fields being kept as fields, and
+/// is found by one of them.
+async function logs(ctx, { token, account }, dataset, filter, from, to) {
   const res = await ctx.fetch(`https://api.cloudflare.com/client/v4/accounts/${account}/workers/observability/telemetry/query`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
@@ -31,7 +33,7 @@ async function logs(ctx, { token, account }, dataset, text, from, to) {
       timeframe: { from, to },
       view: 'events',
       limit: PAGE,
-      parameters: { datasets: [dataset], filters: [{ key: '$metadata.message', operation: 'includes', type: 'string', value: text }] },
+      parameters: { datasets: [dataset], filters: [{ type: 'string', ...filter }] },
     }),
   });
   const body = await res.json().catch(() => null);
@@ -39,7 +41,7 @@ async function logs(ctx, { token, account }, dataset, text, from, to) {
   const events = body.result?.events?.events ?? [];
   if (events.length >= PAGE && to - from > 60000) {
     const mid = from + Math.floor((to - from) / 2);
-    return [...(await logs(ctx, { token, account }, dataset, text, from, mid)), ...(await logs(ctx, { token, account }, dataset, text, mid, to))];
+    return [...(await logs(ctx, { token, account }, dataset, filter, from, mid)), ...(await logs(ctx, { token, account }, dataset, filter, mid, to))];
   }
   if (events.length >= PAGE) ctx.warn(`${dataset}: more than ${PAGE} lines in the minute from ${stamp(from)}; the rest are not shown`);
   return events;
@@ -98,12 +100,18 @@ export async function table(ctx, { args, flags }) {
   const to = ctx.now();
   const from = to - days * 24 * 60 * 60 * 1000;
   ctx.log(`table ${short}, the last ${days} day(s):`);
-  const jurors = (await logs(ctx, { token, account }, 'containers', short, from, to)).map((e) => ({
+  const jurors = (await logs(ctx, { token, account }, 'containers', { key: '$metadata.message', operation: 'includes', value: short }, from, to)).map((e) => ({
     at: e.timestamp,
     from: 'jurors',
     text: e.$metadata?.message ?? e.source?.message ?? '',
   }));
-  const objects = (await logs(ctx, { token, account }, 'cloudflare-workers', `table:${short}`, from, to)).map((e) => ({ at: e.timestamp, ...said(e) }));
+  // The relay's lines name the table as `tag`, the backup jurors'
+  // object's as `table` (service/do/relay.mjs, socketLine; bench.mjs).
+  const tag = `table:${short}`;
+  const objects = [
+    ...(await logs(ctx, { token, account }, 'cloudflare-workers', { key: 'tag', operation: 'eq', value: tag }, from, to)),
+    ...(await logs(ctx, { token, account }, 'cloudflare-workers', { key: 'table', operation: 'eq', value: tag }, from, to)),
+  ].map((e) => ({ at: e.timestamp, ...said(e) }));
   const device = await reports(ctx, short, days);
   const rows = [...jurors, ...objects, ...device].sort((a, b) => a.at - b.at);
   ctx.log(`  ${jurors.length} from the backup jurors, ${objects.filter((r) => r.from === 'relay').length} from the relay, ${objects.filter((r) => r.from === 'bench').length} from their object, ${device.length} from the device`);

@@ -12,7 +12,9 @@ const id = '83167bb6681da6f1b6f4ab8931028fbb';
 const at = (s) => Date.parse(`2026-10-23T23:${s}Z`);
 
 /// A context whose fetch answers Workers Logs from [lines], by dataset
-/// and filter, and New Relic from [reports]; what was asked is kept.
+/// and filter as Workers Logs does, and New Relic from [reports]; what
+/// was asked is kept. A line of text is matched by what its message
+/// holds; a line of JSON has no message, and is matched by its fields.
 function context({ lines = {}, reports = [], env = {} } = {}) {
   const said = [];
   const asked = [];
@@ -31,15 +33,20 @@ function context({ lines = {}, reports = [], env = {} } = {}) {
       }
       const dataset = body.parameters.datasets[0];
       const [filter] = body.parameters.filters;
-      asked.push({ dataset, filter: filter.value, from: body.timeframe.from, to: body.timeframe.to });
-      const events = (lines[dataset] ?? []).filter((e) => e.timestamp >= body.timeframe.from && e.timestamp < body.timeframe.to);
+      asked.push({ dataset, filter: `${filter.key} ${filter.operation} ${filter.value}`, from: body.timeframe.from, to: body.timeframe.to });
+      const matches = (e) =>
+        filter.key === '$metadata.message'
+          ? filter.operation === 'includes' && (e.$metadata?.message ?? '').includes(filter.value)
+          : filter.operation === 'eq' && e.source?.[filter.key] === filter.value;
+      const events = (lines[dataset] ?? []).filter((e) => e.timestamp >= body.timeframe.from && e.timestamp < body.timeframe.to && matches(e));
       return Response.json({ success: true, result: { events: { events: events.slice(0, body.limit) } } });
     },
   };
 }
 
 const juror = (time, message) => ({ timestamp: at(time), source: { message }, $metadata: { message } });
-const json = (time, source) => ({ timestamp: at(time), source, $metadata: { message: JSON.stringify(source) } });
+// Workers Logs keeps a line of JSON as its fields, with no message.
+const json = (time, source) => ({ timestamp: at(time), source, $metadata: {} });
 
 test('the jurors, the relay, their object and the device, in the order things happened', async () => {
   const ctx = context({
@@ -49,6 +56,9 @@ test('the jurors, the relay, their object and the device, in the order things ha
         json('29:03.100', { relay: 'open', tag: 'table:83167bb6', as: 'unanswered', sockets: 5 }),
         json('29:02.000', { bench: 'woken', table: 'table:83167bb6', status: 200, waitedMs: 1200 }),
         json('30:44.000', { relay: 'close', tag: 'table:83167bb6', as: 'device', code: 1006, clean: false, openS: 100, sockets: 4 }),
+        // Another table's, which is not this one's business.
+        json('30:45.000', { relay: 'close', tag: 'table:5cad2c8f', as: 'device', code: 1006, clean: false, openS: 9, sockets: 0 }),
+        json('30:46.000', { bench: 'stop', table: 'table:5cad2c8f' }),
       ],
     },
     reports: [{ timestamp: at('31:05.000'), errorMessage: 'live: game lost: juror quorum lost', seen: 'juror quorum lost at h0/t49', line: '1 of 1 open', build: 'abc' }],
@@ -68,7 +78,11 @@ test('the jurors, the relay, their object and the device, in the order things ha
   // Asked for the table by the first eight of its id, as each side names it.
   assert.deepEqual(
     ctx.asked.filter((a) => a.dataset).map((a) => [a.dataset, a.filter]),
-    [['containers', '83167bb6'], ['cloudflare-workers', 'table:83167bb6']],
+    [
+      ['containers', '$metadata.message includes 83167bb6'],
+      ['cloudflare-workers', 'tag eq table:83167bb6'],
+      ['cloudflare-workers', 'table eq table:83167bb6'],
+    ],
   );
   assert.match(ctx.asked.find((a) => a.nrql).nrql, /WHERE `table` = '83167bb6' SINCE 3 days ago/);
 });

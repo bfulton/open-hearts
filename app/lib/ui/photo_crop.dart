@@ -2,8 +2,8 @@
 ///
 /// Taking the middle square is what a computer would do and it is
 /// wrong about half the time: people are not in the middle of their own
-/// photographs, and a badge is sixty-four pixels, so a head cut off at
-/// the chin is the whole of what anyone sees. So the square stays put
+/// photographs, and a badge is small, so a head cut off at the chin is
+/// the whole of what anyone sees. So the square stays put
 /// and the photograph moves under it — drag to move it, pinch to make
 /// it bigger — and what is kept is what is in the square.
 ///

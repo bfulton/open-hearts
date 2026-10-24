@@ -48,7 +48,7 @@ Future<List<Map<Object?, Object?>>> _heard(WidgetTester tester, Future<void> Fun
 /// Where [name]'s badge is drawn: not the copy laid out to size its
 /// partner.
 Rect _badge(WidgetTester tester, String name) {
-  final drawn = find.byWidgetPredicate((w) => w is SeatBadge && w.name == name).evaluate().where((e) {
+  final drawn = find.byWidgetPredicate((w) => w is SeatBadge && w.look.name == name).evaluate().where((e) {
     var ghost = false;
     e.visitAncestorElements((a) {
       ghost = a.widget is BadgeGhost;
@@ -68,7 +68,39 @@ List<ReactionSaid> _said(LiveHarness live) => [
         if (s.from == live.keys[live.controller.mySeat]) ReactionSaid.decode(s.content)!,
     ];
 
+/// The code points a TrueType font draws, from its cmap's format-12
+/// subtable: the one that reaches past the Basic Multilingual Plane,
+/// where emoji are.
+Set<int> _codePoints(Uint8List font) {
+  final b = ByteData.sublistView(font);
+  for (var i = 0; i < b.getUint16(4); i++) {
+    final record = 12 + 16 * i;
+    if (String.fromCharCodes(font.sublist(record, record + 4)) != 'cmap') continue;
+    final cmap = b.getUint32(record + 8);
+    for (var j = 0; j < b.getUint16(cmap + 2); j++) {
+      final table = cmap + b.getUint32(cmap + 4 + 8 * j + 4);
+      if (b.getUint16(table) != 12) continue;
+      return {
+        for (var g = 0; g < b.getUint32(table + 12); g++)
+          for (var c = b.getUint32(table + 16 + 12 * g); c <= b.getUint32(table + 20 + 12 * g); c++) c,
+      };
+    }
+  }
+  return {};
+}
+
 void main() {
+  test('the font the web draws reactions in has every reaction\'s emoji, and is declared', () {
+    final font = File('fonts/ReactionEmoji.ttf').readAsBytesSync();
+    final drawn = _codePoints(font);
+    for (final r in Reaction.values) {
+      expect(drawn, containsAll(r.emoji.runes), reason: '${r.code} ${r.emoji} is in fonts/ReactionEmoji.ttf (fonts/README.md)');
+    }
+    // Under the family the web asks for (ui/reactions.dart): the
+    // browser suite checks that drawing them fetches no font.
+    expect(File('pubspec.yaml').readAsStringSync(), contains('- family: ReactionEmoji\n      fonts:\n        - asset: fonts/ReactionEmoji.ttf\n'));
+  });
+
   // Measured in the font the screen is drawn in, as the large-text suite
   // does (fits.dart): Roboto, which the web build and Android draw in.
   setUpAll(() async {

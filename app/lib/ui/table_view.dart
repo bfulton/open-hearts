@@ -4,10 +4,10 @@ library;
 import 'dart:math' as math;
 
 import 'package:engine/engine.dart';
+import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/material.dart' hide Card;
 import 'package:flutter/semantics.dart';
 
-import '../avatar.dart';
 import '../l10n/l10n.dart';
 import '../pacing.dart';
 import '../table_model.dart';
@@ -518,14 +518,13 @@ class _Seat extends StatelessWidget {
       onHold: view.onHold == null ? null : () => view.onHold!(controller.seatAt(position)),
       seat: seat,
       position: position,
-      name: controller.names[seat],
-      iconName: controller.iconNameOf(seat),
+      look: controller.lookOf(seat),
       game: game,
       onTurn: game.currentSeat == seat,
-      won: game.pendingTrick?.winner == seat,
+      // A trick with points in it is told by the glow round the badge
+      // (_PointsGlow), and one way of saying it is enough.
+      won: game.pendingTrick?.winner == seat && pointsIn(game.pendingTrick!.plays.map((p) => p.card)) == 0,
       clockMs: controller.clockMs(seat),
-      iconSeed: controller.iconSeedOf(seat),
-      avatar: controller.avatarOf(seat),
       // The seat across the felt reads the same way as the
       // player's own line at the near edge: one line, icon
       // first. The side badges have a strip, so they stack.
@@ -552,7 +551,6 @@ class _Seat extends StatelessWidget {
           child: _PointsGlow(
             key: badgeKey,
             position: position,
-            taken: game.taken[seat],
             trick: pending?.winner == seat ? [for (final p in pending!.plays) p.card] : null,
             child: _badge(position),
           ),
@@ -579,19 +577,20 @@ class _Seat extends StatelessWidget {
 @visibleForTesting
 Key pointsGlowAt(int position) => ValueKey('points glow $position');
 
-/// A seat's badge, glowing as a trick it took with points in it comes
-/// to it: pink, for points taken (theme.dart), and red, the game's own,
-/// half a second longer for a trick with the queen in it. From when the
-/// sweep reaches the badge (_Trick), or at once where the device asks
-/// for less motion and nothing is swept. A trick that was never seen on
-/// the table, as when it catches up with itself, glows nowhere.
+/// A seat's badge, glowing for a trick with points in it that the seat
+/// has won: pink, for points taken (theme.dart), and red, the game's
+/// own, for a trick with the queen in it. It comes up as the trick is
+/// won, in place of the white border a trick without points gives its
+/// winner, and holds while the trick is on the table and swept to the
+/// seat (_Trick); once the cards are in, it holds for half its time and
+/// fades over the other half, the queen's half a second longer. Where
+/// the device asks for less motion nothing is swept, and that time
+/// starts as the trick is taken. A trick that was never seen on the
+/// table, as when it catches up with itself, glows nowhere.
 class _PointsGlow extends StatefulWidget {
-  const _PointsGlow({super.key, required this.position, required this.taken, required this.trick, required this.child});
+  const _PointsGlow({super.key, required this.position, required this.trick, required this.child});
 
   final int position;
-
-  /// The points the seat has taken this hand.
-  final int taken;
 
   /// The finished trick's cards, while it is on the table and the
   /// seat's; null at every other moment.
@@ -603,49 +602,75 @@ class _PointsGlow extends StatefulWidget {
   State<_PointsGlow> createState() => _PointsGlowState();
 }
 
-class _PointsGlowState extends State<_PointsGlow> with SingleTickerProviderStateMixin {
-  late final AnimationController _glow = AnimationController(vsync: this);
+class _PointsGlowState extends State<_PointsGlow> with TickerProviderStateMixin {
+  /// The glow coming up as the trick is won; and, from when it is taken,
+  /// the sweep and the glow's time after the cards are in.
+  late final AnimationController _up = AnimationController(vsync: this);
+  late final AnimationController _down = AnimationController(vsync: this)
+    ..addStatusListener((status) {
+      if (status == AnimationStatus.completed) _up.value = 0;
+    });
 
-  /// The glow's colour, how long it waits for the sweep, and how long it
+  /// The glow's colour, how long the sweep is, and how long the glow
   /// lasts once the cards are in.
   Color _colour = Palette.pink;
   Duration _waits = Duration.zero;
   Duration _lasts = Pacing.pointsGlow;
 
   @override
+  void initState() {
+    super.initState();
+    if (widget.trick != null) _won(widget.trick!);
+  }
+
+  @override
   void dispose() {
-    _glow.dispose();
+    _up.dispose();
+    _down.dispose();
     super.dispose();
   }
 
   @override
   void didUpdateWidget(_PointsGlow old) {
     super.didUpdateWidget(old);
-    // The trick that was on the table as this seat's is gone from it,
-    // and the seat's points have gone up: it has been taken.
-    final took = old.trick;
-    if (took == null || widget.trick != null || widget.taken <= old.taken) return;
-    final queen = took.contains(queenOfSpades);
-    final still = MediaQuery.maybeOf(context)?.disableAnimations ?? false;
-    _colour = queen ? Palette.red : Palette.pink;
-    _waits = still ? Duration.zero : Pacing.trickSweeps;
-    _lasts = queen ? Pacing.queenGlow : Pacing.pointsGlow;
-    _glow
-      ..duration = _waits + _lasts
-      ..forward(from: 0);
+    if (listEquals(old.trick, widget.trick)) return;
+    // The trick that was on the table as this seat's has gone from it:
+    // taken, and on its way to the seat.
+    if (old.trick != null && _up.value > 0 && !_down.isAnimating) {
+      final still = MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+      _waits = still ? Duration.zero : Pacing.trickSweeps;
+      _down
+        ..duration = _waits + _lasts
+        ..forward(from: 0);
+    }
+    if (widget.trick != null) _won(widget.trick!);
   }
 
-  /// How strong the glow is: up quickly as the cards come in, held, and
-  /// gone over its second half. Nothing once it has run, which is the
-  /// moment it reaches its end.
+  /// [trick], with points in it, won by the seat and on the table: the
+  /// glow comes up, from as strong as it is if the last is still going.
+  void _won(List<Card> trick) {
+    if (pointsIn(trick) == 0) return;
+    final queen = trick.contains(queenOfSpades);
+    final now = _strength;
+    _colour = queen ? Palette.red : Palette.pink;
+    _lasts = queen ? Pacing.queenGlow : Pacing.pointsGlow;
+    _down
+      ..stop()
+      ..value = 0;
+    _up
+      ..value = now
+      ..animateTo(1, duration: _lasts * (0.15 * (1 - now)), curve: Curves.easeOut);
+  }
+
+  /// How strong the glow is: up quickly as the trick is won, held until
+  /// the cards are in and half its time after, and gone over the other
+  /// half. Nothing once it has run.
   double get _strength {
-    if (!_glow.isAnimating) return 0;
-    final total = _glow.duration!;
-    final g = (_glow.value * total.inMicroseconds - _waits.inMicroseconds) / _lasts.inMicroseconds;
-    if (g <= 0) return 0;
-    if (g < 0.15) return Curves.easeOut.transform(g / 0.15);
-    if (g < 0.5) return 1;
-    return Curves.easeInOut.transform((1 - g) / 0.5);
+    final up = _up.value;
+    if (!_down.isAnimating) return up;
+    final past = _down.value * _down.duration!.inMicroseconds - (_waits + _lasts * 0.5).inMicroseconds;
+    final fades = _lasts.inMicroseconds / 2;
+    return past <= 0 ? up : up * Curves.easeInOut.transform(1 - past / fades);
   }
 
   @override
@@ -657,7 +682,7 @@ class _PointsGlowState extends State<_PointsGlow> with SingleTickerProviderState
 /// the felt at all. Round the badge and not through it, so what it says
 /// is read as it always is.
 class _Glow extends CustomPainter {
-  _Glow(this.glow) : super(repaint: glow._glow);
+  _Glow(this.glow) : super(repaint: Listenable.merge([glow._up, glow._down]));
 
   final _PointsGlowState glow;
 
@@ -1238,24 +1263,23 @@ class SeatBadge extends StatelessWidget {
   const SeatBadge({
     super.key,
     required this.seat,
-    required this.name,
+    required this.look,
     required this.game,
     required this.onTurn,
     required this.won,
     required this.maxWidth,
-    required this.iconSeed,
-    String? iconName,
-    required this.avatar,
     this.clockMs,
     this.oneLine = false,
     this.height,
     this.onHold,
     required this.iconSize,
     this.position = 0,
-  }) : iconName = iconName ?? name;
+  });
 
-  /// What the icon's initials come from (table_model.dart, iconNameOf).
-  final String iconName;
+  /// Who sits there, as the table draws them: the name, the icon, and
+  /// whether a bot plays the seat, which the icon and a screen reader
+  /// both say.
+  final SeatLook look;
 
   /// What a long press on the badge offers, if anything.
   final VoidCallback? onHold;
@@ -1266,15 +1290,9 @@ class SeatBadge extends StatelessWidget {
   /// left — the seat that plays after them — 2 across, 3 on their right.
   /// A sighted player reads it off the felt; a screen reader says it.
   final int position;
-  final String name;
-
-  /// What the seat's icon is coloured from.
-  final String iconSeed;
-
-  /// How the seat chose to look.
-  final Avatar avatar;
   final HeartsGame game;
   final bool onTurn;
+
   final bool won;
 
   /// What the seat has left on its clock, once it is past its grace;
@@ -1342,7 +1360,7 @@ class SeatBadge extends StatelessWidget {
     // this hand, whether it is their turn, and their clock once it runs.
     final clock = clockMs;
     return Semantics(
-      label: '${context.l10n.seatScores(name, total, taken)}'
+      label: '${context.l10n.seatScores(look.bot ? '${look.name}${context.l10n.seatIsBot}' : look.name, total, taken)}'
           '${onTurn ? context.l10n.seatOnTurn : ''}${clock == null ? '' : context.l10n.seatClock(clockSeconds(clock))}'
           '${position == 0 ? '' : context.l10n.seatWhere(switch (position) { 1 => 'left', 2 => 'across', _ => 'right' })}',
       onLongPress: onHold,
@@ -1395,6 +1413,7 @@ class SeatBadge extends StatelessWidget {
           maxLines: 1,
         )..layout())
         .width;
+    final name = look.name;
     final words = name.split(' ');
     final wrapped = !oneLine && words.length > 1;
     if (widthOf(name) <= room) {
@@ -1436,7 +1455,7 @@ class SeatBadge extends StatelessWidget {
     // The icon sits beside the name where the badge has the width for
     // it and above it where it does not, so a side badge keeps its room
     // for the name either way.
-    final icon = PlayerIcon(name: iconName, seed: iconSeed, avatar: avatar, size: iconSize);
+    final icon = SeatIcon(look: look, size: iconSize);
     // Inside the padding and the border, at its widest: the gold one on
     // the seat whose turn it is. A name given the room the border takes
     // comes out wider than the badge, and the badge scales it to fit.

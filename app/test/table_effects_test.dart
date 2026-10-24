@@ -1,6 +1,8 @@
 /// What the felt does as points are taken (ui/table_view.dart): a seat's
-/// badge glows as a trick with points in it comes to it, pink, and red
-/// half a second longer for the queen; and a moon, whoever shot it,
+/// badge glows from when it wins a trick with points in it until the
+/// cards are in and a while after, pink, and red half a second longer
+/// for the queen, in place of the white border a trick without points
+/// gives its winner; and a moon, whoever shot it,
 /// shakes the felt from the shooter's badge, with rings running out
 /// from it, all over before the sheet comes down.
 library;
@@ -15,18 +17,24 @@ import 'package:open_hearts/l10n/l10n.dart';
 import 'package:open_hearts/pacing.dart';
 import 'package:open_hearts/table_model.dart';
 import 'package:open_hearts/theme.dart';
+import 'package:open_hearts/ui/overlays.dart';
+import 'package:open_hearts/ui/player_icon.dart';
 import 'package:open_hearts/ui/table_view.dart';
 
 /// A table whose four seats are the engine's bots, moved a step at a
 /// time by the test, which says when the felt hears of it.
 class _Table extends ChangeNotifier implements TableModel {
-  _Table(int seed, {this.mySeat = 0}) : game = HeartsGame(seed: seed);
+  _Table(int seed, {this.mySeat = 0, this.people = const {}}) : game = HeartsGame(seed: seed);
 
   @override
   final HeartsGame game;
 
   @override
   final int mySeat;
+
+  /// The seats played by people rather than bots, as a table has them:
+  /// bots all the same, moved by the test, but with no persona.
+  final Set<int> people;
 
   final _bots = [for (var s = 0; s < seatCount; s++) Bot(persona: Persona.roster[s])];
   final _played = <Card>{};
@@ -77,7 +85,7 @@ class _Table extends ChangeNotifier implements TableModel {
   @override
   List<String> get names => const ['Ada', 'Bao', 'Cy', 'Dee'];
   @override
-  Persona? personaAt(int seat) => _bots[seat].persona;
+  Persona? personaAt(int seat) => people.contains(seat) ? null : _bots[seat].persona;
   @override
   Set<Card> get playedThisHand => _played;
   @override
@@ -159,6 +167,45 @@ Future<void> _take(WidgetTester tester, _Table table) async {
   await tester.pump();
 }
 
+/// A table of seed [seed] one step before [done] holds of it: the felt
+/// shown it there sees the step that makes it so.
+_Table _before(int seed, bool Function(HeartsGame game) done) {
+  final probe = _Table(seed);
+  var steps = 0;
+  for (; !done(probe.game); steps++) {
+    probe.step();
+  }
+  final table = _Table(seed);
+  for (var i = 0; i < steps - 1; i++) {
+    table.step();
+  }
+  return table;
+}
+
+/// The last card of the trick played, and the felt told: the trick won.
+Future<void> _win(WidgetTester tester, _Table table) async {
+  table
+    ..step()
+    ..tell();
+  expect(table.game.pendingTrick, isNotNull);
+  await tester.pump();
+}
+
+/// The colour of the border of the badge at [position].
+Color _border(WidgetTester tester, int position) {
+  final box = tester.widget<AnimatedContainer>(find.descendant(of: find.byKey(pointsGlowAt(position)), matching: find.byType(AnimatedContainer)).first);
+  return ((box.decoration! as BoxDecoration).border! as Border).top.color;
+}
+
+/// How strong the glow round the badge at [position] is: the alpha of
+/// its bright edge, which is drawn at full strength's.
+double _strength(WidgetTester tester, int position) {
+  final glow = find.byKey(pointsGlowAt(position));
+  final canvas = _Glows();
+  tester.widget<CustomPaint>(glow).painter!.paint(canvas, tester.getSize(glow));
+  return canvas.drawn.isEmpty ? 0 : canvas.drawn.first.colour.a;
+}
+
 /// The glow round the badge at [position]: its colour at full strength,
 /// or null where there is none.
 Color? _glow(WidgetTester tester, int position) {
@@ -211,50 +258,64 @@ const _frame = Duration(milliseconds: 40);
 /// Long enough for the badge that took a trick to ease out of the
 /// border it wore while it was on the table, which moves a side badge's
 /// middle by a fraction of a point.
-const _border = Duration(milliseconds: 220);
+const _borderEases = Duration(milliseconds: 220);
 
 void main() {
   group('points glow', () {
-    testWidgets('pink round the taker once the cards reach it, and gone after', (tester) async {
-      final table = _Table(1)..stepUntil((g) => g.pendingTrick != null && _points(g.pendingTrick!) > 0 && !_hasQueen(g.pendingTrick!));
+    testWidgets('pink round the winner as soon as the trick is won, for its white border, held through the sweep, and gone after',
+        (tester) async {
+      final table = _before(1, (g) => g.pendingTrick != null && _points(g.pendingTrick!) > 0 && !_hasQueen(g.pendingTrick!));
       await _pump(tester, table);
+      expect(_glows(tester), everyElement(isNull), reason: 'nothing before the trick is won');
+      await _win(tester, table);
       final taker = table.positionOf(table.game.pendingTrick!.winner);
-      await _take(tester, table);
 
-      await tester.pump(Pacing.trickSweeps - _frame);
-      expect(_glows(tester), everyElement(isNull), reason: 'not while the cards are on their way');
-      await tester.pump(_frame * 2);
-      await tester.pump(Pacing.pointsGlow * 0.2);
+      await tester.pump(Pacing.pointsGlow * 0.15 + _frame);
       expect(_glow(tester, taker), Palette.pink);
-      expect([for (var p = 0; p < seatCount; p++) if (p != taker) _glow(tester, p)], everyElement(isNull), reason: 'the taker alone');
+      expect([for (var p = 0; p < seatCount; p++) if (p != taker) _glow(tester, p)], everyElement(isNull), reason: 'the winner alone');
+      expect(_border(tester, taker), isNot(Palette.chrome), reason: 'the glow says it, not a white border as well');
       final glow = find.byKey(pointsGlowAt(taker));
       expect(tester.widget<CustomPaint>(glow).painter!.hitTest(tester.getSize(glow).center(Offset.zero)), isFalse,
           reason: 'what is under it is touched, not it');
-      await tester.pump(Pacing.pointsGlow * 0.8);
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(_glow(tester, taker), Palette.pink, reason: 'held while the trick is on the table');
+
+      await _take(tester, table);
+      await tester.pump(Pacing.trickSweeps + Pacing.pointsGlow * 0.5 - _frame);
+      expect(_strength(tester, taker), 1, reason: 'held through the sweep and half its time after');
+      await tester.pump(Pacing.pointsGlow * 0.25);
+      expect(_strength(tester, taker), allOf(greaterThan(0), lessThan(1)), reason: 'fading');
+      await tester.pump(Pacing.pointsGlow * 0.25 + _frame * 2);
       expect(_glows(tester), everyElement(isNull), reason: 'gone once it has had its time');
       expect(tester.binding.hasScheduledFrame, isFalse);
     });
 
     testWidgets('red for the queen, and half a second longer', (tester) async {
-      final table = _Table(1)..stepUntil((g) => g.pendingTrick != null && _hasQueen(g.pendingTrick!));
+      final table = _before(1, (g) => g.pendingTrick != null && _hasQueen(g.pendingTrick!));
       await _pump(tester, table);
+      await _win(tester, table);
       final taker = table.positionOf(table.game.pendingTrick!.winner);
-      await _take(tester, table);
-
-      await tester.pump(Pacing.trickSweeps + _frame);
-      await tester.pump(Pacing.pointsGlow * 0.2);
+      await tester.pump(Pacing.queenGlow * 0.15 + _frame);
       expect(_glow(tester, taker), Palette.red);
+      expect(_border(tester, taker), isNot(Palette.chrome));
+
+      await _take(tester, table);
       // Where a trick of hearts alone would be gone.
-      await tester.pump(Pacing.pointsGlow * 0.8);
+      await tester.pump(Pacing.trickSweeps + Pacing.pointsGlow + _frame);
       expect(_glow(tester, taker), Palette.red, reason: 'longer than points alone');
       expect(Pacing.queenGlow - Pacing.pointsGlow, const Duration(milliseconds: 500));
       await tester.pump(Pacing.queenGlow - Pacing.pointsGlow);
       expect(_glows(tester), everyElement(isNull));
     });
 
-    testWidgets('none for a trick without points', (tester) async {
-      final table = _Table(1)..stepUntil((g) => g.pendingTrick != null && _points(g.pendingTrick!) == 0);
+    testWidgets('none for a trick without points, whose winner has the white border', (tester) async {
+      final table = _before(1, (g) => g.pendingTrick != null && _points(g.pendingTrick!) == 0);
       await _pump(tester, table);
+      await _win(tester, table);
+      final taker = table.positionOf(table.game.pendingTrick!.winner);
+      await tester.pump(_borderEases);
+      expect(_border(tester, taker), Palette.chrome);
+      await tester.pump(const Duration(milliseconds: 500));
       await _take(tester, table);
       for (var t = Duration.zero; t < Pacing.trickSweeps + Pacing.queenGlow; t += const Duration(milliseconds: 100)) {
         await tester.pump(const Duration(milliseconds: 100));
@@ -277,15 +338,61 @@ void main() {
       expect(_glows(tester), everyElement(isNull));
     });
 
-    testWidgets('at once where the device asks for less motion, nothing being swept', (tester) async {
-      final table = _Table(1)..stepUntil((g) => g.pendingTrick != null && _points(g.pendingTrick!) > 0 && !_hasQueen(g.pendingTrick!));
+    testWidgets('where the device asks for less motion, its time after starts as the trick is taken, nothing being swept',
+        (tester) async {
+      final table = _before(1, (g) => g.pendingTrick != null && _points(g.pendingTrick!) > 0 && !_hasQueen(g.pendingTrick!));
       await _pump(tester, table, still: true);
+      await _win(tester, table);
       final taker = table.positionOf(table.game.pendingTrick!.winner);
-      await _take(tester, table);
-      await tester.pump(Pacing.pointsGlow * 0.2);
+      await tester.pump(Pacing.pointsGlow * 0.15 + _frame);
       expect(_glow(tester, taker), Palette.pink);
-      await tester.pump(Pacing.pointsGlow * 0.8 + _frame);
+      await tester.pump(const Duration(milliseconds: 500));
+      await _take(tester, table);
+      await tester.pump(Pacing.pointsGlow * 0.5 - _frame);
+      expect(_strength(tester, taker), 1);
+      await tester.pump(Pacing.pointsGlow * 0.5 + _frame * 2);
       expect(_glows(tester), everyElement(isNull));
+    });
+
+    testWidgets('the same seat winning the next trick with points before the glow is gone glows on, not twice', (tester) async {
+      final probe = _Table(1);
+      // Two tricks with points in a row to the same seat: the step the
+      // first is won at.
+      int? last;
+      var first = 0;
+      for (var steps = 0;; steps++) {
+        final g = probe.game;
+        if (g.pendingTrick != null && _points(g.pendingTrick!) > 0) {
+          if (last == g.pendingTrick!.winner) break;
+          last = g.pendingTrick!.winner;
+          first = steps;
+        } else if (g.pendingTrick != null) {
+          last = null;
+        }
+        probe.step();
+      }
+      final table = _Table(1);
+      for (var i = 0; i < first; i++) {
+        table.step();
+      }
+      final taker = table.positionOf(last!);
+      final lasts = _hasQueen(table.game.pendingTrick!) ? Pacing.queenGlow : Pacing.pointsGlow;
+      await _pump(tester, table);
+      await tester.pump(lasts * 0.15 + _frame);
+      await _take(tester, table);
+      // The cards in, and its fade begun, when the next trick is won.
+      await tester.pump(Pacing.trickSweeps + lasts * 0.75);
+      final fading = _strength(tester, taker);
+      expect(fading, allOf(greaterThan(0), lessThan(1)));
+      table.stepUntil((g) => g.pendingTrick != null);
+      expect(table.game.pendingTrick!.winner, last);
+      table.tell();
+      await tester.pump();
+      expect(_strength(tester, taker), moreOrLessEquals(fading, epsilon: 0.05), reason: 'up again from where it was, not from nothing');
+      await tester.pump(_frame);
+      expect(_strength(tester, taker), greaterThan(fading));
+      await tester.pump(Pacing.queenGlow);
+      expect(_strength(tester, taker), 1, reason: 'and held while the trick is on the table');
     });
   });
 
@@ -305,9 +412,9 @@ void main() {
 
         // Still while the last trick is on its way to the shooter, once
         // the badge that took it has eased out of its border.
-        await tester.pump(_border);
+        await tester.pump(_borderEases);
         final rest = _centres(tester);
-        await tester.pump(Pacing.trickSweeps - _border - _frame);
+        await tester.pump(Pacing.trickSweeps - _borderEases - _frame);
         expect(_centres(tester), rest);
         expect(_rings(tester), isEmpty);
         await tester.pump(_frame);
@@ -366,9 +473,9 @@ void main() {
       await _pump(tester, table);
       await _take(tester, table);
       expect(table.game.moonShooter, isNull);
-      await tester.pump(_border);
+      await tester.pump(_borderEases);
       final rest = _centres(tester);
-      for (var t = _border; t < Pacing.trickSweeps + Pacing.moonQuake; t += const Duration(milliseconds: 50)) {
+      for (var t = _borderEases; t < Pacing.trickSweeps + Pacing.moonQuake; t += const Duration(milliseconds: 50)) {
         await tester.pump(const Duration(milliseconds: 50));
         expect(_centres(tester), rest);
         expect(_rings(tester), isEmpty);
@@ -393,13 +500,90 @@ void main() {
       await _pump(tester, table, still: true);
       await _take(tester, table);
       expect(table.game.moonShooter, 1);
-      await tester.pump(_border);
+      await tester.pump(_borderEases);
       final rest = _centres(tester);
-      for (var t = _border; t < Pacing.trickSweeps + Pacing.moonQuake; t += const Duration(milliseconds: 50)) {
+      for (var t = _borderEases; t < Pacing.trickSweeps + Pacing.moonQuake; t += const Duration(milliseconds: 50)) {
         await tester.pump(const Duration(milliseconds: 50));
         expect(_centres(tester), rest);
         expect(_rings(tester), isEmpty);
       }
+    });
+  });
+
+  group('bots told from people', () {
+    // The badge on the felt, not the ghosts of it the layout sizes by.
+    Finder badgeOf(int seat) => find.byElementPredicate(
+        (e) => e.widget is SeatBadge && (e.widget as SeatBadge).seat == seat && e.findAncestorWidgetOfExactType<BadgeGhost>() == null);
+    Finder markOn(int seat) => find.descendant(of: badgeOf(seat), matching: find.byType(BotMark));
+    Finder robotOn(int seat) => find.descendant(of: markOn(seat), matching: find.byIcon(Icons.smart_toy));
+
+    testWidgets('a bot wears the mark and is said to be one; a person is neither', (tester) async {
+      final table = _Table(3, people: {0, 2});
+      await _pump(tester, table);
+      expect(markOn(0), findsNothing, reason: 'your own seat');
+      expect(markOn(2), findsNothing, reason: 'another person');
+      expect(markOn(1), findsOneWidget);
+      expect(markOn(3), findsOneWidget);
+      expect(find.descendant(of: find.byType(TableView), matching: find.byIcon(Icons.smart_toy)).hitTestable(), findsNWidgets(2));
+      expect(find.bySemanticsLabel(RegExp(r'^Bao, a bot: ')), findsOneWidget);
+      expect(find.bySemanticsLabel(RegExp(r'^Dee, a bot: ')), findsOneWidget);
+      expect(find.bySemanticsLabel(RegExp(r'^Cy: ')), findsOneWidget);
+      expect(find.bySemanticsLabel(RegExp(r', a bot')), findsNWidgets(2));
+    });
+
+    for (final scale in [1.0, 2.0]) {
+      testWidgets("the mark sits at the icon's lower right, mostly outside it, at ${scale}x type", (tester) async {
+        // At the reader's own text size the mark stays the icon's size:
+        // it is a mark on the icon, and the name beside it is what grows.
+        tester.platformDispatcher.textScaleFactorTestValue = scale;
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        await _pump(tester, _Table(3, people: {0}));
+        final icon = tester.getRect(find.descendant(of: badgeOf(1), matching: find.byType(PlayerIcon)));
+        final disc = tester.getRect(find.ancestor(of: robotOn(1), matching: find.byType(Container)).first);
+        expect(disc.width, lessThanOrEqualTo(icon.width * 0.42), reason: 'small beside the icon');
+        expect(disc.width, moreOrLessEquals(disc.height));
+        final apart = disc.center - icon.center;
+        expect(apart.dx, moreOrLessEquals(apart.dy, epsilon: 0.5), reason: 'on the diagonal');
+        expect(apart.dx, greaterThan(0), reason: 'to the lower right');
+        // Its centre past the icon's rim, and its edge over it: it
+        // touches the icon, and covers little of it.
+        expect(apart.distance, greaterThan(icon.width / 2));
+        expect(apart.distance, lessThan(icon.width / 2 + disc.width / 2));
+      });
+    }
+
+    testWidgets('touched, the mark says it is a bot', (tester) async {
+      await _pump(tester, _Table(3, people: {0}));
+      expect(find.text('Bot'), findsNothing);
+      await tester.tap(robotOn(1));
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(find.text('Bot'), findsOneWidget);
+      await tester.pump(const Duration(seconds: 5));
+      await tester.pumpAndSettle();
+      expect(find.text('Bot'), findsNothing, reason: 'and goes again');
+    });
+
+    testWidgets('the score sheets mark the same seats, and say so', (tester) async {
+      final table = _Table(3, people: {0, 2});
+      await tester.pumpWidget(MaterialApp(
+        theme: buildTheme(),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Scaffold(
+          body: HandOverSheet(handNumber: 0, scores: const [3, 8, 2, 13], totals: const [3, 8, 2, 13], moonShooter: null, seats: table.looks, onNext: () {}),
+        ),
+      ));
+      await tester.pumpAndSettle();
+      expect(find.byType(BotMark), findsNWidgets(2));
+      expect(find.bySemanticsLabel(RegExp(r'^Bao, a bot: ')), findsOneWidget);
+      expect(find.bySemanticsLabel(RegExp(r'^Dee, a bot: ')), findsOneWidget);
+      expect(find.bySemanticsLabel(RegExp(r'^Cy: ')), findsOneWidget);
+    });
+
+    testWidgets('four people, no mark', (tester) async {
+      await _pump(tester, _Table(3, people: {0, 1, 2, 3}));
+      expect(find.byType(BotMark), findsNothing);
+      expect(find.bySemanticsLabel(RegExp(r', a bot')), findsNothing);
     });
   });
 }

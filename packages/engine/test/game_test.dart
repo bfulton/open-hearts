@@ -272,6 +272,157 @@ void main() {
     });
   });
 
+  group('looking ahead', () {
+    /// Everything a game says about itself.
+    String state(HeartsGame g) => [
+      g.phase,
+      g.handNumber,
+      g.totals,
+      g.taken,
+      g.handScores,
+      g.moonShooter,
+      for (var s = 0; s < seatCount; s++) (g.knowsHand(s) ? g.handOf(s) : 'hidden', g.handSizeOf(s)),
+      g.trick,
+      g.pendingTrick,
+      g.lastTrick,
+      g.tricksPlayed,
+      g.heartsBroken,
+      g.leader,
+      g.currentSeat,
+      for (var s = 0; s < seatCount; s++) (g.passOf(s), g.hasPassed(s), g.receivedBy(s)),
+    ].join('|');
+
+    /// The cards [bot] plays from where [g] stands to the end of the
+    /// hand, or for [cards] of them.
+    List<(int, Card)> playOn(HeartsGame g, Bot bot, {int cards = 1 << 20}) {
+      final plays = <(int, Card)>[];
+      while (g.phase == Phase.playing) {
+        if (g.pendingTrick != null && plays.length < cards) {
+          g.collectTrick();
+          continue;
+        }
+        if (plays.length >= cards) break;
+        final seat = g.currentSeat!;
+        final card = bot.chooseCard(
+          BotView(
+            seat: seat,
+            hand: g.handOf(seat),
+            trick: g.trick,
+            played: const {},
+            heartsBroken: g.heartsBroken,
+            isFirstTrick: g.isFirstTrick,
+            taken: g.taken,
+          ),
+          g.legalPlaysFor(seat),
+        );
+        plays.add((seat, card));
+        g.play(seat, card);
+      }
+      return plays;
+    }
+
+    test('a copy plays on as the game would, and the game is untouched by it', () {
+      final bot = Bot();
+      var (broken, scored, pending) = (0, 0, 0);
+      for (var seed = 0; seed < 40; seed++) {
+        final game = HeartsGame(seed: seed);
+        for (var s = 0; s < seatCount; s++) {
+          game.setPass(s, bot.choosePass(game.handOf(s)));
+        }
+        // Into the hand by a different number of cards each time, as
+        // far as its last trick — hearts broken and points taken by
+        // then, as a rule — and every so often with a trick waiting to
+        // be swept.
+        playOn(game, bot, cards: seed * 13 % 51);
+        if (seed.isOdd && game.pendingTrick != null) game.collectTrick();
+        final before = state(game);
+        final ahead = game.lookahead();
+        expect(state(ahead), before, reason: 'seed $seed: the copy starts where the game stands');
+        if (game.heartsBroken) broken++;
+        if (game.taken.any((t) => t > 0)) scored++;
+        if (game.pendingTrick != null) pending++;
+        final plays = playOn(ahead, bot);
+        expect(state(game), before, reason: 'seed $seed: nothing played on the copy is played here');
+        // The same cards here, and the game ends up where the copy did.
+        for (final (seat, card) in plays) {
+          if (game.pendingTrick != null) game.collectTrick();
+          game.play(seat, card);
+        }
+        if (game.pendingTrick != null) game.collectTrick();
+        expect(state(game), state(ahead), reason: 'seed $seed: the copy played the hand out as the game does');
+        expect(() => ahead.nextHand(), throwsStateError, reason: 'and it does not deal');
+        expect(() => ahead.abandonHand(), throwsStateError);
+        game.nextHand();
+        expect(game.handNumber, 1);
+      }
+      // What the copies were taken at, so the copying of each is tried.
+      expect(broken, greaterThan(5));
+      expect(scored, greaterThan(5));
+      expect(pending, greaterThan(2));
+    });
+
+    test('a copy taken in the pass, at the hand\'s end or in a later hand is the game, and shares nothing with it', () {
+      final bot = Bot();
+      // A seed whose second hand is a moon shot, so the copy at its end
+      // has a shooter to copy.
+      final game = HeartsGame(seed: 16);
+      var moons = 0;
+      for (var hand = 0; hand < 2; hand++) {
+        // In the pass, part made: the rest made on the copy alone, then
+        // here, to the same place.
+        game.setPass(0, bot.choosePass(game.handOf(0)));
+        final inPass = game.lookahead();
+        final before = state(game);
+        expect(state(inPass), before, reason: 'hand $hand, in the pass');
+        for (var s = 1; s < seatCount; s++) {
+          inPass.setPass(s, bot.choosePass(inPass.handOf(s)));
+        }
+        expect(state(game), before, reason: 'hand $hand: passes made on the copy are not made here');
+        for (var s = 1; s < seatCount; s++) {
+          game.setPass(s, bot.choosePass(game.handOf(s)));
+        }
+        expect(state(inPass), state(game), reason: 'hand $hand: and made here, they come to the same');
+        // Mid-hand: a copy does not give its hand up.
+        playOn(game, bot, cards: 20);
+        expect(() => game.lookahead().abandonHand(), throwsStateError);
+        playOn(game, bot);
+        // At the hand's end, scored: the scores and the totals copied.
+        expect(game.phase, Phase.handOver);
+        final over = game.lookahead();
+        expect(state(over), state(game), reason: 'hand $hand, over');
+        expect(() => over.nextHand(), throwsStateError);
+        if (game.moonShooter != null) moons++;
+        game.nextHand();
+      }
+      expect(moons, greaterThan(0));
+    });
+
+    test('a sealed game\'s copy keeps the hands this side cannot see hidden', () {
+      final game = HeartsGame(sealed: true);
+      // In order: the 2♣ in seat 0's hand, which this side cannot see.
+      final deck = List.of(Card.deck);
+      game.deal([for (var s = 0; s < seatCount; s++) s == 2 ? deck.sublist(s * 13, s * 13 + 13) : null]);
+      // And who leads, when this side cannot see the 2♣: the deal says.
+      game.declareLeader(1);
+      final ahead = game.lookahead();
+      expect([for (var s = 0; s < seatCount; s++) ahead.knowsHand(s)], [false, false, true, false]);
+      expect(ahead.handOf(2), game.handOf(2));
+      expect(state(ahead), state(game));
+      for (final g in [ahead, game]) {
+        for (var s = 0; s < seatCount; s++) {
+          // Seat 1 passes into the seen hand, so its three are known.
+          g.setPass(s, switch (s) {
+            2 => g.handOf(2).take(3).toList(),
+            1 => deck.sublist(13, 16),
+            _ => null,
+          });
+        }
+      }
+      expect(ahead.currentSeat, game.currentSeat, reason: 'the copy has the declared leader');
+      expect(state(ahead), state(game));
+    });
+  });
+
   group('full games', () {
     test('200 seeded games finish, obeying every rule along the way', () {
       for (var seed = 0; seed < 200; seed++) {

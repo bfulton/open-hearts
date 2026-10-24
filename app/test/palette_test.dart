@@ -14,6 +14,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:open_hearts/avatar.dart';
 import 'package:open_hearts/profile_page.dart';
 import 'package:open_hearts/stats.dart';
+import 'package:open_hearts/table_model.dart' show SeatLook;
 import 'package:open_hearts/theme.dart';
 import 'package:open_hearts/ui/overlays.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -22,6 +23,7 @@ import 'package:table/table.dart';
 import 'table_page_test.dart' show fanCards, pumpTable, tapCard;
 
 const _names = ['Ada', 'Bao', 'You', 'Dee'];
+final _seats = [for (final n in _names) SeatLook(name: n)];
 const _me = 2;
 
 Future<void> pumpSheet(WidgetTester tester, Widget sheet) async {
@@ -87,7 +89,7 @@ void main() {
         scores: const [3, 8, 2, 13],
         totals: const [3, 8, 2, 13],
         moonShooter: null,
-        names: _names,
+        seats: _seats,
         mySeat: _me,
         onNext: () {},
       ),
@@ -104,7 +106,7 @@ void main() {
         scores: const [3, 8, 2, 13],
         totals: const [3, 8, 2, 13],
         moonShooter: null,
-        names: _names,
+        seats: _seats,
         mySeat: _me,
         onNext: () {},
       ),
@@ -123,7 +125,7 @@ void main() {
           scores: const [26, 0, 0, 0],
           totals: const [26, 0, 0, 0],
           moonShooter: shooter,
-          names: _names,
+          seats: _seats,
           mySeat: _me,
           onNext: () {},
         );
@@ -135,11 +137,11 @@ void main() {
 
   testWidgets('a game you won says so in white, and one you lost in red — the new game is gold either way', (tester) async {
     final over = _finished();
-    await pumpSheet(tester, GameOverSheet(game: over.game, names: _names, mySeat: over.won, onNewGame: () {}));
+    await pumpSheet(tester, GameOverSheet(game: over.game, seats: _seats, mySeat: over.won, onNewGame: () {}));
     expect(_colourOf(tester, 'You win'), Palette.chrome);
     expect(_buttonUnder(tester, 'New game'), Palette.gold);
 
-    await pumpSheet(tester, GameOverSheet(game: over.game, names: _names, mySeat: over.lost, onNewGame: () {}));
+    await pumpSheet(tester, GameOverSheet(game: over.game, seats: _seats, mySeat: over.lost, onNewGame: () {}));
     expect(_colourOf(tester, '${_names[over.won]} wins'), Palette.danger);
     expect(_buttonUnder(tester, 'New game'), Palette.gold, reason: 'the way on is the same colour whoever won');
   });
@@ -147,7 +149,7 @@ void main() {
   testWidgets('at the end, the winner\'s row is green and every row at or past the target red', (tester) async {
     final over = _finished();
     final game = over.game;
-    await pumpSheet(tester, GameOverSheet(game: game, names: _names, mySeat: over.won, onNewGame: () {}));
+    await pumpSheet(tester, GameOverSheet(game: game, seats: _seats, mySeat: over.won, onNewGame: () {}));
     var red = 0;
     for (var seat = 0; seat < engine.seatCount; seat++) {
       final expected = game.winners.contains(seat)
@@ -163,7 +165,7 @@ void main() {
     }
     expect(red, greaterThan(0), reason: 'somebody ended the game');
     // A hand's sheet marks nobody: nothing is won or lost yet.
-    await pumpSheet(tester, HandOverSheet(handNumber: 0, scores: const [3, 8, 2, 13], totals: const [3, 8, 2, 13], moonShooter: null, names: _names, mySeat: _me, onNext: () {}));
+    await pumpSheet(tester, HandOverSheet(handNumber: 0, scores: const [3, 8, 2, 13], totals: const [3, 8, 2, 13], moonShooter: null, seats: _seats, mySeat: _me, onNext: () {}));
     expect(_colourOf(tester, 'Ada'), Palette.chrome);
   });
 
@@ -174,7 +176,7 @@ void main() {
           tester,
           GameOverSheet(
             game: over.game,
-            names: _names,
+            seats: _seats,
             mySeat: over.won,
             onNewGame: () {},
             rating: (before: before, after: after),

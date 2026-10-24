@@ -442,10 +442,13 @@ What is published at tables is read from the device's copy
 A name the others would see is refused if it has a word on the lists of
 obscene and offensive words in `third_party/ldnoobw/`, in English,
 Spanish, Portuguese, German or French, or one of a few words refused
-even inside another word. Words are compared in lower case, with
+even inside another word. So is a name that would pass for Open Hearts
+itself or the people who run it: the game's name, and words such as
+*admin*, *moderator*, *support*, *staff*, *official* and *operator* in
+the same five languages. Words are compared in lower case, with
 accents folded and with digits and signs written for letters read as
 letters, so `5h1t` is read as *shit*. Words are matched whole, so
-*Cassandra* and *Scunthorpe* stay names. Entries that would refuse
+*Cassandra*, *Scunthorpe*, *Staffan* and *Supporter* stay names. Entries that would refuse
 real names are left out, and the folder's README says which and why.
 What the lists miss, a report catches.
 

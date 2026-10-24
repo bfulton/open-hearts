@@ -626,6 +626,11 @@ stillFlow('a reaction at a live table: one player sends 👍, and the other sees
   // Ada's steps of the deal: with its cards showing, a reaction said now
   // reaches it.
   await waitFor(bao, cardName, { what: 'Bao\'s hand, dealt', timeout: 120000 });
+  // The six emoji come with the app (app/fonts/README.md): drawing them
+  // fetches no font, from Google's servers or anywhere else, so they
+  // are there the moment the picker opens and a bubble shows.
+  const fontsFetched = [];
+  for (const page of [ada, bao]) page.on('request', (r) => /fonts\.gstatic\.com|notocoloremoji/i.test(r.url()) && fontsFetched.push(r.url()));
   await click(ada, /^React$/);
   await waitFor(ada, /^Good game$/, { what: 'the reactions to pick from' });
   await click(ada, /^Nice$/);
@@ -643,6 +648,7 @@ stillFlow('a reaction at a live table: one player sends 👍, and the other sees
   })();
   await waitFor(ada, /^You: Nice$/, { what: 'Ada\'s own reaction, in the button\'s place', timeout: 5000 });
   const bubble = await onBao;
+  if (fontsFetched.length) throw new Error(`the reactions fetched fonts: ${fontsFetched.join(', ')}`);
   if (!bubble) throw new Error(`no reaction on Bao's screen within 5 s of its saying\nBao saw: ${(await texts(bao)).join(' | ')}`);
   const centre = (r) => ({ x: r.x + r.w / 2, y: r.y + r.h / 2 });
   const away = (r) => Math.hypot(centre(r).x - centre(bubble).x, centre(r).y - centre(bubble).y);

@@ -96,6 +96,14 @@ Future<void> dragCard(WidgetTester tester, engine.Card card, double dy) async {
 }
 
 void main() {
+  testWidgets('alone, the three bots wear the mark and are said to be bots; you do not', (tester) async {
+    await pumpTable(tester);
+    expect(find.byType(BotMark).hitTestable(), findsNWidgets(3));
+    expect(find.bySemanticsLabel(RegExp(r', a bot: ')), findsNWidgets(3));
+    final mine = find.byWidgetPredicate((w) => w is SeatBadge && w.seat == engine.humanSeat && !w.look.bot);
+    expect(mine, findsWidgets, reason: 'your own seat is a person\'s');
+  });
+
   testWidgets('opens on the pass, asking for three cards', (tester) async {
     await pumpTable(tester);
     expect(find.textContaining('Choose 3 more to pass'), findsOneWidget);
@@ -620,7 +628,8 @@ void main() {
     // seat 1 plays after you and is drawn on your left.
     const where = ['', 'on your left', 'across from you', 'on your right'];
     for (var seat = 1; seat < engine.seatCount; seat++) {
-      expect(find.bySemanticsLabel('${model.names[seat]}: 0 in the game, 0 this hand, ${where[model.positionOf(seat)]}'), findsOneWidget);
+      // Each of them a bot, playing alone, and said to be one.
+      expect(find.bySemanticsLabel('${model.names[seat]}, a bot: 0 in the game, 0 this hand, ${where[model.positionOf(seat)]}'), findsOneWidget);
     }
     expect(find.bySemanticsLabel(RegExp(r'\d+ cards')), findsNothing);
     expect(find.bySemanticsLabel('You: 0 in the game, 0 this hand'), findsOneWidget);
@@ -655,7 +664,7 @@ void main() {
       await pumpTable(tester, seed: seed!, key: ValueKey(name));
       expect(tester.takeException(), isNull);
       final names = tester.widget<TableView>(find.byType(TableView)).controller.names;
-      final east = tester.getRect(find.bySemanticsLabel(RegExp('^$name: ')));
+      final east = tester.getRect(find.bySemanticsLabel(RegExp('^$name(, a bot)?: ')));
       expect(east.right, lessThanOrEqualTo(_phone.width - 6));
       for (final slot in _trickSlots(tester)) {
         expect(east.overlaps(slot), isFalse, reason: '$name\'s badge stays clear of the trick');
@@ -677,7 +686,7 @@ void main() {
       if (name == 'Don Juan') {
         // Wrapped to two lines: taller than the north badge, which has
         // the whole width and stays on one.
-        final north = tester.getRect(find.bySemanticsLabel(RegExp('^${names[2]}: ')));
+        final north = tester.getRect(find.bySemanticsLabel(RegExp('^${names[2]}(, a bot)?: ')));
         expect(east.height, greaterThan(north.height + 10));
         expect(tester.widget<Text>(drawn(find.text(name))).maxLines, 2);
       }
@@ -690,7 +699,7 @@ void main() {
     final names = tester.widget<TableView>(find.byType(TableView)).controller.names;
     final slots = _trickSlots(tester);
     for (var seat = 1; seat < engine.seatCount; seat++) {
-      final badge = tester.getRect(find.bySemanticsLabel(RegExp('^${names[seat]}: ')));
+      final badge = tester.getRect(find.bySemanticsLabel(RegExp('^${names[seat]}(, a bot)?: ')));
       for (final slot in slots) {
         expect(badge.overlaps(slot), isFalse, reason: '${names[seat]}\'s badge stays clear of the trick');
       }
@@ -708,7 +717,7 @@ void main() {
       final slots = _trickSlots(tester);
       Rect card(double Function(Rect) edge, bool most) =>
           slots.reduce((a, b) => (most ? edge(a) > edge(b) : edge(a) < edge(b)) ? a : b);
-      Rect badge(String name) => tester.getRect(find.bySemanticsLabel(RegExp('^$name: ')));
+      Rect badge(String name) => tester.getRect(find.bySemanticsLabel(RegExp('^$name(, a bot)?: ')));
       final seats = ['You', names[1], names[2], names[3]];
 
       // Each badge labels the card on its own side of the trick, and is
@@ -727,7 +736,7 @@ void main() {
       // Two pairs, each pair one size: the seat across the felt and
       // your own at the near edge, and the two at the sides.
       for (final name in seats) {
-        expect(find.bySemanticsLabel(RegExp('^$name: ')), findsOneWidget, reason: '$name has one badge');
+        expect(find.bySemanticsLabel(RegExp('^$name(, a bot)?: ')), findsOneWidget, reason: '$name has one badge');
       }
       void samePair(Rect a, Rect b, String which) {
         expect(a.width, closeTo(b.width, 0.5), reason: which);

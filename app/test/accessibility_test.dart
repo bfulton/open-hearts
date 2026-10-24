@@ -82,7 +82,9 @@ void main() {
       await tester.pumpAndSettle();
     }
     for (var seat = 0; seat < engine.seatCount; seat++) {
-      final label = '${c.names[seat]}: ${c.game.handScores[seat]} this hand, ${c.game.totals[seat]} in the game';
+      // Alone, every seat but yours a bot, and said to be one.
+      final who = seat == c.mySeat ? c.names[seat] : '${c.names[seat]}, a bot';
+      final label = '$who: ${c.game.handScores[seat]} this hand, ${c.game.totals[seat]} in the game';
       expect(find.bySemanticsLabel(label), findsOneWidget, reason: label);
     }
   });

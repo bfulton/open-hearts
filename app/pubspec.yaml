@@ -71,3 +71,9 @@ flutter:
   generate: true
 
   uses-material-design: true
+
+  fonts:
+    # The reactions' six emoji, for the web (fonts/README.md).
+    - family: ReactionEmoji
+      fonts:
+        - asset: fonts/ReactionEmoji.ttf

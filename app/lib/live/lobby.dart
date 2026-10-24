@@ -286,21 +286,21 @@ class Lobby extends ChangeNotifier {
     _changed();
   }
 
-  /// How many devices are online, this one included, once this device
-  /// has listened long enough to have heard everyone; null before.
-  /// This one is counted whether or not it says it is here: one that
-  /// cannot deal says nothing of itself (net/duty.dart), and the
-  /// others around it are still the others.
+  /// How many other people's devices are online, once this device has
+  /// listened long enough to have heard everyone; null before. Others,
+  /// so that alone is 0: the number is who there is to play with. And
+  /// people's only: the backup jurors are online too while a table
+  /// might want them, and nobody to play with (packages/table,
+  /// presence_relay.dart).
   ///
   /// And null while the device says it has no network: the beats it
   /// heard before are not who is here now, and it hears nobody new.
-  int? get online {
+  int? get othersOnline {
     final since = _listeningSinceMs;
     final duty = Duty.current;
     if (since == null || duty == null || deviceOffline()) return null;
     if (DateTime.now().millisecondsSinceEpoch - since < duty.presence.everyMs + 1500) return null;
-    final others = duty.presence.online(withinMs: 15000).difference({duty.presence.signer.publicKey});
-    return others.length + 1;
+    return duty.presence.people(withinMs: 15000).difference({duty.presence.signer.publicKey}).length;
   }
 
   /// Ratings, from the relays that just answered — never from an

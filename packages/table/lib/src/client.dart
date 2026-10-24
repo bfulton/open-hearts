@@ -934,25 +934,37 @@ class TableClient {
 
   /// A play for [seat], said rather than worked out by everyone: as
   /// [sayPass], and for the same reason.
-  void sayPlay(int seat, Card card) {
-    final turn = TurnId.play(game.handNumber, _playIndex);
-    final body = <String, Object?>{'hand': game.handNumber, 'turn': turn.index, 'seat': seat, 'card': card.code};
+  void sayPlay(int seat, Card card) => _sayPlayAt(TurnId.play(game.handNumber, _playIndex), seat, card);
+
+  /// [seat]'s play of [card] at [turn], said; false where nothing was.
+  /// The open turn's, or for a held bot seat one ahead of it
+  /// ([_playAhead]), worked out on [after], the cards of the turns
+  /// before it that had not settled: a card's token is its position's,
+  /// fixed once the pass is over, whatever is played before it.
+  bool _sayPlayAt(TurnId turn, int seat, Card card, {List<Card>? after}) {
+    final body = <String, Object?>{
+      'hand': turn.hand,
+      'turn': turn.index,
+      'seat': seat,
+      'card': card.code,
+      if (after != null) 'after': [for (final c in after) c.code],
+    };
     if (spec.sealed) {
       final d = _dealer.deal!;
       final p = d.positionOf(seat, card.index);
-      if (p == null) return;
+      if (p == null) return false;
       final m = d.playToken(p);
-      if (m == null) return;
+      if (m == null) return false;
       body.addAll(m);
       // A person's own play puts on the record the draws that have
       // brought someone into a held seat's escrow since the last one
       // that did ([EscrowCustody.takeGrowth]).
       if (seat == mySeat && _personOf(seat) == signer.publicKey) {
-        final grew = _escrow.growthToName(game.handNumber);
+        final grew = _escrow.growthToName(turn.hand);
         if (grew.isNotEmpty) body['grew'] = grew;
       }
     }
-    _emit(EventKind.play, body);
+    return _emit(EventKind.play, body);
   }
 
   /// The polite exit: this peer's own word, carried as a boot is — the
@@ -1024,22 +1036,24 @@ class TableClient {
   /// of absence, an appeal, a verdict, a leave, a complaint and its
   /// answer — must reach a peer or a juror that cannot read the relay
   /// this device writes to.
-  void _emit(EventKind kind, Map<String, Object?> body, {bool everywhere = false}) {
+  /// Says [body]; false where it was not said.
+  bool _emit(EventKind kind, Map<String, Object?> body, {bool everywhere = false}) {
     // A game that has ended says nothing more, to anyone.
-    if (_failure != null) return;
+    if (_failure != null) return false;
     // Nor does a juror about a hand that was over before it was
     // summoned; that it serves at all is said in its heartbeats.
     final hand = body['hand'];
     if (kind != EventKind.heartbeat && kind != EventKind.serve && hand is int && _beforeSummons(hand)) {
       saidBeforeSummons++;
       _trace('nothing to say about hand $hand, over before this side was summoned: ${kind.name} $body');
-      return;
+      return false;
     }
     final event = TableEvent.sign(signer, table: spec.id, kind: kind, body: body);
     journal?.said(event);
     if (kind != EventKind.heartbeat) _trace('emit ${kind.name} $body');
     transport.broadcast(event.toJson(), everywhere: everywhere);
     _accept(event);
+    return true;
   }
 
   // ---- positions ---------------------------------------------------------
@@ -1275,6 +1289,7 @@ class TableClient {
       // juror only when it is the one back ([EscrowCustody.sayers]).
       final holder = botHolders(turn.hand)[seat];
       if (_isEscrowed(turn.hand, seat) ? !_escrow.firstToSay(turn.hand, seat) : holder != signer.publicKey) return;
+      if (turn.isPlay && _saidAlready(turn, seat)) return;
     }
     if (d != null) {
       if (d.awaitsSecret(seat)) return _stall(turn, seat);
@@ -1341,16 +1356,7 @@ class TableClient {
       }
       game.setPass(seat, cards);
     } else {
-      final view = BotView(
-        seat: seat,
-        hand: game.handOf(seat),
-        trick: game.trick,
-        played: played,
-        heartsBroken: game.heartsBroken,
-        isFirstTrick: game.isFirstTrick,
-        taken: game.taken,
-      );
-      final card = bot.chooseCard(view, game.legalPlaysFor(seat));
+      final card = _botCard(game, seat, played);
       if (heldHere) return sayPlay(seat, card);
       if (d != null) d.playOpen(seat, d.positionOf(seat, card.index)!);
       game.play(seat, card);
@@ -1358,6 +1364,154 @@ class TableClient {
     }
     _races[turn]!.settled = true;
     _closeTurn(turn);
+  }
+
+  /// The card [seat]'s bot plays where [g] stands, with [played] the
+  /// cards played this hand before it: one working out for the turn
+  /// as it opens ([_botActs]) and one ahead of it ([_playAhead]), so the
+  /// two can only come to the same card.
+  Card _botCard(HeartsGame g, int seat, Set<Card> played) {
+    final view = BotView(
+      seat: seat,
+      hand: g.handOf(seat),
+      trick: g.trick,
+      played: played,
+      heartsBroken: g.heartsBroken,
+      isFirstTrick: g.isFirstTrick,
+      taken: g.taken,
+    );
+    return Bot(persona: (holders[seat] as BotSeat).persona).chooseCard(view, g.legalPlaysFor(seat));
+  }
+
+  // ---- playing ahead -----------------------------------------------------
+  //
+  // At a table of one person and three bots the jury holds, every bot
+  // card waited on the person: a turn settles on the witness of a
+  // majority of the people at the table, and the next bot seat's juror
+  // could not play until the person's device had seen the card before
+  // it and said so. Three bots, three round trips through the person's
+  // line between one of their cards and the next — two seconds on a
+  // satellite link (table 64cf65a3).
+  //
+  // But a bot's card is the deal's and the cards before it, worked out
+  // the same by whoever works it out (engine bot.dart has no chance in
+  // it), and a juror holding the next seat hears the card before it from
+  // the juror that said it, a moment after it was said. So it works its
+  // own card out on a copy of the hand with that card played
+  // ([HeartsGame.lookahead]) and says it at once, for the turn after the
+  // open one. Every side holds a card for a turn not open yet until the
+  // turn opens ([_defer]), so nothing settles any sooner and nothing is
+  // decided differently: the person's device hears the three cards in
+  // one breath, and settles them one after another as each turn opens.
+  //
+  // Only over bot seats' cards: a person's card can still give way to
+  // a removal, and the bot that then plays the seat plays another. And
+  // one held for a turn not open yet only if its seat's own juror said
+  // it, and it is a card the seat may play there: nothing has checked
+  // it yet. And a card said ahead names the cards it was worked
+  // out on ('after'), so that where the table does not come to them —
+  // a juror saying two cards for its seat, which no honest one does —
+  // no side takes it ([_valid]), and its juror works the card out again
+  // on what was played ([_saidAlready]).
+
+  /// Cards said ahead of their turn, for a log: none at a table of
+  /// people alone.
+  int playedAhead = 0;
+
+  /// Looks along the turns from the open one, over the moves heard for
+  /// each from its bot seat's juror, and says this side's card for the
+  /// first turn ahead of them that is its seat's.
+  void _playAhead() {
+    if (game.phase != Phase.playing || _closed) return;
+    final hand = game.handNumber;
+    final held = botHolders(hand);
+    if (!held.containsValue(signer.publicKey)) return;
+    HeartsGame? ahead;
+    final cards = <Card>[];
+    for (var index = _playIndex; index < TurnId.plays; index++) {
+      // A bot seat a juror holds; a person's has no holder.
+      final seat = (ahead ?? game).currentSeat;
+      final holder = seat == null ? null : held[seat];
+      if (seat == null || holder == null) return;
+      final turn = TurnId.play(hand, index);
+      // What has been said for the turn: the open one's move, or one
+      // held for a turn not open yet by the seat's own juror — this
+      // side's own among them, said ahead already.
+      final heard = index == _playIndex ? _races[turn]?.action : _heldFor(turn, holder);
+      if (heard == null) {
+        // The first turn with nothing said for it. The open one is
+        // [_botActs]'s, as ever; one ahead of it, this side's to say if
+        // the seat is this side's — the escrow's custodians say a seat
+        // given up as its turns open, one of them, in order — and its
+        // hand open here, as the deal opens it, where nothing passed
+        // into it is still sealed ([openPassInto]).
+        if (ahead == null || holder != signer.publicKey || !ahead.knowsHand(seat)) return;
+        final card = _botCard(ahead, seat, {...played, ...cards});
+        if (!_sayPlayAt(turn, seat, card, after: cards)) return;
+        playedAhead++;
+        _trace('played $turn for seat $seat ahead of the turn, after ${cards.length} card(s) heard and not settled');
+        return;
+      }
+      // One held for a turn not open has not been checked yet: that its
+      // token opens it at a position of the seat's, so that it is in the
+      // seat's hand at all — this side cannot see the hand — and then that
+      // the rules let it be played there. One that passes and that the
+      // table does not come to takes the card worked out on it with it
+      // ([_afterHolds]).
+      final card = Card.parse(heard.body['card'] as String);
+      if (index > _playIndex && _dealer.deal?.verifyPlay(seat, Map<String, Object?>.from(heard.body)) != card.index) return;
+      ahead ??= game.lookahead();
+      if (!ahead.allows(seat, card)) return;
+      ahead.play(seat, card);
+      cards.add(card);
+      if (ahead.pendingTrick != null) ahead.collectTrick();
+    }
+  }
+
+  /// The play [holder] has said for [turn], a turn not open here yet.
+  TableEvent? _heldFor(TurnId turn, PublicKey holder) {
+    for (final e in _future) {
+      if (e.kind == EventKind.play && e.author == holder && e.turn == turn) return e;
+    }
+    return null;
+  }
+
+  /// Whether this side's seat has its card at the open [turn] said
+  /// already: in the turn's race, or ahead of the turn and held for it
+  /// here as it is everywhere, to be taken up as the turn opens
+  /// ([_drainFuture]). One said ahead on cards the table did not come to
+  /// is no card here or anywhere ([_valid]), and is worked out afresh:
+  /// what the bot plays is checked against the bot when the hand is
+  /// opened (record.dart), and a card worked out on a card that was
+  /// never played is not the bot's.
+  bool _saidAlready(TurnId turn, int seat) {
+    if (_races[turn]?.action?.author == signer.publicKey) return true;
+    final mine = _heldFor(turn, signer.publicKey);
+    if (mine == null) return false;
+    if (_afterHolds(turn, mine.body['after'])) return true;
+    _trace('${mine.body['card']} said for seat $seat at $turn ahead of the turn, on cards the table did not come to; worked out again');
+    return false;
+  }
+
+  /// Whether the turns before [turn] settled as [after] has them: the
+  /// cards a card said ahead of [turn] was worked out on, one for each
+  /// turn up to it.
+  bool _afterHolds(TurnId turn, Object? after) {
+    if (after is! List || !turn.isPlay || after.length > turn.playIndex) return false;
+    for (var i = 0; i < after.length; i++) {
+      if (_settledCardAt(TurnId.play(turn.hand, turn.playIndex - after.length + i)) != after[i]) return false;
+    }
+    return true;
+  }
+
+  /// The card the record has played at [turn], by its code; null where
+  /// it has none — not settled, or settled with nothing said.
+  String? _settledCardAt(TurnId turn) {
+    for (var i = record.length - 1; i >= 0; i--) {
+      final d = record[i];
+      if (d.turn == turn && !d.removal && d.event.kind == EventKind.play) return d.event.body['card'] as String?;
+    }
+    return null;
   }
 
   /// After a turn settles: sweep, deal, and open what is next.
@@ -1522,6 +1676,7 @@ class TableClient {
       }
       _notePosition(from, event.hand, event.step);
       _carryForward(from, event.hand, event.step);
+      _sayAgainTo(from);
       return;
     }
     if (_seen.contains(event.id)) {
@@ -1539,6 +1694,9 @@ class TableClient {
       return;
     }
     _accept(event);
+    // A bot seat's card heard can be the one this side's seat plays
+    // after, ahead of its turn ([_playAhead]).
+    if (event.kind == EventKind.play) _playAhead();
     _notify();
   }
 
@@ -2024,6 +2182,7 @@ class TableClient {
       return;
     }
     race.action = event;
+    race.saidAt = clock.nowMs;
     race.forAction.add(event.author);
     race.forAction.addAll(_earlyWitnesses.remove(event.id) ?? const {});
     race.witnessEvents.addAll(_earlyWitnessEvents.remove(event.id) ?? const []);
@@ -2039,6 +2198,10 @@ class TableClient {
   /// own actions were made from its own state and are not re-checked.
   bool _valid(TableEvent event, int seat) {
     try {
+      // A card said ahead of its turn stands only where the turns before
+      // it settled as the card it was worked out on had them — this
+      // side's own as much as anybody's ([_playAhead]).
+      if (event.kind == EventKind.play && event.body.containsKey('after') && !_afterHolds(event.turn, event.body['after'])) return false;
       if (event.author == signer.publicKey) return true;
       if (event.kind == EventKind.deal) return _dealer.validStep(event, seat);
       if (event.kind == EventKind.pass) {
@@ -3056,12 +3219,7 @@ class TableClient {
     final race = _races[turn];
     if (race == null) return false;
     final of = _participantsAt(turn);
-    final spent = {
-      ...race.forAction,
-      ...race.forRemoval,
-      for (final w in race.forRival.values) ...w,
-      ..._ended.difference(race.forEnd),
-    };
+    final spent = {...race.spent, ..._ended.difference(race.forEnd)};
     final past = _votedPast(turn);
     final could = of.where((k) =>
         race.forEnd.contains(k) ||
@@ -3844,7 +4002,25 @@ class TableClient {
       // shared relay. Every half minute is enough to say it is still
       // split.
       if (race.split && _repeatTick % 30 != 0) continue;
-      if (race.action == null && race.boots.isEmpty && race.ends.isEmpty) continue; // nothing to say yet
+      if (race.action == null && race.boots.isEmpty && race.ends.isEmpty) {
+        // Nothing to say yet — unless the turn's seat went to the escrow
+        // here, and the turn waits on the card the escrow's custodians
+        // owe it. The claim that gave it up is in the record, not the
+        // race, and nothing else says it again: a side that missed it —
+        // across a partition, a juror among the custodians — is at the
+        // same step, so no heartbeat has it behind, and it waits on the
+        // seat's own juror while this side waits on the custodians
+        // (partition_escrow_test.dart).
+        final gaveUp = ownOnly ? null : _gaveUpAt(e.key);
+        if (gaveUp == null || _repeatTick < race.nextRepeatTick) continue;
+        race.nextRepeatTick = _repeatTick + _repeatGap(race.repeats);
+        race.repeats++;
+        final everywhere = race.repeats == 2 || insist;
+        for (final b in {gaveUp.event, ...?gaveUp.backing, if (gaveUp.verdict case final v?) v}) {
+          transport.broadcast(b.toJson(), everywhere: everywhere);
+        }
+        continue;
+      }
       // And the rest widen as they go ([_Race.nextRepeatTick]).
       if (_repeatTick < race.nextRepeatTick) continue;
       // What this peer has to say again: its own, always; anybody
@@ -3852,7 +4028,7 @@ class TableClient {
       // to be the point ([_carryDue]).
       final carry = !ownOnly && _carryDue(e.key);
       final action = race.action;
-      final sayAction = action != null && (carry || action.author == signer.publicKey || _speaksFor(e.key));
+      final sayAction = action != null && (carry || _saysAgain(e.key, action));
       final sayBoots = [
         for (final b in race.boots)
           if (carry || b.author == signer.publicKey) b,
@@ -3865,7 +4041,10 @@ class TableClient {
       race.nextRepeatTick = _repeatTick + _repeatGap(race.repeats);
       race.repeats++;
       final everywhere = race.repeats == 2 || insist;
-      if (sayAction) transport.broadcast(action.toJson(), everywhere: everywhere);
+      if (sayAction) {
+        race.saidAt = clock.nowMs;
+        transport.broadcast(action.toJson(), everywhere: everywhere);
+      }
       for (final b in [...sayBoots, ...sayEnds]) {
         transport.broadcast(b.toJson(), everywhere: everywhere);
       }
@@ -3895,6 +4074,68 @@ class TableClient {
     final seat = _turnSeat[turn];
     return seat != null && _isEscrowed(turn.hand, seat) && _escrow.firstToSay(turn.hand, seat);
   }
+
+  /// The record's giving up of [turn]'s seat to the escrow at [turn],
+  /// or null.
+  Decision? _gaveUpAt(TurnId turn) {
+    for (var i = record.length - 1; i >= 0; i--) {
+      final d = record[i];
+      if (d.turn == turn && d.removal && d.event.kind == EventKind.escrow) return d;
+    }
+    return null;
+  }
+
+  /// Whether [action], at [turn], is this side's to say again
+  /// whoever is missing it: its own, or one it speaks for ([_speaksFor]).
+  bool _saysAgain(TurnId turn, TableEvent action) => action.author == signer.publicKey || _speaksFor(turn);
+
+  /// A person's heartbeat, and a play or a pass this side made — or
+  /// says for an escrowed seat ([_speaksFor]) — still open here and not
+  /// backed by them: said again at once, rather than at the next step
+  /// of [_repeat]'s widening gap.
+  ///
+  /// That gap reaches half a minute, and a seat's play or pass has
+  /// fifteen seconds ([TableTiming.botActsMs]) from when a device back
+  /// on its line can hear it again ([_outOfTime]). A phone that lost its
+  /// connection just as the bots passed was back sixteen seconds later,
+  /// and took the three seats off their jurors at fifteen more, with
+  /// each juror's next repeat a second or two away; one let go is left
+  /// out of the next draw, and the backup jurors are four, so the table
+  /// could draw no jury for the hand after and sat there
+  /// (moves_lost_in_a_drop_test.dart). The heartbeat is the person here
+  /// again. One past the turn already has the move — this side missed
+  /// their backing of it — and answers it with what settled it there
+  /// ([_catchUp]), which is what this side is waiting for.
+  ///
+  /// Not a deal step or an audit: their allowance is [TableTiming.botDealsMs],
+  /// longer than the widest gap, and each is kilobytes that a slow
+  /// device still checking it would be sent again every heartbeat.
+  void _sayAgainTo(PublicKey person) {
+    final now = clock.nowMs;
+    for (final MapEntry(key: turn, value: race) in _races.entries) {
+      final action = race.action;
+      if (race.settled || action == null || !(turn.isPlay || turn.isPass) || !_saysAgain(turn, action)) continue;
+      // Backed already: this move, the removal, or another voice's copy
+      // of a bot seat's move. A person has one vote at a turn.
+      if (race.spent.contains(person)) continue;
+      // Said a moment ago, it may be on its way still: the heartbeat
+      // can have left before it arrived.
+      if (now - race.saidAt < _sayAgainAfterMs) continue;
+      race.saidAt = now;
+      saidAgainOnHeartbeat++;
+      _trace('said $turn for seat ${_turnSeat[turn]} again: ${person.substring(0, 4)} is here and has not backed it');
+      transport.broadcast(action.toJson());
+    }
+  }
+
+  /// Moves said again for a heartbeat that did not back them
+  /// ([_sayAgainTo]), for a log: none on a line that loses nothing.
+  int saidAgainOnHeartbeat = 0;
+
+  /// How long after a move was last said a heartbeat that does not
+  /// back it says it again: the first gap of [_repeat], by the same
+  /// reasoning.
+  static const _sayAgainAfterMs = 2000;
 
   /// This peer's own unsettled witnesses, kept to repeat.
   final Map<TurnId, TableEvent> _myWitnessEvents = {};
@@ -4057,9 +4298,11 @@ class TableClient {
     if (own && _liveJurors(hand).length >= jurySize) return;
     // Nor one this table has had to take a seat off for not playing
     // it ([_letGo]): heard from is not the same as playing, and drawn
-    // again it would hold a seat again and cost the table the hand.
-    final quiet = _jurorsOf(hand).difference(_liveJurors(hand)).union(_letGo);
-    final here = p.online(withinMs: 15000).where((k) => !_ofThisTable(k)).toSet().difference(quiet);
+    // again it would hold a seat again and cost the table the hand —
+    // where the table can do without it (below).
+    final gone = _jurorsOf(hand).difference(_liveJurors(hand));
+    final online = p.online(withinMs: 15000).where((k) => !_ofThisTable(k)).toSet().difference(gone);
+    final here = online.difference(_letGo);
     // What this table needs a jury for. Escrow needs somebody; bot
     // seats need enough jurors that a seat survives its holder going
     // (jury.dart, [juryToHoldBots]), and short of that the hand is not
@@ -4079,8 +4322,18 @@ class TableClient {
     // ([_acceptableJury]). So this needs no agreement and cannot
     // deadlock — and where the settled are too few, the draw is from
     // everyone, since a jury of whoever is there beats none.
-    final steady = p.settled(withinMs: 15000, forMs: jurySettledMs).where((k) => !_ofThisTable(k)).toSet().difference(quiet);
-    final candidates = steady.length >= wanted ? steady : here;
+    final steady = p.settled(withinMs: 15000, forMs: jurySettledMs).where((k) => !_ofThisTable(k)).toSet().difference(gone).difference(_letGo);
+    var candidates = steady.length >= wanted ? steady : here;
+    // Short even so, with jurors this table let go still about: those
+    // too, once each. Left out for good, they left a table alone with
+    // the backup jurors, who are four, unable to draw a jury for any
+    // hand after the one it let a juror go in, and it waited for one
+    // that was never coming (moves_lost_in_a_drop_test.dart). A juror
+    // let go may only have been late, or this side may have missed its
+    // move; drawn again and idle again, it costs the table the one
+    // hand, and is out for good this time ([_drawnAgain]).
+    final again = online.intersection(_letGo).difference(_drawnAgain);
+    if (candidates.length < wanted && again.isNotEmpty) candidates = here.union(again);
     if (candidates.length < wanted) {
       if (clock.nowMs - _lastCalledAt >= 10000) {
         _lastCalledAt = clock.nowMs;
@@ -4117,15 +4370,25 @@ class TableClient {
     _lastProposedAt = clock.nowMs;
     _proposalsThisHand++;
     final snapshot = candidates.toList()..sort();
+    final drawn = drawJury(spec.seed, hand, snapshot);
+    for (final k in again.intersection(drawn.toSet())) {
+      _trace('drawing ${k.substring(0, 4)} again, a juror let go, for want of another');
+      _letGo.remove(k);
+      _drawnAgain.add(k);
+    }
     final at = _positionOf(mySeat!);
     _emit(EventKind.jury, {
       'hand': hand,
       'turn': at.index,
       'seat': mySeat,
-      'jurors': drawJury(spec.seed, hand, snapshot),
+      'jurors': drawn,
       'snapshot': snapshot,
     });
   }
+
+  /// Jurors let go and drawn again for want of anyone else ([_proposeJury]):
+  /// let go a second time, they stay out.
+  final Set<PublicKey> _drawnAgain = {};
 
   void _onJury(TableEvent event) {
     // A jury proposed is a set of keys a deal step may seal its escrow
@@ -4518,6 +4781,10 @@ class _Race implements TurnVotes {
   int repeats = 0;
   int nextRepeatTick = 0;
 
+  /// When [action] was last said here, or first heard: what a heartbeat
+  /// that does not back it measures from ([TableClient._sayAgainTo]).
+  int saidAt = 0;
+
   /// Every witness received, so the whole decision can be handed to a
   /// peer that missed some of it.
   @override
@@ -4556,6 +4823,10 @@ class _Race implements TurnVotes {
   @override
   final Map<String, TableEvent> rivals = {};
   final Map<String, Set<PublicKey>> forRival = {};
+
+  /// Everyone whose voice at the turn has gone somewhere: to the move,
+  /// to the removal, or to another voice's copy of a bot seat's move.
+  Set<PublicKey> get spent => {...forAction, ...forRemoval, for (final w in forRival.values) ...w};
 
   /// [action] and its witnesses swapped for the rival [id]'s.
   void adopt(String id) {

@@ -58,10 +58,50 @@ class HeartsGame {
   /// neither, a game that deals itself draws a deal seed of its own.
   HeartsGame({int? seed, DealSeed? dealSeed, this.sealed = false, this.target = gameOverScore})
       : dealSeed = dealSeed ?? (seed == null && !sealed ? DealSeed.draw() : null),
-        _random = Random(seed) {
+        _random = Random(seed),
+        _ahead = false {
     if (seed != null && dealSeed != null) throw ArgumentError('a game is dealt from one seed, not two');
     _startHand();
   }
+
+  /// A copy of the hand as it stands, to play cards on without playing
+  /// them here: what a juror holding a bot seat works the seat's card
+  /// out on before the card ahead of it has settled (packages/table,
+  /// client.dart). Nothing is shared but the seed, and the copy does
+  /// not deal — the next hand is this game's to deal ([nextHand] and
+  /// [abandonHand] throw on it).
+  HeartsGame lookahead() => HeartsGame._ahead(this);
+
+  HeartsGame._ahead(HeartsGame g)
+      : dealSeed = g.dealSeed,
+        sealed = g.sealed,
+        target = g.target,
+        _random = g._random,
+        _ahead = true {
+    _phase = g._phase;
+    _handNumber = g._handNumber;
+    _totals.setAll(0, g._totals);
+    _taken.setAll(0, g._taken);
+    // Replaced as the hand goes, never changed in place: shared.
+    _handScores = g._handScores;
+    _moonShooter = g._moonShooter;
+    _hands = [for (final h in g._hands) h == null ? null : List.of(h)];
+    _sizes = List.of(g._sizes);
+    _trick.addAll(g._trick);
+    final pending = g._pendingTrick;
+    _pendingTrick = pending == null ? null : (plays: List.of(pending.plays), winner: pending.winner);
+    _lastTrick = g._lastTrick;
+    _tricksPlayed = g._tricksPlayed;
+    _heartsBroken = g._heartsBroken;
+    _leader = g._leader;
+    _passes = [for (final p in g._passes) p == null ? null : List.of(p)];
+    _passed = List.of(g._passed);
+    _received = [for (final r in g._received) List.of(r)];
+    _declaredLeader = g._declaredLeader;
+  }
+
+  /// Whether this is a [lookahead] copy.
+  final bool _ahead;
 
   /// The 256 bits every hand of this game is computed from
   /// (deal_seed.dart). Null at a game dealt by [Random] from an int
@@ -493,6 +533,7 @@ class HeartsGame {
   /// Not valid once a hand is over: a hand that reached its score is
   /// scored ([nextHand]).
   void abandonHand() {
+    if (_ahead) throw StateError('a game looked ahead on does not deal');
     if (_phase == Phase.handOver || _phase == Phase.gameOver) {
       throw StateError('a hand that is over is scored, not given up (phase: $_phase)');
     }
@@ -502,6 +543,7 @@ class HeartsGame {
 
   /// Deals the next hand. Only valid from [Phase.handOver].
   void nextHand() {
+    if (_ahead) throw StateError('a game looked ahead on does not deal');
     if (_phase != Phase.handOver) {
       throw StateError('the hand is not over (phase: $_phase)');
     }
