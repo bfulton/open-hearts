@@ -67,6 +67,7 @@ code=it
    Keep each string's markup as it is in English: the same tags, links and `{{…}}` placeholders. `common.translationNote` is the one string English leaves empty. In a translation it is the note, shown on the privacy policy and the terms, that the English version prevails.
 
 1. Add the code to `others` in `site/public/lang.js`, so an English page sends a browser that prefers the language to its pages.
+1. Add the language's App Store and Google Play listings to `site/store.json`, and the store locales they go to under `stores`. See [Update the App Store and Google Play listings](update-the-store-listings.md#change-the-words).
 1. Add the code to `languages` in `e2e/site_shots.mjs`.
 1. Make the site's pictures of the game in the new language. The site build reads `broken-`, `cancel-` and `add-` pictures for every language, so put English copies in place first, then let `e2e/site_shots.mjs` replace them:
 
@@ -96,6 +97,12 @@ code=it
 
    ```bash
    node --test site/build.test.mjs
+   ```
+
+1. Run the store listings' test. It checks that the language has a listing in both stores, within each store's limits:
+
+   ```bash
+   node --test site/store.test.mjs
    ```
 
 1. Run the site in a browser, in every language:

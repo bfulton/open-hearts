@@ -14,11 +14,10 @@ is a plan, not a promise. What has shipped is in the
 - **Pages people search for:** how to play, the rules in full, shooting
   the moon, and strategy. Today the rules are eight lines among the
   support page's questions.
-- **The store listings:** screenshots (the first three matter most), a
-  preview video, keywords, and a description that leads with no ads,
-  free play alone, deals anyone can check, and the Auto switch. In each
-  of the app's languages. What the stores ask about how the app works
-  is answered in [what the stores are told](docs/reference/store-answers.md).
+- **The store listings:** the words and screenshots are made, in each
+  of the app's languages. Still to do: a preview video. What the stores
+  ask about how the app works is answered in
+  [what the stores are told](docs/reference/store-answers.md).
 - **More languages,** where Hearts is played: Dutch first.
 
 ### Learning and playing

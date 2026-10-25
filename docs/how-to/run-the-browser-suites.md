@@ -55,6 +55,7 @@ Use this guide to run the suites in `e2e/` that drive the built web app in a hea
    | `node e2e/site.mjs` | The marketing site in each language. It needs no app build. |
    | `node e2e/shots.mjs` | Screenshots of the table at each screen shape, into `app/build/shots/`. |
    | `node e2e/site_shots.mjs` | The site's pictures of the game, into `site/public/img/`. Run it after a change to the menu. |
+   | `node e2e/store_shots.mjs` | The App Store's and Google Play's pictures of the app, into `app/build/store/`. See [Update the App Store and Google Play listings](update-the-store-listings.md#make-the-pictures). |
 
    For what each suite checks, see [check.sh suites, tiers and CI jobs](../reference/test-suites.md).
 

@@ -34,6 +34,14 @@ squashed from a pull request, the pull request's number.
   copies in the other languages; the site's `robots.txt` names it.
   (2026-10-25, #39)
 
+- The App Store and Google Play listings, in all five languages. Their
+  words are `site/store.json`, held to each store's limits and rules by
+  `site/store.test.mjs`. Their pictures are made from the app by
+  `e2e/store_shots.mjs`: five screenshots at each size the stores ask
+  for, those of games played alone the same in every language, and
+  Google Play's feature graphic and icon. `docs/how-to/update-the-store-listings.md` says
+  where each goes. (2026-10-25, #39)
+
 - Previews play live. They have a relay of their own (`open-hearts-relay-preview`,
   at `relay-preview.openhearts.game`), with its own households and backup
   jurors on the previews' store, and a service key pair of their own.

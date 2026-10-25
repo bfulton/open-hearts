@@ -473,6 +473,20 @@ export async function waitFor(page, re, { timeout = 30000, what = String(re) } =
   throw new Error(`timed out waiting for ${what}\nsaw: ${(await texts(page)).join(' | ')}`);
 }
 
+/// The page's picture once two frames in a row are the same: the cards
+/// that were moving into place have arrived.
+export async function still(page, what) {
+  const until = Date.now() + 10000;
+  let last = await page.screenshot();
+  for (;;) {
+    await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+    const now = await page.screenshot();
+    if (now.equals(last)) return now;
+    if (Date.now() > until) throw new Error(`${what}: the screen did not settle`);
+    last = now;
+  }
+}
+
 /// [context]'s player agreed to the terms of use already, as a device
 /// that has played live before has (app/lib/home_page.dart, `_agreed`):
 /// every context a suite opens is, so that its flows go straight in.
@@ -564,7 +578,8 @@ export async function act(page) {
         let n = 0;
         for (const e of document.querySelectorAll('flt-semantics')) {
           if (e.getAttribute('role') !== 'button') continue; // the passed-you chips carry card names too
-          if (e.getAttribute('aria-selected') === 'true') continue;
+          // Chosen already: a chosen card is a button marked current.
+          if (e.getAttribute('aria-selected') === 'true' || e.getAttribute('aria-current') === 'true') continue;
           if (re.test(labelOf(e)) && e.getAttribute('aria-disabled') !== 'true' && n < want) {
             e.click();
             n++;

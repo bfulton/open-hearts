@@ -15,7 +15,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import { chromium } from './browser.mjs';
-import { act, click, has, root, serveApp, sleep, texts, waitFor } from './drive.mjs';
+import { act, click, has, root, serveApp, sleep, still, texts, waitFor } from './drive.mjs';
 
 const outDir = join(root, 'app', 'build', 'shots');
 
@@ -33,20 +33,6 @@ const shapes = [
   { name: 'desktop', width: 1280, height: 800 },
   { name: 'narrow-split', width: 340, height: 720 },
 ];
-
-/// The page's picture once two frames in a row are the same: the cards
-/// that were moving into place have arrived.
-async function still(page, what) {
-  const until = Date.now() + 10000;
-  let last = await page.screenshot();
-  for (;;) {
-    await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
-    const now = await page.screenshot();
-    if (now.equals(last)) return now;
-    if (Date.now() > until) throw new Error(`${what}: the screen did not settle`);
-    last = now;
-  }
-}
 
 await mkdir(outDir, { recursive: true });
 const app = await serveApp();
