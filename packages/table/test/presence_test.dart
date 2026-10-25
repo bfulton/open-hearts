@@ -59,5 +59,20 @@ void main() {
       presence.receive(here(them, RelayPresence.seated, after: 1));
       expect(presence.people(withinMs: 15000), {me.publicKey, them.publicKey});
     });
+
+    test('count this device while it says it is here, not by its own beat heard back', () {
+      var able = true;
+      final mine = RelayPresence(relays: [Uri.parse('ws://127.0.0.1:9')], signer: me, canServe: () => able);
+      addTearDown(mine.close);
+      // A relay sends a device its own beat, as it sends everyone's; the
+      // one it said before it could no longer serve stays a minute fresh.
+      mine.receive(here(me, 'online'));
+      expect(mine.online(withinMs: 15000), {me.publicKey});
+      able = false;
+      expect(mine.online(withinMs: 15000), isEmpty, reason: 'a device that cannot serve is not here, whatever it heard of itself');
+      able = true;
+      mine.silent = true;
+      expect(mine.online(withinMs: 15000), isEmpty, reason: 'nor while it is silent');
+    });
   });
 }
