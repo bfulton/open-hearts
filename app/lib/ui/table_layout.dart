@@ -33,11 +33,14 @@
 /// the turn keeps the hand.
 library;
 
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import 'hand_fan.dart';
 import 'header.dart';
 import 'scaled.dart';
+import 'table_view.dart' show FeltRoom;
 
 class TableLayout extends StatelessWidget {
   const TableLayout({
@@ -47,6 +50,7 @@ class TableLayout extends StatelessWidget {
     required this.action,
     required this.hand,
     this.below,
+    this.note,
     this.rail,
   });
 
@@ -63,8 +67,17 @@ class TableLayout extends StatelessWidget {
   /// of each card.
   final Widget Function(bool landscape) hand;
 
-  /// A line between the score and the action, when a page has one.
+  /// A line between the felt and the action line, when a page has one.
   final Widget? below;
+
+  /// What the table is teaching, where a page teaches (tutorial.dart):
+  /// under the felt in portrait, and beside it in landscape, where the
+  /// width is. The felt gives it the room either way, so it is over
+  /// nothing the table shows. At the table's scale, like the action
+  /// line, and never taller than [noteShare] of the table in portrait
+  /// or than the felt in landscape: what does not fit scrolls
+  /// (ui/coach_note.dart).
+  final Widget? note;
 
   /// What goes beside the table where there is room beside it, and
   /// nowhere at all where there is not. Given the width it has.
@@ -87,6 +100,14 @@ class TableLayout extends StatelessWidget {
   /// The widest a table wants to be. Past this the fan has started
   /// running away from the thumbs.
   static const tableWidth = 900.0;
+
+  /// The most of the table's height a note takes in portrait; and how
+  /// wide one is beside a felt in landscape, at a phone's scale, or the
+  /// share of the table's width where that is less. The felt on its
+  /// side keeps the width its flat trick and its badges want either way.
+  static const noteShare = 0.4;
+  static const noteWidth = 360.0;
+  static const noteWidthShare = 0.5;
 
   /// The least room worth calling a rail. Narrower than this and the
   /// table simply takes the middle and leaves margins.
@@ -185,14 +206,57 @@ class TableLayout extends StatelessWidget {
     // fan's wherever the fan is narrower than the table — which is
     // everywhere but a phone upright, where the fan takes the width.
     final handReach = HandFan.fullWidth(handHeight, HandFan.spreadFor(landscape: landscape)) + _handPadding.horizontal;
+    final reach = handReach < constraints.maxWidth ? handReach : constraints.maxWidth;
+    final note = this.note;
     return Column(
       children: [
         if (!roomy) header,
         // The four seats are all on the felt (ui/table_view.dart),
         // which takes what the rest leave: the line the table says
         // floats in the room under the near seat, so the felt runs
-        // down to the action line.
-        Expanded(child: felt),
+        // down to the action line. A note shares the felt's room: in
+        // portrait under it, as wide as the action line it sits on; in
+        // landscape beside it, at the end the thumb is nearer, in
+        // width the felt can spare, since the trick lies flat there
+        // and it is height the felt lacks. The felt is laid out wide or
+        // upright by the whole of the room (FeltRoom), so a note coming
+        // and going changes how big the table is drawn, never how it is
+        // laid out; and the felt keeps its place in the tree either
+        // way, so nothing on it starts over when one comes.
+        Expanded(
+          child: LayoutBuilder(
+            builder: (context, room) => FeltRoom(
+              size: room.biggest,
+              child: Flex(
+                direction: landscape ? Axis.horizontal : Axis.vertical,
+                children: [
+                  Expanded(child: felt),
+                  if (note != null && landscape)
+                    SizedBox(
+                      width: math.min(noteWidth * scale, constraints.maxWidth * noteWidthShare),
+                      child: Scaled(
+                        scale: scale,
+                        child: Padding(padding: const EdgeInsetsDirectional.fromSTEB(2, 4, 10, 4), child: Center(child: note)),
+                      ),
+                    )
+                  else if (note != null)
+                    Center(
+                      child: SizedBox(
+                        width: reach,
+                        child: Scaled(
+                          scale: scale,
+                          child: ConstrainedBox(
+                            constraints: BoxConstraints(maxHeight: constraints.maxHeight * noteShare / scale),
+                            child: Padding(padding: const EdgeInsets.fromLTRB(10, 2, 10, 4), child: Center(heightFactor: 1, child: note)),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ),
         ?below,
         // The action line is about the hand, so it sits against it
         // — and keeps a row of the same height whatever it holds,
@@ -201,7 +265,7 @@ class TableLayout extends StatelessWidget {
         // grow with the cards.
         Center(
           child: SizedBox(
-            width: handReach < constraints.maxWidth ? handReach : constraints.maxWidth,
+            width: reach,
             child: Scaled(
               scale: scale,
               child: ConstrainedBox(

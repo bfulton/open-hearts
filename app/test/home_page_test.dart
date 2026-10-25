@@ -18,12 +18,14 @@ import 'package:open_hearts/entitlement.dart';
 import 'package:open_hearts/game_options.dart';
 import 'package:open_hearts/home_page.dart';
 import 'package:open_hearts/identity.dart';
+import 'package:open_hearts/l10n/l10n.dart';
 import 'package:open_hearts/live/lobby.dart';
 import 'package:open_hearts/net/age_check.dart';
 import 'package:open_hearts/net/network.dart';
 import 'package:open_hearts/net/room.dart';
 import 'package:open_hearts/net/standing.dart';
 import 'package:open_hearts/pictures.dart';
+import 'package:open_hearts/record_store.dart';
 import 'package:open_hearts/router.dart';
 import 'package:open_hearts/table_page.dart';
 import 'package:open_hearts/theme.dart';
@@ -338,6 +340,37 @@ void main() {
     await tester.pumpAndSettle();
     expect(tester.widget<TablePage>(find.byType(TablePage)).target, 100);
     expect(find.text('Hand 1  ·  Pass left  ·  to 100'), findsOneWidget);
+  });
+
+  testWidgets('a device new to the game is offered a first hand, once; the menu has it for anyone', (tester) async {
+    await pumpHome(tester);
+    const offer = 'New to Hearts? Learn to play';
+    expect(find.text(offer), findsOneWidget, reason: 'under Play solo, on a device that has played nothing alone');
+    await tester.tap(find.text(offer));
+    await tester.pumpAndSettle();
+    expect(find.text(english.tutorialWelcome), findsOneWidget, reason: 'the taught hand');
+    await tester.tap(find.bySemanticsLabel('Menu'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Leave the table'));
+    await tester.pumpAndSettle();
+    expect(find.text('Play solo'), findsOneWidget, reason: 'back at the door');
+    expect(find.text(offer), findsNothing, reason: 'opened once, offered no more');
+    // The menu still has it.
+    await tester.tap(find.bySemanticsLabel('Menu'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Learn to play'));
+    await tester.pumpAndSettle();
+    expect(find.text(english.tutorialWelcome), findsOneWidget);
+  });
+
+  testWidgets('a device that has finished a game alone is not offered the first hand', (tester) async {
+    SharedPreferences.setMockInitialValues({PrefsRecordStore.key: ['a game']});
+    await pumpHome(tester);
+    expect(find.text('Play solo'), findsOneWidget);
+    expect(find.text('New to Hearts? Learn to play'), findsNothing);
+    await tester.tap(find.bySemanticsLabel('Menu'));
+    await tester.pumpAndSettle();
+    expect(find.text('Learn to play'), findsOneWidget, reason: 'in the menu for anyone');
   });
 
   testWidgets('About is behind the menu, the same control the table carries', (tester) async {

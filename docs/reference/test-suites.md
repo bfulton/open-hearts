@@ -100,7 +100,7 @@ For the `app` suite, `quick` passes `-x slow`, and runs only the test files that
 | Package | `dart_test.yaml` | Tagged `slow` | Fast tier | Slow tier |
 |---|---|---|---|---|
 | `packages/table` | `concurrency: 4`; declares the tag `slow` | `chaos_sealed_test.dart`, `deal_worker_test.dart`, `game_record_test.dart`, `juror_summoned_again_test.dart`, `late_juror_verdict_test.dart`, `rejoin_test.dart`, `sealed_departures_test.dart`, `sealed_lies_test.dart`, `top_up_test.dart`, `undealt_hand_test.dart`, and the later seeds of `chaos_test.dart` | `dart test -x slow` | `dart test -t slow` |
-| `app` | Declares the tag `slow` | `table_fits_test.dart`, `table_fits_live_test.dart`, `table_fits_live_end_test.dart`, `table_fits_wide_test.dart`: the layout matrix in `app/test/fits.dart` | `flutter test -x slow` | `flutter test`, which runs every test |
+| `app` | Declares the tag `slow` | `table_fits_test.dart`, `table_fits_live_test.dart`, `table_fits_live_end_test.dart`, `table_fits_wide_test.dart`, `tutorial_fits_test.dart`: the layout matrix in `app/test/fits.dart` | `flutter test -x slow` | `flutter test`, which runs every test |
 | `service` | `concurrency: 4` | None | `dart test` | None |
 | `packages/engine`, `packages/deal`, `packages/table_sim` | None | None | `dart test` | None |
 

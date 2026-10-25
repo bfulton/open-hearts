@@ -1505,4 +1505,69 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get hideReactions => 'Hide others\' reactions';
+
+  @override
+  String get learnToPlay => 'Learn to play';
+
+  @override
+  String get learnToPlayOffer => 'New to Hearts? Learn to play';
+
+  @override
+  String get tutorialNext => 'Next';
+
+  @override
+  String get tutorialWelcome =>
+      'Four players, thirteen cards each. Every heart you take is a point against you, and the queen of spades is 13. Take as few points as you can.';
+
+  @override
+  String get tutorialPass =>
+      'First, everyone passes three cards. Choose three you would rather not keep and tap Pass. This time they go to the player on your left.';
+
+  @override
+  String get tutorialReceived =>
+      'Three cards came to you from the player on your right. They are marked with a dot until the first trick is played.';
+
+  @override
+  String get tutorialYouLead =>
+      'The 2 of clubs leads the first trick, and you have it. Tap it to play it.';
+
+  @override
+  String tutorialTheyLead(String name) {
+    return 'The 2 of clubs leads the first trick, and $name has it.';
+  }
+
+  @override
+  String get tutorialFollow =>
+      'Play a card of the suit that was led, if you have one. The cards you can\'t play are dimmed: tap one to see why.';
+
+  @override
+  String tutorialNoSuit(String suit) {
+    String _temp0 = intl.Intl.selectLogic(suit, {
+      'clubs': 'You have no clubs',
+      'diamonds': 'You have no diamonds',
+      'spades': 'You have no spades',
+      'other': 'You have no hearts',
+    });
+    return '$_temp0, so any card will do. Any points you play go to whoever takes the trick.';
+  }
+
+  @override
+  String get tutorialNoSuitFirst =>
+      'You have no clubs, so you can play another suit, but not a heart or the queen of spades: the first trick carries no points.';
+
+  @override
+  String get tutorialTrickTaken =>
+      'The highest card of the suit that was led takes the trick, with any points in it. Whoever takes it leads the next one.';
+
+  @override
+  String get tutorialHeartsBroken =>
+      'That\'s the first heart: hearts are broken. Until one had been played, nobody could lead a heart. Now anyone can.';
+
+  @override
+  String get tutorialQueen =>
+      'The queen of spades: 13 points to whoever takes this trick.';
+
+  @override
+  String get tutorialScore =>
+      'Hearts are a point each, the queen of spades 13. Take all 26 and you shoot the moon: everyone else gets them instead. A game goes on to 50 or 100 points, and the lowest score wins.';
 }

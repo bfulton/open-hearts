@@ -114,6 +114,22 @@ const _wideTrickOffset = <int, Offset>{
 @visibleForTesting
 bool turnPillBreathes = true;
 
+/// The room a felt has before anything is taken from it for a note
+/// under or beside it (ui/table_layout.dart, note). The felt lays its
+/// table out wide or upright by this, not by the room it is left: a
+/// note coming and going changes how big the table is drawn, never how
+/// it is laid out.
+class FeltRoom extends InheritedWidget {
+  const FeltRoom({super.key, required this.size, required super.child});
+
+  final Size size;
+
+  static Size? maybeOf(BuildContext context) => context.dependOnInheritedWidgetOfExactType<FeltRoom>()?.size;
+
+  @override
+  bool updateShouldNotify(FeltRoom old) => old.size != size;
+}
+
 class TableView extends StatelessWidget {
   const TableView({super.key, required this.controller, this.onHold, this.corner, this.react});
 
@@ -340,8 +356,10 @@ class _FeltLayout {
     final pillRow = (_pillRow + _Pill.growth(context)) * scale;
     final pillRoom = pillRow + _pillRow * scale;
     // A wide felt — a landscape phone — lays the trick out flatter
-    // and its badges on one line, since height is what it lacks.
-    wide = box.width > box.height * 1.3;
+    // and its badges on one line, since height is what it lacks. Wide
+    // by its whole room, where a note has taken some of it (FeltRoom).
+    final room = FeltRoom.maybeOf(context) ?? box;
+    wide = room.width > room.height * 1.3;
     offsets = wide ? _wideTrickOffset : _trickOffset;
     // The line in the corner sits beside the seat across the felt
     // where there is room for it: clear of the widest that seat's
@@ -1377,6 +1395,12 @@ class SeatBadge extends StatelessWidget {
     return GestureDetector(behavior: HitTestBehavior.opaque, onLongPress: onHold, child: badge);
   }
 
+  /// The room the name has: the badge's, less its padding, its border
+  /// at its widest — the gold one on the seat whose turn it is — and,
+  /// on one line, the icon beside it. At ordinary type; the name's own
+  /// room grows with the reader's (below).
+  double get nameRoom => maxWidth - _padding.horizontal - 2 * _borderMost - (oneLine ? iconSize + 6 : 0);
+
   EdgeInsets get _padding => oneLine
       ? const EdgeInsets.symmetric(horizontal: 10, vertical: 4)
       : EdgeInsets.symmetric(horizontal: ((maxWidth - (minWidth - 2 * _side)) / 2).clamp(_sideLeast, _side), vertical: 7);
@@ -1456,10 +1480,10 @@ class SeatBadge extends StatelessWidget {
     // it and above it where it does not, so a side badge keeps its room
     // for the name either way.
     final icon = SeatIcon(look: look, size: iconSize);
-    // Inside the padding and the border, at its widest: the gold one on
-    // the seat whose turn it is. A name given the room the border takes
-    // comes out wider than the badge, and the badge scales it to fit.
-    final nameText = _name(context, maxWidth - _padding.horizontal - 2 * _borderMost - (oneLine ? iconSize + 6 : 0));
+    // Inside the padding and the border at its widest: a name given the
+    // room the border takes comes out wider than the badge, and the
+    // badge scales it to fit.
+    final nameText = _name(context, nameRoom);
     // A three-digit total beside a two-digit hand is the widest this
     // gets, and it is a hair inside a side badge's room: scaled down
     // rather than clipped should a font run wider.
@@ -1799,11 +1823,18 @@ class _Pill extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: tone.withValues(alpha: strong ? 1 : 0.5)),
       ),
-      child: Text(
-        text,
-        style: _type.copyWith(
-          fontWeight: strong ? FontWeight.w700 : FontWeight.w600,
-          color: strong ? Felt.dark : tone,
+      // Drawn smaller where even a name cut to its first letter leaves
+      // the line too long for its room, as it is where the row is too
+      // short for it (_Said): a felt narrowed by a note beside it, at
+      // the largest type (ui/table_layout.dart, note).
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Text(
+          text,
+          style: _type.copyWith(
+            fontWeight: strong ? FontWeight.w700 : FontWeight.w600,
+            color: strong ? Felt.dark : tone,
+          ),
         ),
       ),
     );

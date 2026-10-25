@@ -341,5 +341,20 @@
   "reaction": "{code, select, nice{Bien} ha{Jaja} wow{Guau} ouch{Ay} sorry{Perdón} gg{Buena partida} other{…}}",
   "reactionSaid": "{name}: {reaction}",
   "react": "Reaccionar",
-  "hideReactions": "Ocultar las reacciones de los demás"
+  "hideReactions": "Ocultar las reacciones de los demás",
+  "learnToPlay": "Aprender a jugar",
+  "learnToPlayOffer": "¿Primera vez con Corazones? Aprende a jugar",
+  "tutorialNext": "Siguiente",
+  "tutorialWelcome": "Cuatro jugadores, trece cartas cada uno. Cada corazón que te llevas es un punto en tu contra, y la reina de picas vale 13. Llévate los menos puntos que puedas.",
+  "tutorialPass": "Primero, todos pasan tres cartas. Elige tres que prefieras no quedarte y toca Pasar. Esta vez van al jugador de tu izquierda.",
+  "tutorialReceived": "Te llegaron tres cartas del jugador de tu derecha. Están marcadas con un punto hasta que se juegue la primera baza.",
+  "tutorialYouLead": "El 2 de tréboles abre la primera baza, y lo tienes tú. Tócalo para jugarlo.",
+  "tutorialTheyLead": "El 2 de tréboles abre la primera baza, y lo tiene {name}.",
+  "tutorialFollow": "Juega una carta del palo que se abrió, si tienes. Las cartas que no puedes jugar están atenuadas: toca una para ver por qué.",
+  "tutorialNoSuit": "{suit, select, clubs{No tienes tréboles} diamonds{No tienes diamantes} spades{No tienes picas} other{No tienes corazones}}, así que puedes jugar cualquier carta. Los puntos que juegues se los lleva quien gane la baza.",
+  "tutorialNoSuitFirst": "No tienes tréboles, así que puedes jugar otro palo, pero no un corazón ni la reina de picas: en la primera baza no se juegan puntos.",
+  "tutorialTrickTaken": "La carta más alta del palo que se abrió gana la baza, con los puntos que haya en ella. Quien la gana abre la siguiente.",
+  "tutorialHeartsBroken": "Es el primer corazón: los corazones se han roto. Hasta que se jugara uno, nadie podía abrir con corazones. Ahora cualquiera puede.",
+  "tutorialQueen": "La reina de picas: 13 puntos para quien gane esta baza.",
+  "tutorialScore": "Cada corazón vale un punto y la reina de picas 13. Si te llevas los 26, disparas a la luna: se los llevan todos los demás. Una partida sigue hasta 50 o 100 puntos, y gana la puntuación más baja."
 }

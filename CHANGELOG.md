@@ -10,6 +10,19 @@ squashed from a pull request, the pull request's number.
 
 ### Added
 
+- A first hand of Hearts, taught. A device that has played nothing
+  alone is offered it under Play solo ("New to Hearts? Learn to
+  play"), and the menu has it for anyone. It is a game alone against
+  three bots, dealt the same way every time, with a note at each thing
+  the hand brings a new player to for the first time: the pass, the
+  cards that came, the 2 of clubs, following suit, a suit you have none
+  of, a trick taken, hearts broken, the queen of spades, and at the end
+  how a hand is scored. A note that tells something holds the table
+  until Next; one that asks for something waits until it is done. The
+  notes never suggest a card. Each takes room of its own, under the
+  felt or beside it, and covers nothing on the table. In all five
+  languages. (2026-10-25, #39)
+
 - `openhearts.game/sitemap.xml` lists every page of the site in each of
   its languages, by the address the page gives as its own, with its
   copies in the other languages; the site's `robots.txt` names it.

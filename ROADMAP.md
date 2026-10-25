@@ -25,7 +25,6 @@ is a plan, not a promise. What has shipped is in the
 
 ### Learning and playing
 
-- **A tutorial** for new players.
 - **Themes:** light, dark, classic green, and one for colour blindness,
   with a switch for larger cards and text. Today there is the green
   felt, and the app follows the device's text size.

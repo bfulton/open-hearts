@@ -14,8 +14,10 @@
 ///
 /// The matrix, and what it checks; the suites that run it are
 /// table_fits_test.dart (phones upright), table_fits_wide_test.dart
-/// (everything wider), table_fits_live_test.dart (a hand) and
-/// table_fits_live_end_test.dart (to the game's end).
+/// (everything wider), table_fits_live_test.dart (a hand),
+/// table_fits_live_end_test.dart (to the game's end) and
+/// tutorial_fits_test.dart (the hand a new player is taught on, its
+/// notes and all).
 library;
 
 import 'dart:io';
@@ -31,6 +33,7 @@ import 'package:open_hearts/table_model.dart';
 import 'package:open_hearts/table_page.dart';
 import 'package:open_hearts/theme.dart';
 import 'package:open_hearts/ui/card_view.dart';
+import 'package:open_hearts/ui/coach_note.dart';
 import 'package:open_hearts/ui/gone.dart';
 import 'package:open_hearts/ui/hand_fan.dart';
 import 'package:open_hearts/ui/header.dart';
@@ -192,6 +195,18 @@ Iterable<_Thing> _texts(Iterable<Element> elements) =>
 
 String _textOf(Element e) => (e.renderObject! as RenderParagraph).text.toPlainText();
 
+/// Whether [e] is in something that scrolls and is longer than the
+/// room it has: what is past its edge is there to be scrolled to.
+bool _scrolled(Element e) {
+  var scrolls = false;
+  e.visitAncestorElements((a) {
+    if (a is! StatefulElement || a.state is! ScrollableState) return true;
+    scrolls = (a.state as ScrollableState).position.maxScrollExtent > 0;
+    return false;
+  });
+  return scrolls;
+}
+
 bool _within(Element e, bool Function(Widget) test) {
   var found = false;
   e.visitAncestorElements((a) {
@@ -213,13 +228,10 @@ void _apart(List<_Thing> things, List<String> faults, String where) {
 }
 
 /// Whether [badge] would cut the name in [p] at ordinary type too: in
-/// the room it has for a name, its width less its padding and, on one
-/// line, its icon (ui/table_view.dart, SeatBadge._badge).
-bool _cutAtOrdinary(RenderParagraph p, SeatBadge badge) {
-  final room = badge.maxWidth - (badge.oneLine ? 20 + badge.iconSize + 6 : 22);
-  return (TextPainter(text: p.text, textDirection: p.textDirection, maxLines: p.maxLines, ellipsis: '…')..layout(maxWidth: room))
-      .didExceedMaxLines;
-}
+/// the room it has for a name (ui/table_view.dart, SeatBadge.nameRoom).
+bool _cutAtOrdinary(RenderParagraph p, SeatBadge badge) =>
+    (TextPainter(text: p.text, textDirection: p.textDirection, maxLines: p.maxLines, ellipsis: '…')..layout(maxWidth: badge.nameRoom))
+        .didExceedMaxLines;
 
 SeatBadge? _badgeOf(Element e) {
   SeatBadge? badge;
@@ -242,8 +254,9 @@ List<String> _faults(WidgetTester tester, String where, {Iterable<String> names 
     final p = t.element.renderObject! as RenderParagraph;
     final text = _textOf(t.element);
     if (text.trim().isEmpty) continue;
-    // A sheet scrolls, so what is past the screen's edge is on it.
-    if (!_within(t.element, (w) => w is HandOverSheet || w is GameOverSheet) && !_inside(t.rect, screen)) {
+    // A sheet scrolls, so what is past the screen's edge is on it; and
+    // a note that scrolls (ui/coach_note.dart) the same.
+    if (!_within(t.element, (w) => w is HandOverSheet || w is GameOverSheet) && !_scrolled(t.element) && !_inside(t.rect, screen)) {
       faults.add('$where: ${t.what} off the screen at ${_r(t.rect)}');
     }
     if (p.textSize.width > p.size.width + 0.5 || p.textSize.height > p.size.height + 0.5) {
@@ -294,13 +307,15 @@ List<String> _faults(WidgetTester tester, String where, {Iterable<String> names 
   }
 
   // The parts of the table, each in its own place: and beside it, where
-  // there is room for one, the rail.
+  // there is room for one, the rail; and where a hand is taught, the
+  // note (tutorial.dart), over none of them.
   final header = _things(find.byType(TableHeader), (e) => 'the header').firstOrNull;
   final felt = _things(find.byType(TableView), (e) => 'the felt').firstOrNull;
   final action = _things(find.byType(ActionBar), (e) => 'the action line').firstOrNull;
   final hand = _things(find.byType(HandFan), (e) => 'the hand').firstOrNull;
   final rail = _things(find.byType(Gone), (e) => 'the rail').firstOrNull;
-  final parts = [?header, ?felt, ?action, ?hand, ?rail];
+  final note = _things(find.byType(CoachNote), (e) => 'the note').firstOrNull;
+  final parts = [?header, ?felt, ?action, ?hand, ?rail, ?note];
   _apart(parts, faults, where);
   for (final p in parts) {
     if (!_inside(p.rect, screen)) faults.add('$where: ${p.what} off the screen at ${_r(p.rect)}');
@@ -359,6 +374,19 @@ List<String> _faults(WidgetTester tester, String where, {Iterable<String> names 
       for (final t in _each(on, (e) => e.widget.runtimeType.toString())) {
         if (!_inside(t.rect, b.rect)) faults.add('$where: ${b.what}\'s ${t.what} ${_r(t.rect)} off it ${_r(b.rect)}');
       }
+    }
+  }
+
+  // The note: its words on it, but where there are more of them than
+  // it has room for and it scrolls; and Next on it, always.
+  if (note != null) {
+    final onNote = [
+      ..._texts(find.descendant(of: find.byType(CoachNote), matching: find.byType(RichText)).evaluate())
+          .where((t) => !_within(t.element, (w) => w is ButtonStyleButton) && !_scrolled(t.element)),
+      ..._things(find.descendant(of: find.byType(CoachNote), matching: find.byWidgetPredicate((w) => w is ButtonStyleButton)), (e) => 'Next'),
+    ];
+    for (final t in onNote) {
+      if (!_inside(t.rect, note.rect)) faults.add('$where: ${t.what} ${_r(t.rect)} off the note ${_r(note.rect)}');
     }
   }
 
@@ -498,6 +526,54 @@ Future<List<String>> _walkSolo(WidgetTester tester, {required Size size, require
   return [...errors, ...walk.report];
 }
 
+/// The hand a new player is taught on (tutorial.dart), at the table's
+/// own pace from the first note to the sheet: the screen looked at with
+/// each note up, Next tapped where the table waits on it, and between
+/// the notes as any game alone is. The notes that scrolled, by the
+/// words they start with, for the matrix to hold to where they may.
+Future<({List<String> faults, Set<String> scrolled})> _walkLesson(WidgetTester tester,
+    {required Size size, required double scale, required String locale}) async {
+  late _Walk walk;
+  final notes = <String>[];
+  final scrolled = <String>{};
+  final errors = await _errors(() async {
+    await _pump(tester, const TablePage(learning: true), size: size, scale: scale, locale: locale);
+    await tester.pump(const Duration(seconds: 1));
+    final c = tester.widget<TableView>(find.byType(TableView)).controller;
+    walk = _Walk(tester, () => c.names);
+    for (var step = 0; step < 3000 && !_sheetUp(); step++) {
+      final note = tester.widgetList<CoachNote>(find.byType(CoachNote)).firstOrNull;
+      if (note != null) {
+        final words = note.text.length > 24 ? '${note.text.substring(0, 24)}…' : note.text;
+        if (notes.lastOrNull != note.text) notes.add(note.text);
+        walk.look('the note "$words"');
+        final scroll = tester.state<ScrollableState>(find.descendant(of: find.byType(CoachNote), matching: find.byType(Scrollable)));
+        if (scroll.position.maxScrollExtent > 0) scrolled.add(words);
+        if (note.next != null) {
+          await tester.tap(find.descendant(of: find.byType(CoachNote), matching: find.byWidgetPredicate((w) => w is ButtonStyleButton)));
+          await tester.pump(const Duration(milliseconds: 250));
+          await tester.pumpAndSettle();
+          continue;
+        }
+      } else {
+        walk.look(_situation(c));
+      }
+      if (!_act(c)) {
+        await tester.pump();
+        continue;
+      }
+      await tester.pump(const Duration(milliseconds: 250));
+      await tester.pumpAndSettle();
+    }
+    expect(_sheetUp(), isTrue, reason: 'the hand came to its end');
+    walk.look('hand over');
+  });
+  // Nine on the felt, the score's on the sheet: the 2 of clubs comes to
+  // the player in the pass, so the note for a bot holding it never does.
+  expect(notes, hasLength(9), reason: 'every note came: $notes');
+  return (faults: [...errors, ...walk.report], scrolled: scrolled);
+}
+
 /// A live deal whose first hand, played by the first legal card, comes
 /// to the Auto switch with four cards still to play.
 const _liveDeal = 3;
@@ -609,6 +685,26 @@ void liveMatrix({required bool toTheEnd}) {
     testWidgets('live, ${_name(size)}, $locale, text ×$scale, ${toTheEnd ? 'to the game\'s end' : 'a hand'}', (tester) async {
       final faults = await _walkLive(tester, size: size, scale: scale, locale: locale, toTheEnd: toTheEnd);
       expect(faults, isEmpty, reason: faults.join('\n'));
+    });
+  }
+}
+
+/// And for the hand that is taught, a phone on its side narrower than
+/// the matrix's own: where a note beside the felt is held to its share
+/// of the width (ui/table_layout.dart, noteWidthShare).
+const _lessonOnly = [(Size(640, 360), 1.0, 'en'), (Size(640, 360), 2.0, 'de')];
+
+/// The hand a new player is taught on, on the screens [shown] picks out
+/// of the matrix. A note scrolls only where it must, at the larger
+/// type; never at ordinary type.
+void lessonMatrix(bool Function(Size size) shown) {
+  _setUp();
+  for (final (size, scale, locale) in [..._solo, ..._lessonOnly].where((c) => shown(c.$1))) {
+    testWidgets('taught, ${_name(size)}, $locale, text ×$scale', (tester) async {
+      final (:faults, :scrolled) = await _walkLesson(tester, size: size, scale: scale, locale: locale);
+      printOnFailure('the notes that scrolled: $scrolled');
+      expect(faults, isEmpty, reason: faults.join('\n'));
+      if (scale == 1.0) expect(scrolled, isEmpty, reason: 'at ordinary type every note fits: $scrolled');
     });
   }
 }

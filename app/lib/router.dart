@@ -99,7 +99,7 @@ GoRouter appRouter({
             redirect: (_, state) => state.extra is SoloGame ? null : '/',
             builder: (_, state) {
               final game = state.extra! as SoloGame;
-              return TablePage(target: game.target, seed: game.seed, paced: game.paced);
+              return TablePage(target: game.target, seed: game.seed, paced: game.paced, learning: game.learning);
             },
           ),
           GoRoute(

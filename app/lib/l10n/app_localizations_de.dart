@@ -1531,4 +1531,69 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get hideReactions => 'Reaktionen der anderen ausblenden';
+
+  @override
+  String get learnToPlay => 'Spielen lernen';
+
+  @override
+  String get learnToPlayOffer => 'Neu bei Hearts? Spielen lernen';
+
+  @override
+  String get tutorialNext => 'Weiter';
+
+  @override
+  String get tutorialWelcome =>
+      'Vier Spieler, je dreizehn Karten. Jedes Herz, das du nimmst, zählt einen Punkt gegen dich, die Pik-Dame 13. Nimm so wenige Punkte wie möglich.';
+
+  @override
+  String get tutorialPass =>
+      'Zuerst gibt jeder drei Karten weiter. Wähle drei, die du lieber nicht behalten willst, und tippe auf Geben. Diesmal gehen sie an den Spieler links von dir.';
+
+  @override
+  String get tutorialReceived =>
+      'Drei Karten kamen vom Spieler rechts von dir. Bis der erste Stich gespielt ist, sind sie mit einem Punkt markiert.';
+
+  @override
+  String get tutorialYouLead =>
+      'Kreuz 2 spielt den ersten Stich aus, und du hast sie. Tippe sie an, um sie zu spielen.';
+
+  @override
+  String tutorialTheyLead(String name) {
+    return 'Kreuz 2 spielt den ersten Stich aus, und $name hat sie.';
+  }
+
+  @override
+  String get tutorialFollow =>
+      'Spiele eine Karte der ausgespielten Farbe, wenn du eine hast. Karten, die du nicht spielen darfst, sind abgedunkelt: Tippe eine an, um zu sehen, warum.';
+
+  @override
+  String tutorialNoSuit(String suit) {
+    String _temp0 = intl.Intl.selectLogic(suit, {
+      'clubs': 'Du hast kein Kreuz',
+      'diamonds': 'Du hast kein Karo',
+      'spades': 'Du hast kein Pik',
+      'other': 'Du hast kein Herz',
+    });
+    return '$_temp0, also darfst du jede Karte spielen. Punkte, die du abwirfst, bekommt, wer den Stich nimmt.';
+  }
+
+  @override
+  String get tutorialNoSuitFirst =>
+      'Du hast kein Kreuz, also darfst du eine andere Farbe spielen, aber kein Herz und nicht die Pik-Dame: Im ersten Stich gibt es keine Punkte.';
+
+  @override
+  String get tutorialTrickTaken =>
+      'Die höchste Karte der ausgespielten Farbe nimmt den Stich, samt allen Punkten darin. Wer ihn nimmt, spielt den nächsten aus.';
+
+  @override
+  String get tutorialHeartsBroken =>
+      'Das ist das erste Herz: Herz ist gebrochen. Bis eines gespielt war, durfte niemand Herz ausspielen. Jetzt darf es jeder.';
+
+  @override
+  String get tutorialQueen =>
+      'Die Pik-Dame: 13 Punkte für den, der diesen Stich nimmt.';
+
+  @override
+  String get tutorialScore =>
+      'Jedes Herz zählt einen Punkt, die Pik-Dame 13. Wer alle 26 nimmt, schafft den Durchmarsch: Dann bekommen sie alle anderen. Gespielt wird bis 50 oder 100 Punkte, und die niedrigste Punktzahl gewinnt.';
 }

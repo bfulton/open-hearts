@@ -54,6 +54,7 @@ import 'profile_page.dart';
 import 'subscribe_page.dart';
 import 'table_page.dart';
 import 'theme.dart';
+import 'tutorial.dart';
 import 'ui/doorway.dart';
 import 'ui/folding_heart.dart';
 import 'ui/header.dart';
@@ -192,13 +193,22 @@ class _HomePageState extends State<HomePage> {
   Future<void> _back() async {
     final name = await Identity.name();
     final avatar = await Identity.avatar();
+    final learning = await Learning.offered();
     if (!mounted) return;
     setState(() {
       _name = Identity.playable(name);
       _avatar = avatar;
+      _offerLearning = learning;
     });
     _showAddress();
   }
+
+  /// Whether the door offers the tutorial under Play solo: to a device
+  /// that has not opened it and has finished no game alone
+  /// (tutorial.dart). The menu has it for anyone.
+  bool _offerLearning = false;
+
+  void _learn() => context.push<void>(located(soloPath), extra: const SoloGame(learning: true));
 
   /// The account's profile taken over this device's: shown at once, and
   /// what the next room or table is told.
@@ -341,12 +351,14 @@ class _HomePageState extends State<HomePage> {
     final avatar = await Identity.avatar();
     final name = await Identity.name();
     final pace = await PaceStore.load();
+    final learning = await Learning.offered();
     if (!mounted) return;
     setState(() {
       _options = options;
       _avatar = avatar;
       _name = Identity.playable(name);
       _lobby.pace = pace;
+      _offerLearning = learning;
     });
     // Here by a link: straight into the room — unless live play is
     // locked, which a link does not open. A device with no name yet is
@@ -529,6 +541,7 @@ class _HomePageState extends State<HomePage> {
             // device, or a backup code from the email, brings it in.
             if (!liveOpen)
               MenuAction(l10n.activateSubscription, icon: Icons.key_outlined, onSelected: () => showActivate(context)),
+            MenuAction(l10n.learnToPlay, icon: Icons.school_outlined, onSelected: _learn),
             MenuAction(l10n.tellUsWhatsBroken, icon: Icons.feedback_outlined, onSelected: () => showFeedback(context)),
             MenuAction(l10n.about, icon: Icons.info_outline, onSelected: _goAbout),
           ],
@@ -560,6 +573,14 @@ class _HomePageState extends State<HomePage> {
           style: _primary(),
           child: Text(l10n.playSolo, style: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.w700)),
         ),
+        if (_offerLearning) ...[
+          const SizedBox(height: 4),
+          TextButton(
+            onPressed: _learn,
+            style: TextButton.styleFrom(foregroundColor: Palette.gold),
+            child: Text(l10n.learnToPlayOffer, textAlign: TextAlign.center, style: const TextStyle(fontSize: 14)),
+          ),
+        ],
         // Live play, as the operator has it now: paused for everyone, open
         // here, or offered — unless the paid tier is not being offered,
         // and then a device without it is not shown it.

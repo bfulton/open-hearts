@@ -25,12 +25,13 @@ class HandOverSheet extends StatelessWidget {
     required this.onNext,
     this.mySeat = humanSeat,
     this.action,
+    this.note,
   });
 
   /// Takes the numbers rather than the game: at a live table the game
   /// has already moved on to the next deal by the time this shows.
   factory HandOverSheet.of(HeartsGame game,
-          {required List<SeatLook> seats, required VoidCallback onNext}) =>
+          {required List<SeatLook> seats, required VoidCallback onNext, String? action, String? note}) =>
       HandOverSheet(
         handNumber: game.handNumber,
         scores: game.handScores,
@@ -38,6 +39,8 @@ class HandOverSheet extends StatelessWidget {
         moonShooter: game.moonShooter,
         seats: seats,
         onNext: onNext,
+        action: action,
+        note: note,
       );
 
   final int handNumber;
@@ -53,6 +56,11 @@ class HandOverSheet extends StatelessWidget {
   /// The button's label, Next hand when null: at a live table the next
   /// hand is already under way, so it only dismisses.
   final String? action;
+
+  /// What the sheet says under the score, where it has something to
+  /// say: how a hand is scored, at the end of the hand a new player is
+  /// taught on (tutorial.dart).
+  final String? note;
 
   @override
   Widget build(BuildContext context) {
@@ -76,6 +84,7 @@ class HandOverSheet extends StatelessWidget {
             mark: null,
           ),
       ],
+      note: note == null ? null : Text(note!, style: const TextStyle(fontSize: 13.5, height: 1.35, color: Palette.chrome)),
       action: action ?? l10n.nextHand,
       onAction: onNext,
     );

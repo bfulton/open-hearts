@@ -341,5 +341,20 @@
   "reaction": "{code, select, nice{Boa} ha{Haha} wow{Uau} ouch{Ai} sorry{Desculpa} gg{Bom jogo} other{…}}",
   "reactionSaid": "{name}: {reaction}",
   "react": "Reagir",
-  "hideReactions": "Esconder as reações dos outros"
+  "hideReactions": "Esconder as reações dos outros",
+  "learnToPlay": "Aprender a jogar",
+  "learnToPlayOffer": "Primeira vez no Copas? Aprenda a jogar",
+  "tutorialNext": "Próximo",
+  "tutorialWelcome": "Quatro jogadores, treze cartas cada um. Cada carta de copas que você leva é um ponto contra você, e a dama de espadas vale 13. Leve o mínimo de pontos que puder.",
+  "tutorialPass": "Primeiro, todos passam três cartas. Escolha três que você prefere não manter e toque em Passar. Desta vez, elas vão para o jogador à sua esquerda.",
+  "tutorialReceived": "Você recebeu três cartas do jogador à sua direita. Elas ficam marcadas com um ponto até a primeira vaza ser jogada.",
+  "tutorialYouLead": "O 2 de paus abre a primeira vaza, e ele está com você. Toque nele para jogá-lo.",
+  "tutorialTheyLead": "O 2 de paus abre a primeira vaza, e ele está com {name}.",
+  "tutorialFollow": "Jogue uma carta do naipe que abriu a vaza, se tiver. As cartas que você não pode jogar ficam apagadas: toque em uma para ver por quê.",
+  "tutorialNoSuit": "{suit, select, clubs{Você não tem paus} diamonds{Você não tem ouros} spades{Você não tem espadas} other{Você não tem copas}}, então pode jogar qualquer carta. Os pontos que você jogar vão para quem levar a vaza.",
+  "tutorialNoSuitFirst": "Você não tem paus, então pode jogar outro naipe, mas não copas nem a dama de espadas: a primeira vaza não leva pontos.",
+  "tutorialTrickTaken": "A carta mais alta do naipe que abriu leva a vaza, com os pontos que houver nela. Quem levar abre a próxima.",
+  "tutorialHeartsBroken": "É a primeira carta de copas: as copas foram quebradas. Até alguém jogar uma, ninguém podia abrir com copas. Agora qualquer um pode.",
+  "tutorialQueen": "A dama de espadas: 13 pontos para quem levar esta vaza.",
+  "tutorialScore": "Cada carta de copas vale um ponto, e a dama de espadas 13. Se você levar os 26, atira na lua: eles vão para todos os outros. Uma partida vai até 50 ou 100 pontos, e vence a menor pontuação."
 }
