@@ -123,13 +123,17 @@ product.
 - **One change at a time.** Two claims of one code, or of two codes
   into the last place, cannot both succeed, since every change to an
   account takes its turn in one object
-  ([one account at a time](service.md#accounts)). Previews have no
-  `HOUSEHOLD` binding and fall back to a per-isolate queue, so there the
-  race is closed only within an isolate.
+  ([one account at a time](service.md#accounts)). A preview's accounts
+  take their turns in the preview relay's objects, the same way.
 - **Rate.** A household is limited to so many changes and reads an hour
   (`householdChangesPerHour`, `householdReadsPerHour`).
   Asking for a code while one is outstanding returns the same code, so
-  it costs a read, not a write.
+  it costs a read, not a write. What a device asks on a licence that
+  the store where it asks doesn't back has an allowance of its own, the
+  size of the reads'. That covers a device just brought in, and one
+  dropped from the household that still holds its licence, so a dropped
+  device spends none of the household's
+  ([one account at a time](service.md#accounts)).
 
 ## TURN
 
@@ -228,3 +232,15 @@ variables and pins `wrangler`. The Android release key's properties
 file is never checked in. Every key in the repository is a published
 test vector: BIP-340's test pair (used by the e2e rig and the relay's
 self-check) and NIP-44's vectors.
+
+**Previews hold none of production's keys.** A preview runs whatever
+branch was deployed to it, reviewed or not, so the secrets it signs
+with are its own ([previews](service.md#previews)): a service key pair
+of its own, whose public half every preview build and the preview relay
+name, and the preview relay's own backup jurors' secret. `oh preview
+secrets` makes them and sets them without showing them, and `oh secret
+set` puts production's on production alone. Nothing a preview signs is
+good in production, and a preview takes nothing production signed: its
+relay admits only activations its own key signed. Who plays on a
+preview is the operator's say: there is nothing to buy, and an account
+there is an invitation (`oh preview invite`).

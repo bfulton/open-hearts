@@ -8,8 +8,8 @@ import 'package:engine/engine.dart';
 import 'package:flutter/material.dart';
 import 'package:table/table.dart' show Rating;
 
-import '../avatar.dart';
 import '../l10n/l10n.dart';
+import '../table_model.dart' show SeatLook;
 import '../theme.dart';
 import 'confetti.dart';
 import 'player_icon.dart';
@@ -21,11 +21,8 @@ class HandOverSheet extends StatelessWidget {
     required this.scores,
     required this.totals,
     required this.moonShooter,
-    required this.names,
+    required this.seats,
     required this.onNext,
-    this.seeds,
-    this.avatars,
-    this.iconNames,
     this.mySeat = humanSeat,
     this.action,
   });
@@ -33,16 +30,13 @@ class HandOverSheet extends StatelessWidget {
   /// Takes the numbers rather than the game: at a live table the game
   /// has already moved on to the next deal by the time this shows.
   factory HandOverSheet.of(HeartsGame game,
-          {required List<String> names, List<String>? iconNames, List<String>? seeds, List<Avatar>? avatars, required VoidCallback onNext}) =>
+          {required List<SeatLook> seats, required VoidCallback onNext}) =>
       HandOverSheet(
         handNumber: game.handNumber,
         scores: game.handScores,
         totals: game.totals,
         moonShooter: game.moonShooter,
-        names: names,
-        iconNames: iconNames,
-        seeds: seeds,
-        avatars: avatars,
+        seats: seats,
         onNext: onNext,
       );
 
@@ -50,17 +44,9 @@ class HandOverSheet extends StatelessWidget {
   final List<int> scores;
   final List<int> totals;
   final int? moonShooter;
-  final List<String> names;
 
-  /// What each seat's icon is coloured from, seat order; the names
-  /// when null.
-  final List<String>? seeds;
-
-  /// How each seat chose to look, seat order; nothing when null.
-  final List<Avatar>? avatars;
-
-  /// What each icon's initials come from, where not [names] (table_model.dart, iconNameOf).
-  final List<String>? iconNames;
+  /// Who sits where, seat order, as the felt draws them.
+  final List<SeatLook> seats;
   final VoidCallback onNext;
   final int mySeat;
 
@@ -77,16 +63,13 @@ class HandOverSheet extends StatelessWidget {
           ? l10n.handNumber(handNumber + 1)
           : shooter == mySeat
               ? l10n.youShotTheMoon
-              : l10n.shotTheMoon(names[shooter]),
+              : l10n.shotTheMoon(seats[shooter].name),
       tone: shooter == null || shooter == mySeat ? Palette.chrome : Palette.danger,
       subtitle: shooter == null ? null : l10n.shotTheMoonDetail,
       rows: [
         for (var seat = 0; seat < seatCount; seat++)
           (
-            name: names[seat],
-            iconName: (iconNames ?? names)[seat],
-            seed: (seeds ?? names)[seat],
-            avatar: avatars?[seat],
+            look: seats[seat],
             delta: scores[seat],
             total: totals[seat],
             you: seat == mySeat,
@@ -107,31 +90,20 @@ class GameOverSheet extends StatelessWidget {
   const GameOverSheet({
     super.key,
     required this.game,
-    required this.names,
+    required this.seats,
     required this.onNewGame,
     this.onCopyRecord,
     this.onSeeGame,
     this.onHome,
-    this.seeds,
-    this.avatars,
-    this.iconNames,
     this.rating,
     this.mySeat = humanSeat,
     this.action,
   });
 
   final HeartsGame game;
-  final List<String> names;
 
-  /// What each seat's icon is coloured from, seat order; the names
-  /// when null.
-  final List<String>? seeds;
-
-  /// How each seat chose to look, seat order; nothing when null.
-  final List<Avatar>? avatars;
-
-  /// What each icon's initials come from, where not [names] (table_model.dart, iconNameOf).
-  final List<String>? iconNames;
+  /// Who sits where, seat order, as the felt draws them.
+  final List<SeatLook> seats;
   final VoidCallback onNewGame;
 
   /// What the game moved this player's rating by, at a rated table.
@@ -165,8 +137,8 @@ class GameOverSheet extends StatelessWidget {
     final title = youWon
         ? (won.length > 1 ? l10n.aShareOfIt : l10n.youWin)
         : won.length > 1
-            ? l10n.namesTie(l10n.together(won.map((s) => names[s])))
-            : l10n.nameWins(names[won.first]);
+            ? l10n.namesTie(l10n.together(won.map((s) => seats[s].name)))
+            : l10n.nameWins(seats[won.first].name);
 
     return _Sheet(
       title: title,
@@ -177,10 +149,7 @@ class GameOverSheet extends StatelessWidget {
       rows: [
         for (var seat = 0; seat < seatCount; seat++)
           (
-            name: names[seat],
-            iconName: (iconNames ?? names)[seat],
-            seed: (seeds ?? names)[seat],
-            avatar: avatars?[seat],
+            look: seats[seat],
             delta: game.handScores[seat],
             total: game.totals[seat],
             you: seat == mySeat,
@@ -207,7 +176,7 @@ class GameOverSheet extends StatelessWidget {
   }
 }
 
-typedef _Row = ({String name, String iconName, String seed, Avatar? avatar, int delta, int total, bool you, Color? mark});
+typedef _Row = ({SeatLook look, int delta, int total, bool you, Color? mark});
 
 /// The confetti of a game won, behind the sheet and in front of it.
 const confettiBehind = ValueKey('confetti behind');
@@ -455,7 +424,7 @@ class _Scores extends StatelessWidget {
         final delta = math.max(48.0, rows.map((r) => widthOf(_delta(r), _deltaStyle(r))).reduce(math.max) + 12);
         final total = math.max(52.0, rows.map((r) => widthOf('${r.total}', _totalStyle(r))).reduce(math.max) + 12);
         final room = constraints.maxWidth - _icon - _iconGap;
-        bool fits(_Row row, double width) => row.name.split(' ').every((word) => widthOf(word, _nameStyle(row)) <= width);
+        bool fits(_Row row, double width) => row.look.name.split(' ').every((word) => widthOf(word, _nameStyle(row)) <= width);
         final beside = rows.every((row) => fits(row, room - delta - total));
         return Column(
           mainAxisSize: MainAxisSize.min,
@@ -488,7 +457,7 @@ class _ScoreRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final name = Text(
-      row.name,
+      row.look.name,
       style: _Scores._nameStyle(row),
       maxLines: whole ? null : 1,
       softWrap: whole,
@@ -501,14 +470,14 @@ class _ScoreRow extends StatelessWidget {
     // One line for a screen reader, the numbers said as what they are:
     // drawn, they are two columns a sighted reader takes in at a glance.
     return Semantics(
-      label: context.l10n.sheetRow(row.name, row.delta, row.total),
+      label: context.l10n.sheetRow(row.look.bot ? '${row.look.name}${context.l10n.seatIsBot}' : row.look.name, row.delta, row.total),
       child: ExcludeSemantics(
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 5),
           child: Row(
             crossAxisAlignment: beside ? CrossAxisAlignment.center : CrossAxisAlignment.start,
             children: [
-              PlayerIcon(name: row.iconName, seed: row.seed, avatar: row.avatar, size: _Scores._icon),
+              SeatIcon(look: row.look, size: _Scores._icon),
               const SizedBox(width: _Scores._iconGap),
               Expanded(
                 child: beside

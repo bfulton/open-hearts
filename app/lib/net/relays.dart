@@ -6,12 +6,12 @@
 /// room code, the results, presence — named in the address before the
 /// socket is opened. The deployed site and production run the same
 /// list. Two exceptions, both decided when the build is made, never on
-/// the page: a build made with `--dart-define=OH_RELAYS=…` — the local
-/// rig against its bridges — uses those, and a build served from
-/// localhost (`flutter run`, the browser suite) uses the local relay
-/// (service/), at the port its address names if it names one. The
-/// remote config may name another relay of ours (net/remote_config.dart),
-/// never anyone else's.
+/// the page: a build made with `--dart-define=OH_RELAYS=…` uses those —
+/// a preview, the preview relay (deploy.sh), and the local rig, its
+/// bridges — and a build served from localhost (`flutter run`, the
+/// browser suite) uses the local relay (service/), at the port its
+/// address names if it names one. The remote config may name another
+/// relay of ours (net/remote_config.dart), never anyone else's.
 library;
 
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -47,14 +47,16 @@ Uri localRelayAt(Uri at) {
   return port == null || port < 1 || port > 65535 ? local : local.replace(port: port);
 }
 
-/// A dev loop's shortcut: a build made with `--dart-define=OH_RELAYS=…`
-/// (a comma list) talks to those instead. Unset in a normal build.
+/// A build made with `--dart-define=OH_RELAYS=…` (a comma list) talks to
+/// those instead: a preview's, the preview relay (deploy.sh), and the
+/// dev loop's, its bridges. Unset in production's.
 const devRelay = String.fromEnvironment('OH_RELAYS');
 
 /// The relays for this build, where it is served from: the operator's,
 /// when the remote config names some (net/remote_config.dart), and the
-/// build's own otherwise. A local build and the rig keep theirs whatever
-/// the config says — they are not on anyone's relays but their own.
+/// build's own otherwise. A preview, a local build and the rig keep
+/// theirs whatever the config says — they are not on anyone's relays
+/// but their own.
 ///
 /// A phone build has no address it was served from, and is a deployed
 /// build like the site's, not a local one.

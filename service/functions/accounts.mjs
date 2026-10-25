@@ -16,9 +16,15 @@ import { S } from './settings.mjs';
 /// In local mode a key nobody has heard of is entitled on the spot for
 /// a month (docs/explanation/service.md), on an account of its own — one branch,
 /// and it is never on in production.
-export async function entitlementOf(store, key, { now = Date.now(), openHouse = false } = {}) {
+///
+/// [written] is the device's row as its account's object has just
+/// written it ([joinAccount]), which is taken instead of the row here:
+/// this store may not show it yet. KV is eventually consistent, and the
+/// object runs where its account was first asked for, not where the
+/// device is asking.
+export async function entitlementOf(store, key, { now = Date.now(), openHouse = false, written = null } = {}) {
   const today = dayOf(now);
-  const row = await store.get(`KEY#${key}`, 'ENTITLEMENT');
+  const row = written ?? (await store.get(`KEY#${key}`, 'ENTITLEMENT'));
   if (!row) {
     if (!openHouse) return null;
     const subscription = `local-${key.slice(0, 16)}`;
@@ -238,8 +244,11 @@ export function backupCodeOf(text) {
 export const backupRow = async (code) => `BACKUP#${await digestOf(`oh-backup/1\n${code}`)}`;
 
 /// Five new codes for [account], replacing any it had: their rows go,
-/// so an old one is no such code. Returns the account's row.
-async function makeBackups(store, account, { now }) {
+/// so an old one is no such code. Returns the account's row. Emails
+/// nothing: an account somebody paid for is told its codes by
+/// [backupsMade], and a preview's invitation is one of them
+/// (ops/preview.mjs).
+export async function makeBackups(store, account, { now = Date.now() } = {}) {
   const old = await store.get(`ACCOUNT#${account}`, 'BACKUP');
   for (const c of old?.codes ?? []) await store.del(await backupRow(c.code), 'META');
   const codes = [];
@@ -351,9 +360,9 @@ export async function joinAccount(key, account, store, { now = Date.now(), movin
   // paid for, into one where he can drop it. Leaving is the device's
   // own to do, by dropping itself first — or by buying a subscription
   // of its own, which is as plain a word as it can say. An account
-  // whose subscription has ended holds nothing, and neither does local
-  // mode's open house, which licenses every device that asks and was
-  // never anybody's purchase.
+  // whose subscription has ended holds nothing, and neither do local
+  // mode's open house, which licenses every device that asks, and a
+  // preview's invitations: neither was ever anybody's purchase (paidUp).
   const was = await accountOfKey(store, key);
   if (was && was !== account && !moving && (await accountPaidUp(store, was, today))) {
     return { status: 409, body: { error: 'this device is on another subscription: drop it there first' } };
@@ -366,21 +375,30 @@ export async function joinAccount(key, account, store, { now = Date.now(), movin
   const sub = subscription ? await store.get(`SUB#${subscription}`, 'META') : null;
   if (!already) await store.put(`ACCOUNT#${account}`, `DEVICE#${key}`, { bound_at: today });
   // A device brought into a suspended account is suspended with it.
-  await store.put(`KEY#${key}`, 'ENTITLEMENT', {
+  const entitlement = {
     account,
     licensed_until: sub?.renews_at ?? null,
     at: today,
     ...((await isSuspended(store, account)) ? { suspended: true } : {}),
-  });
-  return { status: 200, body: { account } };
+  };
+  await store.put(`KEY#${key}`, 'ENTITLEMENT', entitlement);
+  // It goes back with the answer too: the handler that asked signs the
+  // device's licence from it ([entitlementOf], written), where the store
+  // may not show it yet.
+  return { status: 200, body: { account, entitlement } };
 }
 
 /// Whether [subscription] is somebody's purchase and still paid up on
 /// [today]: what a device on it is not moved off without saying so.
-/// Local mode's open house licenses every device that asks and was
-/// never anybody's purchase, so it holds nobody.
+/// Local mode's open house licenses every device that asks, and the
+/// operator invites people to play on previews (ops/preview.mjs); neither
+/// was ever anybody's purchase, so they hold nobody.
 async function paidUp(store, subscription, today) {
   if (typeof subscription !== 'string') return false;
   const sub = await store.get(`SUB#${subscription}`, 'META');
-  return !!sub && sub.source !== 'local' && !!sub.renews_at && sub.renews_at >= today;
+  return !!sub && !UNPAID.has(sub.source) && !!sub.renews_at && sub.renews_at >= today;
 }
+
+/// The subscriptions nobody paid for: local mode's open house, and a
+/// preview's invitations.
+const UNPAID = new Set(['local', 'invited']);

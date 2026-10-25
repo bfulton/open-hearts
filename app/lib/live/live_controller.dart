@@ -850,7 +850,10 @@ class LiveController extends ChangeNotifier implements TableModel {
   /// What the deal is doing, while the table deals; null otherwise.
   String? get dealNote {
     if (client.game.phase != Phase.dealing) return null;
-    final d = client.deal;
+    // This hand's: the client's last deal stays the one it has until the
+    // next is begun, and read here, a hand waiting on its jury said it
+    // was dealing — for as long as the wait, which can be for good.
+    final d = client.dealOf(client.game.handNumber);
     // Before there is a deal at all: a hand with bot seats waits for
     // jurors enough to hold them, because a bot seat nobody holds is
     // a hand everyone can see (docs/explanation/live-play.md).

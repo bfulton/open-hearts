@@ -117,6 +117,19 @@ void main() {
     expect(claimInAddress(Uri.parse('https://x/play/?claim=')), isNull);
   });
 
+  test('every ask shows the licence this device holds, which names its account, and nothing while it holds none', () async {
+    final stand = standUp();
+    final signer = await Identity.signer();
+    await Entitlement.current.load(signer.publicKey);
+    Map<String, Object?> sent() => jsonDecode(stand.seen.last.substring(stand.seen.last.indexOf(' ') + 1)) as Map<String, Object?>;
+    await askHandler('devices', signer, const {}, null);
+    expect(sent().containsKey('licence'), isFalse);
+    await licenceThisDevice();
+    await askHandler('devices', signer, {'drop': 'cd' * 32}, null, what: 'cd' * 32);
+    expect(sent()['licence'], Entitlement.current.licence!.toJson());
+    expect(sent()['drop'], 'cd' * 32, reason: 'beside what it asks');
+  });
+
   test('a code comes back, and a refusal comes back in its own words', () async {
     final stand = standUp();
     final me = FakeSigner('one');

@@ -223,6 +223,14 @@
   "@seatOnTurn": {
     "description": "Added to seatScores when it is that player's turn."
   },
+  "seatIsBot": ", a bot",
+  "@seatIsBot": {
+    "description": "Added after a seat's name where a screen reader says the seat (seatScores), at a live table, when the seat is played by a bot rather than a person."
+  },
+  "botTag": "Bot",
+  "@botTag": {
+    "description": "What the small robot on a bot's icon at a live table says when touched: that the seat is played by a bot, not a person. One short word."
+  },
   "seatClock": ", {seconds} s on the clock",
   "@seatClock": {
     "description": "Added to seatScores when that player's clock is running.",
@@ -433,37 +441,22 @@
       }
     }
   },
-  "youAreRated": "You are rated {rating}{provisional, select, true{, provisionally} other{}}, {games, plural, =1{from 1 rated game} other{from {games} rated games}}.",
-  "@youAreRated": {
-    "description": "Under the game options on the front door. provisional is true while too few games have settled the rating.",
-    "placeholders": {
-      "rating": {
-        "type": "int"
-      },
-      "provisional": {
-        "type": "String"
-      },
-      "games": {
-        "type": "int"
-      }
-    }
-  },
   "playLive": "Play live",
   "@playLive": {
     "description": "Button: a game with whoever else is waiting online."
   },
-  "playLiveSpoken": "{online, plural, =0{Play live, nobody else online} =1{Play live, nobody else online} other{Play live, {online} online}}",
+  "playLiveSpoken": "{online, plural, =0{Play live, nobody else online} other{Play live, {online} online}}",
   "@playLiveSpoken": {
-    "description": "Read by a screen reader for the Play live button. online counts this device too.",
+    "description": "Read by a screen reader for the Play live button. online is how many other people are online, not counting this device.",
     "placeholders": {
       "online": {
         "type": "int"
       }
     }
   },
-  "onlineCount": "{online, plural, =0{Nobody else online} =1{Nobody else online} other{{online} online}}",
+  "onlineCount": "{online} online",
   "@onlineCount": {
-    "description": "Under Play live: how many devices are online, this one included.",
+    "description": "After the game line on the front door, following a middle dot: how many other people are online, not counting this device; 0 when nobody else is. Kept short.",
     "placeholders": {
       "online": {
         "type": "int"
@@ -1501,10 +1494,6 @@
   "paidLiveSoon": "Your payment went through. Live play opens as soon as it reaches us — reload in a minute.",
   "@paidLiveSoon": {
     "description": "On the front door when the payment went through but the licence has not arrived after a while."
-  },
-  "checkingOnline": "Checking online players…",
-  "@checkingOnline": {
-    "description": "On the front door, where the count of players online goes, before the relays have answered."
   },
   "activateSubscription": "Activate subscription",
   "@activateSubscription": {

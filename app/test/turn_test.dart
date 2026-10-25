@@ -6,10 +6,18 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:open_hearts/entitlement.dart';
+import 'package:open_hearts/identity.dart';
 import 'package:open_hearts/net/http.dart';
 import 'package:open_hearts/net/licence.dart' show requestDigest;
 import 'package:open_hearts/net/turn.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:table_sim/table_sim.dart';
+
+import 'home_page_test.dart' show licenceThisDevice;
+
+/// The service key home_page_test.dart's licences are signed for.
+const _service = 'dff1d77f2a671c5f36183726db2341be58feae1da2deced843240f7b502ba659';
 
 void main() {
   final signer = FakeSigner('turn');
@@ -84,6 +92,24 @@ void main() {
       expect(DateTime.now().difference(began), lessThan(const Duration(seconds: 3)));
     } finally {
       await server.close(force: true);
+    }
+  });
+
+  test('the ask shows the licence this device holds, which names its account', () async {
+    // As every ask of the service shows it (household.dart, askHandler):
+    // a device just brought in is asked of its account by it before the
+    // service's store where it asks has heard of it.
+    SharedPreferences.setMockInitialValues({});
+    Entitlement.current = Entitlement(service: _service);
+    addTearDown(() => Entitlement.current = Entitlement());
+    await licenceThisDevice();
+    final h = await handler(200, jsonEncode({'iceServers': [{'urls': ['stun:stun.cloudflare.com:3478']}]}));
+    try {
+      await iceServersFor(await Identity.signer(), endpoint: h.url);
+      final [_, _, body] = h.seen.single.split(' ');
+      expect((jsonDecode(body) as Map)['licence'], Entitlement.current.licence!.toJson());
+    } finally {
+      await h.stop();
     }
   });
 

@@ -6,6 +6,22 @@
 // tests and the local rig hand them in, so the file is laid under env
 // rather than read in each handler: a name set on the project or by a
 // test still wins, except the price, which is the file's alone.
+//
+// A preview is a deployment of its own (docs/how-to/deploy.md): its
+// environment says so (OH_DEPLOYMENT, on the Pages project's preview
+// environment and the preview relay's), and it takes the file as a
+// preview has it ([configFor]).
+
+/// [config] as [deployment] runs it: production's as written; a
+/// preview's with the service key previews have (preview.serviceKey),
+/// and none at all while there is none. Never production's: a preview
+/// runs whatever branch was deployed to it, so what it signs is good on
+/// previews and nowhere else, and it takes nothing production signed.
+export function configFor(config, deployment) {
+  if (deployment !== 'preview') return config;
+  const { preview, ...rest } = config ?? {};
+  return { ...rest, serviceKey: preview?.serviceKey ?? null };
+}
 
 /// The file's fields as the env names the handlers read. A field left
 /// null is left out, so a handler finds it missing, as before.
@@ -54,11 +70,11 @@ const priceOf = (config) => {
   return Number.isInteger(amount) && typeof currency === 'string' ? `${amount} ${currency}` : null;
 };
 
-/// env with the file beneath it, but for the price, which is the file's
-/// alone: it is what the terms state, and no setting on the project
-/// sells at another.
+/// env with the file beneath it, as the deployment env names runs it
+/// ([configFor]), but for the price, which is the file's alone: it is
+/// what the terms state, and no setting on the project sells at another.
 export function withConfig(env, config) {
-  const laid = configEnv(config);
+  const laid = configEnv(configFor(config, env?.OH_DEPLOYMENT));
   const { OH_PRICE: _, ...rest } = env;
   return { ...laid, ...rest };
 }

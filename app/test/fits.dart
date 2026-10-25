@@ -323,7 +323,7 @@ List<String> _faults(WidgetTester tester, String where, {Iterable<String> names 
   // The felt: the badges, the trick, the line the table says, and at a
   // live table who is here.
   if (felt != null) {
-    final badges = _things(find.byType(SeatBadge), (e) => '${(e.widget as SeatBadge).name}\'s badge').toList();
+    final badges = _things(find.byType(SeatBadge), (e) => '${(e.widget as SeatBadge).look.name}\'s badge').toList();
     final trick = _things(find.descendant(of: find.byType(TableView), matching: find.byType(CardView)),
         (e) => 'the ${(e.widget as CardView).card.code} on the felt').toList();
     final said = _things(find.descendant(of: find.byType(TableView), matching: find.byType(Announced)), (e) => 'what the table says')

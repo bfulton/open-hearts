@@ -4,9 +4,9 @@
 //
 // The account may hold other apps, so this keeps to its own:
 // the two zones below, the Pages project, the KV namespaces, the R2
-// bucket, the relay worker and the account-level things named for this
-// app. Nothing else in the account is read for changes, let alone
-// touched.
+// bucket, the relay workers (production's and the previews') and the
+// account-level things named for this app. Nothing else in the account
+// is read for changes, let alone touched.
 //
 // No secret is here, nor anywhere in this directory: a secret is named,
 // and apply.mjs checks it is set, never what it is. Addresses mail is
@@ -61,18 +61,29 @@ export const pages = {
       /// Counts and nothing about anybody (docs/explanation/service.md).
       analyticsEngine: { OH_METRICS: 'open_hearts_api' },
     },
+    /// Every preview, whatever branch it was deployed from: a deployment
+    /// of its own (docs/how-to/deploy.md), playing live on the preview
+    /// relay with the people the operator invites.
     preview: {
       compatibilityDate: '2026-09-09',
       compatibilityFlags: [],
-      vars: {},
-      // No Stripe on preview: the shop says it is not open yet.
-      secrets: ['OH_ID_HMAC', 'OH_SERVICE_SECRET', 'OH_TURN_API_TOKEN'],
-      // Its own store, so a preview never writes production's rows; and
-      // no HOUSEHOLD, whose object reads production's store. Its own
-      // bucket too: a game played on a preview is no game of record.
+      /// Which deployment this is: a preview signs with the service key
+      /// previews have, never production's (service/functions/deployment.mjs).
+      vars: { OH_DEPLOYMENT: 'preview' },
+      // No Stripe on preview: the shop says it is not open yet, and the
+      // people who play are the operator's invitations (ops/preview.mjs).
+      secrets: ['OH_ID_HMAC', 'OH_TURN_API_TOKEN'],
+      /// A preview's own: made for previews, never production's, since a
+      /// preview runs whatever branch was deployed to it. Set by `./oh
+      /// preview secrets --apply`, and not by `./oh secret set`.
+      ownSecrets: ['OH_SERVICE_SECRET'],
+      // Its own store, so a preview never writes production's rows, and
+      // the preview relay's households, which read and write that store
+      // (service/do/wrangler.toml, [env.preview]). Its own bucket too: a
+      // game played on a preview is no game of record.
       kv: { OH_STORE: 'open-hearts-store-preview' },
       r2: { OH_RECORDS: 'open-hearts-records-preview' },
-      durableObjects: {},
+      durableObjects: { HOUSEHOLD: { script: 'open-hearts-relay-preview', class: 'Household' } },
       analyticsEngine: {},
     },
   },
@@ -152,6 +163,18 @@ export const relay = {
   optionalSecrets: ['OH_ARACHNID_USERNAME', 'OH_ARACHNID_PASSWORD', 'OH_PHOTODNA_KEY', 'OH_NCMEC_USERNAME', 'OH_NCMEC_PASSWORD'],
   /// workers.dev off: relay.openhearts.game is its only address.
   workersDev: false,
+  /// The preview relay, open-hearts-relay-preview: wrangler.toml's
+  /// [env.preview], what previews play on. Its secret is its own, never
+  /// production's, since it runs whatever branch was deployed to it; it
+  /// checks no picture, so it has none of the checkers' credentials.
+  preview: {
+    env: 'preview',
+    secrets: [],
+    ownSecrets: ['OH_JUROR_SECRET'],
+    optionalSecrets: [],
+    /// relay-preview.openhearts.game is its only address.
+    workersDev: false,
+  },
 };
 
 // ---- the zones ------------------------------------------------------------
@@ -197,6 +220,7 @@ export const zones = {
       { type: 'TXT', name: 'cf-bounce.openhearts.game', by: 'Email Sending' },
       { type: 'TXT', name: 'cf-bounce._domainkey.openhearts.game', by: 'Email Sending' },
       { type: 'AAAA', name: 'relay.openhearts.game', by: 'the relay worker\'s custom domain' },
+      { type: 'AAAA', name: 'relay-preview.openhearts.game', by: 'the preview relay worker\'s custom domain' },
     ],
     rules: {
       http_request_dynamic_redirect: [
@@ -221,7 +245,7 @@ export const zones = {
         {
           description: 'API and relay: 30 requests per 10 s per address',
           expression:
-            '(http.host eq "play.openhearts.game" and starts_with(http.request.uri.path, "/api/") and not http.request.uri.path in {"/api/stripe" "/api/apple" "/api/apple-id" "/api/play"}) or http.host eq "relay.openhearts.game"',
+            '(http.host eq "play.openhearts.game" and starts_with(http.request.uri.path, "/api/") and not http.request.uri.path in {"/api/stripe" "/api/apple" "/api/apple-id" "/api/play"}) or http.host in {"relay.openhearts.game" "relay-preview.openhearts.game"}',
           action: 'block',
           ratelimit: { characteristics: ['cf.colo.id', 'ip.src'], period: 10, requests_per_period: 30, mitigation_timeout: 10 },
           enabled: true,

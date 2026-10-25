@@ -15,6 +15,31 @@ import 'l10n/l10n.dart';
 /// second 👍 from the same seat is a new bubble, said aloud again.
 typedef SeatReaction = ({Reaction reaction, int n});
 
+/// How a seat looks wherever the table draws it: its badge on the felt,
+/// and its row on the score sheets (ui/player_icon.dart, SeatIcon).
+@immutable
+class SeatLook {
+  const SeatLook({required this.name, String? iconName, String? seed, this.avatar = Avatar.none, this.bot = false})
+      : iconName = iconName ?? name,
+        seed = seed ?? name;
+
+  /// What the seat is called at this table.
+  final String name;
+
+  /// What its icon's initials come from ([TableModel.iconNameOf]).
+  final String iconName;
+
+  /// What its icon is coloured from ([TableModel.iconSeedOf]).
+  final String seed;
+
+  /// How it chose to look.
+  final Avatar avatar;
+
+  /// Whether a bot plays it, which its icon says: alone, every seat but
+  /// the player's; at a live table, each seat a bot holds now.
+  final bool bot;
+}
+
 abstract class TableModel implements Listenable {
   HeartsGame get game;
 
@@ -210,4 +235,13 @@ class AutoPilot {
     if (legal.isEmpty) return null;
     return autoPlayCard(table.handShown, legal);
   }
+}
+
+/// Every table's seats as they look, from what the table says of each.
+extension SeatLooks on TableModel {
+  SeatLook lookOf(int seat) =>
+      SeatLook(name: names[seat], iconName: iconNameOf(seat), seed: iconSeedOf(seat), avatar: avatarOf(seat), bot: personaAt(seat) != null);
+
+  /// Seat order.
+  List<SeatLook> get looks => [for (var s = 0; s < seatCount; s++) lookOf(s)];
 }

@@ -284,6 +284,18 @@ abstract class AppLocalizations {
   /// **', on turn'**
   String get seatOnTurn;
 
+  /// Added after a seat's name where a screen reader says the seat (seatScores), at a live table, when the seat is played by a bot rather than a person.
+  ///
+  /// In en, this message translates to:
+  /// **', a bot'**
+  String get seatIsBot;
+
+  /// What the small robot on a bot's icon at a live table says when touched: that the seat is played by a bot, not a person. One short word.
+  ///
+  /// In en, this message translates to:
+  /// **'Bot'**
+  String get botTag;
+
   /// Added to seatScores when that player's clock is running.
   ///
   /// In en, this message translates to:
@@ -488,28 +500,22 @@ abstract class AppLocalizations {
   /// **'{target} points · {rated, select, rated{rated} other{unrated}}'**
   String gameLine(int target, String rated);
 
-  /// Under the game options on the front door. provisional is true while too few games have settled the rating.
-  ///
-  /// In en, this message translates to:
-  /// **'You are rated {rating}{provisional, select, true{, provisionally} other{}}, {games, plural, =1{from 1 rated game} other{from {games} rated games}}.'**
-  String youAreRated(int rating, String provisional, int games);
-
   /// Button: a game with whoever else is waiting online.
   ///
   /// In en, this message translates to:
   /// **'Play live'**
   String get playLive;
 
-  /// Read by a screen reader for the Play live button. online counts this device too.
+  /// Read by a screen reader for the Play live button. online is how many other people are online, not counting this device.
   ///
   /// In en, this message translates to:
-  /// **'{online, plural, =0{Play live, nobody else online} =1{Play live, nobody else online} other{Play live, {online} online}}'**
+  /// **'{online, plural, =0{Play live, nobody else online} other{Play live, {online} online}}'**
   String playLiveSpoken(int online);
 
-  /// Under Play live: how many devices are online, this one included.
+  /// After the game line on the front door, following a middle dot: how many other people are online, not counting this device; 0 when nobody else is. Kept short.
   ///
   /// In en, this message translates to:
-  /// **'{online, plural, =0{Nobody else online} =1{Nobody else online} other{{online} online}}'**
+  /// **'{online} online'**
   String onlineCount(int online);
 
   /// Button: a new table of the player's own, and a link to send to friends.
@@ -1717,12 +1723,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Your payment went through. Live play opens as soon as it reaches us — reload in a minute.'**
   String get paidLiveSoon;
-
-  /// On the front door, where the count of players online goes, before the relays have answered.
-  ///
-  /// In en, this message translates to:
-  /// **'Checking online players…'**
-  String get checkingOnline;
 
   /// Menu item and page title: bring this device onto a subscription already bought, with a code.
   ///

@@ -14,10 +14,12 @@ import { ARGUMENTS, COMMANDS } from './commands.mjs';
 import { root } from './env.mjs';
 import { releaseProblems } from './gate.mjs';
 import { commandOf, main, markdown, parse } from './oh.mjs';
+import { INVITED_DAYS, withPreviewKey } from './preview.mjs';
 import { rejected, reshaped } from './setup.mjs';
 import { KNOWN_ROW } from '../service/do/checkers.mjs';
 import { configOf } from '../service/functions/config.mjs';
-import { memoryStore } from '../service/functions/rows.mjs';
+import { backupCodeOf, entitlementOf, redeemBackup } from '../service/functions/accounts.mjs';
+import { dayAfter, memoryStore } from '../service/functions/rows.mjs';
 import { config as committed, languages, origin, render, strings } from '../site/build.mjs';
 import { fingerprintOf, formatLedger } from '../site/ledger.mjs';
 
@@ -196,16 +198,22 @@ test('the checker of known images in use is the run-time row known, written wher
 
 test('a secret is set wherever its definition says it lives, from what is typed', async () => {
   const ctx = fake({ readSecret: async () => 's3cret' });
-  assert.equal(await main(['secret', 'set', 'OH_SERVICE_SECRET', '--apply'], ctx), 0);
+  assert.equal(await main(['secret', 'set', 'OH_ID_HMAC', '--apply'], ctx), 0);
   assert.deepEqual(
     ctx.started.map((s) => s.args.slice(2)),
     [
-      ['pages', 'secret', 'put', 'OH_SERVICE_SECRET', '--project-name', 'open-hearts'],
-      ['pages', 'secret', 'put', 'OH_SERVICE_SECRET', '--project-name', 'open-hearts', '--env', 'preview'],
+      ['pages', 'secret', 'put', 'OH_ID_HMAC', '--project-name', 'open-hearts'],
+      ['pages', 'secret', 'put', 'OH_ID_HMAC', '--project-name', 'open-hearts', '--env', 'preview'],
     ],
   );
   assert.ok(ctx.started.every((s) => s.input === 's3cret'));
   assert.ok(!ctx.said.join('\n').includes('s3cret'), 'never said back');
+  // The service's secret is production's alone: previews have their own
+  // (oh preview secrets), and production's is never put on one.
+  const service = fake({ readSecret: async () => 'x' });
+  assert.equal(await main(['secret', 'set', 'OH_SERVICE_SECRET', '--apply'], service), 0);
+  assert.deepEqual(service.started.map((s) => s.args.slice(2)), [['pages', 'secret', 'put', 'OH_SERVICE_SECRET', '--project-name', 'open-hearts']]);
+  // As is the backup jurors': the preview relay's is its own.
   const relay = fake({ readSecret: async () => 'x' });
   assert.equal(await main(['secret', 'set', 'OH_JUROR_SECRET', '--apply'], relay), 0);
   assert.deepEqual(relay.started.map((s) => s.args.slice(2)), [['secret', 'put', 'OH_JUROR_SECRET']]);
@@ -217,4 +225,114 @@ test('a secret is set wherever its definition says it lives, from what is typed'
     assert.deepEqual(optional.started.map((s) => [s.args.slice(2), s.cwd.endsWith('service/do')]), [[['secret', 'put', name], true]], name);
   }
   assert.equal(await main(['secret', 'set', 'OH_NOT_A_SECRET', '--apply'], fake()), 2);
+});
+
+// ---- previews ---------------------------------------------------------------
+
+/// The committed config, copied where a command may write it.
+function configCopy() {
+  const text = readFileSync(join(root, 'config/openhearts.json'), 'utf8');
+  const configFile = join(mkdtempSync(join(tmpdir(), 'config-')), 'openhearts.json');
+  writeFileSync(configFile, text);
+  return { text, configFile };
+}
+
+/// The rest of a config's text, its preview member taken out.
+const outsidePreview = (text) => text.replace(/^ *"preview": \{[^}]*\},\n/m, '');
+
+test("the previews' key goes beside production's, and nothing else in the file changes", () => {
+  const { text } = configCopy();
+  const before = outsidePreview(text);
+  const key = 'b'.repeat(64);
+  const made = withPreviewKey(before, key);
+  assert.deepEqual(JSON.parse(made), { ...JSON.parse(before), preview: { serviceKey: key } });
+  assert.equal(outsidePreview(made), before);
+  assert.match(made, new RegExp(`"serviceKey": "${JSON.parse(before).serviceKey}",\n  "preview": \\{ "serviceKey": "${key}" \\},\n`));
+  // Made again, it is replaced where it is, and what else it holds kept.
+  const again = withPreviewKey(made.replace(`"serviceKey": "${key}" }`, `"serviceKey": "${key}", "kept": 1 }`), 'c'.repeat(64));
+  assert.deepEqual(JSON.parse(again).preview, { serviceKey: 'c'.repeat(64), kept: 1 });
+  assert.equal(outsidePreview(again), before);
+});
+
+test("previews' own secrets are made new, set where they live, and shown to nobody", async () => {
+  const { text, configFile } = configCopy();
+  const key = 'b'.repeat(64);
+  const secret = 'c'.repeat(64);
+  const capture = async (command) => (command === 'dart' ? { code: 0, out: `Building package executable...\n${JSON.stringify({ key, secret })}\n` } : { code: 0, out: '' });
+  const dry = fake({ capture, configFile });
+  assert.equal(await main(['preview', 'secrets'], dry), 0);
+  assert.equal(dry.started.length, 0);
+  assert.equal(readFileSync(configFile, 'utf8'), text, 'nothing written without --apply');
+
+  const ctx = fake({ capture, configFile });
+  assert.equal(await main(['preview', 'secrets', '--apply'], ctx), 0);
+  const [service, jurors] = ctx.started;
+  assert.deepEqual(service.args.slice(2), ['pages', 'secret', 'put', 'OH_SERVICE_SECRET', '--project-name', 'open-hearts', '--env', 'preview']);
+  assert.equal(service.input, secret);
+  assert.deepEqual(jurors.args.slice(2), ['secret', 'put', 'OH_JUROR_SECRET', '--env', 'preview']);
+  assert.ok(jurors.cwd.endsWith('service/do'));
+  assert.match(jurors.input, /^[0-9a-f]{64}$/);
+  assert.notEqual(jurors.input, secret, 'a secret of its own, not the key pair\'s');
+  assert.equal(ctx.started.length, 2);
+  // The public half is written, beside production's, and the rest kept.
+  const written = readFileSync(configFile, 'utf8');
+  assert.equal(JSON.parse(written).preview.serviceKey, key);
+  assert.equal(outsidePreview(written), outsidePreview(text));
+  // Neither secret is said; the key is.
+  const said = [...ctx.said, ...ctx.warned].join('\n');
+  assert.ok(!said.includes(secret) && !said.includes(jurors.input));
+  assert.ok(said.includes(key));
+});
+
+test("previews' secrets: without a key pair nothing is set, and what was said is not repeated", async () => {
+  const { text, configFile } = configCopy();
+  const ctx = fake({ capture: async () => ({ code: 1, out: 'c'.repeat(64) }), configFile });
+  assert.equal(await main(['preview', 'secrets', '--apply'], ctx), 1);
+  assert.equal(ctx.started.length, 0);
+  assert.equal(readFileSync(configFile, 'utf8'), text);
+  assert.ok(!ctx.warned.join('\n').includes('c'.repeat(64)));
+});
+
+test("an invitation is an account on the previews' store that nobody bought, and its code brings a device into it", async () => {
+  const previews = memoryStore();
+  const ctx = fake({ previewStore: async () => previews });
+  assert.equal(await main(['preview', 'invite'], ctx), 0);
+  assert.equal(previews.rows.size, 0, 'nothing made without --apply');
+  assert.equal(await main(['preview', 'invite', '--apply'], ctx), 0);
+  const said = ctx.said.join('\n');
+  const code = /its code: (\S+)/.exec(said)[1];
+  const account = /account ([0-9a-f]{32})/.exec(said)[1];
+  const now = ctx.now();
+  const device = 'd'.repeat(64);
+  assert.equal((await redeemBackup(device, backupCodeOf(code), previews, { now })).status, 200);
+  const held = await entitlementOf(previews, device, { now });
+  assert.equal(held.account, account);
+  assert.equal(held.licensed_until, dayAfter(now, INVITED_DAYS));
+  assert.equal((await ctx.store()).rows.size, 0, "nothing in production's store");
+
+  // Nobody bought it, so it holds no device: another invitation's code
+  // brings the device into that one, as it would from an account whose
+  // subscription had ended, with no dropping first.
+  ctx.said.length = 0;
+  assert.equal(await main(['preview', 'invite', '--apply'], ctx), 0);
+  const other = /its code: (\S+)/.exec(ctx.said.join('\n'))[1];
+  assert.equal((await redeemBackup(device, backupCodeOf(other), previews, { now })).status, 200);
+  assert.notEqual((await entitlementOf(previews, device, { now })).account, account);
+});
+
+test('the preview relay is deployed from what is checked out, without the PhotoDNA module, once previews have a key', async () => {
+  // HEAD is not main: a preview is not held to it.
+  const capture = async (command, args) => ({ code: 0, out: args.includes('HEAD') ? 'def5678\n' : args.includes('origin/main') ? 'abc1234\n' : '' });
+  const keyless = fake({ capture });
+  assert.equal(await main(['deploy', 'relay', '--preview', '--apply'], keyless), 1);
+  assert.match(keyless.said.join('\n'), /no preview\.serviceKey/);
+  assert.equal(keyless.started.length, 0);
+  const ctx = fake({ capture, config: { preview: { serviceKey: 'b'.repeat(64) } } });
+  assert.equal(await main(['deploy', 'relay', '--preview', '--apply'], ctx), 0);
+  assert.deepEqual(ctx.started.map((s) => s.args.slice(2)), [['deploy', '--env', 'preview']]);
+  assert.ok(ctx.started[0].cwd.endsWith('service/do'));
+  // And production's is still held to main.
+  const production = fake({ capture, config: { preview: { serviceKey: 'b'.repeat(64) } } });
+  assert.equal(await main(['deploy', 'relay', '--apply'], production), 1);
+  assert.equal(production.started.length, 0);
 });

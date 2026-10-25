@@ -36,10 +36,26 @@ List<String> _foldedWords(String name) => _foldName(name)
     .where((w) => w.isNotEmpty)
     .toList();
 
+/// Words that would make a name pass for Open Hearts or its staff, and
+/// the game's own name as words (names.mjs, RESERVED_WORDS and
+/// RESERVED_PHRASES): refused as the lists' are.
+const _reservedWords = {
+  'admin', 'administrator', 'administrador', 'administrateur', //
+  'moderator', 'moderador', 'moderateur',
+  'support', 'soporte', 'suporte', 'helpdesk',
+  'staff', 'official', 'oficial', 'officiel', 'offiziell',
+  'operator', 'operador', 'operateur', 'sysop',
+  'openhearts',
+};
+const _reservedPhrases = [
+  ['open', 'hearts'],
+];
+
+bool _blocked(String word) => blockedWords.contains(word) || _reservedWords.contains(word);
+
 /// Whether [word] is refused: on the lists, or on them once a
 /// plural's s is taken off.
-bool _refusedWord(String word) =>
-    blockedWords.contains(word) || (word.length > 2 && word.endsWith('s') && blockedWords.contains(word.substring(0, word.length - 1)));
+bool _refusedWord(String word) => _blocked(word) || (word.length > 2 && word.endsWith('s') && _blocked(word.substring(0, word.length - 1)));
 
 /// Whether [words], a name's in order, are refused.
 bool _refusedWords(List<String> words) {
@@ -55,7 +71,7 @@ bool _refusedWords(List<String> words) {
     if (run.runes.length > 1 && _refusedWord(run)) return true;
     run = '';
   }
-  for (final phrase in blockedPhrases) {
+  for (final phrase in [...blockedPhrases, ..._reservedPhrases]) {
     for (var i = 0; i + phrase.length <= words.length; i++) {
       var all = true;
       for (var j = 0; j < phrase.length && all; j++) {

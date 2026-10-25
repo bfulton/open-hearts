@@ -178,6 +178,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get seatOnTurn => ', on turn';
 
   @override
+  String get seatIsBot => ', a bot';
+
+  @override
+  String get botTag => 'Bot';
+
+  @override
   String seatClock(int seconds) {
     return ', $seconds s on the clock';
   }
@@ -328,21 +334,6 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String youAreRated(int rating, String provisional, int games) {
-    String _temp0 = intl.Intl.selectLogic(provisional, {
-      'true': ', provisionally',
-      'other': '',
-    });
-    String _temp1 = intl.Intl.pluralLogic(
-      games,
-      locale: localeName,
-      other: 'from $games rated games',
-      one: 'from 1 rated game',
-    );
-    return 'You are rated $rating$_temp0, $_temp1.';
-  }
-
-  @override
   String get playLive => 'Play live';
 
   @override
@@ -351,7 +342,6 @@ class AppLocalizationsEn extends AppLocalizations {
       online,
       locale: localeName,
       other: 'Play live, $online online',
-      one: 'Play live, nobody else online',
       zero: 'Play live, nobody else online',
     );
     return '$_temp0';
@@ -359,14 +349,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String onlineCount(int online) {
-    String _temp0 = intl.Intl.pluralLogic(
-      online,
-      locale: localeName,
-      other: '$online online',
-      one: 'Nobody else online',
-      zero: 'Nobody else online',
-    );
-    return '$_temp0';
+    return '$online online';
   }
 
   @override
@@ -1248,9 +1231,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get paidLiveSoon =>
       'Your payment went through. Live play opens as soon as it reaches us — reload in a minute.';
-
-  @override
-  String get checkingOnline => 'Checking online players…';
 
   @override
   String get activateSubscription => 'Activate subscription';

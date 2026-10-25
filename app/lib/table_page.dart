@@ -12,7 +12,6 @@ import 'dart:math' as math;
 import 'package:engine/engine.dart';
 import 'package:flutter/material.dart' hide Card;
 
-import 'avatar.dart';
 import 'entitlement.dart';
 import 'feedback_page.dart';
 import 'game_controller.dart';
@@ -96,9 +95,6 @@ class _TablePageState extends State<TablePage> {
 
   void _onGameChanged() => setState(() {});
 
-  List<String> get _seeds => [for (var s = 0; s < seatCount; s++) _controller.iconSeedOf(s)];
-  List<String> get _iconNames => [for (var s = 0; s < seatCount; s++) _controller.iconNameOf(s)];
-  List<Avatar> get _avatars => [for (var s = 0; s < seatCount; s++) _controller.avatarOf(s)];
 
   @override
   void dispose() {
@@ -196,14 +192,11 @@ class _TablePageState extends State<TablePage> {
               ),
 
               if (game.phase == Phase.handOver && _controller.sheetDue)
-                HandOverSheet.of(game, names: _controller.names, iconNames: _iconNames, seeds: _seeds, avatars: _avatars, onNext: _controller.nextHand),
+                HandOverSheet.of(game, seats: _controller.looks, onNext: _controller.nextHand),
               if (game.phase == Phase.gameOver && _controller.sheetDue)
                 GameOverSheet(
                   game: game,
-                  names: _controller.names,
-                  seeds: _seeds,
-                  iconNames: _iconNames,
-                  avatars: _avatars,
+                  seats: _controller.looks,
                   onNewGame: _controller.newGame,
                   onHome: () => Navigator.of(context).maybePop(),
                   onCopyRecord: _copyRecord,

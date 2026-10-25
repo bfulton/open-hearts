@@ -105,6 +105,19 @@
         "de": "Kann Project Arachnid es nicht, kann PhotoDNA von Microsoft Bilder auf bekannten Kindesmissbrauch prüfen, nur mit einem Fingerabdruck; wir notieren, wer jedes prüfte. Auf dem Handy fragt die App vor Live-Spielen den Store, ob du 13 oder älter bist, und speichert nichts davon.",
         "fr": "Sans Project Arachnid, PhotoDNA de Microsoft peut repérer les images connues d'abus sexuels d'enfants, avec une simple empreinte ; nous notons qui a vérifié chacune. Sur téléphone, avant le jeu en direct, l'app demande à la boutique si vous avez 13 ans ou plus, sans rien garder."
       }
+    },
+    {
+      "date": "2026-10-24",
+      "fingerprint": "6888510e68e7451ea8d03feb44e43f9b45e38d50d4971c9fd89108f17ff98a81",
+      "change": "minor",
+      "storesNotified": null,
+      "summary": {
+        "en": "A picture of your own is now cut down to 192 by 192 pixels on your device, not 64 by 64, so that it is sharp on today's screens. Only that small copy is kept, as before; the photo you picked it from is still not stored or sent.",
+        "es": "Una imagen tuya ahora se reduce a 192 por 192 píxeles en tu dispositivo, no a 64 por 64, para que se vea nítida en las pantallas de hoy. Solo se guarda esa copia pequeña, como antes; la foto de la que la sacaste sigue sin guardarse ni enviarse.",
+        "pt": "Uma imagem sua agora é reduzida para 192 por 192 pixels no seu aparelho, não para 64 por 64, para ficar nítida nas telas de hoje. Só essa cópia pequena é guardada, como antes; a foto de onde você a tirou continua sem ser guardada nem enviada.",
+        "de": "Ein eigenes Bild wird auf deinem Gerät jetzt auf 192 mal 192 Pixel verkleinert statt auf 64 mal 64, damit es auf heutigen Bildschirmen scharf ist. Nur diese kleine Kopie wird gespeichert, wie bisher; das Foto, aus dem du es gewählt hast, wird weder gespeichert noch gesendet.",
+        "fr": "Une image à vous est désormais réduite à 192 sur 192 pixels sur votre appareil, et non plus 64 sur 64, pour être nette sur les écrans d'aujourd'hui. Seule cette petite copie est conservée, comme avant ; la photo d'origine n'est toujours ni stockée ni envoyée."
+      }
     }
   ]
 }

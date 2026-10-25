@@ -37,7 +37,12 @@ that card's label. A badge shows the player's total and what they have
 taken this hand. Each badge hugs its name, and the two badges of a pair
 are laid out to the same size, so a long name and a short one match. The
 trick is sized from the height the badges leave, so nothing overflows
-when a name wraps or the text size goes up.
+when a name wraps or the text size goes up. A bot's icon wears a small
+robot at its lower right, over the icon's edge only a little, so the
+face or picture stays whole (`BotMark`, `app/lib/ui/player_icon.dart`).
+Touched, it says "Bot". The felt and the score sheets draw a seat's
+icon the one way (`SeatIcon`, from the table's `SeatLook` of the seat),
+so the mark is on both, alone and at a live table.
 
 What the table says (who took the trick, whose turn it is) floats under
 your badge. The action line (what you were passed, how many cards are
@@ -104,10 +109,13 @@ on anybody: each card comes as the one before it lands, a trick goes as
 its last card lands, and the sheet follows the sweep. After a moon the
 beat is kept, switch or not, for the quake below.
 
-A trick with points in it lights up the badge of whoever took it as the
-sweep reaches them: pink, the colour of points taken, and red, the
-game's own, half a second longer when the queen is in it
-(`app/lib/ui/table_view.dart`). The glow is drawn round the badge and
+A trick with points in it lights up the badge of whoever wins it, from
+the moment it is won: pink, the colour of points taken, and red, the
+game's own, when the queen is in it (`app/lib/ui/table_view.dart`). The
+glow holds while the trick is on the felt and swept to the winner, and
+fades once the cards are in, the queen's half a second later. It takes
+the place of the white border the winner of a trick without points
+wears, so a trick is told once. The glow is drawn round the badge and
 never across it, so what the badge says reads as always. A trick the
 table never showed, because the screen caught up past it, lights
 nothing.
@@ -129,7 +137,8 @@ pane over it. A game shared at the top counts as won.
 
 None of these can be touched or heard: taps go through them, and screen
 readers never meet them. With `MediaQuery.disableAnimations` there is no
-quake and no confetti, and a glow comes at once, as nothing is swept.
+quake and no confetti, and a glow fades from the moment its trick is
+taken, as nothing is swept.
 
 The heart on the front door folds and opens, then holds still for a
 while (`app/lib/ui/folding_heart.dart`). It requests no frames between
@@ -192,7 +201,8 @@ line cut short, and anything drawn over anything else.
 
 The table can be played entirely through the accessibility tree. Each
 card is a named node, and unplayable cards are disabled. Each seat
-announces its score and where it sits ("on your left"). Trick winners
+announces its score and where it sits ("on your left"), and whether it
+is a bot. Trick winners
 and "Your turn" are announced as they happen (`Announced`,
 `app/lib/ui/table_view.dart`). Each score row reads as one sentence.
 `app/test/accessibility_test.dart` checks that every tappable node on

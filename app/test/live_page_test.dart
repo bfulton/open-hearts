@@ -21,6 +21,7 @@ import 'package:open_hearts/net/report_error.dart' show noticed;
 import 'package:open_hearts/pictures.dart';
 import 'package:open_hearts/report.dart';
 import 'package:open_hearts/theme.dart';
+import 'package:open_hearts/ui/player_icon.dart' show BotMark;
 import 'package:open_hearts/ui/table_view.dart' show ClockText, TableView;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:table/table.dart';
@@ -313,6 +314,7 @@ void main() {
     final live = await pumpLive(tester);
     await act(tester, live);
     await live.advance(tester, 2000);
+    expect(find.byType(BotMark), findsNothing, reason: 'four people, no bot');
 
     // Ada, at seat 0, leaves.
     live.people[0]!.depart(Exit.leave);
@@ -320,6 +322,9 @@ void main() {
     expect(live.controller.personaAt(0), isNotNull, reason: 'a bot holds seat 0');
     expect(find.textContaining('3 of 4 here'), findsOneWidget);
     expect(find.text(live.controller.names[0]), findsWidgets, reason: 'the bot is named on the table');
+    // And it is told from the people still there, to the eye and the ear.
+    expect(find.byIcon(Icons.smart_toy).hitTestable(), findsOneWidget);
+    expect(find.bySemanticsLabel(RegExp('^${live.controller.names[0]}, a bot: ')), findsOneWidget);
 
     // Bao, at seat 1, goes quiet. When it is Bao's turn the clock runs,
     // and at fifteen seconds the Boot button appears.

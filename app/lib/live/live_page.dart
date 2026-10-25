@@ -11,7 +11,6 @@ import 'package:flutter/material.dart' hide Card;
 import 'package:go_router/go_router.dart';
 import 'package:table/table.dart';
 
-import '../avatar.dart';
 import '../feedback_page.dart';
 import '../l10n/l10n.dart';
 import '../net/address.dart' show driven;
@@ -21,7 +20,7 @@ import '../net/share.dart';
 import '../pages.dart';
 import '../reaction_mute.dart';
 import '../report.dart';
-import '../table_model.dart' show TableModelHand;
+import '../table_model.dart' show SeatLooks, TableModelHand;
 import '../table_page.dart' show ActionBar;
 import '../theme.dart';
 import '../ui/gone.dart';
@@ -81,9 +80,6 @@ class _LivePageState extends State<LivePage> {
 
   void _changed() => setState(() {});
 
-  List<String> get _seeds => [for (var s = 0; s < seatCount; s++) _c.iconSeedOf(s)];
-  List<String> get _iconNames => [for (var s = 0; s < seatCount; s++) _c.iconNameOf(s)];
-  List<Avatar> get _avatars => [for (var s = 0; s < seatCount; s++) _c.avatarOf(s)];
 
   @override
   void dispose() {
@@ -439,10 +435,7 @@ class _LivePageState extends State<LivePage> {
                   scores: ended.scores,
                   totals: ended.totals,
                   moonShooter: ended.moonShooter,
-                  names: _c.names,
-                  seeds: _seeds,
-                  iconNames: _iconNames,
-                  avatars: _avatars,
+                  seats: _c.looks,
                   mySeat: _c.mySeat,
                   action: context.l10n.onWithIt,
                   onNext: _c.dismissHandSheet,
@@ -450,10 +443,7 @@ class _LivePageState extends State<LivePage> {
               if (_c.done && _c.gameOverDue)
                 GameOverSheet(
                   game: game,
-                  names: _c.names,
-                  seeds: _seeds,
-                  iconNames: _iconNames,
-                  avatars: _avatars,
+                  seats: _c.looks,
                   mySeat: _c.mySeat,
                   rating: _c.ratingChange,
                   // Another game the way this one began, where the front

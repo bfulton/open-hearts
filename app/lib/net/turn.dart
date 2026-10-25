@@ -13,6 +13,7 @@ import 'dart:convert';
 
 import 'package:table/table.dart';
 
+import '../entitlement.dart';
 import 'address.dart' show appBase, isLocalHost;
 import 'http.dart' as http;
 import 'licence.dart' show signedAsk;
@@ -38,7 +39,10 @@ Future<List<Map<String, Object?>>> iceServersFor(Signer signer,
   final url = endpoint ?? turnEndpoint();
   if (url == null) return const [];
   try {
-    final body = await http.postJson(url, jsonEncode(signedAsk(signer, 'turn'))).timeout(timeout);
+    // With the licence this device holds, as every ask of the service
+    // shows it (household.dart, askHandler).
+    final asked = {...signedAsk(signer, 'turn'), ...Entitlement.current.licenceShown};
+    final body = await http.postJson(url, jsonEncode(asked)).timeout(timeout);
     if (body == null) return const [];
     return parseIceServers(body) ?? const [];
   } catch (_) {

@@ -26,8 +26,9 @@ picture (`app/lib/avatar.dart`). It is kept on the device and, for a
 subscriber, with the account, so every device of the account shows the
 same ([the account's profile](service.md#the-accounts-profile)). A
 picture travels once, as a stored event. The live area says which game
-is asked for (the target score, and rated or unrated), and *Play live*
-shows how many devices are online.
+is asked for (the target score, and rated or unrated) and, after it,
+how many other people are online. The player's own rating is the
+number beside their icon, once a rated game has made one.
 
 Nothing goes to a relay without a name, and, the first time on each
 device, without the player agreeing to the terms of use: a screen says
@@ -304,10 +305,17 @@ A peer counts as heard from when it sent something itself, or when its
 own signed work first arrives at or past where the hearer stands. A
 relayed copy of something already seen is not a sign of life.
 
-Whoever said something that has not settled says it again. A heartbeat
-(`heartbeatMs`) says where its sender stands, and a peer behind is sent
-the turns it is missing, `carryWindow` at a time, unasked. That is also
-how it learns of departures it never received. Catching up is budgeted:
+Whoever said something that has not settled says it again, at a gap
+that widens: two seconds, then four, eight, sixteen, then every half
+minute. And at once, on a person's heartbeat, a play or a pass of its
+own that the person has not backed: the heartbeat is the person back,
+and a card lost to their dropped connection would otherwise wait out
+the widening gap, longer than a bot's turn is given
+([deadlines on a held seat](#deadlines-on-a-held-seat)). A heartbeat
+(`heartbeatMs`) also says where its sender stands, and a peer behind is
+sent the turns it is missing, `carryWindow` at a time, unasked. That is
+also how it learns of departures it never received. Catching up is
+budgeted:
 
 - The lowest key present answers first, and the others only if the
   asker stays behind.
@@ -572,6 +580,34 @@ when it stops playing, not only when it stops speaking, and is left out
 of the next draw. A holder says its seat's part again until it settles,
 as a person does, since it is the seat's only voice.
 
+Left out, unless nobody else can be drawn: a table alone with the
+[backup jurors](#backup-jurors) has as many of them as a jury that holds
+its bot seats needs, and without the one it let go it could deal no
+hand again. So a juror let go is drawn again once, when the table is
+short without it. Let go a second time, it stays out, and the table
+waits for a jury as any table short of one does.
+
+### Playing ahead
+
+A turn settles on the people's witness, so at a table of one person
+and three bots, each bot's card waited for the person's device to have
+seen the card before it: three round trips through the person's line
+between one of their cards and the next. **A bot seat's juror plays
+ahead instead.** A bot's card is the deal's and the cards before it,
+worked out the same by whoever works it out, so on hearing the bot card
+before its seat's turn, the juror works its own out on a copy of the
+hand with that card played and says it at once, for the turn after the
+one still open. Every side holds a card for a turn not open yet until
+the turn opens, so nothing is decided any sooner; the person's device
+just hears the three bot cards together.
+
+A card said ahead names the cards it was worked out on (`after`). Where
+the turns before it settle as some other card, which only a juror
+saying two cards for its seat can bring about, no side takes it, and
+its juror works its card out again on what was played. It plays ahead
+on bot seats' cards alone: a person's card can still give way to a
+removal.
+
 ### When a seat's holder goes
 
 Every seat's deal secret is escrowed: a person's so that any one other
@@ -584,7 +620,10 @@ pieces are released and the seat's hand opens to the table for its bot.
 record.** A person whose clocks say the juror is out (unheard for
 `jurorSilenceMs`, or past its time on the turn) claims the seat for the
 escrow at the seat's own turn. The claim is carried as a boot is, by a
-majority of the people, or where they split, by the jury. For the rest
+majority of the people, or where they split, by the jury. A person says
+the claim that carried again for as long as the turn it was made at
+waits on the escrow's card, since a juror that missed it, across a
+partition, has nothing to tell it so. For the rest
 of the hand the seat is played by its custodians
 ([the escrow](table-states.md#the-escrow)). A juror drawn mid-hand is
 given a piece of every held seat without the secret being rebuilt
@@ -633,7 +672,9 @@ A table short of jurors calls for them on the presence tag, and the
 **backup jurors** we run come online (`LastResortBench`,
 `service/bin/juror.dart`). There are as many as a table needs before it
 can hold any bot seat (`juryToHoldBots`). Each is its own identity,
-drawn as anyone is and running the same code. This is the one place a
+drawn as anyone is and running the same code. Each says it is one
+(`RelayPresence.lastResort`), so a device counting who is online to play
+with leaves them out. This is the one place a
 gameplay event reaches anything of ours, and it says only "a table
 needs a juror". For the hands they serve, you trust us not to collude
 with a player at your table

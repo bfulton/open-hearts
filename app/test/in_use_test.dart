@@ -8,6 +8,8 @@
 /// is proved where those live: `node --test service/functions service/do`.
 library;
 
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:open_hearts/entitlement.dart';
@@ -66,6 +68,19 @@ void main() {
     expect(shown.single.first, 'activation');
     expect(Activation.parse(shown.single.last)!.key, me.publicKey);
     expect(InUse.current.credentials('cd' * 32), isNull);
+  });
+
+  test('the licence this device holds goes with its asking, which names the account', () async {
+    final stand = standUp();
+    final me = await Identity.signer();
+    stand.says('activate', {'activation': activationFor(me.publicKey)});
+    expect(await InUse.current.open(me), Use.here);
+    expect(asked(stand).single, isNot(contains('"licence"')), reason: 'none held, none shown');
+    await licenceThisDevice();
+    await InUse.current.renew();
+    final renewed = asked(stand).last;
+    final body = jsonDecode(renewed.substring(renewed.indexOf(' ') + 1)) as Map;
+    expect(body['licence'], Entitlement.current.licence!.toJson());
   });
 
   test('an activation the service did not sign, or for another device, is no activation', () async {

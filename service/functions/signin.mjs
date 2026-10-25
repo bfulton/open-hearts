@@ -132,14 +132,17 @@ export async function jwtOf(provider, token, fetchImpl = fetch, { now = Date.now
 
 /// Signing in on a device: it comes into the account the sign-in is
 /// linked to, as a backup code would bring it — by the same rules, in
-/// the account's turn. {status, body}, with the account.
+/// the account's turn. {status, body}, with the account; and the
+/// device's row as the account's object wrote it, [entitlement], for
+/// its licence (accounts.mjs, entitlementOf), which the device is not
+/// sent.
 export async function supersede(who, key, store, env, login, { now = Date.now() } = {}) {
   if (!login) return { status: 503, body: notConfigured('OH_ID_HMAC') };
   const account = await linkedAccount(store, login);
   if (!account) return { status: 404, body: { error: 'that sign-in is not linked to an account' } };
   const joined = await inHousehold(env, account, { op: 'join', key, account, now });
   if (joined.status !== 200) return joined;
-  return { status: 200, body: { account, at: dayOf(now) } };
+  return { status: 200, body: { account, at: dayOf(now) }, entitlement: joined.body.entitlement };
 }
 
 // ---- when Apple says a sign-in is gone -----------------------------------

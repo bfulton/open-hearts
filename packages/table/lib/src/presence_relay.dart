@@ -138,8 +138,8 @@ class RelayPresence implements Presence {
   final List<Uri> relays;
   final Signer signer;
 
-  /// What this client says of itself: `online`, or `last-resort` for
-  /// the juror a service brings up.
+  /// What this client says of itself: `online`, [seated], or
+  /// [lastResort] for the juror a service brings up.
   String status;
   final int everyMs;
 
@@ -245,8 +245,12 @@ class RelayPresence implements Presence {
   Set<PublicKey> online({required int withinMs}) {
     final now = _nowMs;
     return {
+      // This device is here while it says so, and only then: a relay
+      // sends it its own beat as it sends everyone's, and the beat it
+      // said before it went silent or could no longer serve is fresh for
+      // a minute after.
       for (final e in _seen.entries)
-        if (now - e.value < withinMs && !_went.contains(e.key) && !_outdone(e.key)) e.key,
+        if (e.key != signer.publicKey && now - e.value < withinMs && !_went.contains(e.key) && !_outdone(e.key)) e.key,
       if (!_silent && _able) signer.publicKey,
     };
   }
@@ -260,10 +264,21 @@ class RelayPresence implements Presence {
     };
   }
 
+  /// Who is online that is somebody: [online] less the backup jurors,
+  /// who say what they are (juror_duty.dart). What a device counts as
+  /// the players about; a table still draws its jury from [online].
+  Set<PublicKey> people({required int withinMs}) => {
+        for (final k in online(withinMs: withinMs))
+          if (_doing[k] != lastResort) k,
+      };
+
   /// What a client says of itself while it is at a table, as against
   /// the lobby: somebody mid-game has a reason to still be here in a
   /// minute.
   static const seated = 'seated';
+
+  /// What a backup juror says of itself: the service's, not a player.
+  static const lastResort = 'last-resort';
 
   /// Says this device is going, so that nobody waits out a heartbeat
   /// to find out. Best effort by its nature — a backgrounded phone, a

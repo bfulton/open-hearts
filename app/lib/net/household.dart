@@ -19,6 +19,7 @@ import 'dart:convert';
 import 'package:flutter/services.dart';
 import 'package:table/table.dart';
 
+import '../entitlement.dart';
 import '../l10n/l10n.dart';
 import 'address.dart';
 import 'http.dart' as http;
@@ -309,12 +310,18 @@ Future<({int status, String body})> Function(Uri url, String body) askService = 
 /// [what] is the part of [more] the request asks for beyond itself,
 /// which the signature covers (licence.dart, [signedAsk]). Null when
 /// nobody answered in [timeout] — a household's wait, unless said.
+///
+/// Every ask shows the licence this device holds
+/// ([Entitlement.licenceShown]), which names its account: a device just
+/// brought in by its account's object somewhere else is known there
+/// before the service's store where it asks has heard of it
+/// (service/functions/licence.mjs, accountAsking and heldAccount).
 Future<({int status, String body})?> askHandler(String handler, Signer signer, Map<String, Object?> more, Uri? endpoint,
     {String what = '', Duration? timeout}) async {
   final url = endpoint ?? handlerAt(handler);
   if (url == null) return null;
   try {
-    return await askService(url, jsonEncode({...signedAsk(signer, handler, what: what), ...more}))
+    return await askService(url, jsonEncode({...signedAsk(signer, handler, what: what), ...Entitlement.current.licenceShown, ...more}))
         .timeout(timeout ?? waits.household);
   } catch (_) {
     return null;

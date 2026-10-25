@@ -70,7 +70,32 @@ void main() {
       return until! - t.clock.nowMs;
     };
 
+    // And neither voice says its card again for a person who has
+    // backed the other: theirs is one vote, and it is spent
+    // (client.dart, _sayAgainTo).
+    final lines = <String>[];
+    for (final c in [a, b]) {
+      c.log = lines.add;
+    }
+    for (final j in t.jurors) {
+      j.log = lines.add;
+    }
+    final cards = <Object?>{};
+    final backed = <String, int>{};
+    t.net.onSend = (from, message) {
+      final body = message['body'];
+      if (body is! Map || body['hand'] != hand) return;
+      if (message['kind'] == 'play' && body['seat'] == seat) cards.add(message['id']);
+      if (message['kind'] == 'witness' && cards.contains(body['event'])) backed.putIfAbsent(from.substring(0, 4), () => t.clock.nowMs);
+    };
+
     final through = t.clock.runUntil(() => [a, b].every((c) => c.game.tricksPlayed >= 1), limitMs: 3 * 60 * 1000);
+    for (final l in lines.where((l) => l.contains(' again: ') && l.contains('for seat $seat '))) {
+      final at = int.parse(l.trimLeft().split(' ').first);
+      final person = RegExp(r'again: (\w{4}) is here').firstMatch(l)!.group(1)!;
+      final since = backed[person];
+      expect(since == null || at < since + 1000, isTrue, reason: 'said again for $person, who backed a card at $since: $l');
+    }
     expect(custodian, isNotNull, reason: 'a custodian said the seat\'s card');
     expect(through, isTrue, reason: 'the table moved past the seat:\n${a.describe()}\n${b.describe()}');
     Decision at(TableClient c, {required bool removal}) =>

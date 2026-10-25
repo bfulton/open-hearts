@@ -129,7 +129,19 @@ fi
 # build, and the whole file for the worker (service/functions/deployment.mjs).
 # A variable of the same name set here still wins, for a one-off build.
 config_of() { node -p "const c = require('./config/openhearts.json'); String(($1) ?? '')"; }
-OH_SERVICE_KEY=${OH_SERVICE_KEY:-$(config_of c.serviceKey)}
+if [ "$LABEL" = main ]; then
+  OH_SERVICE_KEY=${OH_SERVICE_KEY:-$(config_of c.serviceKey)}
+else
+  # A preview is a deployment of its own (docs/how-to/deploy.md): its app
+  # takes licences signed with the key previews have (preview.serviceKey),
+  # never production's, and plays on the preview relay, never
+  # production's: the host service/do/wrangler.toml routes [env.preview]
+  # to. Its worker takes the same key from the same file, since its
+  # environment says it is a preview (OH_DEPLOYMENT, infra/cloudflare.mjs).
+  OH_SERVICE_KEY=${OH_SERVICE_KEY:-$(config_of c.preview?.serviceKey)}
+  PREVIEW_RELAY="wss://$(node --input-type=module -e "import { relayHost } from './ops/env.mjs'; process.stdout.write(await relayHost('preview'))")/{tag}"
+  OH_RELAYS=${OH_RELAYS:-$PREVIEW_RELAY}
+fi
 OH_GOOGLE_CLIENT_ID=${OH_GOOGLE_CLIENT_ID:-$(config_of c.google?.webClientId)}
 OH_APPLE_SERVICE_ID=${OH_APPLE_SERVICE_ID:-$(config_of c.apple?.servicesId)}
 
@@ -204,18 +216,19 @@ cp app/web/schnorr.wasm "$STAGE/_worker.js/schnorr.wasm"
 node --input-type=module -e "await import('file://$(cd "$STAGE" && pwd)/_worker.js/worker.mjs')" ||
   { echo "deploy: the staged worker does not load" >&2; exit 1; }
 
-# OH_RELAYS is left empty so the build uses its own relay list
-# (app/lib/net/relays.dart); the local rig is the only thing that sets
-# it, to its bridges. The build's identity comes from the generated
-# file above, not a flag.
+# OH_RELAYS is left empty for production, so the build uses its own
+# relay list (app/lib/net/relays.dart); a preview's names the preview
+# relay, as the local rig's names its bridges. The build's identity comes
+# from the generated file above, not a flag.
 #
-# OH_SERVICE_KEY (serviceKey in the config) names the service this build
-# will take a licence from, and no other (docs/explanation/service.md,
-# app/lib/net/licence.dart): the public half of the pair `dart run
-# bin/service_key.dart` mints, whose secret is set on the Pages project as
-# OH_SERVICE_SECRET and lives nowhere else. A build published without it has live play shut, which
-# is the safe way round: the alternative is a build that would take a
-# licence from whoever answered first.
+# OH_SERVICE_KEY (serviceKey in the config, preview.serviceKey for a
+# preview) names the service this build will take a licence from, and no
+# other (docs/explanation/service.md, app/lib/net/licence.dart): the
+# public half of a pair whose secret is set on the Pages project's
+# environment as OH_SERVICE_SECRET and lives nowhere else. A build
+# published without it has live play shut, which is the safe way round:
+# the alternative is a build that would take a licence from whoever
+# answered first.
 #
 # OH_GOOGLE_CLIENT_ID and OH_APPLE_SERVICE_ID (google.webClientId and
 # apple.servicesId in the config) are the sign-in providers' identifiers
@@ -260,4 +273,6 @@ echo "site  https://$LABEL.$PROJECT.pages.dev/"
 echo "app   https://$LABEL.$PROJECT.pages.dev/play/"
 if [ "$LABEL" = main ]; then
   echo "      https://play.openhearts.game/ (production, and its /api/)"
+else
+  echo "live  on $OH_RELAYS, with the people you invite (./oh preview invite)"
 fi

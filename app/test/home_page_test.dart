@@ -12,6 +12,7 @@ import 'dart:async';
 import 'package:deal/deal.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:open_hearts/avatar.dart';
 import 'package:open_hearts/crypto/deal.dart';
 import 'package:open_hearts/entitlement.dart';
 import 'package:open_hearts/game_options.dart';
@@ -21,12 +22,14 @@ import 'package:open_hearts/live/lobby.dart';
 import 'package:open_hearts/net/age_check.dart';
 import 'package:open_hearts/net/network.dart';
 import 'package:open_hearts/net/room.dart';
+import 'package:open_hearts/net/standing.dart';
 import 'package:open_hearts/pictures.dart';
 import 'package:open_hearts/router.dart';
 import 'package:open_hearts/table_page.dart';
 import 'package:open_hearts/theme.dart';
 import 'package:open_hearts/ui/folding_heart.dart';
 import 'package:open_hearts/ui/header.dart';
+import 'package:open_hearts/ui/player_icon.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:table/table.dart';
 import 'package:table_sim/table_sim.dart';
@@ -314,7 +317,7 @@ void main() {
 
   testWidgets('the options line says what the next game is; the sheet changes it and the device keeps it', (tester) async {
     await pumpHome(tester);
-    expect(find.text('50 points · rated'), findsOneWidget);
+    expect(find.bySemanticsLabel('50 points · rated'), findsOneWidget);
     await tester.tap(find.bySemanticsLabel('Game options'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('100 points'));
@@ -322,7 +325,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Done'));
     await tester.pumpAndSettle();
-    expect(find.text('100 points · unrated'), findsOneWidget);
+    expect(find.bySemanticsLabel('100 points · unrated'), findsOneWidget);
     final kept = await GameOptions.load();
     expect(kept.target, 100);
     expect(kept.rated, isFalse);
@@ -511,12 +514,87 @@ void main() {
     expect(find.text('Live play'), findsOneWidget, reason: 'the card on the door, and not a second one in the menu');
   });
 
-  testWidgets('the live card: no filler, and the online count said to be on its way until it is known', (tester) async {
+  testWidgets('the live card: no filler, and no online count until it is known', (tester) async {
     await pumpHome(tester);
-    expect(find.text('Checking online players…'), findsOneWidget);
+    expect(find.text('50 points · rated'), findsOneWidget, reason: 'nothing said of who is online until it is known');
+    expect(find.textContaining('You are rated'), findsNothing, reason: 'the rating is a number in the corner');
+    expect(find.bySemanticsLabel(RegExp('^rated ')), findsNothing, reason: 'and none before the standings are in');
     expect(find.textContaining('Four seats, filled'), findsNothing);
     expect(find.textContaining('A new table, and a link to send'), findsNothing);
     expect(find.text('Open source card game, no ads'), findsOneWidget);
+  });
+
+  group('the corner and the game line', () {
+    Future<void> pump(WidgetTester tester, Widget child) async {
+      await tester.pumpWidget(MaterialApp(theme: buildTheme(), home: Scaffold(body: Center(child: child))));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('your rating sits just left of your picture, and a finger on either opens the profile', (tester) async {
+      var opened = 0;
+      await pump(
+          tester,
+          ProfileButton(
+              name: 'Ada', seed: 'ada', avatar: Avatar.none, rating: const Rating(mu: 1739.4, phi: 80), onTap: () => opened++));
+      final number = tester.getRect(find.text('1739'));
+      final picture = tester.getRect(find.byType(PlayerIcon));
+      expect(number.right, lessThanOrEqualTo(picture.left));
+      expect(picture.left - number.right, lessThan(12), reason: 'beside it, not across the bar');
+      expect((number.center.dy - picture.center.dy).abs(), lessThan(1));
+      await tester.tap(find.text('1739'));
+      await tester.tap(find.byType(PlayerIcon));
+      expect(opened, 2);
+
+      // To a screen reader the number is said, and the button keeps
+      // the name a browser's reader finds it by.
+      expect(find.bySemanticsLabel('rated 1739'), findsOneWidget);
+      final button = tester.getSemantics(find.bySemanticsLabel('Your profile'));
+      expect(button.flagsCollection.isButton, isTrue);
+      expect(button.value, isEmpty);
+    });
+
+    testWidgets('a provisional rating is the number alone, and said to be provisional', (tester) async {
+      await pump(tester, ProfileButton(name: 'Ada', seed: 'ada', avatar: Avatar.none, rating: const Rating(mu: 1612, phi: 200), onTap: () {}));
+      expect(find.text('1612'), findsOneWidget);
+      expect(find.bySemanticsLabel('rated 1612, provisionally'), findsOneWidget);
+    });
+
+    test('a rating is shown once the standings are in, and once a rated game has made one', () {
+      final me = FakeSigner('me').publicKey;
+      expect(ProfileButton.shown(null), isNull, reason: 'the relays have not said');
+      final ledger = Ledger();
+      expect(ProfileButton.shown(Standing(ledger, me)), isNull, reason: 'the 1500 everyone starts at is not earned');
+      ledger.apply(GameResult(table: 't1', rated: true, at: 0, seats: [
+        SeatResult(human: true, key: me, account: me, total: 20, fromStart: true),
+        SeatResult(human: false, bot: 'Romeo', total: 50, fromStart: true),
+        SeatResult(human: false, bot: 'Juliet', total: 60, fromStart: true),
+        SeatResult(human: false, bot: 'Tristan', total: 70, fromStart: true),
+      ]));
+      final shown = ProfileButton.shown(Standing(ledger, me));
+      expect(shown, isNotNull);
+      expect(shown!.shown, ledger.of(me).shown);
+    });
+
+    testWidgets('no rating, no number: the picture alone, where it always was', (tester) async {
+      await pump(tester, ProfileButton(name: 'Ada', seed: 'ada', avatar: Avatar.none, rating: null, onTap: () {}));
+      expect(find.byType(Text).evaluate().where((e) => RegExp(r'^\d+$').hasMatch((e.widget as Text).data ?? '')), isEmpty);
+      expect(find.bySemanticsLabel(RegExp('^rated ')), findsNothing);
+      expect(tester.getSize(find.byType(ProfileButton)), const Size(48, 44));
+    });
+
+    testWidgets('the count follows the game, and a screen reader hears the game alone', (tester) async {
+      for (final (others, line) in [
+        (null, '50 points · rated'),
+        (0, '50 points · rated · 0 online'),
+        (5, '50 points · rated · 5 online'),
+      ]) {
+        await pump(tester, LiveGameLine(target: 50, pool: 'rated', others: others));
+        expect(find.text(line), findsOneWidget);
+        expect(find.bySemanticsLabel('50 points · rated'), findsOneWidget);
+      }
+      await pump(tester, const LiveGameLine(target: 100, pool: 'unrated', others: 3));
+      expect(find.text('100 points · unrated · 3 online'), findsOneWidget);
+    });
   });
 
   testWidgets('back from paying: said so at once, and live play opens when the licence comes', (tester) async {

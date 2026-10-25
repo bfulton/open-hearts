@@ -82,24 +82,35 @@ void main() {
       expect(verify(s.publicKey, sha256Hex([1]), dart), isFalse);
       expect(verify(s.publicKey, digest, sha256Hex('${s.publicKey}|$digest'.codeUnits).substring(0, 32)), isFalse,
           reason: 'nor a fake signature, natively');
-      // Timed against Dart in the same run, so a machine under load
-      // slows both alike: what is held is the ratio, which is a hundred
-      // or more where the library is the one in use and about one where
-      // it is not.
-      final fast = Stopwatch()..start();
-      for (var i = 0; i < 200; i++) {
-        verify(s.publicKey, digest, native);
-      }
-      fast.stop();
+      // Timed against Dart in the same run: what is held is the ratio,
+      // which is a hundred or more where the library is the one in use
+      // and about one where it is not. Each side is timed in rounds,
+      // taken in turn, and its best round is the one counted. A native
+      // round is some tens of milliseconds, so whatever else the machine
+      // is doing for a moment can land on it and not on the Dart round
+      // after it: one such moment, in a full check.sh run, made it read
+      // 11. Nothing makes a round faster than the check is.
       final nativeVerifier = schnorrVerifier;
-      schnorrVerifier = before.$1;
-      final slow = Stopwatch()..start();
-      for (var i = 0; i < 20; i++) {
-        verify(s.publicKey, digest, native);
+      var fast = double.infinity;
+      var slow = double.infinity;
+      for (var round = 0; round < 5; round++) {
+        schnorrVerifier = nativeVerifier;
+        final natively = Stopwatch()..start();
+        for (var i = 0; i < 200; i++) {
+          verify(s.publicKey, digest, native);
+        }
+        natively.stop();
+        if (natively.elapsedMicroseconds / 200 < fast) fast = natively.elapsedMicroseconds / 200;
+        schnorrVerifier = before.$1;
+        final inDart = Stopwatch()..start();
+        for (var i = 0; i < 20; i++) {
+          verify(s.publicKey, digest, native);
+        }
+        inDart.stop();
+        if (inDart.elapsedMicroseconds / 20 < slow) slow = inDart.elapsedMicroseconds / 20;
       }
-      slow.stop();
       schnorrVerifier = nativeVerifier;
-      final ratio = (slow.elapsedMicroseconds / 20) / (fast.elapsedMicroseconds / 200);
+      final ratio = slow / fast;
       expect(ratio, greaterThanOrEqualTo(20), reason: 'a check natively, against one in Dart: ${ratio.toStringAsFixed(0)} times as fast');
     } finally {
       schnorrVerifier = before.$1;

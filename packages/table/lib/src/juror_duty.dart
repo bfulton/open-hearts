@@ -285,7 +285,7 @@ class LastResortJuror {
       this.log,
       this.idleMs = 10 * 60 * 1000,
       DealCrypto? crypto}) {
-    presence = RelayPresence(relays: presenceRelays ?? relays, signer: signer, status: 'last-resort', log: log)..silent = true;
+    presence = RelayPresence(relays: presenceRelays ?? relays, signer: signer, status: RelayPresence.lastResort, log: log)..silent = true;
     duty = JurorDuty(relays: relays, signer: signer, presence: presence, log: log, crypto: crypto);
   }
 

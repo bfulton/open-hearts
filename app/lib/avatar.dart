@@ -28,9 +28,11 @@ class Avatar {
   /// kilobytes. Shown over any icon.
   final Uint8List? picture;
 
-  /// The side of a picture, in pixels: enough for a badge, small
-  /// enough to ride a relay.
-  static const side = 64;
+  /// The side of a picture, in pixels: sharp on a phone's screen at
+  /// the size the profile page shows it, 92 points across, three
+  /// pixels to a point; and a photograph this size is a JPEG of under
+  /// [maxPictureBytes], so it still rides a relay.
+  static const side = 192;
 
   /// The most a picture may be, in bytes: what a relay carries without
   /// complaint.

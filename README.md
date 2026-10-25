@@ -71,6 +71,10 @@ its own licence beside it:
 - **New Relic's browser agent** (`app/web/observability.js`): its loader,
   as New Relic serves it, on play.openhearts.game only. Apache-2.0
   (`app/web/nr-loader-full-1.324.0.min.js.LICENSE.txt`).
+- **Noto Color Emoji** (`app/fonts/ReactionEmoji.ttf`): the six
+  emoji of the table's reactions, cut from Google's font for the web
+  build. SIL Open Font License 1.1 (`app/fonts/OFL.txt`); how it was
+  cut is in `app/fonts/README.md`.
 - **The name filter's word lists** (`third_party/ldnoobw/`): the
   English, Spanish, Portuguese, German and French lists from the List
   of Dirty, Naughty, Obscene, and Otherwise Bad Words, by Shutterstock

@@ -31,7 +31,8 @@ the app, at the root, with the handlers. `openhearts.game` is the site
 alone: it answers no handler, and serves nothing of the app, since the
 build served from there would be the app at another origin, with no
 device in it. A preview serves the site at its root and the app under
-`/play/`, and never sends anyone to production.
+`/play/`, never sends anyone to production, and plays live on a relay
+of its own ([previews](#previews)).
 
 **The app calls the handlers on its own origin.** Every address the app
 makes for the service is its page's origin plus `/api/<name>`
@@ -279,11 +280,39 @@ use) goes through one **Household** Durable Object per account, which
 handles them one at a time. A subscription has a turn of its own, the
 object named `sub:` and its id, where its account is found or made
 exactly once. The class is exported from the relay worker and bound to
-the Pages project as `HOUSEHOLD` (production only) and to the relay
-worker under the same name. Without the binding, as in the tests and
-previews, an in-memory queue in the isolate does the same. Each kind of
+the Pages project as `HOUSEHOLD` (a preview's to the preview relay's)
+and to the relay worker under the same name. Without the binding, as in
+the tests, an in-memory queue in the isolate does the same. Each kind of
 operation has an hourly allowance per account, counted in that queue
 ([service settings](../reference/configuration.md#service-settings)).
+
+What the object writes, the handler that asked it takes from the
+object's answer, not from KV. KV is eventually consistent: the object
+runs where its account was first asked for, and a handler somewhere
+else can be shown what was there before for up to a minute, a row it
+found missing included. So a device brought in, by a code, a store
+purchase or a sign-in, is licensed from the entitlement row the object
+wrote. After that, the device shows its licence with every request. The
+service signed that licence, and it names the account:
+
+- A handler that asks the account's object next asks the account the
+  licence names, and the object, which knows the device, decides. These
+  are taking the account up, the profile, the devices, the backup codes,
+  a code for another device, and linking a sign-in.
+- A handler that decides by itself goes by the store, as before, where
+  the store backs the licence. Where the store names another account or
+  none, it asks that account's object whether the device holds live
+  play. These are TURN, a wait for a person, a report, and a game's
+  record, sent or looked at.
+- Deleting an account goes by the store alone. It ends the account's
+  subscriptions and takes its name off its games before its object is
+  asked anything.
+
+A licence lasts up to a month, so a device dropped from its account
+still holds one. The object refuses it. What an object is asked on a
+licence the store does not back is counted against an allowance of its
+own, the size of the reads', so such a device spends nothing of what
+the account's own devices have.
 
 ### When Apple says a sign-in is gone
 
@@ -442,10 +471,13 @@ What is published at tables is read from the device's copy
 A name the others would see is refused if it has a word on the lists of
 obscene and offensive words in `third_party/ldnoobw/`, in English,
 Spanish, Portuguese, German or French, or one of a few words refused
-even inside another word. Words are compared in lower case, with
+even inside another word. So is a name that would pass for Open Hearts
+itself or the people who run it: the game's name, and words such as
+*admin*, *moderator*, *support*, *staff*, *official* and *operator* in
+the same five languages. Words are compared in lower case, with
 accents folded and with digits and signs written for letters read as
 letters, so `5h1t` is read as *shit*. Words are matched whole, so
-*Cassandra* and *Scunthorpe* stay names. Entries that would refuse
+*Cassandra*, *Scunthorpe*, *Staffan* and *Supporter* stay names. Entries that would refuse
 real names are left out, and the folder's README says which and why.
 What the lists miss, a report catches.
 
@@ -593,10 +625,11 @@ people are would stop that, and the service checks nobody.
 
 `turn` mints Cloudflare Realtime TURN credentials, which last
 `turnTtlS`, only for a device whose subscription stands, since TURN is
-billed by the gigabyte. Without the TURN secrets it answers 503, and the
-app makes no data channels and plays over the relay: channels go
-through TURN or not at all, so no peer learns another's address
-([multiplayer](multiplayer.md)).
+billed by the gigabyte. A device just brought in is found by its
+licence, as [above](#accounts). Without the TURN secrets it answers
+503, and the app makes no data channels and plays over the relay:
+channels go through TURN or not at all, so no peer learns another's
+address ([multiplayer](multiplayer.md)).
 
 ## Game records
 
@@ -797,12 +830,39 @@ answers 400, and the app asks again later.
 
 Secrets are set by hand and checked only by name. Everything else that
 is not secret is in `config/openhearts.json`, committed: the service's
-public key, the TURN key's id, the Stripe price, and the store and
-sign-in identifiers. `deploy.sh` compiles the build's from it and ships
-the file to the worker, which reads it beneath the project's settings
+public keys (production's, and the one previews have), the TURN key's
+id, the Stripe price, and the store and sign-in identifiers. `deploy.sh`
+compiles the build's from it and ships the file to the worker, which
+reads it beneath the project's settings
 (`service/functions/deployment.mjs`): a variable of the same name set on
 the project wins, as one set by a test does. A field left null is a
 feature left off ([configuration](../reference/configuration.md)).
+
+### Previews
+
+A preview is a deployment of its own, which plays live like production
+but reaches nothing of it ([deploy](../how-to/deploy.md#play-live-on-a-preview)).
+The Pages project's preview environment binds the previews' store and
+bucket, and the households of the preview relay: the same relay worker's
+code deployed as `open-hearts-relay-preview` (`[env.preview]` in
+`service/do/wrangler.toml`), at its own address, with tags, households
+and backup jurors of its own on that store. Both environments say they
+are a preview (`OH_DEPLOYMENT`), and each worker then takes the
+config as a preview has it (`configFor`): with the service key previews
+have, `preview.serviceKey`, and none while there is none, never
+production's. Every preview build is made with the same key, and talks
+to the preview relay (`deploy.sh`).
+
+A preview runs whatever branch was deployed to it, so its secrets are
+its own ([secrets](security-model.md#secrets)). Nobody buys anything on
+a preview: the operator invites the people who play there (`oh preview
+invite`), each invitation an account on the previews' store that is
+nobody's purchase, good for a year, which a device joins with one of
+its backup codes. A preview emails nobody: the preview relay has no
+mail binding. Nor does it carry profile pictures: it has no pictures
+bucket and no checker, and a picture is carried only once it has been
+checked against known images ([pictures](#the-accounts-profile)), which
+only production does.
 
 ### What is defined in code
 

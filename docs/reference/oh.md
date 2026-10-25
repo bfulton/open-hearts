@@ -10,7 +10,7 @@ Development tools, such as `./check.sh`, the chaos walk and the bot benchmarks, 
 
 - **Nothing changes without `--apply`.** A command that changes anything says what it would do and stops; with `--apply` it does it.
 - **`./oh help <command>`**, or `--help` after it, says what the command takes, what it needs and where its how-to is.
-- **It prints no name, picture, code or email address.** Accounts, keys and rows only.
+- **It prints no name, picture, code or email address.** Accounts, keys and rows only. The one code it prints is the invitation `oh preview invite` makes, which is yours to hand on, and opens nothing of production's.
 - **Exit status:** 0 when it did what it was asked, 1 when it could not, 2 when it was asked wrongly.
 
 ## Arguments
@@ -289,10 +289,10 @@ Putting the relay worker and the site into production, and checking production a
 ### oh deploy relay
 
 ```bash
-oh deploy relay [--apply]
+oh deploy relay [--apply] [--preview]
 ```
 
-Deploys the relay worker, and the backup jurors' container with it, from main. Needs Docker running, Dart and Cargo. Refused unless HEAD is origin/main with nothing uncommitted.
+Deploys the relay worker, and the backup jurors' container with it, from main; with --preview, the preview relay, from what is checked out. Needs Docker running, Dart and Cargo. Production is refused unless HEAD is origin/main with nothing uncommitted. The preview relay is what every preview plays on: it reaches nothing of production's, and is refused until config/openhearts.json has the previews' service key (oh preview secrets).
 
 - **Needs:** `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`
 - **How-to:** [deploy.md](../how-to/deploy.md)
@@ -345,6 +345,34 @@ Checks production: the live build is origin/main, the service is healthy, the re
 - **Needs:** `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `STRIPE_API_KEY`, `NEW_RELIC_API_KEY`, `NEW_RELIC_ACCOUNT_ID`, `NEW_RELIC_REGION`
 - **How-to:** [deploy.md](../how-to/deploy.md#check-it-worked)
 - **Example:** `oh verify`
+
+## Previews
+
+Playing live on a preview of the app: the secrets previews keep for themselves, and the people you invite to play there.
+
+### oh preview secrets
+
+```bash
+oh preview secrets [--apply]
+```
+
+Makes the secrets previews keep for themselves, new, and shows them to nobody: the service key pair previews sign with, and the preview relay's backup jurors' secret. The pair's secret is set on the Pages project's preview environment as OH_SERVICE_SECRET, and its public half written to config/openhearts.json as preview.serviceKey: commit it. None of them is production's, since a preview runs whatever branch was deployed to it. A preview built before keeps the key it was built with: deploy the preview relay and each preview again afterwards.
+
+- **Needs:** `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, Dart, and dart pub get in service/
+- **How-to:** [deploy.md](../how-to/deploy.md#play-live-on-a-preview)
+- **Example:** `oh preview secrets --apply`
+
+### oh preview invite
+
+```bash
+oh preview invite [--apply]
+```
+
+Makes an account that plays live on previews for a year, nobody's purchase, and prints one of its backup codes: the invitation, which a device of any preview enters under Activate subscription. The account is on the previews' store, and opens nothing of production's. Its other four codes are shown on any of its devices.
+
+- **Needs:** `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`
+- **How-to:** [deploy.md](../how-to/deploy.md#play-live-on-a-preview)
+- **Example:** `oh preview invite --apply`
 
 ## Looking into a game
 
@@ -444,7 +472,7 @@ Fetches the PhotoDNA module config/openhearts.json pins, from the private bucket
 oh secret set <name> [--apply]
 ```
 
-Sets a secret wherever infra/cloudflare.mjs says it lives, from what you type (not shown) or pipe in.
+Sets a secret wherever infra/cloudflare.mjs says it lives, from what you type (not shown) or pipe in. Production's, and those previews share with it. The secrets previews keep for themselves are made by oh preview secrets.
 
 - **Needs:** `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`
 - **How-to:** [rotate-the-service-key.md](../how-to/rotate-the-service-key.md)

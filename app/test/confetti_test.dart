@@ -6,11 +6,13 @@ library;
 import 'package:engine/engine.dart' as engine;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:open_hearts/table_model.dart' show SeatLook;
 import 'package:open_hearts/theme.dart';
 import 'package:open_hearts/ui/confetti.dart';
 import 'package:open_hearts/ui/overlays.dart';
 
 const _names = ['Ada', 'Bao', 'You', 'Dee'];
+final _seats = [for (final n in _names) SeatLook(name: n)];
 
 /// [sheet] on a phone-sized table, the device asking for less motion
 /// when [still].
@@ -57,7 +59,7 @@ void main() {
       (tester) async {
     final over = _finished();
     var again = 0;
-    await _pump(tester, GameOverSheet(game: over.game, names: _names, mySeat: over.won, onNewGame: () => again++));
+    await _pump(tester, GameOverSheet(game: over.game, seats: _seats, mySeat: over.won, onNewGame: () => again++));
     await tester.pump(const Duration(milliseconds: 600));
     expect(find.text('You win'), findsOneWidget);
 
@@ -85,7 +87,7 @@ void main() {
 
   testWidgets('in red, white and pink, and nothing else', (tester) async {
     final over = _finished();
-    await _pump(tester, GameOverSheet(game: over.game, names: _names, mySeat: over.won, onNewGame: () {}));
+    await _pump(tester, GameOverSheet(game: over.game, seats: _seats, mySeat: over.won, onNewGame: () {}));
     await tester.pump(const Duration(milliseconds: 300));
     final colours = <int>{};
     for (final layer in [confettiBehind, confettiInFront]) {
@@ -99,7 +101,7 @@ void main() {
 
   testWidgets('a game somebody else won has none, nor does a hand, a moon shot included', (tester) async {
     final over = _finished();
-    await _pump(tester, GameOverSheet(game: over.game, names: _names, mySeat: (over.won + 1) % engine.seatCount, onNewGame: () {}));
+    await _pump(tester, GameOverSheet(game: over.game, seats: _seats, mySeat: (over.won + 1) % engine.seatCount, onNewGame: () {}));
     await tester.pump(const Duration(milliseconds: 600));
     expect(find.byType(Confetti), findsNothing);
     await _pump(
@@ -109,7 +111,7 @@ void main() {
         scores: const [26, 26, 0, 26],
         totals: const [26, 26, 0, 26],
         moonShooter: 2,
-        names: _names,
+        seats: _seats,
         mySeat: 2,
         onNext: () {},
       ),
@@ -121,7 +123,7 @@ void main() {
 
   testWidgets('none where the device asks for less motion', (tester) async {
     final over = _finished();
-    await _pump(tester, GameOverSheet(game: over.game, names: _names, mySeat: over.won, onNewGame: () {}), still: true);
+    await _pump(tester, GameOverSheet(game: over.game, seats: _seats, mySeat: over.won, onNewGame: () {}), still: true);
     await tester.pump(const Duration(milliseconds: 600));
     expect(find.text('You win'), findsOneWidget);
     expect(find.descendant(of: find.byType(Confetti), matching: find.byType(CustomPaint)), findsNothing);

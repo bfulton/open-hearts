@@ -42,6 +42,7 @@ import {
   rulesPlan,
   settingsPlan,
   webhookPlan,
+  wranglerEnv,
 } from './diff.mjs';
 import { stripe } from './stripe.mjs';
 
@@ -174,7 +175,7 @@ async function applyPages() {
     for (const line of lines) say(`${p} ${env}: ${line}`);
     if (write && Object.keys(patch).length) await cf('PATCH', `${acct}/pages/projects/${p}`, { deployment_configs: { [env]: patch } });
     const bindings = ['kv', 'r2', 'durableObjects', 'analyticsEngine'].reduce((n, k) => n + Object.keys(want[k] ?? {}).length, 0);
-    summary.push(`${env} ${Object.keys(want.vars).length} variables, ${want.secrets.length} secrets set, ${bindings} bindings`);
+    summary.push(`${env} ${Object.keys(want.vars).length} variables, ${want.secrets.length + (want.ownSecrets?.length ?? 0)} secrets set, ${bindings} bindings`);
   }
   if (counts.change + counts.owner === before) {
     ok(`Pages ${p}: branch ${pages.productionBranch}, domains ${pages.domains.join(', ')}, no Web Analytics; ${summary.join('; ')}`);
@@ -237,25 +238,32 @@ async function applyStores() {
   }
 }
 
+/// Production's relay worker, and the previews' (wrangler.toml's
+/// [env.preview]), each against what wrangler would deploy for it.
 async function applyRelay() {
-  const toml = parseToml(await readFile(new URL(`../${relay.wrangler}`, import.meta.url), 'utf8'));
-  const name = toml.name;
-  const settings = await maybe(`${acct}/workers/scripts/${name}/settings`);
-  const live = { settings, secrets: [], domains: [], subdomain: null, namespaces: [], containers: [] };
-  if (settings) {
-    live.secrets = (await get(`${acct}/workers/scripts/${name}/secrets`)).map((s) => s.name);
-    live.domains = (await get(`${acct}/workers/domains`)).filter(
-      (d) => d.service === name || (toml.routes ?? []).some((r) => r.pattern === d.hostname),
-    );
-    live.subdomain = await get(`${acct}/workers/scripts/${name}/subdomain`);
-    live.namespaces = (await all(`${acct}/workers/durable_objects/namespaces`)).filter((n) => n.script === name);
-    if (toml.containers?.length) live.containers = await get(`${acct}/containers/applications`);
-  }
-  const problems = relayProblems(toml, relay, live);
-  for (const line of problems) owner(`relay ${name}: ${line} (deploy with wrangler from service/do)`);
-  if (!problems.length) {
-    const routes = (toml.routes ?? []).map((r) => r.pattern).join(', ');
-    ok(`relay worker ${name} matches ${relay.wrangler}: ${routes} only, ${settings.bindings.length} bindings, secrets ${relay.secrets.join(', ')}`);
+  const file = parseToml(await readFile(new URL(`../${relay.wrangler}`, import.meta.url), 'utf8'));
+  for (const def of [relay, relay.preview]) {
+    const toml = wranglerEnv(file, def.env);
+    const name = toml.name;
+    const settings = await maybe(`${acct}/workers/scripts/${name}/settings`);
+    const live = { settings, secrets: [], domains: [], subdomain: null, namespaces: [], containers: [] };
+    if (settings) {
+      live.secrets = (await get(`${acct}/workers/scripts/${name}/secrets`)).map((s) => s.name);
+      live.domains = (await get(`${acct}/workers/domains`)).filter(
+        (d) => d.service === name || (toml.routes ?? []).some((r) => r.pattern === d.hostname),
+      );
+      live.subdomain = await get(`${acct}/workers/scripts/${name}/subdomain`);
+      live.namespaces = (await all(`${acct}/workers/durable_objects/namespaces`)).filter((n) => n.script === name);
+      if (toml.containers?.length) live.containers = await get(`${acct}/containers/applications`);
+    }
+    const problems = relayProblems(toml, def, live);
+    const deploy = def.env ? `./oh deploy relay --${def.env} --apply` : 'deploy with wrangler from service/do';
+    for (const line of problems) owner(`relay ${name}: ${line} (${deploy})`);
+    if (!problems.length) {
+      const routes = (toml.routes ?? []).map((r) => r.pattern).join(', ');
+      const secrets = [...def.secrets, ...(def.ownSecrets ?? [])];
+      ok(`relay worker ${name} matches ${relay.wrangler}${def.env ? ` [env.${def.env}]` : ''}: ${routes} only, ${settings.bindings.length} bindings, secrets ${secrets.join(', ')}`);
+    }
   }
 }
 
@@ -490,7 +498,7 @@ async function cloudflare() {
   console.log('== cloudflare (the account in CLOUDFLARE_ACCOUNT_ID)');
   await part('Pages', applyPages);
   await part('KV, R2 and TURN', applyStores);
-  await part('the relay worker', applyRelay);
+  await part('the relay workers', applyRelay);
   let destinations = null;
   await part('Email Routing destination addresses', async () => {
     destinations = (await all(`${acct}/email/routing/addresses`)).map((d) => ({ email: d.email, verified: Boolean(d.verified) }));

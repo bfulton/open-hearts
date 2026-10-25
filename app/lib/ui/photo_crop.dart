@@ -2,8 +2,8 @@
 ///
 /// Taking the middle square is what a computer would do and it is
 /// wrong about half the time: people are not in the middle of their own
-/// photographs, and a badge is sixty-four pixels, so a head cut off at
-/// the chin is the whole of what anyone sees. So the square stays put
+/// photographs, and a badge is small, so a head cut off at the chin is
+/// the whole of what anyone sees. So the square stays put
 /// and the photograph moves under it — drag to move it, pinch to make
 /// it bigger — and what is kept is what is in the square.
 ///
@@ -116,7 +116,11 @@ class PhotoCrop extends StatefulWidget {
 
 class _PhotoCropState extends State<PhotoCrop> {
   late Window _window = Window(picture: widget.picture, side: widget.side);
-  late Window _began = _window;
+
+  /// How far apart the fingers were at the last update, against when
+  /// they went down: the scale an update gives is the whole pinch so
+  /// far, and the window grows by what it adds since the last.
+  double _scale = 1;
 
   @override
   Widget build(BuildContext context) {
@@ -141,9 +145,14 @@ class _PhotoCropState extends State<PhotoCrop> {
           mainAxisSize: MainAxisSize.min,
           children: [
             GestureDetector(
-              onScaleStart: (_) => _began = _window,
+              onScaleStart: (_) => _scale = 1,
+              // Each update is the step since the last: grown about where
+              // the fingers were, then moved as far as they went, so what
+              // is under them stays under them.
               onScaleUpdate: (d) => setState(() {
-                _window = _began.scaledBy(d.scale, about: d.localFocalPoint).movedBy(d.focalPointDelta);
+                final by = _scale > 0 ? d.scale / _scale : 1.0;
+                _window = _window.scaledBy(by, about: d.localFocalPoint - d.focalPointDelta).movedBy(d.focalPointDelta);
+                _scale = d.scale;
               }),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(widget.side / 2),

@@ -45,6 +45,7 @@ import 'net/in_use.dart';
 import 'net/remote_config.dart';
 import 'net/room.dart';
 import 'net/share.dart';
+import 'net/standing.dart' show Standing;
 import 'options_sheet.dart';
 import 'pace_store.dart';
 import 'pages.dart';
@@ -533,37 +534,21 @@ class _HomePageState extends State<HomePage> {
           ],
         ),
         const Spacer(),
-        Semantics(
-          button: true,
-          label: l10n.yourProfile,
+        ProfileButton(
+          name: _name,
+          // The account's colour, the one the table shows.
+          seed: Entitlement.current.licence?.account ?? _lobby.signer?.publicKey ?? '',
+          avatar: _avatar,
+          rating: ProfileButton.shown(_lobby.standing),
+          height: _chromeHeight,
           onTap: _editProfile,
-          // The ink is the tap a finger makes; the Semantics above is the
-          // one a screen reader does, so the ink says nothing of its own:
-          // otherwise it is a second, nameless button inside the first.
-          child: ExcludeSemantics(
-            child: InkWell(
-              onTap: _editProfile,
-              customBorder: const CircleBorder(),
-              child: SizedBox(
-                width: 48,
-                height: _chromeHeight,
-                child: Center(
-                  child: PlayerIcon(
-                      name: _name.isEmpty ? '?' : _name,
-                      // The account's colour, the one the table shows.
-                      seed: Entitlement.current.licence?.account ?? _lobby.signer?.publicKey ?? '',
-                      avatar: _avatar,
-                      size: 32),
-                ),
-              ),
-            ),
-          ),
         ),
       ],
     );
   }
 
   static const _chromeHeight = 44.0;
+
 
   Widget _entry() {
     final l10n = context.l10n;
@@ -612,7 +597,6 @@ class _HomePageState extends State<HomePage> {
   /// whoever is waiting, or the people you send the link to.
   Widget _live() {
     final l10n = context.l10n;
-    final standing = _lobby.standing;
     return Container(
       padding: const EdgeInsets.fromLTRB(14, 10, 14, 14),
       decoration: BoxDecoration(
@@ -625,10 +609,7 @@ class _HomePageState extends State<HomePage> {
         children: [
           Row(
             children: [
-              Expanded(
-                child: Text(l10n.gameLine(_options.target, _options.pool),
-                    style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: Palette.chrome, letterSpacing: 0.2)),
-              ),
+              Expanded(child: LiveGameLine(target: _options.target, pool: _options.pool, others: _lobby.othersOnline)),
               Semantics(
                 button: true,
                 label: l10n.gameOptions,
@@ -649,23 +630,8 @@ class _HomePageState extends State<HomePage> {
               ),
             ],
           ),
-          // Your rating, once the standings are in, and how many are online
-          // — said to be on its way until the relays answer. The button
-          // says the count to a screen reader, so it is not said twice.
-          Builder(builder: (context) {
-            final rated = standing == null
-                ? null
-                : l10n.youAreRated(standing.mine.shown, flag(standing.mine.provisional), standing.ledger.gamesOf(standing.me));
-            final n = _lobby.online;
-            final online = n == null ? l10n.checkingOnline : l10n.onlineCount(n);
-            return Text(
-              rated == null ? online : '$rated · $online',
-              semanticsLabel: rated ?? '',
-              style: const TextStyle(fontSize: 12, color: Palette.chromeDim),
-            );
-          }),
-          const SizedBox(height: 12),
-          _PlayLive(online: _lobby.online, busy: _lobby.opening == Opening.live, disabled: _lobby.busy, onTap: _lobby.play),
+          const SizedBox(height: 8),
+          _PlayLive(others: _lobby.othersOnline, busy: _lobby.opening == Opening.live, disabled: _lobby.busy, onTap: _lobby.play),
           const SizedBox(height: 10),
           // The same gold as the rest: two ways into a live game, and
           // neither is the lesser of them.
@@ -698,15 +664,129 @@ class _HomePageState extends State<HomePage> {
 
 }
 
-/// Into a live game, with how many devices are online on the button
-/// itself: the count is the reason to press it now or to come back
-/// later, so it belongs where the pressing happens.
-class _PlayLive extends StatelessWidget {
-  const _PlayLive({required this.online, required this.busy, required this.disabled, required this.onTap});
+/// The way into your profile, in the top right: how you look to the
+/// others, and just left of it your rating once there is one. A finger
+/// has the number and the picture as one button, since the profile is
+/// where both are said in full. A screen reader has them as what they
+/// are: the rating said, and the picture the button, named as ever.
+class ProfileButton extends StatelessWidget {
+  const ProfileButton(
+      {super.key, required this.name, required this.seed, required this.avatar, required this.rating, required this.onTap, this.height = 44});
 
-  /// Devices online, this one included; null before the relays have
-  /// been heard from.
-  final int? online;
+  final String name;
+  final String seed;
+  final Avatar avatar;
+
+  /// None before the standings are in or before a rated game ([shown]).
+  final Rating? rating;
+  final VoidCallback onTap;
+  final double height;
+
+  /// Your rating as the corner shows it: once the standings are in and
+  /// a rated game has made one. Before that it is the 1500 everyone
+  /// starts at, which the profile does not show as earned either
+  /// (profile_page.dart).
+  static Rating? shown(Standing? standing) {
+    if (standing == null || standing.ledger.gamesOf(standing.me) == 0) return null;
+    return standing.mine;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final rating = this.rating;
+    return InkWell(
+      onTap: onTap,
+      customBorder: const StadiumBorder(),
+      // The ink is the tap a finger makes, and says nothing of its own:
+      // otherwise it is a second, nameless button around the first.
+      excludeFromSemantics: true,
+      child: SizedBox(
+        height: height,
+        child: Padding(
+          padding: EdgeInsets.only(left: rating == null ? 8 : 12, right: 8),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (rating != null) ...[
+                Semantics(
+                  container: true,
+                  label: l10n.ratedSpoken(rating.shown, flag(rating.provisional)),
+                  child: ExcludeSemantics(
+                    child: Text(
+                      '${rating.shown}',
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        fontFeatures: [FontFeature.tabularFigures()],
+                        color: Palette.chrome,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+              ],
+              Semantics(
+                container: true,
+                button: true,
+                label: l10n.yourProfile,
+                onTap: onTap,
+                child: ExcludeSemantics(
+                  child: SizedBox(
+                    height: height,
+                    child: Center(child: PlayerIcon(name: name.isEmpty ? '?' : name, seed: seed, avatar: avatar, size: 32)),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The game the live buttons are about to ask for, and how many other
+/// people are online to play it with, once the relays have said. The
+/// Play live button says the count to a screen reader, so it is not
+/// said twice.
+class LiveGameLine extends StatelessWidget {
+  const LiveGameLine({super.key, required this.target, required this.pool, required this.others});
+
+  final int target;
+  final String pool;
+
+  /// Other people online (live/lobby.dart); null until it is known.
+  final int? others;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final game = l10n.gameLine(target, pool);
+    final n = others;
+    return Text.rich(
+      TextSpan(text: game, children: [
+        if (n != null)
+          TextSpan(
+            text: ' · ${l10n.onlineCount(n)}',
+            style: const TextStyle(fontWeight: FontWeight.w500, color: Palette.chromeDim),
+          ),
+      ]),
+      semanticsLabel: game,
+      style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: Palette.chrome, letterSpacing: 0.2),
+    );
+  }
+}
+
+/// Into a live game. A screen reader hears how many are online with
+/// the button: the count is the reason to press it now or to come back
+/// later, so it is said where the pressing happens. The eye has it on
+/// the line above ([LiveGameLine]).
+class _PlayLive extends StatelessWidget {
+  const _PlayLive({required this.others, required this.busy, required this.disabled, required this.onTap});
+
+  /// Other people online; null before the relays have been heard from.
+  final int? others;
 
   /// Whether this is the one being opened, which is what the spinner
   /// says; [disabled] is either of them being opened, which is what
@@ -718,7 +798,7 @@ class _PlayLive extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    final n = online;
+    final n = others;
     // One spoken line, so a screen reader and the suite read the same
     // thing the button says.
     final spoken = n == null ? l10n.playLive : l10n.playLiveSpoken(n);

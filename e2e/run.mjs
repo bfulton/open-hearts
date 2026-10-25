@@ -49,8 +49,8 @@ const names = ['Ada', 'Bao', 'Cara', 'Dee'];
 /// nothing here and takes the machine's speed out of the question
 /// (app/lib/net/address.dart).
 const driven = 'e2e=1&roomWait=45';
-/// A seat badge that is not one of the four people: a bot took a seat.
-const roster = /^(?!Ada:|Bao:|Cara:|Dee:)[A-Z][\w ]+: \d+ in the game, \d+ this hand/;
+/// A seat badge that says it is a bot's: a bot took a seat.
+const roster = /^[A-Z][\w ]+, a bot: \d+ in the game, \d+ this hand/;
 
 /// Whether hand [n] is over on a page: its score sheet is up, or the
 /// sheet has been and gone and the header is on the next hand. Not the
@@ -178,7 +178,7 @@ async function main() {
     // Every device is online from the front door, and each one sees
     // the other three: presence over the relay, before anyone sits
     // down, counted on the button itself.
-    for (const page of pages) await waitFor(page, /^Play live, 4 online$/, { what: 'everyone online', timeout: 40000 });
+    for (const page of pages) await waitFor(page, /^Play live, 3 online$/, { what: 'everyone online', timeout: 40000 });
     log('four online at the front door');
     playing = true;
 
@@ -304,7 +304,7 @@ async function main() {
     // four badges on the screen and none of them his, so a moment with
     // no badges drawn is not taken for one without Bao.
     await playUntil([pages[0]], async (p) => {
-      const badges = (await texts(p)).filter((t) => /^[A-Z][\w ]*: \d+ in the game/.test(t));
+      const badges = (await texts(p)).filter((t) => /^[A-Z][\w ]*(, a bot)?: \d+ in the game/.test(t));
       return badges.length === 4 && !badges.some((t) => t.startsWith('Bao: '));
     }, { timeout: 300000 });
     log('the jury ruled; Ada alone with three bots');

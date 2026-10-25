@@ -9,7 +9,7 @@ import decode from './vendor/jpeg-js/decoder.js';
 export class Unreadable extends Error {}
 
 /// The most a picture may have to be decoded, in millions of pixels:
-/// far more than the app's 64 by 64 (app/lib/avatar.dart), and little
+/// far more than the app's 192 by 192 (app/lib/avatar.dart), and little
 /// enough that no picture of 12,000 bytes can make the decoder take
 /// much memory.
 const MOST_MEGAPIXELS = 1;

@@ -70,14 +70,8 @@ export const activeInStore = (store) => ({
 /// [revoke] tells the relay objects the superseded device was seen at.
 export async function activate(op, store, active, { now = Date.now(), revoke = null } = {}) {
   const { key, account } = op;
-  const held = await entitlementOf(store, key, { now });
-  if (!held || held.account !== account || !(await store.get(`ACCOUNT#${account}`, `DEVICE#${key}`))) {
-    // A suspended account's device is told so, as the licence handler
-    // tells it, so that one the relay's word missed shuts live play at
-    // its next renewal.
-    if ((await store.get(`KEY#${key}`, 'ENTITLEMENT'))?.suspended) return { status: 403, body: { error: SUSPENDED_WHY, suspended: true } };
-    return { status: 402, body: { error: 'no subscription' } };
-  }
+  const { held, refused } = await heldIn(account, key, store, now);
+  if (refused) return refused;
   const seated = op.seated === undefined ? undefined : typeof op.seated === 'string' && /^[0-9a-f]{32}$/.test(op.seated) ? op.seated : null;
   const was = (await active.get(account)) ?? { key: null, epoch: 0, tags: [] };
   if (was.key === key) {
@@ -92,6 +86,19 @@ export async function activate(op, store, active, { now = Date.now(), revoke = n
   await active.put(account, { key, epoch, at: now, seated: seated ?? null, seated_at: now, tags: [] });
   if (was.tags?.length) await revoke?.(was.tags, account, epoch);
   return { status: 200, body: { epoch, licensed_until: held.licensed_until, took: was.key !== null, profile: await profileVersion(store, account) } };
+}
+
+/// Whether [key] is a device of [account] that holds live play, as this
+/// account's object has it from what it wrote itself: {held}, its
+/// entitlement, when it is; {refused}, the answer, when it is not.
+async function heldIn(account, key, store, now) {
+  const held = await entitlementOf(store, key, { now });
+  if (held && held.account === account && (await store.get(`ACCOUNT#${account}`, `DEVICE#${key}`))) return { held };
+  // A suspended account's device is told so, as the licence handler
+  // tells it, so that one the relay's word missed shuts live play at
+  // its next renewal.
+  if ((await store.get(`KEY#${key}`, 'ENTITLEMENT'))?.suspended) return { refused: { status: 403, body: { error: SUSPENDED_WHY, suspended: true } } };
+  return { refused: { status: 402, body: { error: 'no subscription' } } };
 }
 
 /// The version of [account]'s profile, 0 for none: said with each
@@ -191,7 +198,7 @@ export function sequencer({ now = Date.now } = {}) {
       const most =
         kind === 'order'
           ? Infinity
-          : kind === 'read'
+          : kind === 'read' || kind === 'shown'
           ? S().householdReadsPerHour
           : kind === 'active'
             ? S().activationsPerHour
@@ -256,6 +263,10 @@ export async function householdOp(op, store, { now = Date.now(), mail = null, ac
       return unlinkSignIn(op.account, op.login, store);
     case 'activate':
       return activate(op, store, active, { now, revoke });
+    case 'held':
+      // A handler that decides where the device is asking, and whose
+      // store there has yet to hear of it (licence.mjs, heldAccount).
+      return (await heldIn(op.account, op.key, store, now)).refused ?? { status: 200, body: { account: op.account } };
     case 'seen':
       return seenAt(op, active);
     case 'inUse':
@@ -275,10 +286,17 @@ export async function householdOp(op, store, { now = Date.now(), mail = null, ac
 /// Which of the hour's allowances [op] is counted against. An unlink is
 /// Apple's word, not the person's, and has an allowance of its own (the
 /// size of the changes'), so the person's own changes never stand in
-/// its way; an operator's order has no allowance at all.
+/// its way; an operator's order has no allowance at all. What a device
+/// asks on a licence the store where it asked does not back (licence.mjs,
+/// accountAsking) has one of its own too (the size of the reads'): a
+/// device dropped from the account still holds its licence until its
+/// day, and is refused here, but spends none of what the account's own
+/// devices have.
 const kindOf = (op) =>
   op.op === 'order'
     ? 'order'
+    : op.shown === true
+    ? 'shown'
     : op.op === 'activate' || op.op === 'seen' || op.op === 'inUse'
     ? 'active'
     : op.op === 'record'
