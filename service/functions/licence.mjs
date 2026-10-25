@@ -22,7 +22,8 @@
 // elsewhere (the tests, wrangler pages dev) fetched from the static
 // assets the worker serves.
 
-import { entitlementOf } from './accounts.mjs';
+import { accountOfKey, entitlementOf } from './accounts.mjs';
+import { inHousehold } from './household.mjs';
 import { dayAfter, dayOf, digestOf, earlier, hex, storeOf } from './rows.mjs';
 import { S, notConfigured } from './settings.mjs';
 import { SUSPENDED_WHY } from './suspension.mjs';
@@ -113,13 +114,46 @@ export async function licenceFor(key, account, until, keys) {
 /// object to ask, and that object, which brought the device in, decides.
 export async function licensedAccount(licence, key, env, { signer, now = Date.now() } = {}) {
   const keys = serviceKeys(env);
-  if (!keys || !signer || licence?.key !== key || typeof licence.sig !== 'string') return null;
+  // A signature is read into the signer's 64 bytes as it stands: one of
+  // any other shape is none, as for a request's (http.mjs, askedBy).
+  if (!keys || !signer || licence?.key !== key || typeof licence.sig !== 'string' || !/^[0-9a-f]{128}$/.test(licence.sig)) return null;
   // The account and the day are what the service signed; anything else
   // in them fails the signature.
   const { account, until } = licence;
   if (typeof until !== 'string' || until < dayOf(now)) return null;
   const digest = await digestOf(`${STATEMENT}\n${key}\n${account}\n${until}\n${PLAN}`);
   return signer.verify(keys.service, digest, licence.sig) ? account : null;
+}
+
+/// The account of the device asking, [key], from [body], what it sent,
+/// for a handler that asks that account's object next: {account,
+/// shown}. The account its licence names, when it shows one that holds
+/// ([licensedAccount]), else the one the store here names. `shown` is
+/// when the store here does not back the licence, naming another
+/// account or none: a device just brought in or moved, whose account's
+/// object has written what the store here has yet to show
+/// ([entitlementOf]). What the object is then asked is counted apart
+/// from what the account's own devices ask (household.mjs, kindOf),
+/// and the object decides from what it wrote itself: a device dropped
+/// from the account, which still holds its licence, is refused there,
+/// and spends none of the account's allowance.
+export async function accountAsking(store, key, body, env, { signer, now = Date.now() } = {}) {
+  const named = await licensedAccount(body?.licence, key, env, { signer, now });
+  const stored = await accountOfKey(store, key);
+  return named ? { account: named, shown: named !== stored } : { account: stored, shown: false };
+}
+
+/// The account of the device asking, [key], while it holds live play,
+/// for a handler that decides here rather than in the account's object;
+/// null otherwise. The store here says so, as it always has, where it
+/// backs the account the device's licence names ([accountAsking]); where
+/// it does not, that account's object does, from what it wrote
+/// (household.mjs, `held`).
+export async function heldAccount(store, key, body, env, { signer, now = Date.now(), openHouse = false } = {}) {
+  const { account, shown } = await accountAsking(store, key, body, env, { signer, now });
+  if (!shown) return (await entitlementOf(store, key, { now, openHouse }))?.account ?? null;
+  const said = await inHousehold(env, account, { op: 'held', key, account, shown });
+  return said.status === 200 ? account : null;
 }
 
 /// The service's two halves, when both are set and look like keys.

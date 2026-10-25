@@ -68,10 +68,16 @@ A signed request's body carries `key` (64 hex characters), `at` (the second it w
 | Statement | Lines, separated by `\n` | Signed by | Made by | Checked by |
 |---|---|---|---|---|
 | A request | `oh-request/1`, the handler's name, the key, `at`, the `what` line | The device's key | `signedAsk` and `requestDigest` in `app/lib/net/licence.dart` | `requestStatement` and `askedBy` in `service/functions/http.mjs` |
-| A licence | `oh-licence/2`, the device's key, the account, the last day (`YYYY-MM-DD`, UTC), the plan (`PLAN`) | The service key (`OH_SERVICE_SECRET`) | `licenceFor` in `service/functions/licence.mjs` | `Licence` in `packages/table/lib/src/licence.dart`; `licensedAccount` in `service/functions/licence.mjs` |
+| A licence | `oh-licence/2`, the device's key, the account, the last day (`YYYY-MM-DD`, UTC), the plan (`PLAN`) | The service key (`OH_SERVICE_SECRET`) | `licenceFor` in `service/functions/licence.mjs` | `Licence` in `packages/table/lib/src/licence.dart`; `licensedAccount`, `accountAsking` and `heldAccount` in `service/functions/licence.mjs` |
 | An activation | `oh-active/1`, the account, the device's key, the epoch, the last second (Unix time) | The service key | `activationFor` in `service/functions/licence.mjs` | `Activation` in `packages/table/lib/src/licence.dart`; `activationOf` in `service/do/relay.mjs` |
 
-An `activate` or `profile` request also carries `licence`, the licence the device holds, when it holds one. The handler asks the account the licence names, if the licence is this device's, signed by the service and not run out, and otherwise the account the store names. A device just brought in by its account's `Household` object somewhere else is known to that object before the store at the handler's end has heard of it (see [the service](../explanation/service.md#accounts)).
+Every signed request from the app also carries `licence`, the licence the device holds, when it holds one (`askHandler` in `app/lib/net/household.dart`, and `iceServersFor` in `app/lib/net/turn.dart`). A licence counts only if it is this device's, signed by the service with a signature of 128 hex characters, and not run out (`licensedAccount`). A device just brought in by its account's `Household` object somewhere else is known to that object before the store at the handler's end has heard of it (see [the service](../explanation/service.md#accounts)):
+
+- `activate`, `profile`, `devices`, `backups`, `ticket` and `attest` ask the account the licence names, and otherwise the account the store names (`accountAsking` in `service/functions/licence.mjs`). The account's object decides.
+- `turn`, `waiting`, `report`, `record` and `review` take the store's word where it backs the licence. Where the store names another account or none, they ask the object of the account the licence names whether it holds the device (`heldAccount`, and the `held` operation in `service/functions/household.mjs`).
+- `delete` takes the store's word alone.
+
+What an account's object is asked on a licence the store doesn't back is counted against an allowance of its own, `householdReadsPerHour` an hour, apart from the account's own devices' allowances.
 
 Each signature is BIP-340 over the SHA-256 hex digest of the statement's text (`digestOf` in `service/functions/rows.mjs`). A request whose `at` is further from the service's clock than `requestToleranceS` ([service settings](configuration.md#service-settings)) is refused with 401. An activation lasts at most `ACTIVATION_S` (in `service/functions/licence.mjs`), and never past the end of the day the subscription is paid to.
 

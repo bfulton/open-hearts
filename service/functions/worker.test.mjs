@@ -11,7 +11,7 @@ import { licence, licenceFor, signerOn } from './licence.mjs';
 import { objectsAt, seenFrom } from './places.fixtures.mjs';
 import { attest, loginRow } from './logins.mjs';
 import { dayAfter, dayOf, memoryStore } from './rows.mjs';
-import { SITE, forgetSettings, openHouse, useSettings } from './settings.mjs';
+import { SERVICE_DEFAULTS, SITE, forgetSettings, openHouse, useSettings } from './settings.mjs';
 import { SUSPENDED_WHY } from './suspension.mjs';
 import { forgetProviderKeys, supersede, whoSignedIn } from './signin.mjs';
 import { CHECKOUT_LOCALES, STRIPE_VERSION, checkout, checkoutLanguage, endRefunded, manage, record, sameSite, webhookSigned } from './stripe.mjs';
@@ -1022,6 +1022,13 @@ test('a device just brought in takes its account up at once, showing its licence
   assert.equal((await activate(BAO, { licence: old })).status, 402, 'one run out');
   assert.equal((await activate(BAO, { licence: { ...mine, sig: undefined } })).status, 402, 'one unsigned');
   assert.equal((await activate(BAO, { licence: 'not one' })).status, 402);
+  // A signature that is not one is none, though its first 64 bytes are
+  // the service's: read as it stands, it would run on past the
+  // signer's 64 into the rest of its memory.
+  assert.equal((await activate(BAO, { licence: { ...mine, sig: `${mine.sig}00` } })).status, 402, 'one too long');
+  assert.equal((await activate(BAO, { licence: { ...mine, sig: mine.sig.repeat(40) } })).status, 402, 'one far too long');
+  assert.equal((await activate(BAO, { licence: { ...mine, sig: mine.sig.toUpperCase() } })).status, 402, 'one not as the service writes it');
+  assert.equal((await activate(BAO, { licence: mine })).status, 200, 'and the signer reads the next as ever');
 });
 
 test("a device just moved shows its licence for the account it is in, over what the store here last read", async () => {
@@ -1560,6 +1567,129 @@ test('a device signing in is licensed at once, though the store where it asked h
   }
 });
 
+/// Accounts' objects, each seeing the store from where it runs
+/// (places.fixtures.mjs, objectsAt), and what each was asked.
+const watchedObjects = (there) => {
+  const objects = objectsAt(there);
+  const asked = [];
+  return {
+    asked,
+    idFromName: objects.idFromName,
+    get: (id) => {
+      const object = objects.get(id);
+      return { fetch: async (url, init) => (asked.push(JSON.parse(init.body)), object.fetch(url, init)) };
+    },
+  };
+};
+
+/// Google's keys for a sign-in, as [p] serves them, and Cloudflare's
+/// TURN for credentials (okUpstream).
+const upstreams = (p) => (url, init) => (String(url).startsWith('https://rtc.live.cloudflare.com/') ? okUpstream(url, init) : p.fetch(url, init));
+
+test('a device just brought in is asked of its account by each handler at once, showing its licence where the store here has yet to hear of it', async () => {
+  forgetProviderKeys();
+  const kept = new Map();
+  const records = {
+    head: async (k) => (kept.has(k) ? {} : null),
+    get: async (k) => (kept.has(k) ? { body: new Blob([kept.get(k)]).stream() } : null),
+    put: async (k, body) => kept.set(k, Buffer.from(body)),
+  };
+  const store = await household(Date.now(), ADA.public);
+  const account = await accountOfSub(store, 'sub_9');
+  const { codes } = await makeBackups(store, account);
+  const { send } = serving(store);
+  const objects = watchedObjects(seenFrom(kvOf(store)));
+  const held = { ...env, ...signedInAs, OH_SERVICE_SECRET: SERVICE_SECRET, OH_SERVICE_KEY: SERVICE_KEY, OH_STORE: seenFrom(kvOf(store)), HOUSEHOLD: objects, OH_RECORDS: records };
+  const p = await provider({ iss: 'https://accounts.google.com', aud: signedInAs.OH_GOOGLE_AUDIENCE });
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = upstreams(p);
+  try {
+    assert.equal((await worker.fetch(send('licence', await asking(BAO, 'licence')), held)).status, 402);
+    const typed = codes[0].code;
+    const { licence: mine } = await (await worker.fetch(send('claim', await asking(BAO, 'claim', { what: typed, ticket: typed })), held)).json();
+    // The device in use, as the app takes its account up before all else.
+    assert.equal((await worker.fetch(send('activate', await asking(BAO, 'activate', { what: 'open ', want: 'open', licence: mine })), held)).status, 200);
+
+    // Each as the app asks it, and what each answers once the account is
+    // found: a game nobody kept, a record that is not one, and a report
+    // with nowhere here to go are past the asking. Without its licence,
+    // the store here has no account for the device, for up to a minute.
+    const table = '0123456789abcdef0123456789abcdef';
+    const someone = 'b0'.repeat(16);
+    const token = await p.token({ sub: 'sub-2', nonce: await nonceFor(BAO.public) });
+    const asks = [
+      ['ticket', {}, 200],
+      ['backups', {}, 200],
+      ['devices', {}, 200],
+      ['profile', {}, 200],
+      ['attest', { provider: 'google', token }, 200],
+      ['turn', {}, 200],
+      ['waiting', { what: 'rated 50', pool: 'rated', target: 50 }, 200],
+      ['review', { what: table, table }, 404],
+      ['record', { what: table, table, record: 'not a record' }, 400],
+      ['report', { what: `${someone} name`, about: someone }, 503, { what: 'name' }],
+    ];
+    for (const [handler, ask, past, after = {}] of asks) {
+      const asked = async (more) => worker.fetch(send(handler, { ...(await asking(BAO, handler, { ...ask, ...more })), ...after }), held);
+      assert.equal((await asked({})).status, 402, `${handler}, with no licence shown`);
+      assert.equal((await asked({ licence: mine })).status, past, `${handler}, with its licence`);
+    }
+
+    // A device the store here knows is asked of as ever: its licence,
+    // which the store backs, costs a handler that decides here nothing.
+    const { licence: hers } = await (await worker.fetch(send('licence', await asking(ADA, 'licence')), held)).json();
+    objects.asked.length = 0;
+    assert.equal((await worker.fetch(send('turn', await asking(ADA, 'turn', { licence: hers })), held)).status, 200);
+    assert.equal((await worker.fetch(send('waiting', await asking(ADA, 'waiting', { what: 'rated 50', pool: 'rated', target: 50, licence: hers })), held)).status, 200);
+    assert.deepEqual(objects.asked, [], 'no object asked');
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+});
+
+test("a device dropped from its account, still holding its licence, is refused, and spends nothing of what the account's own devices have", async () => {
+  forgetProviderKeys();
+  const store = await household(Date.now(), ADA.public);
+  const account = await accountOfSub(store, 'sub_9');
+  const { codes } = await makeBackups(store, account);
+  const { send } = serving(store);
+  const held = { ...env, ...signedInAs, OH_SERVICE_SECRET: SERVICE_SECRET, OH_SERVICE_KEY: SERVICE_KEY, OH_STORE: seenFrom(kvOf(store)), HOUSEHOLD: objectsAt(seenFrom(kvOf(store))) };
+  const p = await provider({ iss: 'https://accounts.google.com', aud: signedInAs.OH_GOOGLE_AUDIENCE });
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = upstreams(p);
+  okUpstream.calls.length = 0;
+  try {
+    assert.equal((await worker.fetch(send('licence', await asking(BAO, 'licence')), held)).status, 402);
+    const typed = codes[0].code;
+    const { licence: kept } = await (await worker.fetch(send('claim', await asking(BAO, 'claim', { what: typed, ticket: typed })), held)).json();
+    const { licence: hers } = await (await worker.fetch(send('licence', await asking(ADA, 'licence')), held)).json();
+    // Ada drops it. It keeps the licence it was given, good for a month.
+    assert.equal((await worker.fetch(send('devices', await asking(ADA, 'devices', { what: BAO.public, drop: BAO.public, licence: hers })), held)).status, 200);
+    const ask = async (pair, handler, more = {}) => worker.fetch(send(handler, await asking(pair, handler, { ...more, licence: pair === BAO ? kept : hers })), held);
+    const open = { what: 'open ', want: 'open' };
+
+    // The account it names does not know it now, and says so.
+    assert.equal((await ask(BAO, 'activate', open)).status, 402);
+    assert.equal((await ask(BAO, 'turn')).status, 402);
+    assert.equal(okUpstream.calls.length, 0, 'no credentials made for it');
+    // Asked and asked again, it spends what is kept for devices the store
+    // where they ask has yet to hear of, the size of the account's reads...
+    for (let spent = 2; spent < SERVICE_DEFAULTS.householdReadsPerHour; spent++) assert.equal((await ask(BAO, 'activate', open)).status, 402);
+    const token = await p.token({ sub: 'sub-2', nonce: await nonceFor(BAO.public) });
+    const drop = { what: ADA.public, drop: ADA.public };
+    for (const [handler, more] of [['activate', open], ['ticket'], ['backups'], ['devices'], ['devices', drop], ['profile'], ['attest', { provider: 'google', token }]]) {
+      assert.equal((await ask(BAO, handler, more)).status, 429, `${handler}: spent for the hour`);
+    }
+    // ...and nothing of what the account's own devices have.
+    assert.equal((await ask(ADA, 'activate', open)).status, 200, 'taking it up');
+    assert.equal((await ask(ADA, 'devices')).status, 200, 'reading it');
+    assert.equal((await ask(ADA, 'backups', { what: 'rotate', rotate: true })).status, 200, 'changing it');
+    assert.equal((await ask(ADA, 'turn')).status, 200);
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+});
+
 test('a sign-in binds only a key that asked to be bound, so nobody\'s account is put on somebody else\'s device', async () => {
   // The nonce is the caller's to choose, so a stranger can have the
   // provider sign his own account over Ada's key. Bound to her key, his
@@ -1769,6 +1899,28 @@ const twoDevices = async (now) => {
   await claimWith(BAO.public, (await ticketFor(ADA.public, store, { now })).body.ticket, store, { now });
   return store;
 };
+
+test("an account's object holds a device by both of its own rows: the device's entitlement naming the account, and the account's row for the device", async () => {
+  // What it answers is what taking the account up goes by, and what a
+  // handler deciding where the device asks goes by when the store there
+  // has yet to hear of the device (licence.mjs, heldAccount).
+  const now = Date.now();
+  const store = await twoDevices(now);
+  const account = await accountOfKey(store, ADA.public);
+  const held = async (key, of = account) => (await householdOp({ op: 'held', key, account: of }, store, { now })).status;
+  assert.equal(await held(BAO.public), 200);
+  // A device that moved on from another account, whose row there was
+  // left behind (its new account's object read the old one's name from
+  // a store that had yet to show it), is not held there.
+  const before = '0b'.repeat(16);
+  await store.put(`ACCOUNT#${before}`, `DEVICE#${BAO.public}`, { bound_at: dayOf(now) });
+  assert.equal(await held(BAO.public, before), 402);
+  assert.equal((await activate({ key: BAO.public, account: before, want: 'open' }, store, activeInStore(store), { now })).status, 402, 'nor taken up there');
+  // Nor is one whose row in the account has gone, whatever its own row says.
+  await store.del(`ACCOUNT#${account}`, `DEVICE#${BAO.public}`);
+  assert.equal(await held(BAO.public), 402);
+  assert.equal((await activate({ key: BAO.public, account, want: 'open' }, store, activeInStore(store), { now })).status, 402, 'nor taken up');
+});
 
 test('the newest device to take an account up is the one in use, at once; the one before is superseded', async () => {
   const now = Date.UTC(2026, 8, 16);

@@ -23,7 +23,7 @@ import { healthOf } from './health.mjs';
 import { holdOf } from './holds.mjs';
 import { inHousehold, inSubscription } from './household.mjs';
 import { MOST_BODY, MOST_EVENT, cors, json, preflight, signedFor, textOf } from './http.mjs';
-import { ACTIVATION_S, activationFor, licence, licensedAccount, serviceKeys } from './licence.mjs';
+import { ACTIVATION_S, accountAsking, activationFor, heldAccount, licence, serviceKeys } from './licence.mjs';
 import { loginRow } from './logins.mjs';
 import { measure } from './metrics.mjs';
 import { carryOutNotice, noticesOf } from './notices.mjs';
@@ -45,11 +45,15 @@ async function ticketRoute(request, env) {
   if (request.method !== 'POST') return json(request, 405, { error: 'POST' }, { allow: 'POST, OPTIONS' });
   const asked = await signedFor(request, env, 'ticket');
   if (asked instanceof Response) return asked;
+  const { key, body, signer } = asked;
   const store = storeOf(env);
   if (!store) return json(request, 503, notConfigured('OH_STORE'));
-  const account = await accountOfKey(store, asked.key);
+  // The account its licence names, or the store's (licence.mjs,
+  // accountAsking), whose object decides: so for each handler that
+  // asks it next.
+  const { account, shown } = await accountAsking(store, key, body, env, { signer });
   if (!account) return json(request, 402, { error: 'no subscription' });
-  const { status, body: out } = await inHousehold(env, account, { op: 'ticket', key: asked.key });
+  const { status, body: out } = await inHousehold(env, account, { op: 'ticket', key, shown });
   return json(request, status, out);
 }
 
@@ -95,16 +99,16 @@ async function backupsRoute(request, env) {
   if (request.method !== 'POST') return json(request, 405, { error: 'POST' }, { allow: 'POST, OPTIONS' });
   const asked = await signedFor(request, env, 'backups', (body) => (body.rotate === true ? 'rotate' : body.send === true ? 'send' : ''));
   if (asked instanceof Response) return asked;
-  const { key, body } = asked;
+  const { key, body, signer } = asked;
   const store = storeOf(env);
   if (!store) return json(request, 503, notConfigured('OH_STORE'));
-  const account = await accountOfKey(store, key);
+  const { account, shown } = await accountAsking(store, key, body, env, { signer });
   if (!account) return json(request, 402, { error: 'no subscription' });
   const rotate = body.rotate === true;
   const send = !rotate && body.send === true;
   const subscription = (await store.get(`ACCOUNT#${account}`, 'META'))?.subscription;
   const payer = send ? await payerLookup(store, subscription, env) : { email: null, why: null };
-  const { status, body: out } = await inHousehold(env, account, { op: 'backups', key, rotate, send, email: payer.email, why: payer.why });
+  const { status, body: out } = await inHousehold(env, account, { op: 'backups', key, rotate, send, email: payer.email, why: payer.why, shown });
   return json(request, status, out);
 }
 
@@ -118,12 +122,15 @@ async function reviewRoute(request, env) {
   if (request.method !== 'POST') return json(request, 405, { error: 'POST' }, { allow: 'POST, OPTIONS' });
   const asked = await signedFor(request, env, 'review', (body) => (typeof body.table === 'string' ? body.table : ''));
   if (asked instanceof Response) return asked;
-  const { key, body } = asked;
+  const { key, body, signer } = asked;
   if (typeof body.table !== 'string' || !tableIdShape.test(body.table)) return json(request, 400, { error: 'a table id, 32 hex' });
   const store = storeOf(env);
   if (!store) return json(request, 503, notConfigured('OH_STORE'));
-  const account = await accountOfKey(store, key);
-  if (!account || !(await entitlementOf(store, key))) return json(request, 402, { error: 'no subscription' });
+  // Held by the store here, or by the object of the account its licence
+  // names where the store here has yet to hear of it (licence.mjs,
+  // heldAccount): so for each handler that decides here.
+  const account = await heldAccount(store, key, body, env, { signer });
+  if (!account) return json(request, 402, { error: 'no subscription' });
   const ok = await inHousehold(env, account, { op: 'inUse', key, account, table: body.table });
   if (ok.status !== 200) return json(request, ok.status, ok.body);
   return recordResponse(env.OH_RECORDS, body.table, cors(request));
@@ -152,10 +159,10 @@ async function activateRoute(request, env) {
   if (open) await entitlementOf(store, key, { now, openHouse: true });
   // The account its licence names, or the store's: a device just brought
   // in shows the one, before the store here has the other.
-  const account = (await licensedAccount(body.licence, key, env, { signer, now })) ?? (await accountOfKey(store, key));
+  const { account, shown } = await accountAsking(store, key, body, env, { signer, now });
   if (!account) return json(request, 402, { error: 'no subscription' });
   const seated = body.seated === undefined ? undefined : body.seated;
-  const took = await inHousehold(env, account, { op: 'activate', key, account, want: body.want, ...(seated !== undefined ? { seated } : {}) });
+  const took = await inHousehold(env, account, { op: 'activate', key, account, want: body.want, ...(seated !== undefined ? { seated } : {}), shown });
   if (took.status !== 200) return json(request, took.status, took.body);
   // An hour, and never past the end of the day the subscription is paid
   // to.
@@ -183,8 +190,8 @@ async function recordRoute(request, env) {
   const { key, body: sent, signer } = asked;
   const store = storeOf(env);
   if (!store) return json(request, 503, notConfigured('OH_STORE'));
-  const account = await accountOfKey(store, key);
-  if (!account || !(await entitlementOf(store, key))) return json(request, 402, { error: 'no subscription' });
+  const account = await heldAccount(store, key, sent, env, { signer });
+  if (!account) return json(request, 402, { error: 'no subscription' });
   const ok = await inHousehold(env, account, { op: 'record', key, account });
   if (ok.status !== 200) return json(request, ok.status, ok.body);
   const { status, body } = await keepRecord(env.OH_RECORDS, key, sent.table, sent.record, {
@@ -200,18 +207,18 @@ async function devicesRoute(request, env) {
   if (request.method !== 'POST') return json(request, 405, { error: 'POST' }, { allow: 'POST, OPTIONS' });
   const asked = await signedFor(request, env, 'devices', (body) => (typeof body.drop === 'string' ? body.drop : ''));
   if (asked instanceof Response) return asked;
-  const { key, body } = asked;
+  const { key, body, signer } = asked;
   const store = storeOf(env);
   if (!store) return json(request, 503, notConfigured('OH_STORE'));
   const drop = body.drop;
   if (typeof drop === 'string' && !/^[0-9a-f]{64}$/.test(drop)) return json(request, 400, { error: 'a table key, 64 hex' });
-  const account = await accountOfKey(store, key);
+  const { account, shown } = await accountAsking(store, key, body, env, { signer });
   if (!account) return json(request, 402, { error: 'no subscription' });
   if (typeof drop === 'string') {
-    const { status, body: out } = await inHousehold(env, account, { op: 'drop', key, device: drop });
+    const { status, body: out } = await inHousehold(env, account, { op: 'drop', key, device: drop, shown });
     if (status !== 200) return json(request, status, out);
   }
-  const { status, body: out } = await inHousehold(env, account, { op: 'list', key });
+  const { status, body: out } = await inHousehold(env, account, { op: 'list', key, shown });
   return json(request, status, out);
 }
 
@@ -232,10 +239,9 @@ async function profileRoute(request, env) {
   if (body.profile !== undefined && typeof body.profile !== 'string') return json(request, 400, { error: 'not a profile' });
   const store = storeOf(env);
   if (!store) return json(request, 503, notConfigured('OH_STORE'));
-  // As activateRoute finds it.
-  const account = (await licensedAccount(body.licence, key, env, { signer })) ?? (await accountOfKey(store, key));
+  const { account, shown } = await accountAsking(store, key, body, env, { signer });
   if (!account) return json(request, 402, { error: 'no subscription' });
-  const { status, body: out } = await inHousehold(env, account, { op: 'profile', key, ...(body.profile !== undefined ? { profile: body.profile } : {}) });
+  const { status, body: out } = await inHousehold(env, account, { op: 'profile', key, ...(body.profile !== undefined ? { profile: body.profile } : {}), shown });
   return json(request, status, out);
 }
 
@@ -261,11 +267,11 @@ async function signInRoute(request, env, move) {
   // In local mode a device nobody has heard of has an account, as it
   // asks for anything.
   if (openHouse(env, request)) await entitlementOf(store, key, { openHouse: true });
-  const mine = await accountOfKey(store, key);
+  const { account: mine, shown } = await accountAsking(store, key, body, env, { signer });
   const { status, body: out, entitlement } = move
     ? await supersede(who, key, store, env, login)
     : mine
-      ? await inHousehold(env, mine, { op: 'attest', who, key, login })
+      ? await inHousehold(env, mine, { op: 'attest', who, key, login, shown })
       : { status: 402, body: { error: 'no subscription' } };
   if (status !== 200) return json(request, status, out);
   // Straight back with the licence it is owed, if any: a device that
@@ -441,14 +447,14 @@ async function waitingRoute(request, env, ctx) {
   if (request.method !== 'POST') return json(request, 405, { error: 'POST' }, { allow: 'POST, OPTIONS' });
   const asked = await signedFor(request, env, 'waiting', (body) => `${body.pool ?? ''} ${body.target ?? ''}`);
   if (asked instanceof Response) return asked;
-  const { key, body } = asked;
+  const { key, body, signer } = asked;
   if (typeof body.pool !== 'string' || !/^[a-z]{1,16}$/.test(body.pool) || !Number.isInteger(body.target) || body.target < 1 || body.target > 100) {
     return json(request, 400, { error: 'a pool and the score its game runs to' });
   }
   const store = storeOf(env);
   if (!store) return json(request, 503, notConfigured('OH_STORE'));
-  const account = await accountOfKey(store, key);
-  if (!account || !(await entitlementOf(store, key))) return json(request, 402, { error: 'no subscription' });
+  const account = await heldAccount(store, key, body, env, { signer });
+  if (!account) return json(request, 402, { error: 'no subscription' });
   if (!openHouse(env, request)) await after(ctx, alertWaiting(env, store, { key, account, pool: body.pool, target: body.target }));
   return json(request, 200, { ok: true });
 }
@@ -466,8 +472,8 @@ async function reportRoute(request, env) {
   if (!report) return json(request, 400, { error: 'a report: who, for what, and a short note at most' });
   const store = storeOf(env);
   if (!store) return json(request, 503, notConfigured('OH_STORE'));
-  const account = await accountOfKey(store, asked.key);
-  if (!account || !(await entitlementOf(store, asked.key))) return json(request, 402, { error: 'no subscription' });
+  const account = await heldAccount(store, asked.key, asked.body, env, { signer: asked.signer });
+  if (!account) return json(request, 402, { error: 'no subscription' });
   if (report.about === account) return json(request, 400, { error: 'a report is of somebody else' });
   // Local mode tells nobody, as for a wait.
   if (openHouse(env, request)) return json(request, 200, { ok: true });
@@ -497,6 +503,10 @@ async function deleteRoute(request, env) {
   if (asked instanceof Response) return asked;
   const store = storeOf(env);
   if (!store) return json(request, 503, notConfigured('OH_STORE'));
+  // The store's word alone, never a licence's (licence.mjs,
+  // accountAsking): what is outside the store is done here, before the
+  // account's object is asked anything, and a device dropped from the
+  // account still holds its licence until its day.
   const account = await accountOfKey(store, asked.key);
   if (!account || !(await store.get(`ACCOUNT#${account}`, `DEVICE#${asked.key}`))) return json(request, 404, { error: 'no account' });
   if (!(await holdOf(store, account))) {
@@ -529,7 +539,9 @@ async function turn(request, env) {
   if (asked instanceof Response) return asked;
   const store = storeOf(env);
   if (!store) return json(request, 503, notConfigured('OH_STORE'));
-  if (!(await entitlementOf(store, asked.key, { openHouse: openHouse(env, request) }))) return json(request, 402, { error: 'no subscription' });
+  if (!(await heldAccount(store, asked.key, asked.body, env, { signer: asked.signer, openHouse: openHouse(env, request) }))) {
+    return json(request, 402, { error: 'no subscription' });
+  }
   // Local mode's own TURN server (the browser rig's, e2e/drive.mjs), so
   // the rig's channels take the path production's do.
   if (openHouse(env, request) && env.OH_TURN_LOCAL) {

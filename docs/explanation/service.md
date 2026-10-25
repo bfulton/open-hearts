@@ -292,11 +292,27 @@ runs where its account was first asked for, and a handler somewhere
 else can be shown what was there before for up to a minute, a row it
 found missing included. So a device brought in, by a code, a store
 purchase or a sign-in, is licensed from the entitlement row the object
-wrote. After that, the device shows its licence when it takes the
-account up and when it reads or writes the profile. The service signed
-that licence, and it names the account, so the handler asks that
-account's object, which knows the device, rather than the store, which
-may not have heard of it yet.
+wrote. After that, the device shows its licence with every request. The
+service signed that licence, and it names the account:
+
+- A handler that asks the account's object next asks the account the
+  licence names, and the object, which knows the device, decides. These
+  are taking the account up, the profile, the devices, the backup codes,
+  a code for another device, and linking a sign-in.
+- A handler that decides by itself goes by the store, as before, where
+  the store backs the licence. Where the store names another account or
+  none, it asks that account's object whether the device holds live
+  play. These are TURN, a wait for a person, a report, and a game's
+  record, sent or looked at.
+- Deleting an account goes by the store alone. It ends the account's
+  subscriptions and takes its name off its games before its object is
+  asked anything.
+
+A licence lasts up to a month, so a device dropped from its account
+still holds one. The object refuses it. What an object is asked on a
+licence the store does not back is counted against an allowance of its
+own, the size of the reads', so such a device spends nothing of what
+the account's own devices have.
 
 ### When Apple says a sign-in is gone
 
@@ -609,10 +625,11 @@ people are would stop that, and the service checks nobody.
 
 `turn` mints Cloudflare Realtime TURN credentials, which last
 `turnTtlS`, only for a device whose subscription stands, since TURN is
-billed by the gigabyte. Without the TURN secrets it answers 503, and the
-app makes no data channels and plays over the relay: channels go
-through TURN or not at all, so no peer learns another's address
-([multiplayer](multiplayer.md)).
+billed by the gigabyte. A device just brought in is found by its
+licence, as [above](#accounts). Without the TURN secrets it answers
+503, and the app makes no data channels and plays over the relay:
+channels go through TURN or not at all, so no peer learns another's
+address ([multiplayer](multiplayer.md)).
 
 ## Game records
 

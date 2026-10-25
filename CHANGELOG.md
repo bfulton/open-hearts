@@ -354,10 +354,17 @@ squashed from a pull request, the pull request's number.
   through accounts whose object ran at ORD, went so. A store purchase
   and signing in on a new device read it back the same way. Each is now
   licensed from what the account's object wrote. For the same minute
-  the device could not take the account up or keep its profile: Play
-  live said "No relay answered". Now the device shows its licence when
-  it does either, and the handler asks the account the licence names.
-  (2026-10-25, #38)
+  the device was refused nearly everything else it asked. It could not
+  take the account up or keep its profile, so Play live said "No relay
+  answered". It got no TURN credentials, so its table played without
+  data channels. "Wait for a person" told nobody, though it said it
+  would. The devices and codes under Manage, a code for another device,
+  linking a sign-in, a report, and a game's record were refused too.
+  Now the device shows its licence with every request, and a handler
+  the store can't answer asks the account the licence names, whose
+  object decides. A device dropped from a household keeps its licence
+  for up to a month, so what it asks on it is counted apart and spends
+  none of the household's hourly allowance. (2026-10-25, #38)
 - A live table that stopped for good when the person's connection
   dropped as the bots passed (table 64cf65a3). Back sixteen seconds
   later, their device gave each bot fifteen seconds and took all three

@@ -128,7 +128,12 @@ product.
 - **Rate.** A household is limited to so many changes and reads an hour
   (`householdChangesPerHour`, `householdReadsPerHour`).
   Asking for a code while one is outstanding returns the same code, so
-  it costs a read, not a write.
+  it costs a read, not a write. What a device asks on a licence that
+  the store where it asks doesn't back has an allowance of its own, the
+  size of the reads'. That covers a device just brought in, and one
+  dropped from the household that still holds its licence, so a dropped
+  device spends none of the household's
+  ([one account at a time](service.md#accounts)).
 
 ## TURN
 
