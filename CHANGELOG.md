@@ -10,6 +10,12 @@ squashed from a pull request, the pull request's number.
 
 ### Added
 
+- On the phones, a moment after you win a game, the app asks the App
+  Store or Google Play for its own prompt to rate the app, at most once
+  every four months. Whether the prompt shows is the store's to decide,
+  and the app is not told what you chose there. The web asks nothing.
+  (2026-10-25, #39)
+
 - A first hand of Hearts, taught. A device that has played nothing
   alone is offered it under Play solo ("New to Hearts? Learn to
   play"), and the menu has it for anyone. It is a game alone against

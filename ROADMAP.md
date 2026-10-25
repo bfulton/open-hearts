@@ -19,8 +19,6 @@ is a plan, not a promise. What has shipped is in the
   free play alone, deals anyone can check, and the Auto switch. In each
   of the app's languages. What the stores ask about how the app works
   is answered in [what the stores are told](docs/reference/store-answers.md).
-- **Asking for a review** after a good moment, such as a win, through
-  the stores' own prompt.
 - **More languages,** where Hearts is played: Dutch first.
 
 ### Learning and playing

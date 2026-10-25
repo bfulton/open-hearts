@@ -29,6 +29,7 @@ Every row is linked to the player's account, by the account's number. Nothing is
 - **The camera's pictures.** The camera is used only to scan a code that adds a device, and the picture stays on the device.
 - **What is passed on but not kept.** While a player waits for a game, their name, rating, look and pace go through the relay, as does whether a device is online. A watched table's state is passed on the same way. The relay keeps none of it. Apple counts only data kept longer than a request takes, and Google calls this ephemeral processing.
 - **Tell us what's broken.** It opens a GitHub issue in the browser, filled in, for the player to post under their own GitHub account. Nothing goes to Open Hearts unless the player posts it, and then it goes to GitHub.
+- **A rating in the store's own prompt.** After a game a player wins, the phone apps ask the App Store or Google Play to show its prompt to rate the app. The rating and any review are entered in the store's prompt and go to the store, under its terms. The app is told nothing, not even whether the prompt showed. Google's [in-app review guide](https://developer.android.com/guide/playcore/in-app-review#data-safety) lists them as data Google Play handles itself, to publish the review, and leaves the Data safety answers to the developer.
 
 ### Google's Data safety
 

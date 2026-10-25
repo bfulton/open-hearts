@@ -171,6 +171,13 @@ sheet comes in, once, for under three seconds
 some in front of it, so it falls through the table rather than on a
 pane over it. A game shared at the top counts as won.
 
+On the phones, a won game's sheet also asks the App Store or Google
+Play for its own prompt to rate the app, once the confetti has fallen
+(`reviewAfter` in `app/lib/net/store_review.dart`). It asks at most
+once in four months, and not at all once the sheet has gone. The store
+decides whether to show the prompt and says nothing back. The app asks
+nothing of its own first, and the web asks nothing.
+
 None of these can be touched or heard: taps go through them, and screen
 readers never meet them. With `MediaQuery.disableAnimations` there is no
 quake and no confetti, and a glow fades from the moment its trick is

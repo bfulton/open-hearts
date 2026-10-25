@@ -2,6 +2,7 @@
 /// the game.
 library;
 
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:engine/engine.dart';
@@ -9,6 +10,7 @@ import 'package:flutter/material.dart';
 import 'package:table/table.dart' show Rating;
 
 import '../l10n/l10n.dart';
+import '../net/store_review.dart';
 import '../table_model.dart' show SeatLook;
 import '../theme.dart';
 import 'confetti.dart';
@@ -149,7 +151,7 @@ class GameOverSheet extends StatelessWidget {
             ? l10n.namesTie(l10n.together(won.map((s) => seats[s].name)))
             : l10n.nameWins(seats[won.first].name);
 
-    return _Sheet(
+    final sheet = _Sheet(
       title: title,
       tone: youWon ? Palette.chrome : Palette.danger,
       // A game won, alone or shared.
@@ -182,7 +184,41 @@ class GameOverSheet extends StatelessWidget {
           (label: l10n.copyRecord, onPressed: onCopyRecord!),
       ],
     );
+    // And a game won is the moment to ask for a review.
+    return youWon ? _AsksForReview(child: sheet) : sheet;
   }
+}
+
+/// Asks the store for its review prompt (net/store_review.dart) a
+/// moment after a game the player won comes in: once the confetti has
+/// fallen, and only if the sheet is still up by then. A player already
+/// on to the next game is not stopped for it.
+class _AsksForReview extends StatefulWidget {
+  const _AsksForReview({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_AsksForReview> createState() => _AsksForReviewState();
+}
+
+class _AsksForReviewState extends State<_AsksForReview> {
+  Timer? _ask;
+
+  @override
+  void initState() {
+    super.initState();
+    _ask = Timer(reviewAfter, () => unawaited(askForReviewAfterWin()));
+  }
+
+  @override
+  void dispose() {
+    _ask?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }
 
 typedef _Row = ({SeatLook look, int delta, int total, bool you, Color? mark});
