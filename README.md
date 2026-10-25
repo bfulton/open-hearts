@@ -80,3 +80,7 @@ its own licence beside it:
   of Dirty, Naughty, Obscene, and Otherwise Bad Words, by Shutterstock
   and its contributors. CC BY 4.0; how Open Hearts reads them is in
   that folder's README.
+- **Flutter's fix for a simulator's log stream** (`third_party/flutter/`):
+  from flutter/flutter#193142, fitted to Flutter 3.47.2, which the `ios`
+  workflow applies to the Flutter it builds with until a release
+  carries it. BSD-3-Clause; what it fixes is in that folder's README.

@@ -164,6 +164,7 @@ One job, `ios`, on macOS. It runs when started by hand, and on pull requests and
 
 | Step | What it checks |
 |---|---|
+| `third_party/flutter/simulator_log_stream.patch`, applied to the Flutter it sets up, and the tool built again | Nothing itself. It is Flutter's fix for the tool waiting with no end on a simulator, which no release carries yet (`third_party/flutter/README.md`). It fails if the patch no longer applies, or the tool built again does not have it. |
 | `crypto/build_ios.sh` | The deal and Schnorr libraries build as XCFrameworks. |
 | `flutter test integration_test/native_libs_test.dart` on a simulator, once it has booted, for at most 25 minutes | The libraries load as the app loads them (`app/integration_test/native_libs_test.dart`). When it fails or hangs, the next step prints the end of the Flutter tool's log, the simulator's state, a sample of the app's threads, and the app's log on the simulator. |
 | `flutter build ios --release --no-codesign`, without the service key | The release build is refused (`app/ios/release_check.sh`). |

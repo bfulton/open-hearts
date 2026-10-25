@@ -25,6 +25,7 @@ on:
       - service/functions/deployment.mjs
       - packages/deal/**
       - packages/table/lib/src/schnorr_native*
+      - third_party/flutter/**
   push:
     branches: [main]
     paths:
@@ -39,6 +40,7 @@ on:
       - service/functions/deployment.mjs
       - packages/deal/**
       - packages/table/lib/src/schnorr_native*
+      - third_party/flutter/**
 
 permissions:
   contents: read
@@ -58,6 +60,22 @@ jobs:
           channel: stable
           flutter-version: 3.47.2
           cache: true
+      # 3.47.2 launches an app on a simulator before the log stream it
+      # reads the app's VM service address from is ready, and when the
+      # stream starts late it waits for that address with no end
+      # (third_party/flutter/README.md). Once the pinned Flutter carries
+      # the fix, this step and that folder go.
+      - name: Flutter's tool, with its fix for a simulator's log stream (third_party/flutter)
+        run: |
+          cd "$FLUTTER_ROOT"
+          fix="$GITHUB_WORKSPACE/third_party/flutter/simulator_log_stream.patch"
+          # A Flutter restored from the cache may have the fix already.
+          git apply --reverse --check "$fix" 2> /dev/null || git apply "$fix"
+          # An empty stamp has the flutter command build its tool again,
+          # from the patched source, before it runs.
+          : > bin/cache/flutter_tools.stamp
+          flutter --version
+          grep -q 'The iOS simulator log stream did not start' bin/cache/flutter_tools.snapshot
       - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master
         with:
           toolchain: 1.97.0
@@ -71,9 +89,11 @@ jobs:
         run: crypto/build_ios.sh
       - name: On a simulator (the libraries loaded as the app loads them, and checked)
         id: simulator
-        # A run that passes takes about 9 minutes. One that hangs, as two
-        # have once the app was built, is stopped well inside the job's
-        # hour, so that the step after it can say where it was.
+        # A run that passes takes about 9 minutes. One that hangs is
+        # stopped well inside the job's hour, so that the step after it
+        # can say where it was. The three it caught before the fix in
+        # third_party/flutter were the tool waiting for the VM service's
+        # address.
         timeout-minutes: 25
         run: |
           udid=$(xcrun simctl list devices available -j | python3 -c '
