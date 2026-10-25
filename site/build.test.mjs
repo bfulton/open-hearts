@@ -108,8 +108,38 @@ test('every link to a part of a page finds that part', () => {
 test('robots.txt lets Project Arachnid\'s crawler in, on the site and on the app\'s host alike', () => {
   // Arachnid Shield confirms Open Hearts runs these hosts by this line;
   // every other crawler has no group of its own here, so is let in too.
+  // Only the site's names a sitemap: the app's host has no pages to list.
   const site = readFileSync(new URL('./public/robots.txt', import.meta.url), 'utf8');
   const app = readFileSync(new URL('../app/web/robots.txt', import.meta.url), 'utf8');
-  assert.equal(app, site);
-  assert.match(site, /^User-Agent: ProjectArachnid\/E2Z7A4DOVNGNKQIUSZP4UGZACZODKBYW\nAllow: \*\n$/);
+  const arachnid = 'User-Agent: ProjectArachnid/E2Z7A4DOVNGNKQIUSZP4UGZACZODKBYW\nAllow: *\n';
+  assert.equal(app, arachnid);
+  assert.equal(site, `${arachnid}\nSitemap: https://openhearts.game/sitemap.xml\n`);
+});
+
+test('the sitemap robots.txt names lists every page in every language, by its canonical, with the copies its head names', () => {
+  const out = mkdtempSync(join(tmpdir(), 'site-'));
+  build(out);
+  const sitemapAt = readFileSync(join(out, 'robots.txt'), 'utf8').match(/^Sitemap: https:\/\/openhearts\.game\/(.+)$/m)[1];
+  const xml = readFileSync(join(out, sitemapAt), 'utf8');
+  assert.match(xml, /^<\?xml version="1\.0" encoding="UTF-8"\?>\n<urlset xmlns="http:\/\/www\.sitemaps\.org\/schemas\/sitemap\/0\.9" xmlns:xhtml="http:\/\/www\.w3\.org\/1999\/xhtml">\n/);
+  assert.match(xml, /\n<\/urlset>\n$/);
+  // Written out here rather than asked of build.mjs, so the addresses
+  // are checked, not only agreed on: English at the root, every other
+  // language under its code, and the front page as a directory.
+  const address = (code, page) => `https://openhearts.game${code === 'en' ? '' : `/${code}`}${page === 'index' ? '/' : `/${page}`}`;
+  const copies = (page) => [...languages.map((l) => `${l.lang} ${address(l.code, page)}`), `x-default ${address('en', page)}`].sort();
+  const listed = [...xml.matchAll(/<url>\n {4}<loc>([^<]+)<\/loc>\n((?: {4}<xhtml:link [^>]+\/>\n)+) {2}<\/url>/g)]
+    .map(([, loc, links]) => [loc, [...links.matchAll(/<xhtml:link rel="alternate" hreflang="([^"]+)" href="([^"]+)"\/>/g)].map(([, h, href]) => `${h} ${href}`).sort()]);
+  const want = languages.flatMap((l) => pages().map((p) => [address(l.code, p), copies(p)]));
+  assert.deepEqual(listed.sort(), want.sort());
+  assert.equal(xml.match(/<url>/g).length, want.length, 'every entry is whole');
+  // And each page says the same of itself.
+  for (const l of languages) {
+    for (const p of pages()) {
+      const html = readFileSync(join(l.code === 'en' ? out : join(out, l.code), `${p}.html`), 'utf8');
+      assert.equal(html.match(/<link rel="canonical" href="([^"]+)">/)[1], address(l.code, p), `${l.code}/${p}`);
+      const named = [...html.matchAll(/<link rel="alternate" hreflang="([^"]+)" href="([^"]+)">/g)].map(([, h, href]) => `${h} ${href}`).sort();
+      assert.deepEqual(named, copies(p), `${l.code}/${p}`);
+    }
+  }
 });

@@ -64,7 +64,7 @@ Run the Dart tools from `service` as `dart run bin/<name>.dart` or `dart run too
 | `crypto/wasm.sh` | Not run by itself: sourced by the two wasm builds. Its `wasm_build` builds the same bytes on any machine. | Not applicable |
 | `crypto/build_android.sh` | Builds the deal and Schnorr libraries for Android's ABIs, into the app's `jniLibs`. Needs the Android NDK and the Rust targets. | None |
 | `crypto/build_ios.sh` | Builds the deal and Schnorr libraries as XCFrameworks, into `app/ios/Frameworks`. Needs a Mac with Xcode and the Rust targets. | None |
-| `site/build.mjs` | Builds the site into a directory, once in each language. `deploy.sh` runs it. | `<out>` |
+| `site/build.mjs` | Builds the site into a directory, once in each language, with the sitemap that lists it. `deploy.sh` runs it. | `<out>` |
 | `app/worker/build.sh` | Compiles the review worker beside a built app. `deploy.sh` and `e2e/build.sh` run it. | `<build directory>` |
 | `service/bench/build.sh` | Builds the backup jurors' container image. The relay's `wrangler deploy` runs it. | None |
 

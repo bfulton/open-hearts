@@ -10,6 +10,11 @@ squashed from a pull request, the pull request's number.
 
 ### Added
 
+- `openhearts.game/sitemap.xml` lists every page of the site in each of
+  its languages, by the address the page gives as its own, with its
+  copies in the other languages; the site's `robots.txt` names it.
+  (2026-10-25, #39)
+
 - Previews play live. They have a relay of their own (`open-hearts-relay-preview`,
   at `relay-preview.openhearts.game`), with its own households and backup
   jurors on the previews' store, and a service key pair of their own.

@@ -9,8 +9,8 @@ is a plan, not a promise. What has shipped is in the
 ### Getting found
 
 - **Search.** openhearts.game already has a title, a description, link
-  previews and a page per language. Still to do: a sitemap, and the
-  site verified in Google Search Console so that it is indexed.
+  previews, a page per language and a sitemap. Still to do: the site
+  verified in Google Search Console so that it is indexed.
 - **Pages people search for:** how to play, the rules in full, shooting
   the moon, and strategy. Today the rules are eight lines among the
   support page's questions.

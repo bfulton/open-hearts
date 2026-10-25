@@ -4,7 +4,8 @@
 //
 // public/ is copied as it is. Each template in pages/ is written once per
 // language: English at the root, the others under /es/, /pt/, /de/ and
-// /fr/. A template's words are `{{page.key}}` placeholders filled from
+// /fr/; sitemap.xml lists every page so written, and robots.txt names
+// it. A template's words are `{{page.key}}` placeholders filled from
 // strings/<lang>.json; every language must have every key English has,
 // and no other. A string may use the placeholders below as well.
 //
@@ -113,6 +114,11 @@ export function keys(tree, prefix = '') {
 const lookup = (tree, key) => key.split('.').reduce((t, k) => t?.[k], tree);
 const base = (code) => (code === 'en' ? '' : `/${code}`);
 const pathOf = (page) => (page === 'index' ? '/' : `/${page}`);
+/// A page's address in a language: its canonical there.
+const urlOf = (page, code) => `${origin}${base(code)}${pathOf(page)}`;
+/// Each copy of a page, as [hreflang, address]: one per language, then
+/// the one for a reader of none of them.
+const alternatesOf = (page) => [...languages.map((l) => [l.lang, urlOf(page, l.code)]), ['x-default', urlOf(page, 'en')]];
 const partial = (name) => readFileSync(join(here, 'pages', `_${name}.html`), 'utf8');
 
 /// One page in one language. [price] and [published] — the ledger's
@@ -125,15 +131,12 @@ export function render(page, language, words, { price = config().price, publishe
     lang: language.lang,
     locale: language.locale,
     base: base(language.code),
-    url: `${origin}${base(language.code)}${path}`,
+    url: urlOf(page, language.code),
     app,
     // The site's language is the app's: the app is at an origin of its
     // own now, and reads it from the address (app/lib/l10n/l10n.dart).
     play: `${app}/?lang=${language.code}`,
-    alternates: [
-      ...languages.map((l) => `<link rel="alternate" hreflang="${l.lang}" href="${origin}${base(l.code)}${path}">`),
-      `<link rel="alternate" hreflang="x-default" href="${origin}${path}">`,
-    ].join('\n'),
+    alternates: alternatesOf(page).map(([hreflang, href]) => `<link rel="alternate" hreflang="${hreflang}" href="${href}">`).join('\n'),
     langs: languages
       .map((l) => `<li><a href="${base(l.code)}${path}" hreflang="${l.lang}" lang="${l.lang}"` +
         `${l.code === language.code ? ' aria-current="true"' : ''}>${l.name}</a></li>`)
@@ -179,6 +182,25 @@ export const pages = () =>
     .filter((f) => f.endsWith('.html') && !f.startsWith('_'))
     .map((f) => f.slice(0, -'.html'.length));
 
+/// sitemap.xml: every page in every language, by its canonical, each
+/// with the copies its own head names, as a search engine takes them
+/// from a sitemap.
+export function sitemap() {
+  const entry = (page, language) => [
+    '  <url>',
+    `    <loc>${urlOf(page, language.code)}</loc>`,
+    ...alternatesOf(page).map(([hreflang, href]) => `    <xhtml:link rel="alternate" hreflang="${hreflang}" href="${href}"/>`),
+    '  </url>',
+  ];
+  return [
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">',
+    ...pages().flatMap((page) => languages.flatMap((language) => entry(page, language))),
+    '</urlset>',
+    '',
+  ].join('\n');
+}
+
 /// What is wrong with a language's strings, against English's: a key
 /// missing or extra, or a string whose markup — tags, links and
 /// placeholders — is not English's, in any order. The note that a page
@@ -209,6 +231,7 @@ export function build(out) {
     mkdirSync(dir, { recursive: true });
     for (const page of pages()) writeFileSync(join(dir, `${page}.html`), render(page, language, words));
   }
+  writeFileSync(join(out, 'sitemap.xml'), sitemap());
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

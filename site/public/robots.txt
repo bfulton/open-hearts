@@ -1,2 +1,4 @@
 User-Agent: ProjectArachnid/E2Z7A4DOVNGNKQIUSZP4UGZACZODKBYW
 Allow: *
+
+Sitemap: https://openhearts.game/sitemap.xml
