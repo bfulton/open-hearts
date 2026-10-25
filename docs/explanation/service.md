@@ -292,7 +292,11 @@ runs where its account was first asked for, and a handler somewhere
 else can be shown what was there before for up to a minute, a row it
 found missing included. So a device brought in, by a code, a store
 purchase or a sign-in, is licensed from the entitlement row the object
-wrote.
+wrote. After that, the device shows its licence when it takes the
+account up and when it reads or writes the profile. The service signed
+that licence, and it names the account, so the handler asks that
+account's object, which knows the device, rather than the store, which
+may not have heard of it yet.
 
 ### When Apple says a sign-in is gone
 

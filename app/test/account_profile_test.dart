@@ -51,6 +51,9 @@ class Kept {
   /// What was asked, in order: `read` or `write`.
   final asked = <String>[];
 
+  /// The licence each read or write showed (Entitlement.licenceShown).
+  final shown = <Object?>[];
+
   Future<({int status, String body})> ask(Uri url, String body) async {
     if (!reachable) throw const SocketException('nobody there');
     final json = jsonDecode(body) as Map;
@@ -59,6 +62,7 @@ class Kept {
       return (status: 200, body: jsonEncode({'activation': activationFor(key), 'profile': version}));
     }
     if (url.path != '/api/profile') return (status: 404, body: '{"error":"no such handler"}');
+    shown.add(json['licence']);
     final text = json['profile'];
     // What is written is what was signed.
     expect(schnorrVerifier(key, requestDigest('profile', key, json['at'] as int, text is String ? text : ''), json['sig'] as String), isTrue);
@@ -130,6 +134,15 @@ void main() {
     await AccountProfile.current.sync();
     expect(await here(), (name: 'Bao B.', avatar: Avatar.none));
     expect(kept.asked, ['read', 'read', 'read'], reason: 'never written over by a read');
+  });
+
+  test('the profile is read and written with the licence this device holds, which names the account', () async {
+    final kept = standUp();
+    await licenceThisDevice();
+    await Identity.setName('Ada');
+    await AccountProfile.current.sync();
+    expect(kept.asked, ['read', 'write'], reason: 'the account had none, and takes this device\'s');
+    expect(kept.shown, [Entitlement.current.licence!.toJson(), Entitlement.current.licence!.toJson()]);
   });
 
   test('a change on the profile page is kept here at once and sent as the account\'s', () async {

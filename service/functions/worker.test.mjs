@@ -990,6 +990,59 @@ test('a device brought into a suspended account is told so, though the store whe
   assert.deepEqual([claimed.status, await claimed.json()], [403, { error: SUSPENDED_WHY, suspended: true }], 'not offered a subscription it cannot use');
 });
 
+test('a device just brought in takes its account up at once, showing its licence where the store has yet to hear of it', async () => {
+  const store = await household(Date.now(), ADA.public);
+  const account = await accountOfSub(store, 'sub_9');
+  const { codes } = await makeBackups(store, account);
+  const { send } = serving(store);
+  const held = { ...env, OH_SERVICE_SECRET: SERVICE_SECRET, OH_SERVICE_KEY: SERVICE_KEY, OH_STORE: seenFrom(kvOf(store)), HOUSEHOLD: objectsAt(seenFrom(kvOf(store))) };
+  assert.equal((await worker.fetch(send('licence', await asking(BAO, 'licence')), held)).status, 402);
+  const typed = codes[0].code;
+  const { licence: mine } = await (await worker.fetch(send('claim', await asking(BAO, 'claim', { what: typed, ticket: typed })), held)).json();
+  const activate = async (pair, more = {}) => worker.fetch(send('activate', await asking(pair, 'activate', { what: 'open ', want: 'open', ...more })), held);
+
+  // The store here has nothing for it yet, for up to a minute: with no
+  // licence shown, the handler has no account to ask.
+  assert.equal((await activate(BAO)).status, 402);
+  // Its licence names the account, whose object brought it in and knows it.
+  const took = await activate(BAO, { licence: mine });
+  assert.equal(took.status, 200);
+  assert.equal((await took.json()).activation.account, account);
+  const profile = await worker.fetch(send('profile', await asking(BAO, 'profile', { licence: mine })), held);
+  assert.equal(profile.status, 200);
+
+  // A licence is taken only as the service's word for the device showing
+  // it, and only while it is good: another device's, one altered, or one
+  // run out is no word at all, though the account's object knows this
+  // device.
+  const { licence: hers } = await (await worker.fetch(send('licence', await asking(ADA, 'licence')), held)).json();
+  assert.equal((await activate(BAO, { licence: hers })).status, 402, "another device's licence");
+  assert.equal((await activate(BAO, { licence: { ...mine, until: dayAfter(Date.now(), 400) } })).status, 402, 'one altered');
+  const old = await licenceFor(BAO.public, account, dayAfter(Date.now(), -2), { signer, secret: SERVICE_SECRET, service: SERVICE_KEY });
+  assert.equal((await activate(BAO, { licence: old })).status, 402, 'one run out');
+  assert.equal((await activate(BAO, { licence: { ...mine, sig: undefined } })).status, 402, 'one unsigned');
+  assert.equal((await activate(BAO, { licence: 'not one' })).status, 402);
+});
+
+test("a device just moved shows its licence for the account it is in, over what the store here last read", async () => {
+  // The store here read the device's row while it was another
+  // account's; its new account's object has since written it in.
+  const store = await household(Date.now(), ADA.public);
+  const account = await accountOfSub(store, 'sub_9');
+  const here = seenFrom(kvOf(store));
+  const held = { ...env, OH_SERVICE_SECRET: SERVICE_SECRET, OH_SERVICE_KEY: SERVICE_KEY, OH_STORE: here, HOUSEHOLD: objectsAt(seenFrom(kvOf(store))) };
+  const before = '0b'.repeat(16);
+  await store.put(`KEY#${BAO.public}`, 'ENTITLEMENT', { account: before, licensed_until: '2027-09-16', at: dayOf(Date.now()) });
+  assert.equal((await here.get(`KEY#${BAO.public}|ENTITLEMENT`, 'json')).account, before);
+  const { codes } = await makeBackups(store, account);
+  await redeemBackup(BAO.public, codes[0].code, store);
+  const mine = await licenceFor(BAO.public, account, dayAfter(Date.now(), 30), { signer, secret: SERVICE_SECRET, service: SERVICE_KEY });
+  const { send } = serving(store);
+  const took = await worker.fetch(send('activate', await asking(BAO, 'activate', { what: 'open ', want: 'open', licence: mine })), held);
+  assert.equal(took.status, 200, "asked of the account it is in, not the one the store here last read");
+  assert.equal((await took.json()).activation.account, account);
+});
+
 test('the routes: a code, a claim that answers with the licence, and the devices list', async () => {
   const now = Date.UTC(2026, 8, 16);
   const store = await household(now, ADA.public);

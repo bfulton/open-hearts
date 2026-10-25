@@ -44,6 +44,13 @@ class Entitlement extends ChangeNotifier {
   /// The licence this device holds, if it holds a good one.
   Licence? get licence => _licence;
 
+  /// What a request that needs this device's account shows besides what
+  /// it asks: the licence it holds, which the service signed and which
+  /// names the account. A device just brought in by its account's object
+  /// somewhere else is known there before the service's store here has
+  /// heard of it (service/functions/licence.mjs, licensedAccount).
+  Map<String, Object?> get licenceShown => {'licence': ?_licence?.toJson()};
+
   /// Whether live play is open here. The one question the front door
   /// asks, and the only one anything outside this file should.
   bool get live => _licence != null;

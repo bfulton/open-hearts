@@ -353,7 +353,11 @@ squashed from a pull request, the pull request's number.
   minute. On preview pr38 every one of eight activations from IAD,
   through accounts whose object ran at ORD, went so. A store purchase
   and signing in on a new device read it back the same way. Each is now
-  licensed from what the account's object wrote. (2026-10-25, #38)
+  licensed from what the account's object wrote. For the same minute
+  the device could not take the account up or keep its profile: Play
+  live said "No relay answered". Now the device shows its licence when
+  it does either, and the handler asks the account the licence names.
+  (2026-10-25, #38)
 - A live table that stopped for good when the person's connection
   dropped as the bots passed (table 64cf65a3). Back sixteen seconds
   later, their device gave each bot fifteen seconds and took all three

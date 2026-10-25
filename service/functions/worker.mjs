@@ -23,7 +23,7 @@ import { healthOf } from './health.mjs';
 import { holdOf } from './holds.mjs';
 import { inHousehold, inSubscription } from './household.mjs';
 import { MOST_BODY, MOST_EVENT, cors, json, preflight, signedFor, textOf } from './http.mjs';
-import { ACTIVATION_S, activationFor, licence, serviceKeys } from './licence.mjs';
+import { ACTIVATION_S, activationFor, licence, licensedAccount, serviceKeys } from './licence.mjs';
 import { loginRow } from './logins.mjs';
 import { measure } from './metrics.mjs';
 import { carryOutNotice, noticesOf } from './notices.mjs';
@@ -150,7 +150,9 @@ async function activateRoute(request, env) {
   // In local mode a device nobody has heard of is licensed, and so has
   // an account, as it asks.
   if (open) await entitlementOf(store, key, { now, openHouse: true });
-  const account = await accountOfKey(store, key);
+  // The account its licence names, or the store's: a device just brought
+  // in shows the one, before the store here has the other.
+  const account = (await licensedAccount(body.licence, key, env, { signer, now })) ?? (await accountOfKey(store, key));
   if (!account) return json(request, 402, { error: 'no subscription' });
   const seated = body.seated === undefined ? undefined : body.seated;
   const took = await inHousehold(env, account, { op: 'activate', key, account, want: body.want, ...(seated !== undefined ? { seated } : {}) });
@@ -226,11 +228,12 @@ async function profileRoute(request, env) {
     most: MOST_PROFILE_BODY,
   });
   if (asked instanceof Response) return asked;
-  const { key, body } = asked;
+  const { key, body, signer } = asked;
   if (body.profile !== undefined && typeof body.profile !== 'string') return json(request, 400, { error: 'not a profile' });
   const store = storeOf(env);
   if (!store) return json(request, 503, notConfigured('OH_STORE'));
-  const account = await accountOfKey(store, key);
+  // As activateRoute finds it.
+  const account = (await licensedAccount(body.licence, key, env, { signer })) ?? (await accountOfKey(store, key));
   if (!account) return json(request, 402, { error: 'no subscription' });
   const { status, body: out } = await inHousehold(env, account, { op: 'profile', key, ...(body.profile !== undefined ? { profile: body.profile } : {}) });
   return json(request, status, out);

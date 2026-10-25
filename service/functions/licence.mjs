@@ -23,7 +23,7 @@
 // assets the worker serves.
 
 import { entitlementOf } from './accounts.mjs';
-import { dayAfter, digestOf, earlier, hex, storeOf } from './rows.mjs';
+import { dayAfter, dayOf, digestOf, earlier, hex, storeOf } from './rows.mjs';
 import { S, notConfigured } from './settings.mjs';
 import { SUSPENDED_WHY } from './suspension.mjs';
 
@@ -103,6 +103,23 @@ async function serviceSigned(canonical, { signer, secret, service }) {
 export async function licenceFor(key, account, until, keys) {
   const sig = await serviceSigned(`${STATEMENT}\n${key}\n${account}\n${until}\n${PLAN}`, keys);
   return sig ? { key, account, until, plan: PLAN, sig } : null;
+}
+
+/// The account [licence] says [key] is a device of, when the licence is
+/// the service's own word for [key] and is still good; null otherwise.
+/// A device brought in by its account's object somewhere else shows
+/// it, where the store here may not have heard of the device for a
+/// minute yet (accounts.mjs, entitlementOf): it says which account's
+/// object to ask, and that object, which brought the device in, decides.
+export async function licensedAccount(licence, key, env, { signer, now = Date.now() } = {}) {
+  const keys = serviceKeys(env);
+  if (!keys || !signer || licence?.key !== key || typeof licence.sig !== 'string') return null;
+  // The account and the day are what the service signed; anything else
+  // in them fails the signature.
+  const { account, until } = licence;
+  if (typeof until !== 'string' || until < dayOf(now)) return null;
+  const digest = await digestOf(`${STATEMENT}\n${key}\n${account}\n${until}\n${PLAN}`);
+  return signer.verify(keys.service, digest, licence.sig) ? account : null;
 }
 
 /// The service's two halves, when both are set and look like keys.

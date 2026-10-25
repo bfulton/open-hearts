@@ -137,7 +137,7 @@ class InUse extends ChangeNotifier {
   Future<Use> _ask(String want, {bool place = true}) async {
     final signer = _signer!;
     final seated = _seated;
-    final more = <String, Object?>{'want': want, if (place) 'seated': seated};
+    final more = <String, Object?>{'want': want, if (place) 'seated': seated, ...Entitlement.current.licenceShown};
     final answer = await askHandler('activate', signer, more, null, what: '$want ${place ? (seated ?? '') : ''}', timeout: waits.licence);
     if (answer == null) {
       _unanswered = DateTime.now();

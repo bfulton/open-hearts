@@ -68,8 +68,10 @@ A signed request's body carries `key` (64 hex characters), `at` (the second it w
 | Statement | Lines, separated by `\n` | Signed by | Made by | Checked by |
 |---|---|---|---|---|
 | A request | `oh-request/1`, the handler's name, the key, `at`, the `what` line | The device's key | `signedAsk` and `requestDigest` in `app/lib/net/licence.dart` | `requestStatement` and `askedBy` in `service/functions/http.mjs` |
-| A licence | `oh-licence/2`, the device's key, the account, the last day (`YYYY-MM-DD`, UTC), the plan (`PLAN`) | The service key (`OH_SERVICE_SECRET`) | `licenceFor` in `service/functions/licence.mjs` | `Licence` in `packages/table/lib/src/licence.dart` |
+| A licence | `oh-licence/2`, the device's key, the account, the last day (`YYYY-MM-DD`, UTC), the plan (`PLAN`) | The service key (`OH_SERVICE_SECRET`) | `licenceFor` in `service/functions/licence.mjs` | `Licence` in `packages/table/lib/src/licence.dart`; `licensedAccount` in `service/functions/licence.mjs` |
 | An activation | `oh-active/1`, the account, the device's key, the epoch, the last second (Unix time) | The service key | `activationFor` in `service/functions/licence.mjs` | `Activation` in `packages/table/lib/src/licence.dart`; `activationOf` in `service/do/relay.mjs` |
+
+An `activate` or `profile` request also carries `licence`, the licence the device holds, when it holds one. The handler asks the account the licence names, if the licence is this device's, signed by the service and not run out, and otherwise the account the store names. A device just brought in by its account's `Household` object somewhere else is known to that object before the store at the handler's end has heard of it (see [the service](../explanation/service.md#accounts)).
 
 Each signature is BIP-340 over the SHA-256 hex digest of the statement's text (`digestOf` in `service/functions/rows.mjs`). A request whose `at` is further from the service's clock than `requestToleranceS` ([service settings](configuration.md#service-settings)) is refused with 401. An activation lasts at most `ACTIVATION_S` (in `service/functions/licence.mjs`), and never past the end of the day the subscription is paid to.
 
