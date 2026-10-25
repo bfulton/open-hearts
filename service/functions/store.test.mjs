@@ -10,6 +10,7 @@ import worker from './worker.mjs';
 import { devicesOn, entitlementOf } from './accounts.mjs';
 import { forgetHouseholds } from './household.mjs';
 import { signerOn } from './licence.mjs';
+import { objectsAt, seenFrom } from './places.fixtures.mjs';
 import { memoryStore } from './rows.mjs';
 import { forgetProviderKeys } from './signin.mjs';
 import { forgetPlayAccess, playPurchase, storeAccountOf } from './stores.mjs';
@@ -202,6 +203,23 @@ test('the device that bought it is licensed on it; another restoring it joins th
   const account = (await store.get('SUB#apple:2000000000000001', 'ACCOUNT')).account;
   assert.deepEqual((await devicesOn(store, account)).map((d) => d.key).sort(), [ADA.public, BAO.public].sort());
   assert.equal((await entitlementOf(store, BAO.public, { now })).account, account, 'one account, two devices');
+});
+
+test('the device that bought it is licensed at once, though the store where it asked has yet to hear of it', async () => {
+  trustAppleRoots([der(pki.root)]);
+  const store = memoryStore();
+  const { env: plain, send } = serving(store);
+  const env = { ...plain, OH_STORE: seenFrom(kvOf(store)), HOUSEHOLD: objectsAt(seenFrom(kvOf(store))) };
+  const ada = await storeAccountOf(ADA.public);
+  const proof = await appleJws(transaction({ appAccountToken: ada.apple }));
+
+  // The app asks for its licence as it starts, and has none; then its
+  // person buys a year in the store.
+  assert.equal((await worker.fetch(send('licence', await asking(ADA, 'licence', '')), env)).status, 402);
+  const bought = await worker.fetch(send('store', await bring(ADA, 'apple', proof)), env);
+  assert.equal(bought.status, 200);
+  assert.equal((await bought.json()).licence.key, ADA.public);
+  forgetAppleRoots();
 });
 
 test('the proof is what is signed, and a proof Apple did not sign is refused', async () => {

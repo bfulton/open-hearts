@@ -345,6 +345,15 @@ squashed from a pull request, the pull request's number.
 
 ### Fixed
 
+- A code entered under Activate subscription spent itself, brought the
+  device in, and answered "No subscription." whenever the account's
+  object ran somewhere other than where the device was: the service
+  read the device's licence back from KV at the device's end, where the
+  app's own ask of a few seconds before was still held, for up to a
+  minute. On preview pr38 every one of eight activations from IAD,
+  through accounts whose object ran at ORD, went so. A store purchase
+  and signing in on a new device read it back the same way. Each is now
+  licensed from what the account's object wrote. (2026-10-25, #38)
 - A live table that stopped for good when the person's connection
   dropped as the bots passed (table 64cf65a3). Back sixteen seconds
   later, their device gave each bot fifteen seconds and took all three

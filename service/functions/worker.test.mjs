@@ -8,6 +8,7 @@ import { accountFor, claimWith, devicesOn, entitlementOf, makeBackups, redeemBac
 import { activate, activeInStore, dropDevice, householdOp } from './household.mjs';
 import { allowedOrigin, askedBy, requestStatement } from './http.mjs';
 import { licence, licenceFor, signerOn } from './licence.mjs';
+import { objectsAt, seenFrom } from './places.fixtures.mjs';
 import { attest, loginRow } from './logins.mjs';
 import { dayAfter, dayOf, memoryStore } from './rows.mjs';
 import { SITE, forgetSettings, openHouse, useSettings } from './settings.mjs';
@@ -951,6 +952,44 @@ test('the routes: backup codes shown, one claimed with the licence back, and rep
   assert.equal(typeof (await sentTo.json()).emailed, 'boolean');
 });
 
+test("a device brought in by a code is licensed at once, though the store where it asked has yet to hear of it", async () => {
+  const store = await household(Date.now(), ADA.public);
+  const account = await accountOfSub(store, 'sub_9');
+  const { codes } = await makeBackups(store, account);
+  const { send } = serving(store);
+  const held = { ...env, OH_SERVICE_SECRET: SERVICE_SECRET, OH_SERVICE_KEY: SERVICE_KEY, OH_STORE: seenFrom(kvOf(store)), HOUSEHOLD: objectsAt(seenFrom(kvOf(store))) };
+
+  // The app asks for its licence as it starts, and has none; a few
+  // seconds later its person types a backup code.
+  assert.equal((await worker.fetch(send('licence', await asking(BAO, 'licence')), held)).status, 402);
+  const typed = codes[0].code;
+  const claimed = await worker.fetch(send('claim', await asking(BAO, 'claim', { what: typed, ticket: typed })), held);
+  assert.equal(claimed.status, 200);
+  const { licence: signed } = await claimed.json();
+  const { licence: theirs } = await (await worker.fetch(send('licence', await asking(ADA, 'licence')), held)).json();
+  assert.deepEqual([signed.key, signed.account, signed.until], [BAO.public, account, theirs.until], 'as long as the device that was there already');
+
+  // A code off another device's screen, the same.
+  assert.equal((await worker.fetch(send('licence', await asking(CY, 'licence')), held)).status, 402);
+  const { ticket } = (await ticketFor(ADA.public, store)).body;
+  const scanned = await worker.fetch(send('claim', await asking(CY, 'claim', { what: ticket, ticket })), held);
+  assert.equal(scanned.status, 200);
+  assert.equal((await scanned.json()).licence.key, CY.public);
+});
+
+test('a device brought into a suspended account is told so, though the store where it asked has yet to hear of it', async () => {
+  const store = await household(Date.now(), ADA.public);
+  const account = await accountOfSub(store, 'sub_9');
+  const { codes } = await makeBackups(store, account);
+  await store.put(`ACCOUNT#${account}`, 'SUSPENDED', { since: dayOf(Date.now()) });
+  const { send } = serving(store);
+  const held = { ...env, OH_SERVICE_SECRET: SERVICE_SECRET, OH_SERVICE_KEY: SERVICE_KEY, OH_STORE: seenFrom(kvOf(store)), HOUSEHOLD: objectsAt(seenFrom(kvOf(store))) };
+  assert.equal((await worker.fetch(send('licence', await asking(BAO, 'licence')), held)).status, 402);
+  const typed = codes[0].code;
+  const claimed = await worker.fetch(send('claim', await asking(BAO, 'claim', { what: typed, ticket: typed })), held);
+  assert.deepEqual([claimed.status, await claimed.json()], [403, { error: SUSPENDED_WHY, suspended: true }], 'not offered a subscription it cannot use');
+});
+
 test('the routes: a code, a claim that answers with the licence, and the devices list', async () => {
   const now = Date.UTC(2026, 8, 16);
   const store = await household(now, ADA.public);
@@ -1437,6 +1476,32 @@ test('the sign-in route: a token that does not check out is 401, and one that do
     const joined = await moved.json();
     assert.equal(joined.licence.key, BAO.public);
     assert.equal(joined.account, await accountOfSub(store, 'sub_9'));
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+});
+
+test('a device signing in is licensed at once, though the store where it asked has yet to hear of it', async () => {
+  forgetProviderKeys();
+  const store = await household(Date.now(), ADA.public);
+  const p = await provider({ iss: 'https://accounts.google.com', aud: signedInAs.OH_GOOGLE_AUDIENCE });
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = p.fetch;
+  try {
+    const { send } = serving(store);
+    const held = { ...env, ...signedInAs, OH_SERVICE_SECRET: SERVICE_SECRET, OH_SERVICE_KEY: SERVICE_KEY, OH_STORE: seenFrom(kvOf(store)), HOUSEHOLD: objectsAt(seenFrom(kvOf(store))) };
+    const mine = await p.token({ sub: 'sub-1', nonce: await nonceFor(ADA.public) });
+    assert.equal((await worker.fetch(send('attest', await asking(ADA, 'attest', { provider: 'google', token: mine })), held)).status, 200);
+
+    // A new phone asks for its licence as it starts, and has none; then
+    // its person signs in.
+    assert.equal((await worker.fetch(send('licence', await asking(BAO, 'licence')), held)).status, 402);
+    const theirs = await p.token({ sub: 'sub-1', nonce: await nonceFor(BAO.public) });
+    const moved = await worker.fetch(send('supersede', await asking(BAO, 'supersede', { provider: 'google', token: theirs })), held);
+    assert.equal(moved.status, 200);
+    const said = await moved.json();
+    assert.equal(said.licence?.key, BAO.public);
+    assert.deepEqual(Object.keys(said).sort(), ['account', 'at', 'licence'], 'and nothing else of what the object said');
   } finally {
     globalThis.fetch = realFetch;
   }

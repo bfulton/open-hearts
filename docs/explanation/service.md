@@ -286,6 +286,14 @@ the tests, an in-memory queue in the isolate does the same. Each kind of
 operation has an hourly allowance per account, counted in that queue
 ([service settings](../reference/configuration.md#service-settings)).
 
+What the object writes, the handler that asked it takes from the
+object's answer, not from KV. KV is eventually consistent: the object
+runs where its account was first asked for, and a handler somewhere
+else can be shown what was there before for up to a minute, a row it
+found missing included. So a device brought in, by a code, a store
+purchase or a sign-in, is licensed from the entitlement row the object
+wrote.
+
 ### When Apple says a sign-in is gone
 
 Sign in with Apple tells `apple-id` when a person stops using it with

@@ -16,9 +16,15 @@ import { S } from './settings.mjs';
 /// In local mode a key nobody has heard of is entitled on the spot for
 /// a month (docs/explanation/service.md), on an account of its own — one branch,
 /// and it is never on in production.
-export async function entitlementOf(store, key, { now = Date.now(), openHouse = false } = {}) {
+///
+/// [written] is the device's row as its account's object has just
+/// written it ([joinAccount]), which is taken instead of the row here:
+/// this store may not show it yet. KV is eventually consistent, and the
+/// object runs where its account was first asked for, not where the
+/// device is asking.
+export async function entitlementOf(store, key, { now = Date.now(), openHouse = false, written = null } = {}) {
   const today = dayOf(now);
-  const row = await store.get(`KEY#${key}`, 'ENTITLEMENT');
+  const row = written ?? (await store.get(`KEY#${key}`, 'ENTITLEMENT'));
   if (!row) {
     if (!openHouse) return null;
     const subscription = `local-${key.slice(0, 16)}`;
@@ -369,13 +375,17 @@ export async function joinAccount(key, account, store, { now = Date.now(), movin
   const sub = subscription ? await store.get(`SUB#${subscription}`, 'META') : null;
   if (!already) await store.put(`ACCOUNT#${account}`, `DEVICE#${key}`, { bound_at: today });
   // A device brought into a suspended account is suspended with it.
-  await store.put(`KEY#${key}`, 'ENTITLEMENT', {
+  const entitlement = {
     account,
     licensed_until: sub?.renews_at ?? null,
     at: today,
     ...((await isSuspended(store, account)) ? { suspended: true } : {}),
-  });
-  return { status: 200, body: { account } };
+  };
+  await store.put(`KEY#${key}`, 'ENTITLEMENT', entitlement);
+  // It goes back with the answer too: the handler that asked signs the
+  // device's licence from it ([entitlementOf], written), where the store
+  // may not show it yet.
+  return { status: 200, body: { account, entitlement } };
 }
 
 /// Whether [subscription] is somebody's purchase and still paid up on

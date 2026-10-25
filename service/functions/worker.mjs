@@ -82,8 +82,10 @@ async function claimRoute(request, env) {
   }
   if (claimed.status !== 200) return json(request, claimed.status, claimed.body);
   // Straight back with the licence it was claimed for, so the device
-  // that scanned a code is playing rather than waiting to be told.
-  const { status, body: out } = await licence(key, env, { signer, open: openHouse(env, request) });
+  // that scanned a code is playing rather than waiting to be told:
+  // signed from what the account's object wrote, which the store here
+  // may not show yet.
+  const { status, body: out } = await licence(key, env, { signer, open: openHouse(env, request), written: claimed.body.entitlement });
   return json(request, status, out);
 }
 
@@ -257,15 +259,16 @@ async function signInRoute(request, env, move) {
   // asks for anything.
   if (openHouse(env, request)) await entitlementOf(store, key, { openHouse: true });
   const mine = await accountOfKey(store, key);
-  const { status, body: out } = move
+  const { status, body: out, entitlement } = move
     ? await supersede(who, key, store, env, login)
     : mine
       ? await inHousehold(env, mine, { op: 'attest', who, key, login })
       : { status: 402, body: { error: 'no subscription' } };
   if (status !== 200) return json(request, status, out);
   // Straight back with the licence it is owed, if any: a device that
-  // has just proved who it is should not have to ask twice.
-  const licensed = await licence(key, env, { signer, open: openHouse(env, request) });
+  // has just proved who it is should not have to ask twice. One brought
+  // in is licensed from what its account's object wrote.
+  const licensed = await licence(key, env, { signer, open: openHouse(env, request), written: entitlement });
   return json(request, 200, { ...out, ...(licensed.status === 200 ? licensed.body : {}) });
 }
 
@@ -586,7 +589,7 @@ async function storeRoute(request, env, ctx) {
   const bound = await inSubscription(env, bought.subscription, { op: 'bind', key, ...op });
   if (bound.status !== 200) return json(request, bound.status, bound.body);
   if (!known) await after(ctx, alertSubscribed(env, store, { subscription: bought.subscription, source: bought.source, key, now }));
-  const { status, body: out } = await licence(key, env, { signer, now });
+  const { status, body: out } = await licence(key, env, { signer, now, written: bound.body.entitlement });
   return json(request, status, out);
 }
 
