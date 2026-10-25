@@ -350,6 +350,13 @@ squashed from a pull request, the pull request's number.
 
 ### Fixed
 
+- A live table no longer says "Your connection is down — reconnecting"
+  as it opens. Its line opens a moment after the table does, and until
+  then the table took itself for cut off and said so: in a browser on
+  the rig, for 0.2 to 1.8 seconds at every table, with the line up all
+  along. It says so now of a line that has been up and is cut off, as
+  before, or of one that has not opened in ten seconds. (2026-10-25,
+  #39)
 - A code entered under Activate subscription spent itself, brought the
   device in, and answered "No subscription." whenever the account's
   object ran somewhere other than where the device was: the service

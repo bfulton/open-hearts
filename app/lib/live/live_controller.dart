@@ -83,6 +83,7 @@ class LiveController extends ChangeNotifier implements TableModel {
     });
     _heardReactions = reactions?.reactions.listen(_heardReaction);
     _mute.addListener(_muteChanged);
+    _openedAtMs = client.clock.nowMs;
     client.start();
   }
 
@@ -192,6 +193,19 @@ class LiveController extends ChangeNotifier implements TableModel {
   int? _cutOffSince;
   bool _toldLost = false, _toldDown = false;
 
+  /// When this table opened here, by its clock, and whether its line
+  /// has been up since ([lineDown]).
+  late final int _openedAtMs;
+  bool _lineUp = false;
+
+  /// Whether to say this device's own line is down: cut off
+  /// ([TableClient.cutOff]) once its line has been up, or, where it
+  /// never has, once it has been trying for as long as a line that was
+  /// up is given ([unansweredMs]). A table's line opens a moment after
+  /// the table does, and the client is cut off until it has — rightly,
+  /// as it hears nobody yet — with nothing down.
+  bool get lineDown => client.cutOff && (_lineUp || client.clock.nowMs - _openedAtMs >= unansweredMs);
+
   /// How long a line may be down at a live table before it is told of:
   /// past anything a train's tunnel or a lift does, and well short of
   /// the minutes a player waits before giving up.
@@ -210,6 +224,7 @@ class LiveController extends ChangeNotifier implements TableModel {
     }
     if (!client.cutOff) {
       _cutOffSince = null;
+      _lineUp = true;
       return;
     }
     final now = client.clock.nowMs;

@@ -47,6 +47,7 @@ class LiveHarness {
     bool workers = false,
     bool canPlayAgain = false,
     int seed = 21,
+    Transport Function(Transport line)? myLine,
   }) {
     // Each device's deal work in a worker of its own, taking a
     // browser's time over each job, as the app's does.
@@ -84,7 +85,7 @@ class LiveHarness {
           seatAvatars: avatars,
           pictures: pictures,
           signer: signers[s],
-          transport: net.attach(signers[s].publicKey),
+          transport: (myLine ?? (line) => line)(net.attach(signers[s].publicKey)),
           clock: clock,
           crypto: crypto,
           dealWorker: myWorker = worker(),
@@ -179,6 +180,7 @@ Future<LiveHarness> pumpLive(WidgetTester tester,
     Set<int> botSeats = const {},
     int jurors = 0,
     bool workers = false,
+    Transport Function(Transport line)? myLine,
     ReportSender? report}) async {
   tester.view
     ..physicalSize = const Size(390, 844)
@@ -186,11 +188,40 @@ Future<LiveHarness> pumpLive(WidgetTester tester,
   addTearDown(tester.view.reset);
   final live =
       LiveHarness(
-          crypto: crypto, pictures: pictures, avatars: avatars, target: target, rated: rated, botSeats: botSeats, jurors: jurors, workers: workers);
+          crypto: crypto, pictures: pictures, avatars: avatars, target: target, rated: rated, botSeats: botSeats, jurors: jurors, workers: workers, myLine: myLine);
   await tester.pumpWidget(MaterialApp(
       theme: buildTheme(), home: LivePage(controller: live.controller, report: report ?? (_) async => throw StateError('no report expected'))));
   await tester.pumpAndSettle();
   return live;
+}
+
+/// This device's line as a table's first opens: a socket not open yet
+/// sends nothing, hears nothing and is cut off (packages/table,
+/// relays.dart), until [open]; and as the network has it after.
+class OpeningLine implements Transport {
+  OpeningLine(this.line);
+  final Transport line;
+  bool open = false;
+
+  @override
+  bool get cutOff => !open || line.cutOff;
+  @override
+  void broadcast(Map<String, Object?> message, {bool everywhere = false}) {
+    if (open) line.broadcast(message, everywhere: everywhere);
+  }
+
+  @override
+  late final incoming = line.incoming.where((_) => open);
+  @override
+  Stream<PublicKey> get disconnected => line.disconnected;
+  @override
+  List<String> get paths => line.paths;
+  @override
+  void heard(PublicKey peer, List<String> paths) => line.heard(peer, paths);
+  @override
+  void reach(Set<PublicKey> peers) => line.reach(peers);
+  @override
+  void close() => line.close();
 }
 
 /// Plays for the thumb: passes anything, plays the first legal card.
@@ -404,6 +435,65 @@ void main() {
       await live.advance(tester, 1000);
     }
     expect(find.text(down), findsNothing, reason: 'back, and the note gone');
+    expect(tester.takeException(), isNull);
+  });
+
+  // A table's line opens a moment after the table does: in a browser on
+  // the rig, a second or so, with the line up all along. Sealed, as
+  // every table people play at is, so that its deal waits on the line;
+  // and with bots, as most are, whose jury it has not heard yet either.
+  for (final bots in [false, true]) {
+    testWidgets('a table${bots ? ' with bots' : ''} whose line is still opening says nothing of it, nor of the others, until it has tried as long as a line is given',
+        (tester) async {
+      late OpeningLine line;
+      final live = await pumpLive(tester,
+          crypto: await rememberedCrypto(), botSeats: bots ? const {1, 3} : const {}, jurors: bots ? 4 : 0, myLine: (l) => line = OpeningLine(l));
+      const down = 'Your connection is down — reconnecting';
+      for (var s = 0; s < 10; s++) {
+        expect(find.text(down), findsNothing, reason: '$s s in, never up');
+        // Nobody heard yet: nothing said of the others, or of a jury —
+        // the deal's own note, and that alone.
+        expect(find.text(live.controller.dealNote!), findsOneWidget, reason: '$s s in: the deal, all there is to say');
+        for (final note in ['Waiting for the others to reconnect', 'Asking the jury', 'Nobody online to draw a jury from — waiting for one', 'Waiting for the jury']) {
+          expect(find.text(note), findsNothing, reason: '$s s in: $note');
+        }
+        await live.advance(tester, 1000);
+      }
+      expect(live.controller.client.cutOff, isTrue);
+      expect(find.text(down), findsOneWidget, reason: 'ten seconds without the line is the line down, as it is once up');
+
+      line.open = true;
+      for (var s = 0; s < 5 && find.text(down).evaluate().isNotEmpty; s++) {
+        await live.advance(tester, 1000);
+      }
+      expect(find.text(down), findsNothing, reason: 'up, and the note gone');
+      for (var guard = 0; guard < 120 && live.controller.game.phase == engine.Phase.dealing; guard++) {
+        await live.advance(tester, 500);
+      }
+      expect(live.controller.game.phase, engine.Phase.passing, reason: 'and the hand dealt');
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('a line that has been up says it is down as soon as it is cut off, however soon after the table opened', (tester) async {
+    late OpeningLine line;
+    final live = await pumpLive(tester, crypto: await rememberedCrypto(), myLine: (l) => line = OpeningLine(l));
+    const down = 'Your connection is down — reconnecting';
+    await live.advance(tester, 1000);
+    line.open = true;
+    await live.advance(tester, 1000);
+    expect(live.controller.client.cutOff, isFalse);
+    expect(find.text(down), findsNothing);
+
+    // Its socket drops, two seconds in: no longer opening, but down.
+    line.open = false;
+    await live.advance(tester, 1000);
+    expect(find.text(down), findsOneWidget, reason: 'down at once, as a socket that drops is');
+    line.open = true;
+    for (var s = 0; s < 5 && find.text(down).evaluate().isNotEmpty; s++) {
+      await live.advance(tester, 1000);
+    }
+    expect(find.text(down), findsNothing, reason: 'back');
     expect(tester.takeException(), isNull);
   });
 
