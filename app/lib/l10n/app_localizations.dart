@@ -2155,6 +2155,96 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Hide others\' reactions'**
   String get hideReactions;
+
+  /// Menu item on the front door: a first hand of Hearts, taught (tutorial.dart).
+  ///
+  /// In en, this message translates to:
+  /// **'Learn to play'**
+  String get learnToPlay;
+
+  /// A link under Play solo on the front door, for a device that has played no game alone and not opened the tutorial: opens it. Hearts is the game's name as the language has it.
+  ///
+  /// In en, this message translates to:
+  /// **'New to Hearts? Learn to play'**
+  String get learnToPlayOffer;
+
+  /// Button on a tutorial note the table waits on: the note has been read, and the game goes on.
+  ///
+  /// In en, this message translates to:
+  /// **'Next'**
+  String get tutorialNext;
+
+  /// The tutorial's first note, over the dealt hand: what the game is and what to aim for.
+  ///
+  /// In en, this message translates to:
+  /// **'Four players, thirteen cards each. Every heart you take is a point against you, and the queen of spades is 13. Take as few points as you can.'**
+  String get tutorialWelcome;
+
+  /// Tutorial, while the player chooses cards to pass. Pass is the button's own word (passButton).
+  ///
+  /// In en, this message translates to:
+  /// **'First, everyone passes three cards. Choose three you would rather not keep and tap Pass. This time they go to the player on your left.'**
+  String get tutorialPass;
+
+  /// Tutorial, once the pass is made: the three cards that came in, which the hand marks with a dot until the first trick.
+  ///
+  /// In en, this message translates to:
+  /// **'Three cards came to you from the player on your right. They are marked with a dot until the first trick is played.'**
+  String get tutorialReceived;
+
+  /// Tutorial, when the player holds the 2 of clubs and must play it to start the first trick.
+  ///
+  /// In en, this message translates to:
+  /// **'The 2 of clubs leads the first trick, and you have it. Tap it to play it.'**
+  String get tutorialYouLead;
+
+  /// Tutorial, when a bot holds the 2 of clubs and is about to play it to start the first trick. name is the bot's name.
+  ///
+  /// In en, this message translates to:
+  /// **'The 2 of clubs leads the first trick, and {name} has it.'**
+  String tutorialTheyLead(String name);
+
+  /// Tutorial, at the player's first turn in a trick whose suit they hold: they must follow it. A card that cannot be played is drawn dimmed, and tapping it says why.
+  ///
+  /// In en, this message translates to:
+  /// **'Play a card of the suit that was led, if you have one. The cards you can\'t play are dimmed: tap one to see why.'**
+  String get tutorialFollow;
+
+  /// Tutorial, at the player's first turn in a trick whose suit they hold none of, after the first trick: any card may be played. suit is the suit led.
+  ///
+  /// In en, this message translates to:
+  /// **'{suit, select, clubs{You have no clubs} diamonds{You have no diamonds} spades{You have no spades} other{You have no hearts}}, so any card will do. Any points you play go to whoever takes the trick.'**
+  String tutorialNoSuit(String suit);
+
+  /// As tutorialNoSuit, on the first trick, which clubs always lead and where no heart or queen of spades may be played.
+  ///
+  /// In en, this message translates to:
+  /// **'You have no clubs, so you can play another suit, but not a heart or the queen of spades: the first trick carries no points.'**
+  String get tutorialNoSuitFirst;
+
+  /// Tutorial, over the first trick once all four cards are on the table: who takes a trick, and who leads after.
+  ///
+  /// In en, this message translates to:
+  /// **'The highest card of the suit that was led takes the trick, with any points in it. Whoever takes it leads the next one.'**
+  String get tutorialTrickTaken;
+
+  /// Tutorial, when the hand's first heart is played: hearts are broken (refuseHeartsUnbroken's word), and may be led from now on.
+  ///
+  /// In en, this message translates to:
+  /// **'That\'s the first heart: hearts are broken. Until one had been played, nobody could lead a heart. Now anyone can.'**
+  String get tutorialHeartsBroken;
+
+  /// Tutorial, when the queen of spades is played to a trick.
+  ///
+  /// In en, this message translates to:
+  /// **'The queen of spades: 13 points to whoever takes this trick.'**
+  String get tutorialQueen;
+
+  /// Tutorial, on the score sheet at the end of its one hand: how a hand is scored, shooting the moon (the language's own word, as shotTheMoon has it), and how a game ends.
+  ///
+  /// In en, this message translates to:
+  /// **'Hearts are a point each, the queen of spades 13. Take all 26 and you shoot the moon: everyone else gets them instead. A game goes on to 50 or 100 points, and the lowest score wins.'**
+  String get tutorialScore;
 }
 
 class _AppLocalizationsDelegate

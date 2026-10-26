@@ -35,7 +35,7 @@ Each suite is a `suite_<name>` function in `check.sh`, run from the repository's
 | `service_object` | The `service` tests with `OH_RELAY=object`: against that relay under the object's own rules |
 | `relay_js` | `node --test service/do/*.test.mjs` |
 | `functions` | `node --test service/functions/*.test.mjs` |
-| `site` | `node --test site/*.test.mjs`: every page in every language, and the terms and the privacy policy against `site/ledger.json` and main's copy of it |
+| `site` | `node --test site/*.test.mjs`: every page in every language, the terms and the privacy policy against `site/ledger.json` and main's copy of it, and the store listings' words against each store's limits |
 | `infra` | `node --test infra/*.test.mjs` |
 | `ops` | `node --test ops/*.test.mjs`: [the oh command](oh.md), its reference against its table, and each command against fakes of the store, Stripe and the programs it starts |
 | `workers` | `node --test` on `e2e/deal_worker.test.mjs`, `e2e/deal_golden.test.mjs`, `e2e/offline_worker.test.mjs`, `e2e/carry.test.mjs` and `crypto/schnorr_wasm/vectors.test.mjs`: the page's workers, against the committed wasm |
@@ -100,7 +100,7 @@ For the `app` suite, `quick` passes `-x slow`, and runs only the test files that
 | Package | `dart_test.yaml` | Tagged `slow` | Fast tier | Slow tier |
 |---|---|---|---|---|
 | `packages/table` | `concurrency: 4`; declares the tag `slow` | `chaos_sealed_test.dart`, `deal_worker_test.dart`, `game_record_test.dart`, `juror_summoned_again_test.dart`, `late_juror_verdict_test.dart`, `rejoin_test.dart`, `sealed_departures_test.dart`, `sealed_lies_test.dart`, `top_up_test.dart`, `undealt_hand_test.dart`, and the later seeds of `chaos_test.dart` | `dart test -x slow` | `dart test -t slow` |
-| `app` | Declares the tag `slow` | `table_fits_test.dart`, `table_fits_live_test.dart`, `table_fits_live_end_test.dart`, `table_fits_wide_test.dart`: the layout matrix in `app/test/fits.dart` | `flutter test -x slow` | `flutter test`, which runs every test |
+| `app` | Declares the tag `slow` | `table_fits_test.dart`, `table_fits_live_test.dart`, `table_fits_live_end_test.dart`, `table_fits_wide_test.dart`, `tutorial_fits_test.dart`: the layout matrix in `app/test/fits.dart` | `flutter test -x slow` | `flutter test`, which runs every test |
 | `service` | `concurrency: 4` | None | `dart test` | None |
 | `packages/engine`, `packages/deal`, `packages/table_sim` | None | None | `dart test` | None |
 
@@ -123,8 +123,9 @@ The scripts in `e2e/`. Each suite exits non-zero on failure. For what they need 
 | `e2e/site.mjs` | The marketing site in each language: the language redirect, a chosen language kept, and every page fitting a phone | None | `e2e_site` |
 | `e2e/shots.mjs` | Not a check. Screenshots of the table at the shapes in [screens](../explanation/screens.md), into `app/build/shots/`. | `--app-dir <path>` | None |
 | `e2e/site_shots.mjs` | Not a check. The site's pictures of the game in each language, into `site/public/img/`. | `--app-dir <path>` | None |
+| `e2e/store_shots.mjs` | Not a check. The App Store's and Google Play's screenshots in each language and size, and Google Play's feature graphic and icon, into `app/build/store/`. | `--size <name>`, `--lang <code>`, `--only <picture>`, `--app-dir <path>` | None |
 
-- `--only <text>` runs the flows whose names contain the text.
+- `--only <text>` runs the flows whose names contain the text. For `store_shots.mjs`, it is one picture (`play`, `live`, `learn`, `won` or `pass`), or `graphics` for Google Play's feature graphics and icon alone; `--size` and `--lang` narrow it to one size or language.
 - `--jobs <n>` shares the flows among `n` workers, each with a rig of its own (`jobsAsked` in `e2e/pool.mjs`). `--serial` is one worker, in order.
 - `--app-dir <path>` serves another build instead of `app/build/e2e` (`appDir` in `e2e/drive.mjs`).
 
@@ -134,6 +135,7 @@ The suites open the app with these query parameters. Each is read only when the 
 |---|---|
 | `e2e` | Marks the page as driven by a suite, and builds the accessibility tree from the start. |
 | `relay=<port>` | The local relay's port. |
+| `seed=<n>` | The deal a solo game starts from (`_dealtFrom` in `app/lib/home_page.dart`). |
 | `pace=<share>` | The share of a table's beats to wait, such as `0.1` (`paceIn`). |
 | `target=<points>` | The score the games this device starts play to, such as `1` (`targetIn`). |
 | `roomWait=<seconds>` | How long a room waits for one more arrival (`roomWait`). |
@@ -162,6 +164,7 @@ One job, `ios`, on macOS. It runs when started by hand, and on pull requests and
 
 | Step | What it checks |
 |---|---|
+| `third_party/flutter/simulator_log_stream.patch`, applied to the Flutter it sets up, and the tool built again | Nothing itself. It is Flutter's fix for the tool waiting with no end on a simulator, which no release carries yet (`third_party/flutter/README.md`). It fails if the patch no longer applies, or the tool built again does not have it. |
 | `crypto/build_ios.sh` | The deal and Schnorr libraries build as XCFrameworks. |
 | `flutter test integration_test/native_libs_test.dart` on a simulator, once it has booted, for at most 25 minutes | The libraries load as the app loads them (`app/integration_test/native_libs_test.dart`). When it fails or hangs, the next step prints the end of the Flutter tool's log, the simulator's state, a sample of the app's threads, and the app's log on the simulator. |
 | `flutter build ios --release --no-codesign`, without the service key | The release build is refused (`app/ios/release_check.sh`). |

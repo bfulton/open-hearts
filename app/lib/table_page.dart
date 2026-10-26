@@ -7,6 +7,7 @@
 /// than it gives. The menu is the one way off it.
 library;
 
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:engine/engine.dart';
@@ -21,6 +22,8 @@ import 'net/copy.dart';
 import 'pages.dart';
 import 'table_model.dart';
 import 'theme.dart';
+import 'tutorial.dart';
+import 'ui/coach_note.dart';
 import 'ui/gone.dart';
 import 'ui/hand_fan.dart';
 import 'ui/header.dart';
@@ -34,15 +37,19 @@ import 'ui/update_pill.dart';
 /// A game alone, as `/solo` is opened with it (router.dart, soloPath):
 /// what the address cannot carry.
 class SoloGame {
-  const SoloGame({this.target = gameOverScore, this.seed, this.paced = true});
+  const SoloGame({this.target = gameOverScore, this.seed, this.paced = true, this.learning = false});
 
   final int target;
   final int? seed;
   final bool paced;
+
+  /// The hand a new player is taught on, rather than a game
+  /// (tutorial.dart).
+  final bool learning;
 }
 
 class TablePage extends StatefulWidget {
-  const TablePage({super.key, this.seed, this.paced = true, this.target = gameOverScore});
+  const TablePage({super.key, this.seed, this.paced = true, this.target = gameOverScore, this.learning = false});
 
   /// Fixes the shuffle: a test's, or a browser suite's under `?e2e&seed=`
   /// (home_page.dart); in play, never.
@@ -56,6 +63,11 @@ class TablePage extends StatefulWidget {
   /// hand out without pumping a clock through 52 plays.
   final bool paced;
 
+  /// The hand a new player is taught on (tutorial.dart): the same deal
+  /// every time, a note at each thing it comes to, and the score sheet
+  /// at its end the way home.
+  final bool learning;
+
   @override
   State<TablePage> createState() => _TablePageState();
 }
@@ -63,11 +75,23 @@ class TablePage extends StatefulWidget {
 class _TablePageState extends State<TablePage> {
   late final GameController _controller;
 
+  /// The notes, where this is the hand a new player is taught on.
+  Tutorial? _tutorial;
+
   @override
   void initState() {
     super.initState();
-    _controller = GameController(seed: widget.seed, paced: widget.paced, target: widget.target)
-      ..addListener(_onGameChanged);
+    _controller = GameController(
+      seed: widget.learning ? Tutorial.seed : widget.seed,
+      paced: widget.paced,
+      target: widget.target,
+      hold: widget.learning ? () => _tutorial!.ready() : null,
+    )..addListener(_onGameChanged);
+    if (widget.learning) {
+      _tutorial = Tutorial(_controller)..addListener(_onGameChanged);
+      // Opened is enough: the front door offers it once (tutorial.dart).
+      unawaited(Learning.opened());
+    }
     // Your avatar, as chosen in the lobby, on your line here too.
     Identity.avatar().then((a) {
       if (mounted) setState(() => _controller.myAvatar = a);
@@ -98,6 +122,9 @@ class _TablePageState extends State<TablePage> {
 
   @override
   void dispose() {
+    _tutorial
+      ?..removeListener(_onGameChanged)
+      ..dispose();
     _controller
       ..removeListener(_onGameChanged)
       ..dispose();
@@ -105,6 +132,8 @@ class _TablePageState extends State<TablePage> {
   }
 
   void _tapCard(Card card) {
+    // A note being read holds the player's cards as it holds the bots'.
+    if (_tutorial?.holds ?? false) return;
     final controller = _controller;
     if (controller.awaitingPass) {
       controller.toggleSelected(card);
@@ -113,6 +142,16 @@ class _TablePageState extends State<TablePage> {
     if (!controller.awaitingPlay) return;
     final refusal = controller.playCard(card);
     if (refusal != null) _say(refusal);
+  }
+
+  /// The note up now, where this is the hand a new player is taught on:
+  /// any but the score's, which the sheet says. The felt gives it room
+  /// (ui/table_layout.dart, note), so it is over nothing on the table.
+  Widget? _coachNote() {
+    final tutorial = _tutorial;
+    final text = tutorial?.say(context.l10n);
+    if (tutorial == null || text == null || tutorial.showing == Lesson.score) return null;
+    return CoachNote(text: text, next: tutorial.holds ? context.l10n.tutorialNext : null, onNext: tutorial.next);
   }
 
   Future<void> _copyRecord() async {
@@ -164,6 +203,7 @@ class _TablePageState extends State<TablePage> {
                     const Positioned(right: 6, bottom: 2, child: UpdatePill()),
                   ],
                 ),
+                note: _coachNote(),
                 action: ActionBar(
                   controller: _controller,
                   onPass: _controller.confirmPass,
@@ -192,7 +232,14 @@ class _TablePageState extends State<TablePage> {
               ),
 
               if (game.phase == Phase.handOver && _controller.sheetDue)
-                HandOverSheet.of(game, seats: _controller.looks, onNext: _controller.nextHand),
+                _tutorial == null
+                    ? HandOverSheet.of(game, seats: _controller.looks, onNext: _controller.nextHand)
+                    : HandOverSheet.of(game,
+                        seats: _controller.looks,
+                        // The one hand, and home after it.
+                        onNext: () => Navigator.of(context).maybePop(),
+                        action: context.l10n.done,
+                        note: _tutorial!.say(context.l10n)),
               if (game.phase == Phase.gameOver && _controller.sheetDue)
                 GameOverSheet(
                   game: game,

@@ -198,6 +198,71 @@ flow('a thumb, not the tree', async ({ open }) => {
   }
 });
 
+stillFlow('learning to play', async ({ open }) => {
+  // A device new to the game: the door offers the hand that teaches it
+  // (app/lib/tutorial.dart), which is dealt the same way every time.
+  const page = await open({ pointer: true });
+  await waitFor(page, /^New to Hearts\? Learn to play$/, { what: 'the offer on the door' });
+  await click(page, /^New to Hearts\? Learn to play$/);
+  await waitFor(page, /^Four players, thirteen cards each\./, { what: 'the first note' });
+  // A note that tells holds the table, the player's own cards with it:
+  // a card tapped under it is not chosen.
+  const [first] = await handOf(page);
+  await click(page, new RegExp(`^${first}$`));
+  await sleep(300);
+  if (!(await has(page, /^Choose 3 more to pass$/))) throw new Error(`a card was chosen under the note\nsaw: ${(await texts(page)).join(' | ')}`);
+  // Next, pressed where it is drawn: the note is in a place of its own
+  // under the felt, and a press there lands on it.
+  await tapAt(page, /^Next$/, { dx: 20 });
+  await waitFor(page, /^First, everyone passes three cards\./, { what: 'the note on the pass' });
+  // The rest of the hand, each step decided on one reading of the
+  // screen: a note that holds is read and Next tapped, and the player
+  // moves only when the table waits on them, when nothing else moves
+  // and no note comes unseen.
+  const notes = {
+    welcome: /^Four players, thirteen cards each\./,
+    pass: /^First, everyone passes three cards\./,
+    received: /^Three cards came to you from the player on your right\./,
+    youLead: /^The 2 of clubs leads the first trick, and you have it\./,
+    trickTaken: /^The highest card of the suit that was led takes the trick/,
+    follow: /^Play a card of the suit that was led, if you have one\./,
+    noSuit: /^You have no (clubs|diamonds|spades|hearts), so any card will do\./,
+    heartsBroken: /^That's the first heart: hearts are broken\./,
+    queen: /^The queen of spades: 13 points to whoever takes this trick\.$/,
+  };
+  const seen = ['welcome'];
+  const until = Date.now() + 180000;
+  for (;;) {
+    if (Date.now() > until) throw new Error(`the hand never ended; notes ${seen.join(', ')}\nsaw: ${(await texts(page)).join(' | ')}`);
+    const now = await texts(page);
+    if (now.includes('Done')) break;
+    const note = Object.entries(notes).find(([, re]) => now.some((t) => re.test(t)))?.[0];
+    if (note && seen.at(-1) !== note) seen.push(note);
+    if (now.includes('Next')) await click(page, /^Next$/);
+    else if (now.includes('Pass') || now.includes('Your turn')) await act(page);
+    await sleep(250);
+  }
+  if (seen.slice(0, 4).join() !== 'welcome,pass,received,youLead' || new Set(seen).size !== Object.keys(notes).length || seen.length !== Object.keys(notes).length) {
+    throw new Error(`not every note, once each, in its place: ${seen.join(', ')}`);
+  }
+  // One hand, and its sheet says how a hand is scored; Done goes home.
+  const sheet = await texts(page);
+  if (!sheet.some((t) => /^Hearts are a point each, the queen of spades 13\./.test(t))) throw new Error(`the sheet without the score's note\nsaw: ${sheet.join(' | ')}`);
+  if (sheet.includes('Next hand')) throw new Error('the taught hand offers another');
+  await click(page, /^Done$/);
+  await waitFor(page, /^Play solo$/, { what: 'the door again' });
+  // Taken up, it is not offered again, on this visit or the next; and it
+  // stays in the menu.
+  if (await has(page, /^New to Hearts\? Learn to play$/)) throw new Error('the door still offers the tutorial');
+  await page.reload();
+  await waitFor(page, /^Play solo$/, { what: 'the door after a reload' });
+  if (await has(page, /^New to Hearts\? Learn to play$/)) throw new Error('the door offers the tutorial again after a reload');
+  await click(page, /^Menu$/);
+  await waitFor(page, /^Learn to play$/, { what: 'the tutorial in the menu' });
+  await click(page, /^Learn to play$/);
+  await waitFor(page, /^Four players, thirteen cards each\./, { what: 'the tutorial from the menu' });
+});
+
 stillFlow('turning the phone mid-hand', async ({ open }) => {
   const page = await open();
   await click(page, /^Play solo$/);

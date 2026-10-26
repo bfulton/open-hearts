@@ -9,23 +9,19 @@ is a plan, not a promise. What has shipped is in the
 ### Getting found
 
 - **Search.** openhearts.game already has a title, a description, link
-  previews and a page per language. Still to do: a sitemap, and the
-  site verified in Google Search Console so that it is indexed.
+  previews, a page per language and a sitemap. Still to do: the site
+  verified in Google Search Console so that it is indexed.
 - **Pages people search for:** how to play, the rules in full, shooting
   the moon, and strategy. Today the rules are eight lines among the
   support page's questions.
-- **The store listings:** screenshots (the first three matter most), a
-  preview video, keywords, and a description that leads with no ads,
-  free play alone, deals anyone can check, and the Auto switch. In each
-  of the app's languages. What the stores ask about how the app works
-  is answered in [what the stores are told](docs/reference/store-answers.md).
-- **Asking for a review** after a good moment, such as a win, through
-  the stores' own prompt.
+- **The store listings:** the words and screenshots are made, in each
+  of the app's languages. Still to do: a preview video. What the stores
+  ask about how the app works is answered in
+  [what the stores are told](docs/reference/store-answers.md).
 - **More languages,** where Hearts is played: Dutch first.
 
 ### Learning and playing
 
-- **A tutorial** for new players.
 - **Themes:** light, dark, classic green, and one for colour blindness,
   with a switch for larger cards and text. Today there is the green
   felt, and the app follows the device's text size.

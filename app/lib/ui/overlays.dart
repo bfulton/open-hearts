@@ -2,6 +2,7 @@
 /// the game.
 library;
 
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:engine/engine.dart';
@@ -9,6 +10,7 @@ import 'package:flutter/material.dart';
 import 'package:table/table.dart' show Rating;
 
 import '../l10n/l10n.dart';
+import '../net/store_review.dart';
 import '../table_model.dart' show SeatLook;
 import '../theme.dart';
 import 'confetti.dart';
@@ -25,12 +27,13 @@ class HandOverSheet extends StatelessWidget {
     required this.onNext,
     this.mySeat = humanSeat,
     this.action,
+    this.note,
   });
 
   /// Takes the numbers rather than the game: at a live table the game
   /// has already moved on to the next deal by the time this shows.
   factory HandOverSheet.of(HeartsGame game,
-          {required List<SeatLook> seats, required VoidCallback onNext}) =>
+          {required List<SeatLook> seats, required VoidCallback onNext, String? action, String? note}) =>
       HandOverSheet(
         handNumber: game.handNumber,
         scores: game.handScores,
@@ -38,6 +41,8 @@ class HandOverSheet extends StatelessWidget {
         moonShooter: game.moonShooter,
         seats: seats,
         onNext: onNext,
+        action: action,
+        note: note,
       );
 
   final int handNumber;
@@ -53,6 +58,11 @@ class HandOverSheet extends StatelessWidget {
   /// The button's label, Next hand when null: at a live table the next
   /// hand is already under way, so it only dismisses.
   final String? action;
+
+  /// What the sheet says under the score, where it has something to
+  /// say: how a hand is scored, at the end of the hand a new player is
+  /// taught on (tutorial.dart).
+  final String? note;
 
   @override
   Widget build(BuildContext context) {
@@ -76,6 +86,7 @@ class HandOverSheet extends StatelessWidget {
             mark: null,
           ),
       ],
+      note: note == null ? null : Text(note!, style: const TextStyle(fontSize: 13.5, height: 1.35, color: Palette.chrome)),
       action: action ?? l10n.nextHand,
       onAction: onNext,
     );
@@ -140,7 +151,7 @@ class GameOverSheet extends StatelessWidget {
             ? l10n.namesTie(l10n.together(won.map((s) => seats[s].name)))
             : l10n.nameWins(seats[won.first].name);
 
-    return _Sheet(
+    final sheet = _Sheet(
       title: title,
       tone: youWon ? Palette.chrome : Palette.danger,
       // A game won, alone or shared.
@@ -173,7 +184,41 @@ class GameOverSheet extends StatelessWidget {
           (label: l10n.copyRecord, onPressed: onCopyRecord!),
       ],
     );
+    // And a game won is the moment to ask for a review.
+    return youWon ? _AsksForReview(child: sheet) : sheet;
   }
+}
+
+/// Asks the store for its review prompt (net/store_review.dart) a
+/// moment after a game the player won comes in: once the confetti has
+/// fallen, and only if the sheet is still up by then. A player already
+/// on to the next game is not stopped for it.
+class _AsksForReview extends StatefulWidget {
+  const _AsksForReview({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_AsksForReview> createState() => _AsksForReviewState();
+}
+
+class _AsksForReviewState extends State<_AsksForReview> {
+  Timer? _ask;
+
+  @override
+  void initState() {
+    super.initState();
+    _ask = Timer(reviewAfter, () => unawaited(askForReviewAfterWin()));
+  }
+
+  @override
+  void dispose() {
+    _ask?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }
 
 typedef _Row = ({SeatLook look, int delta, int total, bool you, Color? mark});

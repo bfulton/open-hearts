@@ -10,6 +10,38 @@ squashed from a pull request, the pull request's number.
 
 ### Added
 
+- On the phones, a moment after you win a game, the app asks the App
+  Store or Google Play for its own prompt to rate the app, at most once
+  every four months. Whether the prompt shows is the store's to decide,
+  and the app is not told what you chose there. The web asks nothing.
+  (2026-10-25, #39)
+
+- A first hand of Hearts, taught. A device that has played nothing
+  alone is offered it under Play solo ("New to Hearts? Learn to
+  play"), and the menu has it for anyone. It is a game alone against
+  three bots, dealt the same way every time, with a note at each thing
+  the hand brings a new player to for the first time: the pass, the
+  cards that came, the 2 of clubs, following suit, a suit you have none
+  of, a trick taken, hearts broken, the queen of spades, and at the end
+  how a hand is scored. A note that tells something holds the table
+  until Next; one that asks for something waits until it is done. The
+  notes never suggest a card. Each takes room of its own, under the
+  felt or beside it, and covers nothing on the table. In all five
+  languages. (2026-10-25, #39)
+
+- `openhearts.game/sitemap.xml` lists every page of the site in each of
+  its languages, by the address the page gives as its own, with its
+  copies in the other languages; the site's `robots.txt` names it.
+  (2026-10-25, #39)
+
+- The App Store and Google Play listings, in all five languages. Their
+  words are `site/store.json`, held to each store's limits and rules by
+  `site/store.test.mjs`. Their pictures are made from the app by
+  `e2e/store_shots.mjs`: five screenshots at each size the stores ask
+  for, those of games played alone the same in every language, and
+  Google Play's feature graphic and icon. `docs/how-to/update-the-store-listings.md` says
+  where each goes. (2026-10-25, #39)
+
 - Previews play live. They have a relay of their own (`open-hearts-relay-preview`,
   at `relay-preview.openhearts.game`), with its own households and backup
   jurors on the previews' store, and a service key pair of their own.
@@ -345,6 +377,13 @@ squashed from a pull request, the pull request's number.
 
 ### Fixed
 
+- A live table no longer says "Your connection is down — reconnecting"
+  as it opens. Its line opens a moment after the table does, and until
+  then the table took itself for cut off and said so: in a browser on
+  the rig, for 0.2 to 1.8 seconds at every table, with the line up all
+  along. It says so now of a line that has been up and is cut off, as
+  before, or of one that has not opened in ten seconds. (2026-10-25,
+  #39)
 - A code entered under Activate subscription spent itself, brought the
   device in, and answered "No subscription." whenever the account's
   object ran somewhere other than where the device was: the service

@@ -1525,4 +1525,69 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get hideReactions => 'Ocultar las reacciones de los demás';
+
+  @override
+  String get learnToPlay => 'Aprender a jugar';
+
+  @override
+  String get learnToPlayOffer => '¿Primera vez con Corazones? Aprende a jugar';
+
+  @override
+  String get tutorialNext => 'Siguiente';
+
+  @override
+  String get tutorialWelcome =>
+      'Cuatro jugadores, trece cartas cada uno. Cada corazón que te llevas es un punto en tu contra, y la reina de picas vale 13. Llévate los menos puntos que puedas.';
+
+  @override
+  String get tutorialPass =>
+      'Primero, todos pasan tres cartas. Elige tres que prefieras no quedarte y toca Pasar. Esta vez van al jugador de tu izquierda.';
+
+  @override
+  String get tutorialReceived =>
+      'Te llegaron tres cartas del jugador de tu derecha. Están marcadas con un punto hasta que se juegue la primera baza.';
+
+  @override
+  String get tutorialYouLead =>
+      'El 2 de tréboles abre la primera baza, y lo tienes tú. Tócalo para jugarlo.';
+
+  @override
+  String tutorialTheyLead(String name) {
+    return 'El 2 de tréboles abre la primera baza, y lo tiene $name.';
+  }
+
+  @override
+  String get tutorialFollow =>
+      'Juega una carta del palo que se abrió, si tienes. Las cartas que no puedes jugar están atenuadas: toca una para ver por qué.';
+
+  @override
+  String tutorialNoSuit(String suit) {
+    String _temp0 = intl.Intl.selectLogic(suit, {
+      'clubs': 'No tienes tréboles',
+      'diamonds': 'No tienes diamantes',
+      'spades': 'No tienes picas',
+      'other': 'No tienes corazones',
+    });
+    return '$_temp0, así que puedes jugar cualquier carta. Los puntos que juegues se los lleva quien gane la baza.';
+  }
+
+  @override
+  String get tutorialNoSuitFirst =>
+      'No tienes tréboles, así que puedes jugar otro palo, pero no un corazón ni la reina de picas: en la primera baza no se juegan puntos.';
+
+  @override
+  String get tutorialTrickTaken =>
+      'La carta más alta del palo que se abrió gana la baza, con los puntos que haya en ella. Quien la gana abre la siguiente.';
+
+  @override
+  String get tutorialHeartsBroken =>
+      'Es el primer corazón: los corazones se han roto. Hasta que se jugara uno, nadie podía abrir con corazones. Ahora cualquiera puede.';
+
+  @override
+  String get tutorialQueen =>
+      'La reina de picas: 13 puntos para quien gane esta baza.';
+
+  @override
+  String get tutorialScore =>
+      'Cada corazón vale un punto y la reina de picas 13. Si te llevas los 26, disparas a la luna: se los llevan todos los demás. Una partida sigue hasta 50 o 100 puntos, y gana la puntuación más baja.';
 }

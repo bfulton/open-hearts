@@ -50,6 +50,42 @@ left to choose, the Pass button) sits against the hand, as wide as the
 fan. Its row is always as tall as its tallest state, so the table above
 never shifts.
 
+## The hand that teaches
+
+A device that has played nothing alone is offered a first hand of
+Hearts, taught, under Play solo; the menu has it for anyone
+(`app/lib/tutorial.dart`). It is a game alone against three bots, dealt
+the same way every time, with a note at each thing the hand brings a
+new player to for the first time. A note that tells something holds the
+table, the bots and your own cards with it, until you tap Next; a note
+that asks for something (the pass, the 2 of clubs, a card of the suit
+led) stays until you have done it. The notes say what the rules allow
+and what follows from them, never which card to play.
+
+The note is never drawn over the table. It takes room of its own, and
+the felt gives way to it (`note`, `app/lib/ui/table_layout.dart`):
+
+- **Upright, under the felt,** just above the action line and as wide
+  as it. It takes what it needs, up to four tenths of the table's
+  height.
+- **On its side, beside the felt,** at the right, where the thumb is:
+  at most 360 points at a phone's scale, or half the width. A felt on
+  its side is short of height, not width.
+- **The felt keeps its arrangement.** It chooses wide or upright from
+  the room it has before the note takes any (`FeltRoom`,
+  `app/lib/ui/table_view.dart`), so a note coming and going changes
+  how big the table is drawn, never how it is laid out. The felt keeps
+  its place in the widget tree either way, so nothing on it starts
+  over when a note comes.
+- **At ordinary type every note fits** on every screen in the matrix.
+  At larger type, a note longer than its room scrolls, with Next still
+  under it.
+
+The note is drawn at the table's scale, like the action line, and a
+screen reader says each note as it comes. `app/test/tutorial_fits_test.dart`
+plays the taught hand through every note at every shape, text size and
+language of the matrix, and on a narrow phone on its side.
+
 ## Tablets
 
 A phone layout scaled up is the wrong answer: enormous cards and a fan
@@ -134,6 +170,13 @@ sheet comes in, once, for under three seconds
 (`app/lib/ui/confetti.dart`). Some of it falls behind the sheet and
 some in front of it, so it falls through the table rather than on a
 pane over it. A game shared at the top counts as won.
+
+On the phones, a won game's sheet also asks the App Store or Google
+Play for its own prompt to rate the app, once the confetti has fallen
+(`reviewAfter` in `app/lib/net/store_review.dart`). It asks at most
+once in four months, and not at all once the sheet has gone. The store
+decides whether to show the prompt and says nothing back. The app asks
+nothing of its own first, and the web asks nothing.
 
 None of these can be touched or heard: taps go through them, and screen
 readers never meet them. With `MediaQuery.disableAnimations` there is no

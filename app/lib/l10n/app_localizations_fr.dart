@@ -1520,4 +1520,70 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get hideReactions => 'Masquer les réactions des autres';
+
+  @override
+  String get learnToPlay => 'Apprendre à jouer';
+
+  @override
+  String get learnToPlayOffer =>
+      'Vous découvrez la Dame de pique ? Apprenez à jouer';
+
+  @override
+  String get tutorialNext => 'Suivant';
+
+  @override
+  String get tutorialWelcome =>
+      'Quatre joueurs, treize cartes chacun. Chaque cœur que vous ramassez compte un point contre vous, et la dame de pique en vaut 13. Prenez le moins de points possible.';
+
+  @override
+  String get tutorialPass =>
+      'D\'abord, chacun passe trois cartes. Choisissez-en trois que vous préférez ne pas garder et touchez Passer. Cette fois, elles vont au joueur à votre gauche.';
+
+  @override
+  String get tutorialReceived =>
+      'Trois cartes vous sont arrivées du joueur à votre droite. Elles sont marquées d\'un point jusqu\'à ce que le premier pli soit joué.';
+
+  @override
+  String get tutorialYouLead =>
+      'Le 2 de trèfle entame le premier pli, et c\'est vous qui l\'avez. Touchez-le pour le jouer.';
+
+  @override
+  String tutorialTheyLead(String name) {
+    return 'Le 2 de trèfle entame le premier pli, et c\'est $name qui l\'a.';
+  }
+
+  @override
+  String get tutorialFollow =>
+      'Jouez une carte de la couleur entamée, si vous en avez. Les cartes que vous ne pouvez pas jouer sont grisées : touchez-en une pour savoir pourquoi.';
+
+  @override
+  String tutorialNoSuit(String suit) {
+    String _temp0 = intl.Intl.selectLogic(suit, {
+      'clubs': 'Vous n\'avez pas de trèfle',
+      'diamonds': 'Vous n\'avez pas de carreau',
+      'spades': 'Vous n\'avez pas de pique',
+      'other': 'Vous n\'avez pas de cœur',
+    });
+    return '$_temp0, vous pouvez donc jouer n\'importe quelle carte. Les points que vous jouez vont à qui remporte le pli.';
+  }
+
+  @override
+  String get tutorialNoSuitFirst =>
+      'Vous n\'avez pas de trèfle, vous pouvez donc jouer une autre couleur, mais ni un cœur ni la dame de pique : pas de points au premier pli.';
+
+  @override
+  String get tutorialTrickTaken =>
+      'La plus haute carte de la couleur entamée remporte le pli, avec les points qu\'il contient. Qui le remporte entame le suivant.';
+
+  @override
+  String get tutorialHeartsBroken =>
+      'C\'est le premier cœur : les cœurs sont ouverts. Tant qu\'aucun n\'avait été joué, personne ne pouvait entamer à cœur. Maintenant, tout le monde peut.';
+
+  @override
+  String get tutorialQueen =>
+      'La dame de pique : 13 points pour qui remporte ce pli.';
+
+  @override
+  String get tutorialScore =>
+      'Chaque cœur vaut un point, la dame de pique 13. Prenez les 26 et vous faites le grand chelem : ils vont à tous les autres. Une partie se joue en 50 ou 100 points, et le plus petit score gagne.';
 }

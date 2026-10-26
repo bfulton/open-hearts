@@ -341,5 +341,20 @@
   "reaction": "{code, select, nice{Stark} ha{Haha} wow{Wow} ouch{Autsch} sorry{Sorry} gg{Gutes Spiel} other{…}}",
   "reactionSaid": "{name}: {reaction}",
   "react": "Reagieren",
-  "hideReactions": "Reaktionen der anderen ausblenden"
+  "hideReactions": "Reaktionen der anderen ausblenden",
+  "learnToPlay": "Spielen lernen",
+  "learnToPlayOffer": "Neu bei Hearts? Spielen lernen",
+  "tutorialNext": "Weiter",
+  "tutorialWelcome": "Vier Spieler, je dreizehn Karten. Jedes Herz, das du nimmst, zählt einen Punkt gegen dich, die Pik-Dame 13. Nimm so wenige Punkte wie möglich.",
+  "tutorialPass": "Zuerst gibt jeder drei Karten weiter. Wähle drei, die du lieber nicht behalten willst, und tippe auf Geben. Diesmal gehen sie an den Spieler links von dir.",
+  "tutorialReceived": "Drei Karten kamen vom Spieler rechts von dir. Bis der erste Stich gespielt ist, sind sie mit einem Punkt markiert.",
+  "tutorialYouLead": "Kreuz 2 spielt den ersten Stich aus, und du hast sie. Tippe sie an, um sie zu spielen.",
+  "tutorialTheyLead": "Kreuz 2 spielt den ersten Stich aus, und {name} hat sie.",
+  "tutorialFollow": "Spiele eine Karte der ausgespielten Farbe, wenn du eine hast. Karten, die du nicht spielen darfst, sind abgedunkelt: Tippe eine an, um zu sehen, warum.",
+  "tutorialNoSuit": "{suit, select, clubs{Du hast kein Kreuz} diamonds{Du hast kein Karo} spades{Du hast kein Pik} other{Du hast kein Herz}}, also darfst du jede Karte spielen. Punkte, die du abwirfst, bekommt, wer den Stich nimmt.",
+  "tutorialNoSuitFirst": "Du hast kein Kreuz, also darfst du eine andere Farbe spielen, aber kein Herz und nicht die Pik-Dame: Im ersten Stich gibt es keine Punkte.",
+  "tutorialTrickTaken": "Die höchste Karte der ausgespielten Farbe nimmt den Stich, samt allen Punkten darin. Wer ihn nimmt, spielt den nächsten aus.",
+  "tutorialHeartsBroken": "Das ist das erste Herz: Herz ist gebrochen. Bis eines gespielt war, durfte niemand Herz ausspielen. Jetzt darf es jeder.",
+  "tutorialQueen": "Die Pik-Dame: 13 Punkte für den, der diesen Stich nimmt.",
+  "tutorialScore": "Jedes Herz zählt einen Punkt, die Pik-Dame 13. Wer alle 26 nimmt, schafft den Durchmarsch: Dann bekommen sie alle anderen. Gespielt wird bis 50 oder 100 Punkte, und die niedrigste Punktzahl gewinnt."
 }

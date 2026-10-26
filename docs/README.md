@@ -26,6 +26,7 @@ Releasing:
 
 - [Deploy the site, app and service](how-to/deploy.md)
 - [Build a phone release for the App Store or Google Play](how-to/cut-a-phone-release.md)
+- [Update the App Store and Google Play listings](how-to/update-the-store-listings.md)
 
 Operating:
 

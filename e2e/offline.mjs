@@ -69,6 +69,24 @@ async function never(page, re, seconds, what) {
   }
 }
 
+/// Watches the screen for [re] from now on, at every change to it, and
+/// answers a function that says whether it has shown: what [never]
+/// looks for four times a second, this sees for a single frame.
+async function watching(page, re) {
+  const key = `watched${Math.random().toString(36).slice(2)}`;
+  await page.evaluate(`((key, source) => {
+    const labelOf = ${labelOf};
+    const re = new RegExp(source);
+    window[key] = false;
+    const look = () => {
+      if ([...document.querySelectorAll('flt-semantics')].some((e) => re.test(labelOf(e)))) window[key] = true;
+    };
+    look();
+    new MutationObserver(look).observe(document.documentElement, { subtree: true, childList: true, characterData: true, attributes: true });
+  })(${JSON.stringify(key)}, ${JSON.stringify(re.source)})`);
+  return () => page.evaluate(`window[${JSON.stringify(key)}]`);
+}
+
 /// A screenshot of the moment, beside the one each flow ends on.
 const look = (page, what) => page.screenshot({ path: join(shots, `${what}.png`) }).catch(() => {});
 
@@ -338,8 +356,14 @@ flow('the network gone at a live table, and back', async ({ context, open, relay
   const page = await open();
   await name(page);
   await waitFor(page, /^Play live, /, { timeout: 40000, what: 'online, and counted' });
+  const down = /^Your connection is down — reconnecting$/;
+  const saidDown = await watching(page, down);
   await click(page, /^Play live/);
   await waitFor(page, /^Choose 3 more to pass$|^Your (turn|lead)$/, { timeout: 120000, what: 'a hand dealt' });
+  // The table's line opens a moment after the table does, the line up
+  // all along: nothing is down (app/lib/live/live_controller.dart,
+  // lineDown). Said, it was a second or so of the note at every table.
+  if (await saidDown()) throw new Error('said its connection was down as the table opened, with the line up');
   for (let i = 0; i < 8; i++) {
     await act(page);
     await sleep(400);
@@ -350,7 +374,6 @@ flow('the network gone at a live table, and back', async ({ context, open, relay
   // who play on: it says so, and waits for the line rather than ending
   // the game (docs/explanation/live-play.md, a device cut off from the
   // table).
-  const down = /^Your connection is down — reconnecting$/;
   const began = Date.now();
   await waitFor(page, down, { timeout: 30000, what: 'the device to say its own connection is down' });
   log(`      said its connection is down: ${((Date.now() - began) / 1000).toFixed(0)} s`);

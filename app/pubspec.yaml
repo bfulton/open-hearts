@@ -51,6 +51,9 @@ dependencies:
   google_sign_in_android: ^7.2.17
   google_sign_in_platform_interface: ^3.1.0
   age_range_signals: ^0.10.1
+  # The store's own prompt for a review, after a game won, on the phones
+  # (net/store_review.dart).
+  in_app_review: ^2.0.12
 
 dev_dependencies:
   flutter_test:

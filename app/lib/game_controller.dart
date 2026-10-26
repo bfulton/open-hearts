@@ -19,15 +19,23 @@ import 'record_store.dart';
 import 'table_model.dart';
 
 class GameController extends ChangeNotifier implements TableModel {
-  GameController({this.seed, this.paced = true, this.target = gameOverScore, RecordStore? store})
+  GameController({this.seed, this.paced = true, this.target = gameOverScore, RecordStore? store, this.hold})
       : _store = store ?? PrefsRecordStore() {
     _start();
   }
 
   /// Fixes the shuffle, so [newGame] reshuffles the same way a test
   /// expects: dealt by [Random] from it. Null in the app, where every
-  /// game is a fresh draw of a [DealSeed].
+  /// game is a fresh draw of a [DealSeed] — but for the hand a new
+  /// player is taught on, which is the same hand every time
+  /// (tutorial.dart).
   final int? seed;
+
+  /// What the table waits on before it moves on without the player —
+  /// each bot's card, a card Auto plays for them, a trick swept — where
+  /// something may be on the screen to be read first: a hand being
+  /// taught (tutorial.dart). Null at a game played for itself.
+  final Future<void> Function()? hold;
 
   /// The score this game runs to, and every game after it on this
   /// screen: the player's own choice (game_options.dart).
@@ -337,7 +345,7 @@ class GameController extends ChangeNotifier implements TableModel {
         if (_game.phase != Phase.playing) break; // handOver
 
         if (_game.pendingTrick != null) {
-          if (!await _wait(_trickHold)) return;
+          if (!await _wait(_trickHold) || !await _held()) return;
           _game.collectTrick();
           notifyListeners();
           if (_game.phase != Phase.playing) {
@@ -360,11 +368,12 @@ class GameController extends ChangeNotifier implements TableModel {
           _auto.watch(this);
           final card = _auto.cardFor(this);
           if (card == null) break;
+          if (!await _held()) return;
           _playMine(card);
           continue;
         }
 
-        if (!await _wait(_botThink(seat))) return;
+        if (!await _held() || !await _wait(_botThink(seat))) return;
         final legal = _game.legalPlaysFor(seat);
         final card = _bots[seat]!.chooseCard(_viewFor(seat), legal);
         _game.play(seat, card);
@@ -378,6 +387,14 @@ class GameController extends ChangeNotifier implements TableModel {
 
   Timer? _waitTimer;
   Completer<void>? _waiting;
+
+  /// Waits on [hold], where there is one, and reports whether the
+  /// controller is still alive after.
+  Future<bool> _held() async {
+    final hold = this.hold;
+    if (hold != null) await hold();
+    return !_disposed;
+  }
 
   /// Sleeps, and reports whether the controller is still alive after —
   /// every await point is a place the widget can be torn down.

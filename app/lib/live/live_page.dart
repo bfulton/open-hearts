@@ -269,7 +269,7 @@ class _LivePageState extends State<LivePage> {
     if (refused != null) return _note(l10n.noRelayTakesEvents(_short(refused)));
     // Its own line down: whatever the table seems to wait on, it is
     // this device not hearing it, and the game waits for the line.
-    if (_c.client.cutOff) return _note(l10n.connectionDown);
+    if (_c.lineDown) return _note(l10n.connectionDown);
     if (_c.pause == Pause.waitingForPeers) return _note(l10n.waitingToReconnect);
     if (_c.pause == Pause.waitingForJury) {
       if (_c.jury.live > 0) return _note(l10n.askingTheJury);

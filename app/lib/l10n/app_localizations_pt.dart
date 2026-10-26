@@ -1515,4 +1515,69 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get hideReactions => 'Esconder as reações dos outros';
+
+  @override
+  String get learnToPlay => 'Aprender a jogar';
+
+  @override
+  String get learnToPlayOffer => 'Primeira vez no Copas? Aprenda a jogar';
+
+  @override
+  String get tutorialNext => 'Próximo';
+
+  @override
+  String get tutorialWelcome =>
+      'Quatro jogadores, treze cartas cada um. Cada carta de copas que você leva é um ponto contra você, e a dama de espadas vale 13. Leve o mínimo de pontos que puder.';
+
+  @override
+  String get tutorialPass =>
+      'Primeiro, todos passam três cartas. Escolha três que você prefere não manter e toque em Passar. Desta vez, elas vão para o jogador à sua esquerda.';
+
+  @override
+  String get tutorialReceived =>
+      'Você recebeu três cartas do jogador à sua direita. Elas ficam marcadas com um ponto até a primeira vaza ser jogada.';
+
+  @override
+  String get tutorialYouLead =>
+      'O 2 de paus abre a primeira vaza, e ele está com você. Toque nele para jogá-lo.';
+
+  @override
+  String tutorialTheyLead(String name) {
+    return 'O 2 de paus abre a primeira vaza, e ele está com $name.';
+  }
+
+  @override
+  String get tutorialFollow =>
+      'Jogue uma carta do naipe que abriu a vaza, se tiver. As cartas que você não pode jogar ficam apagadas: toque em uma para ver por quê.';
+
+  @override
+  String tutorialNoSuit(String suit) {
+    String _temp0 = intl.Intl.selectLogic(suit, {
+      'clubs': 'Você não tem paus',
+      'diamonds': 'Você não tem ouros',
+      'spades': 'Você não tem espadas',
+      'other': 'Você não tem copas',
+    });
+    return '$_temp0, então pode jogar qualquer carta. Os pontos que você jogar vão para quem levar a vaza.';
+  }
+
+  @override
+  String get tutorialNoSuitFirst =>
+      'Você não tem paus, então pode jogar outro naipe, mas não copas nem a dama de espadas: a primeira vaza não leva pontos.';
+
+  @override
+  String get tutorialTrickTaken =>
+      'A carta mais alta do naipe que abriu leva a vaza, com os pontos que houver nela. Quem levar abre a próxima.';
+
+  @override
+  String get tutorialHeartsBroken =>
+      'É a primeira carta de copas: as copas foram quebradas. Até alguém jogar uma, ninguém podia abrir com copas. Agora qualquer um pode.';
+
+  @override
+  String get tutorialQueen =>
+      'A dama de espadas: 13 pontos para quem levar esta vaza.';
+
+  @override
+  String get tutorialScore =>
+      'Cada carta de copas vale um ponto, e a dama de espadas 13. Se você levar os 26, atira na lua: eles vão para todos os outros. Uma partida vai até 50 ou 100 pontos, e vence a menor pontuação.';
 }

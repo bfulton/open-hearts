@@ -349,6 +349,12 @@ playing on all along. Once the line is back, the table carries it
 forward as it would anyone behind, and a jury really gone is found
 out then, a half minute and `quorumLostMs` on.
 
+A table's line opens a moment after the table does, and until it has,
+the device is cut off too: it hears nobody yet, so nobody is silent on
+its word. But nothing is down, and the screen says so only of a line
+that has been up, or of one that has not opened in `unansweredMs`
+(`LiveController.lineDown`).
+
 The `botActsMs` and `jurorSilenceMs` clocks are kept above ten seconds
 for this ([configuration](../reference/configuration.md#table-clocks)).
 A device that loses a game, or whose line is down for two minutes,

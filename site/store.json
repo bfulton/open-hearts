@@ -1,0 +1,435 @@
+{
+  "stores": {
+    "apple": {
+      "en": [
+        "en-US"
+      ],
+      "es": [
+        "es-ES",
+        "es-MX"
+      ],
+      "pt": [
+        "pt-BR"
+      ],
+      "de": [
+        "de-DE"
+      ],
+      "fr": [
+        "fr-FR"
+      ]
+    },
+    "google": {
+      "en": [
+        "en-US"
+      ],
+      "es": [
+        "es-ES",
+        "es-419"
+      ],
+      "pt": [
+        "pt-BR"
+      ],
+      "de": [
+        "de-DE"
+      ],
+      "fr": [
+        "fr-FR"
+      ]
+    }
+  },
+  "copyright": "2026 Bright Fulton",
+  "category": {
+    "apple": "Games, subcategory Card",
+    "google": "Game, category Card"
+  },
+  "contact": {
+    "email": "help@openhearts.game",
+    "website": "https://openhearts.game/",
+    "privacy": "https://openhearts.game/privacy"
+  },
+  "en": {
+    "apple": {
+      "name": "Open Hearts",
+      "subtitle": "Hearts card game, no ads",
+      "promotionalText": "Hearts, the card game. Play alone for free, with no ads and no sign-up, or live with people on a deal nobody can rig.",
+      "keywords": "card game,cards,trick taking,classic,offline,bots,multiplayer,friends,queen of spades,shoot the moon",
+      "supportUrl": "https://openhearts.game/support",
+      "marketingUrl": "https://openhearts.game/",
+      "privacyUrl": "https://openhearts.game/privacy",
+      "description": [
+        "Hearts, the card game. Play alone for free, with no ads and no sign-up, or live with people on a deal nobody can rig.",
+        "",
+        "PLAY ALONE",
+        "• Free, with no ads and nothing to sign up for.",
+        "• Three bots at the table, each with a style of its own.",
+        "• Works offline.",
+        "• New to Hearts? A first hand teaches you as you play.",
+        "• Auto plays out the rest of a hand once nothing you hold can change it.",
+        "• Your profile counts up your games: wins, points, moons shot.",
+        "",
+        "PLAY LIVE",
+        "• Four seats, filled by rating from whoever is waiting — or by friends you send a link to.",
+        "• Every seat shuffles the deck in turn. While a hand is played, no server sees your cards, ours included.",
+        "• A rating of your own, from signed results anyone can check.",
+        "• Share a game’s link and others can watch it as the table sees it. Once it’s over, the whole game is there, checked.",
+        "• When nobody else is waiting, bots fill the empty seats.",
+        "• Live play is a yearly subscription, for up to five devices.",
+        "",
+        "OPEN",
+        "• Open source under the MIT licence: anyone can read how the game deals, plays and keeps score.",
+        "• In English, Spanish, Portuguese, German and French.",
+        "",
+        "Terms of Use: https://openhearts.game/terms",
+        "Privacy: https://openhearts.game/privacy",
+        "Help: help@openhearts.game"
+      ]
+    },
+    "google": {
+      "title": "Open Hearts",
+      "shortDescription": "Hearts, the card game. Free alone with no ads, or live on a deal nobody can rig.",
+      "fullDescription": [
+        "Hearts, the card game. Play alone for free, with no ads and no sign-up, or live with people on a deal nobody can rig.",
+        "",
+        "PLAY ALONE",
+        "• Free, with no ads and nothing to sign up for.",
+        "• Three bots at the table, each with a style of its own.",
+        "• Works offline.",
+        "• New to Hearts? A first hand teaches you as you play.",
+        "• Auto plays out the rest of a hand once nothing you hold can change it.",
+        "• Your profile counts up your games: wins, points, moons shot.",
+        "",
+        "PLAY LIVE",
+        "• Four seats, filled by rating from whoever is waiting — or by friends you send a link to.",
+        "• Every seat shuffles the deck in turn. While a hand is played, no server sees your cards, ours included.",
+        "• A rating of your own, from signed results anyone can check.",
+        "• Share a game’s link and others can watch it as the table sees it. Once it’s over, the whole game is there, checked.",
+        "• When nobody else is waiting, bots fill the empty seats.",
+        "• Live play is a yearly subscription, for up to five devices, on the web too.",
+        "",
+        "OPEN",
+        "• Open source under the MIT licence: anyone can read how the game deals, plays and keeps score.",
+        "• In English, Spanish, Portuguese, German and French.",
+        "",
+        "Terms of Use: https://openhearts.game/terms",
+        "Privacy: https://openhearts.game/privacy",
+        "Help: help@openhearts.game"
+      ],
+      "alt": {
+        "play": "Your turn in a game alone against three bots: three cards on the table, and in your hand the cards you may play are lit.",
+        "live": "A live game between four people, each with a name and an avatar: your turn, with cards already on the table.",
+        "learn": "The hand that teaches, at its note on a trick: the highest card of the suit that was led takes it.",
+        "won": "A game won: the final scores, under falling confetti.",
+        "pass": "The pass: three cards chosen to go to the player on your left.",
+        "feature": "Open Hearts: Hearts, the card game. No ads, open source."
+      }
+    }
+  },
+  "es": {
+    "apple": {
+      "name": "Open Hearts",
+      "subtitle": "Corazones sin anuncios",
+      "promotionalText": "Corazones, el juego de cartas. Juega solo gratis, sin anuncios y sin registrarte, o en vivo con otras personas, con un reparto que nadie puede amañar.",
+      "keywords": "corazones,juego de cartas,naipes,clásico,sin conexión,bots,multijugador,amigos,reina de picas",
+      "supportUrl": "https://openhearts.game/es/support",
+      "marketingUrl": "https://openhearts.game/es/",
+      "privacyUrl": "https://openhearts.game/es/privacy",
+      "description": [
+        "Corazones, el juego de cartas. Juega solo gratis, sin anuncios y sin registrarte, o en vivo con otras personas, con un reparto que nadie puede amañar.",
+        "",
+        "JUEGA SOLO",
+        "• Gratis, sin anuncios y sin registrarte.",
+        "• Tres bots en la mesa, cada uno con su propio estilo.",
+        "• Funciona sin conexión.",
+        "• ¿Primera vez con Corazones? Una primera mano te enseña mientras juegas.",
+        "• Auto juega el resto de una mano cuando nada de lo que tienes puede cambiarla.",
+        "• Tu perfil lleva la cuenta de tus partidas: victorias, puntos, lunas disparadas.",
+        "",
+        "JUEGA EN VIVO",
+        "• Cuatro asientos para quienes estén esperando, según su clasificación — o para los amigos a los que envíes un enlace.",
+        "• Cada asiento baraja por turnos. Mientras se juega una mano, ningún servidor ve tus cartas, tampoco el nuestro.",
+        "• Una clasificación propia, a partir de resultados firmados que cualquiera puede comprobar.",
+        "• Comparte el enlace de una partida y otros podrán verla tal como la ve la mesa. Cuando termine, la partida entera está ahí, comprobada.",
+        "• Si nadie más está esperando, los bots ocupan los asientos libres.",
+        "• El juego en vivo es una suscripción anual, para hasta cinco dispositivos.",
+        "",
+        "ABIERTO",
+        "• Código abierto con licencia MIT: cualquiera puede leer cómo reparte, juega y lleva la cuenta.",
+        "• En inglés, español, portugués, alemán y francés.",
+        "",
+        "Condiciones de uso: https://openhearts.game/es/terms",
+        "Privacidad: https://openhearts.game/es/privacy",
+        "Ayuda: help@openhearts.game"
+      ]
+    },
+    "google": {
+      "title": "Open Hearts",
+      "shortDescription": "Corazones gratis, sin anuncios, o en vivo con un reparto que nadie puede amañar.",
+      "fullDescription": [
+        "Corazones, el juego de cartas. Juega solo gratis, sin anuncios y sin registrarte, o en vivo con otras personas, con un reparto que nadie puede amañar.",
+        "",
+        "JUEGA SOLO",
+        "• Gratis, sin anuncios y sin registrarte.",
+        "• Tres bots en la mesa, cada uno con su propio estilo.",
+        "• Funciona sin conexión.",
+        "• ¿Primera vez con Corazones? Una primera mano te enseña mientras juegas.",
+        "• Auto juega el resto de una mano cuando nada de lo que tienes puede cambiarla.",
+        "• Tu perfil lleva la cuenta de tus partidas: victorias, puntos, lunas disparadas.",
+        "",
+        "JUEGA EN VIVO",
+        "• Cuatro asientos para quienes estén esperando, según su clasificación — o para los amigos a los que envíes un enlace.",
+        "• Cada asiento baraja por turnos. Mientras se juega una mano, ningún servidor ve tus cartas, tampoco el nuestro.",
+        "• Una clasificación propia, a partir de resultados firmados que cualquiera puede comprobar.",
+        "• Comparte el enlace de una partida y otros podrán verla tal como la ve la mesa. Cuando termine, la partida entera está ahí, comprobada.",
+        "• Si nadie más está esperando, los bots ocupan los asientos libres.",
+        "• El juego en vivo es una suscripción anual, para hasta cinco dispositivos, también en la web.",
+        "",
+        "ABIERTO",
+        "• Código abierto con licencia MIT: cualquiera puede leer cómo reparte, juega y lleva la cuenta.",
+        "• En inglés, español, portugués, alemán y francés.",
+        "",
+        "Condiciones de uso: https://openhearts.game/es/terms",
+        "Privacidad: https://openhearts.game/es/privacy",
+        "Ayuda: help@openhearts.game"
+      ],
+      "alt": {
+        "play": "Tu turno en una partida en solitario contra tres bots: tres cartas en la mesa y, en tu mano, resaltadas las que puedes jugar.",
+        "live": "Una partida en vivo entre cuatro personas, cada una con su nombre y su avatar: tu turno, con cartas ya en la mesa.",
+        "learn": "La mano que enseña, en su nota sobre la baza: la carta más alta del palo que se abrió la gana.",
+        "won": "Una partida ganada: las puntuaciones finales, bajo una lluvia de confeti.",
+        "pass": "El pase: tres cartas elegidas para el jugador de tu izquierda.",
+        "feature": "Open Hearts: Corazones, el juego de cartas. Sin anuncios, código abierto."
+      }
+    }
+  },
+  "pt": {
+    "apple": {
+      "name": "Open Hearts",
+      "subtitle": "Jogo de Copas sem anúncios",
+      "promotionalText": "Copas, o jogo de cartas. Jogue sozinho de graça, sem anúncios e sem cadastro, ou ao vivo com outras pessoas, numa distribuição que ninguém consegue manipular.",
+      "keywords": "copas,jogo de cartas,cartas,baralho,clássico,offline,bots,multijogador,amigos,dama de espadas",
+      "supportUrl": "https://openhearts.game/pt/support",
+      "marketingUrl": "https://openhearts.game/pt/",
+      "privacyUrl": "https://openhearts.game/pt/privacy",
+      "description": [
+        "Copas, o jogo de cartas. Jogue sozinho de graça, sem anúncios e sem cadastro, ou ao vivo com outras pessoas, numa distribuição que ninguém consegue manipular.",
+        "",
+        "JOGUE SOZINHO",
+        "• De graça, sem anúncios e sem cadastro.",
+        "• Três bots na mesa, cada um com seu próprio estilo.",
+        "• Funciona offline.",
+        "• Primeira vez no Copas? Uma primeira mão ensina enquanto você joga.",
+        "• O Auto joga o resto de uma mão quando nada do que você tem pode mudá-la.",
+        "• Seu perfil conta suas partidas: vitórias, pontos, luas atiradas.",
+        "",
+        "JOGUE AO VIVO",
+        "• Quatro lugares para quem estiver esperando, de acordo com o rating — ou para os amigos a quem você mandar um link.",
+        "• Cada lugar embaralha as cartas, um de cada vez. Enquanto uma mão é jogada, nenhum servidor vê suas cartas, nem o nosso.",
+        "• Um rating só seu, a partir de resultados assinados que qualquer pessoa pode verificar.",
+        "• Compartilhe o link de uma partida e outros podem assistir, vendo só o que a mesa vê. Quando ela acaba, o jogo inteiro está lá, verificado.",
+        "• Se ninguém mais estiver esperando, bots ocupam os lugares vazios.",
+        "• O jogo ao vivo é uma assinatura anual, para até cinco aparelhos.",
+        "",
+        "ABERTO",
+        "• Código aberto com licença MIT: qualquer pessoa pode ler como o jogo distribui, joga e conta os pontos.",
+        "• Em inglês, espanhol, português, alemão e francês.",
+        "",
+        "Termos de uso: https://openhearts.game/pt/terms",
+        "Privacidade: https://openhearts.game/pt/privacy",
+        "Ajuda: help@openhearts.game"
+      ]
+    },
+    "google": {
+      "title": "Open Hearts",
+      "shortDescription": "Copas grátis e sem anúncios, ou ao vivo numa distribuição que ninguém manipula.",
+      "fullDescription": [
+        "Copas, o jogo de cartas. Jogue sozinho de graça, sem anúncios e sem cadastro, ou ao vivo com outras pessoas, numa distribuição que ninguém consegue manipular.",
+        "",
+        "JOGUE SOZINHO",
+        "• De graça, sem anúncios e sem cadastro.",
+        "• Três bots na mesa, cada um com seu próprio estilo.",
+        "• Funciona offline.",
+        "• Primeira vez no Copas? Uma primeira mão ensina enquanto você joga.",
+        "• O Auto joga o resto de uma mão quando nada do que você tem pode mudá-la.",
+        "• Seu perfil conta suas partidas: vitórias, pontos, luas atiradas.",
+        "",
+        "JOGUE AO VIVO",
+        "• Quatro lugares para quem estiver esperando, de acordo com o rating — ou para os amigos a quem você mandar um link.",
+        "• Cada lugar embaralha as cartas, um de cada vez. Enquanto uma mão é jogada, nenhum servidor vê suas cartas, nem o nosso.",
+        "• Um rating só seu, a partir de resultados assinados que qualquer pessoa pode verificar.",
+        "• Compartilhe o link de uma partida e outros podem assistir, vendo só o que a mesa vê. Quando ela acaba, o jogo inteiro está lá, verificado.",
+        "• Se ninguém mais estiver esperando, bots ocupam os lugares vazios.",
+        "• O jogo ao vivo é uma assinatura anual, para até cinco aparelhos, na web também.",
+        "",
+        "ABERTO",
+        "• Código aberto com licença MIT: qualquer pessoa pode ler como o jogo distribui, joga e conta os pontos.",
+        "• Em inglês, espanhol, português, alemão e francês.",
+        "",
+        "Termos de uso: https://openhearts.game/pt/terms",
+        "Privacidade: https://openhearts.game/pt/privacy",
+        "Ajuda: help@openhearts.game"
+      ],
+      "alt": {
+        "play": "Sua vez numa partida sozinho contra três bots: três cartas na mesa e, na sua mão, em destaque as que você pode jogar.",
+        "live": "Uma partida ao vivo entre quatro pessoas, cada uma com seu nome e seu avatar: sua vez, com cartas já na mesa.",
+        "learn": "A mão que ensina, na sua nota sobre a vaza: a carta mais alta do naipe que abriu leva a vaza.",
+        "won": "Uma partida vencida: as pontuações finais, sob uma chuva de confete.",
+        "pass": "O passe: três cartas escolhidas para o jogador à sua esquerda.",
+        "feature": "Open Hearts: Copas, o jogo de cartas. Sem anúncios, código aberto."
+      }
+    }
+  },
+  "de": {
+    "apple": {
+      "name": "Open Hearts",
+      "subtitle": "Kartenspiel Hearts, werbefrei",
+      "promotionalText": "Hearts, das Kartenspiel. Spiel allein, kostenlos, ohne Werbung und ohne Anmeldung, oder live mit anderen, bei einem Austeilen, das niemand manipulieren kann.",
+      "keywords": "Kartenspiel,Karten,Stiche,klassisch,offline,Bots,Mehrspieler,Freunde,Pik Dame,Schwarze Dame",
+      "supportUrl": "https://openhearts.game/de/support",
+      "marketingUrl": "https://openhearts.game/de/",
+      "privacyUrl": "https://openhearts.game/de/privacy",
+      "description": [
+        "Hearts, das Kartenspiel. Spiel allein, kostenlos, ohne Werbung und ohne Anmeldung, oder live mit anderen, bei einem Austeilen, das niemand manipulieren kann.",
+        "",
+        "ALLEIN SPIELEN",
+        "• Kostenlos, ohne Werbung und ohne Anmeldung.",
+        "• Drei Bots am Tisch, jeder mit seinem eigenen Stil.",
+        "• Funktioniert offline.",
+        "• Neu bei Hearts? Eine erste Runde bringt es dir beim Spielen bei.",
+        "• Auto spielt den Rest einer Runde, sobald nichts auf deiner Hand sie noch ändern kann.",
+        "• Dein Profil zählt deine Spiele: Siege, Punkte, Durchmärsche.",
+        "",
+        "LIVE SPIELEN",
+        "• Vier Plätze für alle, die gerade warten, nach Wertung — oder für Freunde, denen du einen Link schickst.",
+        "• Jeder Platz mischt der Reihe nach. Solange eine Runde läuft, sieht kein Server deine Karten, auch unserer nicht.",
+        "• Eine eigene Wertung, aus signierten Ergebnissen, die jeder prüfen kann.",
+        "• Teile den Link eines Spiels, und andere können zusehen, so wie der Tisch es sieht. Ist es vorbei, steht dort das ganze Spiel, geprüft.",
+        "• Wartet sonst niemand, setzen sich Bots auf die freien Plätze.",
+        "• Live spielen ist ein Jahresabo für bis zu fünf Geräte.",
+        "",
+        "OFFEN",
+        "• Open Source unter der MIT-Lizenz: Jeder kann nachlesen, wie das Spiel austeilt, spielt und zählt.",
+        "• Auf Englisch, Spanisch, Portugiesisch, Deutsch und Französisch.",
+        "",
+        "Nutzungsbedingungen: https://openhearts.game/de/terms",
+        "Datenschutz: https://openhearts.game/de/privacy",
+        "Hilfe: help@openhearts.game"
+      ]
+    },
+    "google": {
+      "title": "Open Hearts",
+      "shortDescription": "Hearts gratis und werbefrei, oder live: Das Austeilen kann niemand manipulieren.",
+      "fullDescription": [
+        "Hearts, das Kartenspiel. Spiel allein, kostenlos, ohne Werbung und ohne Anmeldung, oder live mit anderen, bei einem Austeilen, das niemand manipulieren kann.",
+        "",
+        "ALLEIN SPIELEN",
+        "• Kostenlos, ohne Werbung und ohne Anmeldung.",
+        "• Drei Bots am Tisch, jeder mit seinem eigenen Stil.",
+        "• Funktioniert offline.",
+        "• Neu bei Hearts? Eine erste Runde bringt es dir beim Spielen bei.",
+        "• Auto spielt den Rest einer Runde, sobald nichts auf deiner Hand sie noch ändern kann.",
+        "• Dein Profil zählt deine Spiele: Siege, Punkte, Durchmärsche.",
+        "",
+        "LIVE SPIELEN",
+        "• Vier Plätze für alle, die gerade warten, nach Wertung — oder für Freunde, denen du einen Link schickst.",
+        "• Jeder Platz mischt der Reihe nach. Solange eine Runde läuft, sieht kein Server deine Karten, auch unserer nicht.",
+        "• Eine eigene Wertung, aus signierten Ergebnissen, die jeder prüfen kann.",
+        "• Teile den Link eines Spiels, und andere können zusehen, so wie der Tisch es sieht. Ist es vorbei, steht dort das ganze Spiel, geprüft.",
+        "• Wartet sonst niemand, setzen sich Bots auf die freien Plätze.",
+        "• Live spielen ist ein Jahresabo für bis zu fünf Geräte, auch im Web.",
+        "",
+        "OFFEN",
+        "• Open Source unter der MIT-Lizenz: Jeder kann nachlesen, wie das Spiel austeilt, spielt und zählt.",
+        "• Auf Englisch, Spanisch, Portugiesisch, Deutsch und Französisch.",
+        "",
+        "Nutzungsbedingungen: https://openhearts.game/de/terms",
+        "Datenschutz: https://openhearts.game/de/privacy",
+        "Hilfe: help@openhearts.game"
+      ],
+      "alt": {
+        "play": "Du bist dran, allein gegen drei Bots: drei Karten auf dem Tisch, und auf deiner Hand leuchten die Karten, die du spielen darfst.",
+        "live": "Ein Live-Spiel zu viert, alle mit Namen und Avatar: Du bist dran, und auf dem Tisch liegen schon Karten.",
+        "learn": "Die Runde, die das Spiel beibringt, bei ihrem Hinweis zum Stich: Die höchste Karte der ausgespielten Farbe nimmt ihn.",
+        "won": "Ein gewonnenes Spiel: der Endstand, mit fallendem Konfetti.",
+        "pass": "Das Geben: drei Karten, gewählt für den Spieler links von dir.",
+        "feature": "Open Hearts: Hearts, das Kartenspiel. Keine Werbung, Open Source."
+      }
+    }
+  },
+  "fr": {
+    "apple": {
+      "name": "Open Hearts",
+      "subtitle": "Dame de pique, sans pub",
+      "promotionalText": "La Dame de pique, le jeu de cartes. Jouez seul gratuitement, sans pub ni inscription, ou en direct avec d’autres, sur une donne que personne ne peut truquer.",
+      "keywords": "jeu de cartes,cartes,levées,classique,hors ligne,bots,multijoueur,amis,cœurs,grand chelem",
+      "supportUrl": "https://openhearts.game/fr/support",
+      "marketingUrl": "https://openhearts.game/fr/",
+      "privacyUrl": "https://openhearts.game/fr/privacy",
+      "description": [
+        "La Dame de pique, le jeu de cartes. Jouez seul gratuitement, sans pub et sans inscription, ou en direct avec d’autres joueurs, sur une donne que personne ne peut truquer.",
+        "",
+        "JOUER SEUL",
+        "• Gratuit, sans pub et sans inscription.",
+        "• Trois bots à la table, chacun avec son style.",
+        "• Fonctionne hors ligne.",
+        "• Vous découvrez la Dame de pique ? Une première donne vous apprend à jouer en jouant.",
+        "• Auto joue la fin d’une donne dès que rien dans votre main ne peut plus la changer.",
+        "• Votre profil compte vos parties : victoires, points, grands chelems.",
+        "",
+        "JOUER EN DIRECT",
+        "• Quatre places pour ceux qui attendent, selon leur classement — ou pour les amis à qui vous envoyez un lien.",
+        "• Chaque place mélange le jeu à son tour. Pendant qu’une donne se joue, aucun serveur ne voit vos cartes, pas même le nôtre.",
+        "• Un classement à vous, issu de résultats signés que chacun peut vérifier.",
+        "• Partagez le lien d’une partie pour qu’on la regarde telle que la table la voit. Une fois finie, toute la partie est là, vérifiée.",
+        "• Si personne d’autre n’attend, des bots prennent les places libres.",
+        "• Le jeu en direct est un abonnement annuel, pour cinq appareils au maximum.",
+        "",
+        "OUVERT",
+        "• Open source sous licence MIT : chacun peut lire comment le jeu distribue, joue et compte les points.",
+        "• En anglais, espagnol, portugais, allemand et français.",
+        "",
+        "Conditions d’utilisation : https://openhearts.game/fr/terms",
+        "Confidentialité : https://openhearts.game/fr/privacy",
+        "Aide : help@openhearts.game"
+      ]
+    },
+    "google": {
+      "title": "Open Hearts",
+      "shortDescription": "Dame de pique gratuite et sans pub, ou en direct sur une donne jamais truquée.",
+      "fullDescription": [
+        "La Dame de pique, le jeu de cartes. Jouez seul gratuitement, sans pub et sans inscription, ou en direct avec d’autres joueurs, sur une donne que personne ne peut truquer.",
+        "",
+        "JOUER SEUL",
+        "• Gratuit, sans pub et sans inscription.",
+        "• Trois bots à la table, chacun avec son style.",
+        "• Fonctionne hors ligne.",
+        "• Vous découvrez la Dame de pique ? Une première donne vous apprend à jouer en jouant.",
+        "• Auto joue la fin d’une donne dès que rien dans votre main ne peut plus la changer.",
+        "• Votre profil compte vos parties : victoires, points, grands chelems.",
+        "",
+        "JOUER EN DIRECT",
+        "• Quatre places pour ceux qui attendent, selon leur classement — ou pour les amis à qui vous envoyez un lien.",
+        "• Chaque place mélange le jeu à son tour. Pendant qu’une donne se joue, aucun serveur ne voit vos cartes, pas même le nôtre.",
+        "• Un classement à vous, issu de résultats signés que chacun peut vérifier.",
+        "• Partagez le lien d’une partie pour qu’on la regarde telle que la table la voit. Une fois finie, toute la partie est là, vérifiée.",
+        "• Si personne d’autre n’attend, des bots prennent les places libres.",
+        "• Le jeu en direct est un abonnement annuel, pour cinq appareils au maximum, sur le web aussi.",
+        "",
+        "OUVERT",
+        "• Open source sous licence MIT : chacun peut lire comment le jeu distribue, joue et compte les points.",
+        "• En anglais, espagnol, portugais, allemand et français.",
+        "",
+        "Conditions d’utilisation : https://openhearts.game/fr/terms",
+        "Confidentialité : https://openhearts.game/fr/privacy",
+        "Aide : help@openhearts.game"
+      ],
+      "alt": {
+        "play": "À vous de jouer, seul contre trois bots : trois cartes sur la table et, dans votre main, en surbrillance celles que vous pouvez jouer.",
+        "live": "Une partie en direct entre quatre personnes, chacune avec son nom et son avatar : à vous de jouer, des cartes déjà sur la table.",
+        "learn": "La donne qui apprend à jouer, à sa note sur le pli : la plus haute carte de la couleur entamée le remporte.",
+        "won": "Une partie gagnée : les scores finaux, sous une pluie de confettis.",
+        "pass": "La passe : trois cartes choisies pour le joueur à votre gauche.",
+        "feature": "Open Hearts : la Dame de pique, le jeu de cartes. Sans pub, open source."
+      }
+    }
+  }
+}
