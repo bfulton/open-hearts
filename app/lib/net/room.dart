@@ -531,8 +531,9 @@ class Room extends ChangeNotifier {
       // The leader's game, not this device's: a start event from a
       // build that had no say says fifty.
       target: c['target'] as int? ?? gameOverScore,
-      // And the leader's clocks: none said is the standard table, and
-      // one out of bounds is too, at every seat alike.
+      // And the leader's clocks: none said, or one out of bounds, is
+      // the table every build reads that as (TableTiming.unsaid), at
+      // every seat alike.
       timing: TableTiming.parse(c['timing']),
     );
     // Every seat an account's by the service's word, each account once:

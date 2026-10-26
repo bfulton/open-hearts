@@ -101,9 +101,10 @@ class TableSpec {
         'rated': rated,
         'sealed': sealed,
         'target': target,
-        // Left out at the standard, so that an ordinary table's spec
-        // carries no timing at all.
-        if (timing != TableTiming.standard) 'timing': timing.toJson(),
+        // Left out only where it is what every build reads a spec with
+        // none as (timing.dart): the standard has moved on from it, and
+        // a juror on another build reads this spec from a summons.
+        if (timing != TableTiming.unsaid) 'timing': timing.toJson(),
         'seats': [
           for (final h in seats)
             switch (h) {

@@ -197,7 +197,8 @@ void main() {
   // own connection gone, so it waits the silence a person is given:
   // were it the one cut off, that is how long the table would take to
   // go on without it.
-  test('the last person at a table of two, with the jury gone: the game ends once the other has been silent two minutes', () {
+  test('the last person at a table of two, with the jury gone: the game ends once the other has been silent as long as a person is given',
+      () {
     final t = SimTable(humans: 2, seed: 3, jurors: jurySize);
     t.start();
     final (:x, :y, :turn) = atAPlayTurn(t);
@@ -206,11 +207,11 @@ void main() {
       t.net.goOffline(j.signer.publicKey);
     }
     final goneAt = t.clock.nowMs;
-    t.clock.advance(90 * 1000);
+    t.clock.advance(TableTiming.standard.silenceMs - 5000);
     expect(x.tableState, TableState.pausedForJury, reason: 'waiting, and saying so:\n${x.describe()}');
     expect(x.failure, isNull, reason: 'not while the other might be the one cut off');
     expect(t.clock.runUntil(() => x.failure != null, limitMs: 3 * 60 * 1000), isTrue, reason: 'the game ended:\n${x.describe()}');
-    expect(t.clock.nowMs - goneAt, greaterThanOrEqualTo(120 * 1000 + TableTiming.standard.quorumLostMs),
+    expect(t.clock.nowMs - goneAt, greaterThanOrEqualTo(TableTiming.standard.silenceMs + TableTiming.standard.quorumLostMs),
         reason: 'the silence a person is given, and the twenty seconds after it');
     expect(x.failure, Failure.jurorQuorumLost);
     expect(x.failedAt?.turn, turn);
@@ -286,7 +287,7 @@ void main() {
     for (final j in t.jurors) {
       t.net.goOffline(j.signer.publicKey);
     }
-    t.clock.advance(90 * 1000);
+    t.clock.advance(TableTiming.standard.silenceMs - 5000);
     expect(x.tableState, TableState.pausedForJury);
     expect(y.tableState, TableState.pausedForJury, reason: 'and the one cut off, hearing nobody, waits too:\n${y.describe()}');
     t.net.comeOnline(y.signer.publicKey);
@@ -354,10 +355,10 @@ void main() {
     }
     t.net.goOffline(other.signer.publicKey);
     final goneAt = t.clock.nowMs;
-    t.clock.advance(90 * 1000);
+    t.clock.advance(TableTiming.standard.silenceMs - 5000);
     expect(c.failure, isNull, reason: 'not while the other might be the one cut off');
     expect(t.clock.runUntil(() => c.failure != null, limitMs: 3 * 60 * 1000), isTrue, reason: 'the game ended:\n${c.describe()}');
-    expect(t.clock.nowMs - goneAt, greaterThanOrEqualTo(120 * 1000 + TableTiming.standard.quorumLostMs));
+    expect(t.clock.nowMs - goneAt, greaterThanOrEqualTo(TableTiming.standard.silenceMs + TableTiming.standard.quorumLostMs));
     expect(c.failure, Failure.jurorQuorumLost);
     final juror = t.jurors.firstWhere((j) => j.signer.publicKey == kept).client!;
     expect(t.clock.runUntil(() => !juror.serving, limitMs: 10 * 1000), isTrue, reason: 'and the juror heard it:\n${juror.describe()}');

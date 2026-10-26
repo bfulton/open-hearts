@@ -1,7 +1,7 @@
 /// A table's own clocks (timing.dart): chosen by whoever starts the
 /// table, carried in the start event, and the same at every seat and
-/// juror — or the standard, where the event says none or says one out
-/// of bounds.
+/// juror — or, where the event says none or says one out of bounds,
+/// the clocks every build reads that as ([TableTiming.unsaid]).
 library;
 
 import 'dart:convert';
@@ -17,10 +17,7 @@ TableSpec overTheWire(TableSpec spec) => TableSpec.parse(jsonDecode(jsonEncode(s
 
 void main() {
   group('parse', () {
-    test('none said is the standard table, and the standard is today\'s clocks', () {
-      for (final none in [null, const <String, Object?>{}, 'fast', 42, const [6000]]) {
-        expect(TableTiming.parse(none), TableTiming.standard, reason: '$none');
-      }
+    test('the standard is today\'s clocks: a person silent half a minute is gone', () {
       const s = TableTiming.standard;
       expect(s.bank.graceMs, 6000);
       expect(s.bank.passGraceMs, 20000);
@@ -29,13 +26,45 @@ void main() {
       expect(s.botActsMs, 15000);
       expect(s.botDealsMs, 40000);
       expect(s.quorumLostMs, 20000);
-      expect(s.silenceMs, 120000);
+      expect(s.silenceMs, 30000);
       expect(s.jurorSilenceMs, 30000);
       expect(TableTiming.bounds.keys, unorderedEquals(s.toJson().keys), reason: 'every field has bounds');
-      for (final MapEntry(:key, :value) in s.toJson().entries) {
-        final (least, most) = TableTiming.bounds[key]!;
-        expect(value, inInclusiveRange(least, most), reason: 'the standard $key is a timing a start may say');
+      for (final t in [s, TableTiming.unsaid]) {
+        for (final MapEntry(:key, :value) in t.toJson().entries) {
+          final (least, most) = TableTiming.bounds[key]!;
+          expect(value, inInclusiveRange(least, most), reason: '$key is a timing a start may say: $t');
+        }
       }
+    });
+
+    // What a start event that names no timing means, which every build
+    // has to read alike: the first builds' standard, for good. A start
+    // from one of them says none, and a juror reading it on this build
+    // plays by the clocks its seats play by.
+    test('none said is the first builds\' standard, whatever the standard is now', () {
+      for (final none in [null, const <String, Object?>{}, 'fast', 42, const [6000]]) {
+        expect(TableTiming.parse(none), TableTiming.unsaid, reason: '$none');
+      }
+      const u = TableTiming.unsaid;
+      expect(u.bank.graceMs, 6000);
+      expect(u.bank.passGraceMs, 20000);
+      expect(u.bank.bankMs, 45000);
+      expect(u.bank.fixedMs, 40000);
+      expect(u.botActsMs, 15000);
+      expect(u.botDealsMs, 40000);
+      expect(u.quorumLostMs, 20000);
+      expect(u.silenceMs, 120000);
+      expect(u.jurorSilenceMs, 30000);
+    });
+
+    test('the operator\'s word is read over the standard, all or nothing as a start is', () {
+      for (final none in [null, const <String, Object?>{}, 'fast', 42]) {
+        expect(TableTiming.parse(none, base: TableTiming.standard), TableTiming.standard, reason: '$none');
+      }
+      final t = TableTiming.parse({'bankMs': 10000}, base: TableTiming.standard);
+      expect(t.bank.bankMs, 10000);
+      expect(t.silenceMs, TableTiming.standard.silenceMs, reason: 'a field not named is the standard\'s');
+      expect(TableTiming.parse({'bankMs': 10000, 'silenceMs': 1}, base: TableTiming.standard), TableTiming.standard);
     });
 
     // A device whose way in has stalled knows it only once it has heard
@@ -48,22 +77,23 @@ void main() {
       expect(s.jurorSilenceMs, greaterThan(unansweredMs));
     });
 
-    test('the fields said are taken, the rest are the standard', () {
+    test('the fields said are taken, the rest are what none said means', () {
       final t = TableTiming.parse({'graceMs': 3000, 'botActsMs': 8000, 'later': 'a later build\'s'});
       expect(t.bank.graceMs, 3000);
       expect(t.botActsMs, 8000);
       expect(t.bank.bankMs, 45000);
       expect(t.quorumLostMs, 20000);
+      expect(t.silenceMs, TableTiming.unsaid.silenceMs);
       expect(TableTiming.parse(t.toJson()), t, reason: 'round trip');
       expect(TableTiming.parse(jsonDecode(jsonEncode(t.toJson()))), t, reason: 'and through JSON');
     });
 
-    test('one field out of bounds, or of the wrong type, and the whole of it is the standard', () {
+    test('one field out of bounds, or of the wrong type, and the whole of it is what none said means', () {
       for (final MapEntry(:key, value: (least, most)) in TableTiming.bounds.entries) {
         expect(TableTiming.parse({key: least}).toJson()[key], least, reason: '$key at its least is in');
         expect(TableTiming.parse({key: most}).toJson()[key], most, reason: '$key at its most is in');
         for (final bad in [least - 1, most + 1, '$least', least.toDouble(), null, true]) {
-          expect(TableTiming.parse({'graceMs': 3000, key: bad}), TableTiming.standard, reason: '$key: $bad');
+          expect(TableTiming.parse({'graceMs': 3000, key: bad}), TableTiming.unsaid, reason: '$key: $bad');
         }
       }
       expect(TableTiming.parse({'graceMs': 3000, 'jurorsWaitMs': 40000}).bank.graceMs, 3000,
@@ -75,23 +105,29 @@ void main() {
       final first = TableTiming.parse(said);
       for (var i = 0; i < 20; i++) {
         expect(TableTiming.parse(jsonDecode(jsonEncode(said))), first);
-        expect(TableTiming.parse({...said, 'bankMs': 5000}), TableTiming.standard);
+        expect(TableTiming.parse({...said, 'bankMs': 5000}), TableTiming.unsaid);
       }
     });
 
-    test('the spec carries it; an ordinary table\'s spec reads as it always did', () {
+    test('the spec carries it in full, and leaves out only what none said means', () {
       final seats = [const HumanSeat('a'), const HumanSeat('b'), BotSeat(Persona.roster[0]), BotSeat(Persona.roster[1])];
       final plain = TableSpec(id: 't', seed: 1, seats: seats);
-      expect(plain.toJson().containsKey('timing'), isFalse);
+      expect(plain.timing, TableTiming.standard);
+      expect(plain.toJson()['timing'], TableTiming.standard.toJson(),
+          reason: 'every field said, so a build with another standard reads the same clocks');
       expect(overTheWire(plain).timing, TableTiming.standard);
       final quick = TableSpec(id: 't', seed: 1, seats: seats, timing: TableTiming.parse({'graceMs': 3000}));
       expect(overTheWire(quick).timing, quick.timing);
-      // A start event from a build with no timing, and one whose timing
-      // is out of bounds: the standard, at every seat that reads it.
-      final old = plain.toJson();
-      expect(TableSpec.parse(old)!.timing, TableTiming.standard);
-      expect(TableSpec.parse({...old, 'timing': {'graceMs': 500}})!.timing, TableTiming.standard);
-      expect(TableSpec.parse({...old, 'timing': 'quick'})!.timing, TableTiming.standard);
+      final first = TableSpec(id: 't', seed: 1, seats: seats, timing: TableTiming.unsaid);
+      expect(first.toJson().containsKey('timing'), isFalse);
+      expect(overTheWire(first).timing, TableTiming.unsaid);
+      // A start event from a build with no timing to say, and one whose
+      // timing is out of bounds: what none said means, at every seat
+      // that reads it.
+      final old = first.toJson();
+      expect(TableSpec.parse(old)!.timing, TableTiming.unsaid);
+      expect(TableSpec.parse({...old, 'timing': {'graceMs': 500}})!.timing, TableTiming.unsaid);
+      expect(TableSpec.parse({...old, 'timing': 'quick'})!.timing, TableTiming.unsaid);
     });
   });
 
@@ -119,9 +155,9 @@ void main() {
       t.stop();
     });
 
-    test('a timing out of bounds is the standard at every seat: the same player keeps five cards', () {
+    test('a timing out of bounds is what none said means at every seat: the same player keeps five cards', () {
       final t = SimTable(humans: 4, seed: 71, timing: TableTiming.parse({'graceMs': 2000, 'bankMs': 1000}));
-      expect(t.clients.every((c) => c.timing == TableTiming.standard), isTrue);
+      expect(t.clients.every((c) => c.timing == TableTiming.unsaid), isTrue);
       t.people[1].thinkMs = 14000;
       t.start();
       final c = t.people[0].client;

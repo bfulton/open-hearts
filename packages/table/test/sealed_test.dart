@@ -8,6 +8,7 @@ library;
 
 import 'package:deal/deal.dart';
 import 'package:engine/engine.dart';
+import 'package:table/table.dart' show jurySize;
 import 'package:table_sim/table_sim.dart';
 import 'package:test/test.dart';
 
@@ -34,6 +35,26 @@ void main() {
     expect(t.run(), isTrue, reason: 'every client reaches the end of the game');
     agree(t);
     expect(t.clients.first.pause, isNull);
+    t.stop();
+  }, timeout: const Timeout(Duration(minutes: 5)));
+
+  // The seat that only one person hears directly (matrix_test.dart),
+  // at the standard's half minute rather than two: at a sealed table,
+  // as every live one is, the seat's own work comes far oftener — every
+  // deal step is its own — and whoever hears it carries it to whoever
+  // does not, so the others never find it silent.
+  test('a seat only one person hears directly is carried, not booted, at the standard\'s half minute', () {
+    final t = SimTable(humans: 4, seed: 53, crypto: crypto, jurors: jurySize + 2);
+    final keys = t.signers.map((s) => s.publicKey).toList();
+    t.start();
+    expect(t.clock.runUntil(() => t.clients.first.game.handNumber >= 1, limitMs: 30 * 60 * 1000), isTrue, reason: 'a hand played');
+    t.net.cut(keys[1], keys[2]);
+    t.net.cut(keys[1], keys[3]);
+    expect(t.run(), isTrue, reason: 'the game plays out');
+    for (final c in t.clients) {
+      expect(c.participants.length, 4, reason: 'nobody was removed');
+    }
+    agree(t);
     t.stop();
   }, timeout: const Timeout(Duration(minutes: 5)));
 

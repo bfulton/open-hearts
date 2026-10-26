@@ -16,6 +16,10 @@
 /// proposer's own choice of candidates for a jury: none of it decides
 /// a state, and two seats pacing differently still agree about where
 /// the table is (docs/explanation/table-states.md).
+///
+/// The standard can change from one build to the next; what a start
+/// event that names no timing means cannot ([TableTiming.unsaid]),
+/// since seats on two builds read the same event.
 library;
 
 import 'time_bank.dart';
@@ -26,13 +30,30 @@ class TableTiming {
     this.botActsMs = 15000,
     this.botDealsMs = 40000,
     this.quorumLostMs = 20000,
-    this.silenceMs = 120000,
+    this.silenceMs = 30000,
     this.jurorSilenceMs = 30000,
   });
 
   /// The timing a table has unless the device that starts it is told
   /// otherwise.
   static const standard = TableTiming();
+
+  /// The timing of a start event that names none, at every build: the
+  /// clocks the first builds had as their standard, kept as they were.
+  /// A build whose standard has moved on reads an older build's event
+  /// as that build meant it, and says its own timing in full
+  /// (`TableSpec.toJson`), so two builds at one table play by the same
+  /// clocks. Fixed for good, every field spelled out rather than left
+  /// to the defaults above, which may move: changing it would split a
+  /// table between builds that read the same unsaid timing two ways.
+  static const unsaid = TableTiming(
+    bank: TimeBank(graceMs: 6000, passGraceMs: 20000, bankMs: 45000, fixedMs: 40000),
+    botActsMs: 15000,
+    botDealsMs: 40000,
+    quorumLostMs: 20000,
+    silenceMs: 120000,
+    jurorSilenceMs: 30000,
+  );
 
   /// A person's clock: a grace per decision, a bank per hand
   /// (time_bank.dart).
@@ -79,10 +100,14 @@ class TableTiming {
   final int quorumLostMs;
 
   /// How long a person may be silent before a peer boots them at their
-  /// turn without waiting on their clock (docs/explanation/live-play.md). Two
-  /// minutes, longer than a bank a stalled seat empties in under one,
-  /// so that a phone that switches apps for a moment does not come back
-  /// to a bot in its seat.
+  /// turn without waiting on their clock (docs/explanation/live-play.md).
+  /// Half a minute, sooner than a full bank runs out (time_bank.dart):
+  /// a device gone is replaced at its turn without anyone pressing
+  /// Boot. Six heartbeats, with room for a socket that stalls to be
+  /// found out and made again (`unansweredMs`, ten seconds). Longer
+  /// than the twenty seconds a connection seen to close is given
+  /// (`TableClient.reloadGraceMs`), which is silence the transport is
+  /// sure of.
   final int silenceMs;
 
   /// How long a juror may be silent before the table stops counting it
@@ -117,24 +142,28 @@ class TableTiming {
     'jurorSilenceMs': (10000, 120000),
   };
 
-  /// The timing [json] says, field by field, with the standard for any
+  /// The timing [json] says, field by field, with [base]'s for any
   /// field it does not name — so a start event from a build that had
-  /// no timing to say is the standard table.
+  /// no timing to say is the [unsaid] table.
   ///
   /// Every seat parses the same signed event and has to come out with
   /// the same clocks, so this is a function of [json] alone, and all or
   /// nothing: a field of the wrong type or outside its [bounds], and
-  /// the whole timing is the standard. Clamping one field and keeping the rest would be as
+  /// the whole timing is [base]. Clamping one field and keeping the rest would be as
   /// deterministic, but would make a table nobody chose. Names it does
   /// not know are passed over, for a later build's fields.
-  static TableTiming parse(Object? json) {
-    if (json == null) return standard;
-    if (json is! Map) return standard;
-    final at = standard.toJson();
+  ///
+  /// [base] is [unsaid] for what a table says, which every build reads
+  /// alike; the operator's word on the tables a device starts (the
+  /// remote config's `table`) is read over the [standard] instead.
+  static TableTiming parse(Object? json, {TableTiming base = unsaid}) {
+    if (json == null) return base;
+    if (json is! Map) return base;
+    final at = base.toJson();
     for (final MapEntry(:key, :value) in json.entries) {
       final range = bounds[key];
       if (range == null) continue;
-      if (value is! int || value < range.$1 || value > range.$2) return standard;
+      if (value is! int || value < range.$1 || value > range.$2) return base;
       at[key as String] = value;
     }
     return TableTiming(

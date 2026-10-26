@@ -273,6 +273,14 @@ squashed from a pull request, the pull request's number.
   Back, a phone's or a browser's, and says what leaving costs: the
   seat, a rated game counted as last, and Play live's wait where there
   would be one. (2026-10-26, #40)
+- A live table gives a bot the seat of a device that has gone quiet, at
+  its turn, once nothing has been heard from it for half a minute, not
+  two minutes. A connection seen to close is still given twenty
+  seconds, and a device that is there and slow is still timed by its
+  clock. A table started by an earlier build keeps that build's two
+  minutes, and every build reads it so. Heartbeats go by every relay
+  every ten seconds, not every thirty, so a device the others can only
+  hear that way is heard well inside the half minute. (2026-10-26, #40)
 - The front door's top corner has your rating, the number alone, just
   left of your picture, from your first rated game; the sentence under
   the game options that said it is gone. A screen reader hears it as

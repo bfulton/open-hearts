@@ -2613,9 +2613,9 @@ class TableClient {
       // side can still reach a majority: the action needs everyone who
       // has not backed the boot, the boot everyone but the seat itself
       // who has not witnessed the action — and no vote is coming from
-      // anyone this peer has not heard from for two minutes, who
-      // cannot be removed before their own turn. Only the jury breaks a
-      // deadlock.
+      // anyone this peer has not heard from for the table's silence
+      // ([TableTiming.silenceMs]), who cannot be removed before their
+      // own turn. Only the jury breaks a deadlock.
       final holder = holders[seat];
       if (holder is! HumanSeat && race.boots.isNotEmpty) {
         // A held seat's juror's move against the escrow, and neither
@@ -2673,7 +2673,8 @@ class TableClient {
     final backing = [race.forAction.intersection(of), for (final w in race.forRival.values) w.intersection(of)];
     final committed = {for (final w in backing) ...w, ...race.forEnd};
     // As at a person's seat: nobody this side has not heard from for
-    // two minutes is a vote still coming, and this side always is.
+    // the table's silence is a vote still coming, and this side always
+    // is.
     final free = of.difference(committed).where((k) => k == signer.publicKey || !_silent(k)).length;
     return backing.every((w) => w.length + free < needed);
   }
@@ -3080,9 +3081,9 @@ class TableClient {
   /// left at a table hears nobody, and would wait for good. By the time
   /// the rest have been silent that long it has been removed wherever
   /// they are — or there is nobody else. A juror heard at any time in
-  /// those two minutes counts, not only in the last half: one cut off
-  /// from this side for less may already have ruled, and its ruling be
-  /// on its way — though not one that could not open the seat anyway.
+  /// that silence counts, even where a juror's own is shorter: one cut
+  /// off from this side for less may already have ruled, and its ruling
+  /// be on its way — though not one that could not open the seat anyway.
   ///
   /// Nor for a jury this side could not hear for its own line being down
   /// ([cutOff]): the jury may be playing on — as one was while a plane's
@@ -3801,14 +3802,17 @@ class TableClient {
     // missing turns.
     _timers.add(clock.schedule(_behind ? 1000 : heartbeatMs, _heartbeat));
     heartbeatsSent++;
-    // Every sixth — half a minute at the usual pace — goes by every
-    // path: a peer or a juror that cannot read the relay this device
-    // writes to still hears it alive, well inside the silence that
-    // would let it be booted.
-    final everywhere = heartbeatsSent % 6 == 0;
+    // One in so many goes by every path, three to the silence that
+    // would see this side booted, or passed over as a juror — every
+    // other one, at the standard's half minute and the usual pace — so
+    // that a peer or a juror that cannot read the relay this device
+    // writes to still hears it alive, well inside that silence.
+    final seated = amSeated && !_left;
+    final silence = seated ? timing.silenceMs : timing.jurorSilenceMs;
+    final everywhere = heartbeatsSent % max(1, silence ~/ (3 * heartbeatMs)) == 0;
     // And each says which paths this peer reads, so that a writer can
     // pick one it can hear (transport.dart).
-    if (amSeated && !_left) {
+    if (seated) {
       _emit(EventKind.heartbeat, {'hand': game.handNumber, 'step': step, 'reads': transport.paths}, everywhere: everywhere);
     } else if (mySeat == null && _juror.summoned && !done) {
       _emit(EventKind.serve, {'hand': game.handNumber, 'step': step, 'serving': _juror.hands.toList(), 'reads': transport.paths},
@@ -3882,8 +3886,8 @@ class TableClient {
       // a silent person is given: the game ends ([_judgeQuorum]).
       _judgeQuorum();
       if (_failure != null) return;
-      // Anyone not heard from for two minutes whose turn is open is
-      // booted at once, for silence.
+      // Anyone not heard from for the table's silence whose turn is
+      // open is booted at once, for it.
       for (final e in List.of(_races.entries)) {
         final race = e.value;
         if (race.settled || race.action != null || _myWitness.containsKey(e.key)) continue;

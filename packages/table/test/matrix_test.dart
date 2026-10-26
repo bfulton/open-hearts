@@ -207,17 +207,20 @@ void main() {
   });
 
   group('partitions', () {
-    test('four humans split two and two: nobody is removed, and the game finishes when it heals', () {
+    test('four humans split two and two inside the silence: nobody is removed, and the game finishes when it heals', () {
       final t = SimTable(humans: 4, seed: 51);
       final keys = t.signers.map((s) => s.publicKey).toList();
       t.start();
-      // Let a hand get under way, then split for a minute.
+      // Let a hand get under way, then split for a little less than the
+      // silence a person is given. Past it each side counts the other
+      // gone, and with no jury to rule, the game ends for a lost quorum
+      // (quorum_lost_test.dart).
       t.clock.runUntil(() => t.clients.first.game.handNumber >= 1, limitMs: 3600000);
       t.net.partition([
         {keys[0], keys[1]},
         {keys[2], keys[3]},
       ]);
-      t.clock.advance(60000);
+      t.clock.advance(TableTiming.standard.silenceMs - 5000);
       for (final c in t.clients) {
         expect(c.participants.length, 4, reason: 'no side can carry a removal');
         expect(c.done, isFalse);
@@ -235,7 +238,13 @@ void main() {
       // seat 1's turn they booted it while seat 0 witnessed its play,
       // two against two, and the table split for the jury. Fresh work
       // by a seat, however it arrives, is the seat.
-      final t = SimTable(humans: 4, seed: 53);
+      //
+      // With no jury, nothing else carries the seat between its own
+      // moves, and a hand's end and the pass after it can keep it quiet
+      // longer than the standard's half minute: so this is a table that
+      // gives a person two minutes. A sealed table, with its jury,
+      // carries the seat at the half minute (sealed_test.dart).
+      final t = SimTable(humans: 4, seed: 53, timing: TableTiming.unsaid);
       final keys = t.signers.map((s) => s.publicKey).toList();
       t.start();
       t.clock.runUntil(() => t.clients.first.game.handNumber >= 1, limitMs: 3600000);

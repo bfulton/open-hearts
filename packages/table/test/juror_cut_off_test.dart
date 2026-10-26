@@ -1,7 +1,7 @@
 /// A juror cut off from the table, and the appeal it heard before.
 ///
-/// A juror rules by the seat's presence to it: silent two minutes, the
-/// removal stands (docs/explanation/live-play.md). A juror that has lost the
+/// A juror rules by the seat's presence to it: silent the table's
+/// silence, the removal stands (docs/explanation/live-play.md). A juror that has lost the
 /// table hears that silence from every seat, and cannot tell it from
 /// its own. It went on ruling on an appeal heard minutes before: with
 /// one person of two silent the turn was stuck, the jurors heard the
@@ -15,6 +15,11 @@
 ///
 /// An appeal stands while the people say it, every ten seconds; a
 /// juror rules only on one it has heard in the last half minute.
+///
+/// At a table that gives a person two minutes, as that one did: the
+/// person comes back after the appeal and before the silence that
+/// would have the jurors rule. At the standard's half minute the
+/// jurors rule at once, on a seat already silent that long.
 library;
 
 import 'package:engine/engine.dart';
@@ -24,7 +29,7 @@ import 'package:test/test.dart';
 
 void main() {
   test('a juror cut off after the appeal rules nothing on the turn the table settles without it', () {
-    final t = SimTable(humans: 2, seed: 1, jurors: jurySize + 3);
+    final t = SimTable(humans: 2, seed: 1, jurors: jurySize + 3, timing: TableTiming.unsaid);
     t.start();
     final a = t.clients.first;
     final quiet = t.people.last;
@@ -52,7 +57,8 @@ void main() {
     expect(t.clock.runUntil(() => a.record.any((d) => !d.removal && d.turn == turn), limitMs: 3 * 60 * 1000), isTrue,
         reason: 'the table settled the turn by the seat\'s own card:\n${a.describe()}');
 
-    // Long past two minutes of the seat's silence at the jurors cut off.
+    // Long past the table's two minutes of the seat's silence at the
+    // jurors cut off.
     t.clock.advance(4 * 60 * 1000);
     for (final j in jury) {
       final out = j.client!.record.where((d) => d.removal && d.event.seat == seat).toList();

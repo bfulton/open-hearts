@@ -458,6 +458,32 @@ String? walkChaos(int seed,
       }
       final v = verifyRecord(t.spec, survivors.first.record, juries: survivors.first.juries, crypto: t.crypto, releases: survivors.first.releases);
       if (!(v.ok && v.complete)) return 'the finished record does not verify complete: ${v.reason}';
+    } else if (survivors.any((c) => c.done)) {
+      // Some sides finished, and the rest ended the game for themselves.
+      // A side cut off from the rest, with no juror it can reach, ends
+      // the game once everyone it cannot hear has been silent as long
+      // as a person is given, and by then the rest, a majority, have
+      // put it out at its turn and played on (docs/explanation/live-play.md).
+      // The sides that finished hold one record, complete, and every
+      // side that ended is out on it; its ending was judged when it
+      // was seen.
+      final over = [for (final c in survivors) if (c.done) c];
+      final keysOf = [for (final c in over) c.record.map((d) => d.key).toList()];
+      for (final r in keysOf) {
+        if (!_sameList(r, keysOf.first)) return 'survivors that finished hold different records; faults were [${faults()}]';
+      }
+      final v = verifyRecord(t.spec, over.first.record, juries: over.first.juries, crypto: t.crypto, releases: over.first.releases);
+      if (!(v.ok && v.complete)) return 'the finished record does not verify complete: ${v.reason}';
+      for (final c in survivors.where((c) => !c.done)) {
+        if (c.tableState != TableState.failed) {
+          return 'some finished, and ${c.signer.publicKey.substring(0, 6)} neither finished nor ended the game; '
+              'faults were [${faults()}]\n${c.describe()}';
+        }
+        if (over.first.holders[c.mySeat!] is HumanSeat) {
+          return '${c.signer.publicKey.substring(0, 6)} ended the game, and the record that finished it still seats it; '
+              'faults were [${faults()}]';
+        }
+      }
     } else {
       final up = upNow();
       const paused = {TableState.pausedForJury, TableState.pausedForPeers, TableState.pausedForDeal};

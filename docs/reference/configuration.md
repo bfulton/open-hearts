@@ -278,7 +278,7 @@ What either checker said of a picture stands whichever is in use: a picture is a
 
 ## Table clocks
 
-The clocks a table plays by. The device that starts a table takes them from the `table` field of its [remote config](#remote-config), and they ride in the signed start event (`TableSpec.timing` in `packages/table/lib/src/spec.dart`), so every seat plays by the same clocks. A start event with no timing, or with any field of the wrong type or out of bounds, gives the standard table (`TableTiming.parse`).
+The clocks a table plays by. The device that starts a table takes them from the `table` field of its [remote config](#remote-config), and they ride in the signed start event (`TableSpec.timing` in `packages/table/lib/src/spec.dart`), so every seat plays by the same clocks. A start event with no timing, or with any field of the wrong type or out of bounds, gives the clocks every build reads that as: the first builds' standard, `TableTiming.unsaid`, a two-minute silence and the rest as today's standard (`TableTiming.parse`). A start at today's standard, or at any clocks but those, says every field. A `table` field in remote config that leaves a clock out gives today's standard for it.
 
 Bounds: `TableTiming.bounds` in `packages/table/lib/src/timing.dart`, and the same values in `TABLE_TIMING_BOUNDS` in `service/functions/config.mjs`. All values are milliseconds.
 
@@ -291,7 +291,7 @@ Bounds: `TableTiming.bounds` in `packages/table/lib/src/timing.dart`, and the sa
 | `botActsMs` | `TableTiming` in `packages/table/lib/src/timing.dart` | A held bot seat's card or pass. Keep it above ten seconds: a device whose own line stalls takes up to that long to know it (`unansweredMs` in `packages/table/lib/src/transport.dart`), and until it does, a juror's move it never heard looks like a juror sitting on its turn. |
 | `botDealsMs` | `TableTiming` | A held bot seat's deal steps and audit. |
 | `quorumLostMs` | `TableTiming` | How long a table stopped for a lost quorum waits before the game ends. |
-| `silenceMs` | `TableTiming` | How long a person may be silent before a peer may boot them at their turn. |
+| `silenceMs` | `TableTiming` | How long a person may be silent before a peer may boot them at their turn, without waiting on their clock. |
 | `jurorSilenceMs` | `TableTiming` | How long a juror may be silent before the table stops counting it. Above ten seconds, for the same reason as `botActsMs`. |
 
 Three more clocks are fixed in code and are not in remote config: `reloadGraceMs` in `TableClient` (`packages/table/lib/src/client.dart`), how long a seat whose connection closed has to come back before it counts as silent; and `unansweredMs` and `answerMs` (`packages/table/lib/src/transport.dart`), how long a device may hear nothing, with something it sent waiting longer than an answer takes, before it takes itself for cut off ([a device cut off from the table](../explanation/live-play.md#a-device-cut-off-from-the-table)).

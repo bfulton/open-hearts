@@ -251,9 +251,12 @@ Events that decide something for someone else go by every path: a
 boot, a claim of absence, an appeal, a verdict, a leave, a claim for the
 escrow. So does a seat's own action the moment a boot or appeal names
 it, since a peer that cannot read the relay this device writes to
-cannot say so. A device's own events should come back on its
-subscription, so a subscription that delivers nothing for a while after
-publishing (`RelayConnection.quietMs`) is taken as dead and remade.
+cannot say so. So do enough of its heartbeats to be heard three times
+inside the silence that would see it booted, or, for a juror, passed
+over: every other one at the standard table. A device's own events
+should come back on its subscription, so a subscription that delivers
+nothing for a while after publishing (`RelayConnection.quietMs`) is
+taken as dead and remade.
 
 ## Turns and majorities
 
@@ -376,10 +379,13 @@ A table's clocks are chosen by the device that starts it, from its
 remote config ([the service](service.md#remote-config)), and ride in the
 signed start event (`TableTiming`, `timing.dart`). Seats that disagreed
 about when a boot was due would back different sides of it. A start
-that names none, or one out of bounds, is the standard table everywhere.
-Pacing, meaning how often something is said again, is each device's
-own. Every clock, with its standard value and bounds, is in the
-[configuration reference](../reference/configuration.md#table-clocks).
+that names none, or one out of bounds, is the same table at every
+build: the clocks the first builds had as their standard
+(`TableTiming.unsaid`), so a build whose standard has moved on reads an
+older build's start as it was meant. A start at any other clocks says
+them in full. Pacing, meaning how often something is said again, is
+each device's own. Every clock, with its standard value and bounds, is
+in the [configuration reference](../reference/configuration.md#table-clocks).
 
 ## Leaving
 
@@ -410,10 +416,15 @@ dropped message: a valid play for turn T voids any boot for T. The
 player being booted sees their own countdown.
 
 **Silence.** A peer that has heard nothing from a seat for the table's
-silence (`silenceMs`) claims its absence the moment its turn is open.
-The silence is longer than the bank a stalled seat empties, so an active
-table resolves through the visible boot, and a phone that switches apps
-for a moment comes back to its seat.
+silence (`silenceMs`, half a minute) claims its absence the moment its
+turn is open, without waiting on its clock. So a device that has gone
+holds the table up at its turn for half a minute, where its clock would
+run most of a minute and then wait on somebody pressing *Boot*. A
+device that is there and slow is heard, and its clock times it. A
+connection the transport sees close counts as silent after twenty
+seconds (`reloadGraceMs`), time for a reloaded page to come back to its
+seat. A phone off the network for longer than the silence comes back to
+a bot in its seat if its turn came round meanwhile.
 
 Silence is answered **at the seat's own turn and nowhere else**. A
 silent seat still counts toward every majority meanwhile, so someone

@@ -409,7 +409,9 @@ class RemoteConfig {
       feedback: feedback != null && _goesSomewhere(feedback) ? feedback : null,
       // One for each document at most.
       notices: [if (json['notices'] case final List<Object?> list) ...list.map(LegalNotice.parse).nonNulls.take(2)],
-      table: TableTiming.parse(json['table']),
+      // The operator's word over this build's standard, not over what
+      // a table that says nothing means.
+      table: TableTiming.parse(json['table'], base: TableTiming.standard),
       waits: AppWaits.parse(json['waits']),
       leftEarly: switch (json['leftEarlyMin']) {
         final int m when m >= leftEarlyBounds.$1 && m <= leftEarlyBounds.$2 => Duration(minutes: m),

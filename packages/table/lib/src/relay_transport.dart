@@ -202,8 +202,10 @@ class RelayTransport implements Transport, ReactionLane {
   List<String> get paths => [for (final u in _group.reading) u.toString()];
 
   /// What each peer last said it reads, and when: a peer not heard
-  /// from in two minutes is out of the reckoning, as it is out of the
-  /// table's.
+  /// from in two minutes is out of the reckoning. Longer than the
+  /// standard silence after which a table counts a person gone
+  /// (timing.dart), so a peer the table still waits on is not left out
+  /// of where this device writes.
   final Map<PublicKey, ({Set<Uri> reads, int at})> _peerReads = {};
 
   @override
