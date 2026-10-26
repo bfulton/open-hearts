@@ -76,7 +76,7 @@ jobs:
           : > bin/cache/flutter_tools.stamp
           flutter --version
           grep -q 'The iOS simulator log stream did not start' bin/cache/flutter_tools.snapshot
-      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
         with:
           toolchain: 1.97.0
           targets: aarch64-apple-ios, aarch64-apple-ios-sim, x86_64-apple-ios
