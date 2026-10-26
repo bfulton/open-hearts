@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="{{lang}}">
+<head>
+{{> head}}
+<title>{{rules.meta.title}}</title>
+<meta name="description" content="{{rules.meta.description}}">
+<meta property="og:title" content="{{rules.meta.title}}">
+<meta property="og:description" content="{{rules.meta.description}}">
+<link rel="stylesheet" href="/page.css">
+</head>
+<body>
+
+<a class="skip" href="#main">{{common.skip}}</a>
+
+<header class="bar">
+  <div class="wrap">
+    <div class="title">
+      <h1>{{rules.header.title}}</h1>
+      <a class="logo" href="{{base}}/" aria-label="Open Hearts"><svg viewBox="0 0 100 100" aria-hidden="true"><path fill="currentColor" d="M50 92C6 62 2 34 20 16C35 2 46 12 50 26C54 12 65 2 80 16C98 34 94 62 50 92Z"/></svg></a>
+    </div>
+    <p class="tagline">{{rules.header.tagline}}</p>
+  </div>
+</header>
+
+<main id="main" class="wrap">
+  <section>
+    <h2>{{rules.game}}</h2>
+
+    <h3 id="cards"><a class="anchor" href="#cards">{{rules.cards.title}}</a></h3>
+    <p>{{rules.cards.p1}}</p>
+
+    <h3 id="deal"><a class="anchor" href="#deal">{{rules.deal.title}}</a></h3>
+    <p>{{rules.deal.p1}}</p>
+
+    <h3 id="pass"><a class="anchor" href="#pass">{{rules.pass.title}}</a></h3>
+    <p>{{rules.pass.p1}}</p>
+
+    <h3 id="lead"><a class="anchor" href="#lead">{{rules.lead.title}}</a></h3>
+    <p>{{rules.lead.p1}}</p>
+
+    <h3 id="follow"><a class="anchor" href="#follow">{{rules.follow.title}}</a></h3>
+    <p>{{rules.follow.p1}}</p>
+
+    <h3 id="first-trick"><a class="anchor" href="#first-trick">{{rules.firstTrick.title}}</a></h3>
+    <p>{{rules.firstTrick.p1}}</p>
+
+    <h3 id="breaking"><a class="anchor" href="#breaking">{{rules.breaking.title}}</a></h3>
+    <p>{{rules.breaking.p1}}</p>
+
+    <h3 id="taking"><a class="anchor" href="#taking">{{rules.taking.title}}</a></h3>
+    <p>{{rules.taking.p1}}</p>
+
+    <h3 id="scoring"><a class="anchor" href="#scoring">{{rules.scoring.title}}</a></h3>
+    <p>{{rules.scoring.p1}}</p>
+
+    <h3 id="moon"><a class="anchor" href="#moon">{{rules.moon.title}}</a></h3>
+    <p>{{rules.moon.p1}}</p>
+
+    <h3 id="end"><a class="anchor" href="#end">{{rules.end.title}}</a></h3>
+    <p>{{rules.end.p1}}</p>
+  </section>
+
+  <section>
+    <h2 id="live">{{rules.live}}</h2>
+
+    <h3 id="seating"><a class="anchor" href="#seating">{{rules.seating.title}}</a></h3>
+    <p>{{rules.seating.p1}}</p>
+
+    <h3 id="clock"><a class="anchor" href="#clock">{{rules.clock.title}}</a></h3>
+    <p>{{rules.clock.p1}}</p>
+
+    <h3 id="leaving"><a class="anchor" href="#leaving">{{rules.leaving.title}}</a></h3>
+    <p>{{rules.leaving.p1}}</p>
+
+    <h3 id="rated"><a class="anchor" href="#rated">{{rules.rated.title}}</a></h3>
+    <p>{{rules.rated.p1}}</p>
+  </section>
+
+  <section>
+    <h2 id="variants">{{rules.variants.title}}</h2>
+    <p>{{rules.variants.p1}}</p>
+    <ul class="plain">
+      <li>{{rules.variants.jack}}</li>
+      <li>{{rules.variants.queen}}</li>
+      <li>{{rules.variants.first}}</li>
+      <li>{{rules.variants.moon}}</li>
+      <li>{{rules.variants.pass}}</li>
+      <li>{{rules.variants.lead}}</li>
+      <li>{{rules.variants.players}}</li>
+    </ul>
+
+    <p class="go"><a href="{{play}}">{{home.playNow}}</a></p>
+  </section>
+
+  <nav class="learn" aria-labelledby="learn">
+    <h2 id="learn">{{common.learn}}</h2>
+{{> learn}}
+  </nav>
+</main>
+
+{{> footer}}
+
+</body>
+</html>

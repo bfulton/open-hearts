@@ -389,10 +389,17 @@ game because a fourth got on a train. A seat never comes back to a
 person once a bot has it. There are three doors, and all produce the
 same fact on the record: **seat N is out as of turn T.**
 
-**Leave**, from the menu. The leave is signed by the leaver at the turn
-they stood at, and carried by a majority of the people there. Where a
-leave and a boot cross, only one carries
-([the leave](table-states.md#the-leave)).
+**Leave**, from the menu or by going back. While the game is on, the
+app asks first, and says what leaving costs: the seat, a rated game
+counted as last, and Play live's wait where there would be one
+([below](#the-wait-after-leaving-early)). A phone's Back asks the same,
+and so does a browser's own Back, which reaches the app as an address
+to go to (the route's `onExit`, `app/lib/router.dart`): Stay keeps the
+table and puts its address back, and Leave says the seat is given up,
+rather than leaving it for the table to find silent. The leave is
+signed by the leaver at the turn they stood at, and carried by a
+majority of the people there. Where a leave and a boot cross, only one
+carries ([the leave](table-states.md#the-leave)).
 
 **Boot.** Once a seat's bank is empty and the grace on its current
 decision spent, the *Boot* button appears. It is a **trigger, not a
@@ -415,6 +422,40 @@ to the jury. Removing a seat mid-turn would let two peers that apply the
 removal at different moments settle the turn opposite ways.
 
 A seat that is booted or falls silent sees *A bot took your seat*.
+
+### The wait after leaving early
+
+Leaving costs the people still playing a fourth, so a device that
+leaves a game Play live seated it at, while somebody else is still
+playing it, waits before Play live seats it again: five minutes, or the
+remote config's `leftEarlyMin`
+([configuration](../reference/configuration.md#remote-config)). Playing
+alone and friends' rooms never wait, and leaving a friends' room starts
+no wait: friends settle that among themselves.
+
+What counts (`LiveController.leftEarly`):
+
+- Leaving by the menu or by Back while the game is on and not stopped
+  (for the jury, or for a peer to come back), with another person still
+  seated.
+- A seat the table gives to a bot, booted at an empty clock or found
+  silent, with another person still seated and the game not over.
+- A seat kept to come back to and found too old to come back to
+  (`SeatStore.load`, `gone`): the app closed mid-game for longer than a
+  table waits. The wait counts from when the device was last at the
+  table.
+
+What does not: a game that failed for everyone, a device that could no
+longer run the deal, and an account taken up on another device
+(`net/in_use.dart`), which is the player using it there.
+
+The wait is the device's alone (`app/lib/live/left_early.dart`). It
+keeps the time of its last early leave until the wait after it is over;
+meanwhile Play live is shut and says until when, and `Lobby.play`
+refuses. Nothing else holds a device to it: no relay keeps a table's
+events, and matchmaking has nobody in charge to ask. A device whose
+storage was cleared, or a build changed to skip the wait, plays again
+at once. Like pace, it decides nothing anybody else has to trust.
 
 ### Coming back after a reload
 

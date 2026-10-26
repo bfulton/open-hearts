@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="{{lang}}">
+<head>
+{{> head}}
+<title>{{howToPlay.meta.title}}</title>
+<meta name="description" content="{{howToPlay.meta.description}}">
+<meta property="og:title" content="{{howToPlay.meta.title}}">
+<meta property="og:description" content="{{howToPlay.meta.description}}">
+<link rel="stylesheet" href="/page.css">
+</head>
+<body>
+
+<a class="skip" href="#main">{{common.skip}}</a>
+
+<header class="bar">
+  <div class="wrap">
+    <div class="title">
+      <h1>{{howToPlay.header.title}}</h1>
+      <a class="logo" href="{{base}}/" aria-label="Open Hearts"><svg viewBox="0 0 100 100" aria-hidden="true"><path fill="currentColor" d="M50 92C6 62 2 34 20 16C35 2 46 12 50 26C54 12 65 2 80 16C98 34 94 62 50 92Z"/></svg></a>
+    </div>
+    <p class="tagline">{{howToPlay.header.tagline}}</p>
+  </div>
+</header>
+
+<main id="main" class="wrap">
+  <section>
+    <h2>{{howToPlay.game}}</h2>
+
+    <h3 id="aim"><a class="anchor" href="#aim">{{howToPlay.aim.title}}</a></h3>
+    <p>{{howToPlay.aim.p1}}</p>
+
+    <h3 id="deal"><a class="anchor" href="#deal">{{howToPlay.deal.title}}</a></h3>
+    <p>{{howToPlay.deal.p1}}</p>
+
+    <h3 id="pass"><a class="anchor" href="#pass">{{howToPlay.pass.title}}</a></h3>
+    <p>{{howToPlay.pass.p1}}</p>
+
+    <h3 id="tricks"><a class="anchor" href="#tricks">{{howToPlay.tricks.title}}</a></h3>
+    <p>{{howToPlay.tricks.p1}}</p>
+    <p>{{howToPlay.tricks.p2}}</p>
+
+    <h3 id="breaking"><a class="anchor" href="#breaking">{{howToPlay.breaking.title}}</a></h3>
+    <p>{{howToPlay.breaking.p1}}</p>
+
+    <h3 id="scoring"><a class="anchor" href="#scoring">{{howToPlay.score.title}}</a></h3>
+    <p>{{howToPlay.score.p1}}</p>
+
+    <h3 id="moon"><a class="anchor" href="#moon">{{howToPlay.moon.title}}</a></h3>
+    <p>{{howToPlay.moon.p1}}</p>
+
+    <h3 id="end"><a class="anchor" href="#end">{{howToPlay.end.title}}</a></h3>
+    <p>{{howToPlay.end.p1}}</p>
+  </section>
+
+  <section>
+    <h2>{{howToPlay.here}}</h2>
+
+    <h3 id="learn-to-play"><a class="anchor" href="#learn-to-play">{{howToPlay.learn.title}}</a></h3>
+    <p>{{howToPlay.learn.p1}}</p>
+
+    <h3 id="alone"><a class="anchor" href="#alone">{{howToPlay.solo.title}}</a></h3>
+    <p>{{howToPlay.solo.p1}}</p>
+
+    <h3 id="live"><a class="anchor" href="#live">{{howToPlay.live.title}}</a></h3>
+    <p>{{howToPlay.live.p1}}</p>
+
+    <p class="go"><a href="{{play}}">{{home.playNow}}</a></p>
+  </section>
+
+  <nav class="learn" aria-labelledby="learn">
+    <h2 id="learn">{{common.learn}}</h2>
+{{> learn}}
+  </nav>
+</main>
+
+{{> footer}}
+
+</body>
+</html>

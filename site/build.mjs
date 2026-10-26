@@ -162,11 +162,9 @@ export function render(page, language, words, { price = config().price, publishe
     });
   };
   let html = fill(readFileSync(join(here, 'pages', `${page}.html`), 'utf8'));
-  // The site's own links mark the page they are on.
-  html = html.replace(
-    new RegExp(`(<nav[^>]*>[\\s\\S]*?<a href="${base(language.code)}${path}")`),
-    '$1 aria-current="page"',
-  );
+  // The site's own links, in every nav, mark the page they are on.
+  const self = `<a href="${base(language.code)}${path}"`;
+  html = html.replace(/<nav[^>]*>[\s\S]*?<\/nav>/g, (nav) => nav.replaceAll(self, `${self} aria-current="page"`));
   // Each link to a stylesheet, script or picture carries its file's
   // fingerprint, so a changed one is fetched at once by a browser that
   // kept the last.

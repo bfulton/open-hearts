@@ -16,6 +16,7 @@ import '../l10n/l10n.dart';
 import '../net/address.dart' show driven;
 import '../net/copy.dart';
 import '../net/in_use.dart';
+import '../net/remote_config.dart';
 import '../net/share.dart';
 import '../pages.dart';
 import '../reaction_mute.dart';
@@ -222,6 +223,13 @@ class _LivePageState extends State<LivePage> {
     Navigator.of(context).pop();
   }
 
+  /// Leave the table, from its menu or by a phone's Back: asked first
+  /// while the game goes on ([askToLeave]).
+  Future<void> _askToLeave() async {
+    if (!_c.inGame) return _leave();
+    if (await askToLeave(context, _c) && mounted) _leave();
+  }
+
   /// In a build being driven (net/address.dart), the client's own account of the table
   /// (participants, open races, who was heard when) sits in the
   /// accessibility tree, invisible: for a test or a tool driving the
@@ -316,6 +324,19 @@ class _LivePageState extends State<LivePage> {
 
   @override
   Widget build(BuildContext context) {
+    // Back, while the game goes on, is leaving it, and asked like the
+    // menu's Leave the table: a phone's here, a browser's where it
+    // arrives, at the route (router.dart).
+    return PopScope(
+      canPop: !_c.inGame,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) unawaited(_askToLeave());
+      },
+      child: _screen(context),
+    );
+  }
+
+  Widget _screen(BuildContext context) {
     // This device, not the game: its worker for the deal failed for
     // good, and it left the table rather than hold it up. The others
     // play on, a bot in this seat. Before the seat that is no longer
@@ -393,7 +414,7 @@ class _LivePageState extends State<LivePage> {
                   game: game,
                   menu: [
                     MenuAction(context.l10n.shareToWatch, icon: Icons.visibility_outlined, onSelected: _shareToWatch),
-                    MenuAction(context.l10n.leaveTheTable, icon: Icons.logout, onSelected: _leave, danger: true),
+                    MenuAction(context.l10n.leaveTheTable, icon: Icons.logout, onSelected: _askToLeave, danger: true),
                     MenuAction(context.l10n.tellUsWhatsBroken, icon: Icons.feedback_outlined, onSelected: () => showFeedback(context)),
                     MenuAction(context.l10n.about, icon: Icons.info_outline, onSelected: () {
                       openPage<void>(context, AppPage.about);
@@ -461,6 +482,47 @@ class _LivePageState extends State<LivePage> {
         ),
       ),
     );
+  }
+}
+
+/// The tables whose question to leave is showing ([askToLeave]).
+final _asking = Expando<bool>('asking to leave');
+
+/// Whether to leave a live game that goes on, asked from the table's
+/// menu and a phone's Back (the page) and from a browser's Back
+/// (router.dart), with what leaving costs: the seat, a rated game's
+/// place, and Play live's wait after a game left early
+/// (left_early.dart) where there would be one. True for Leave. A way
+/// out taken while the question shows is the question's to answer, so
+/// it asks nothing more and stays.
+Future<bool> askToLeave(BuildContext context, LiveController c) async {
+  if (_asking[c] ?? false) return false;
+  _asking[c] = true;
+  try {
+    final l10n = context.l10n;
+    final wait = RemoteSettings.current.config.leftEarly;
+    final sure = await showDialog<bool>(
+      context: context,
+      builder: (dialog) => AlertDialog(
+        title: Text(l10n.leaveTableTitle),
+        content: Text([
+          l10n.leaveTableBot,
+          if (c.client.spec.rated) l10n.leaveTableRated,
+          if (c.strangers && c.othersPlaying && wait > Duration.zero) l10n.leaveTableWait(wait.inMinutes),
+        ].join(' ')),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(dialog).pop(false), child: Text(l10n.stay)),
+          FilledButton(
+            onPressed: () => Navigator.of(dialog).pop(true),
+            style: FilledButton.styleFrom(backgroundColor: Palette.danger, foregroundColor: Felt.dark),
+            child: Text(l10n.leave),
+          ),
+        ],
+      ),
+    );
+    return sure == true;
+  } finally {
+    _asking[c] = null;
   }
 }
 

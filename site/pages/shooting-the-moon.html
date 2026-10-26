@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="{{lang}}">
+<head>
+{{> head}}
+<title>{{moon.meta.title}}</title>
+<meta name="description" content="{{moon.meta.description}}">
+<meta property="og:title" content="{{moon.meta.title}}">
+<meta property="og:description" content="{{moon.meta.description}}">
+<link rel="stylesheet" href="/page.css">
+</head>
+<body>
+
+<a class="skip" href="#main">{{common.skip}}</a>
+
+<header class="bar">
+  <div class="wrap">
+    <div class="title">
+      <h1>{{moon.header.title}}</h1>
+      <a class="logo" href="{{base}}/" aria-label="Open Hearts"><svg viewBox="0 0 100 100" aria-hidden="true"><path fill="currentColor" d="M50 92C6 62 2 34 20 16C35 2 46 12 50 26C54 12 65 2 80 16C98 34 94 62 50 92Z"/></svg></a>
+    </div>
+    <p class="tagline">{{moon.header.tagline}}</p>
+  </div>
+</header>
+
+<main id="main" class="wrap">
+  <section>
+    <h2>{{moon.rule}}</h2>
+
+    <h3 id="what"><a class="anchor" href="#what">{{moon.what.title}}</a></h3>
+    <p>{{moon.what.p1}}</p>
+
+    <h3 id="example"><a class="anchor" href="#example">{{moon.example.title}}</a></h3>
+    <p>{{moon.example.p1}}</p>
+    <p>{{moon.example.p2}}</p>
+  </section>
+
+  <section>
+    <h2>{{moon.play}}</h2>
+
+    <h3 id="gamble"><a class="anchor" href="#gamble">{{moon.gamble.title}}</a></h3>
+    <p>{{moon.gamble.p1}}</p>
+
+    <h3 id="when"><a class="anchor" href="#when">{{moon.when.title}}</a></h3>
+    <p>{{moon.when.p1}}</p>
+    <p>{{moon.when.p2}}</p>
+
+    <h3 id="stop"><a class="anchor" href="#stop">{{moon.stop.title}}</a></h3>
+    <p>{{moon.stop.p1}}</p>
+    <p>{{moon.stop.p2}}</p>
+  </section>
+
+  <section>
+    <h2>{{moon.more}}</h2>
+
+    <h3 id="here"><a class="anchor" href="#here">{{moon.here.title}}</a></h3>
+    <p>{{moon.here.p1}}</p>
+
+    <h3 id="variants"><a class="anchor" href="#variants">{{moon.variants.title}}</a></h3>
+    <p>{{moon.variants.p1}}</p>
+
+    <p class="go"><a href="{{play}}">{{home.playNow}}</a></p>
+  </section>
+
+  <nav class="learn" aria-labelledby="learn">
+    <h2 id="learn">{{common.learn}}</h2>
+{{> learn}}
+  </nav>
+</main>
+
+{{> footer}}
+
+</body>
+</html>

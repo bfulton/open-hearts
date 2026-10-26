@@ -618,6 +618,9 @@ class _HomePageState extends State<HomePage> {
   /// whoever is waiting, or the people you send the link to.
   Widget _live() {
     final l10n = context.l10n;
+    // A game left early is waited out before Play live seats this device
+    // again (live/left_early.dart); the rest of the door is as ever.
+    final wait = _lobby.leftEarlyWait;
     return Container(
       padding: const EdgeInsets.fromLTRB(14, 10, 14, 14),
       decoration: BoxDecoration(
@@ -652,7 +655,15 @@ class _HomePageState extends State<HomePage> {
             ],
           ),
           const SizedBox(height: 8),
-          _PlayLive(others: _lobby.othersOnline, busy: _lobby.opening == Opening.live, disabled: _lobby.busy, onTap: _lobby.play),
+          _PlayLive(others: _lobby.othersOnline, busy: _lobby.opening == Opening.live, disabled: _lobby.busy || wait != null, onTap: _lobby.play),
+          if (wait != null) ...[
+            const SizedBox(height: 6),
+            Text(
+              l10n.leftEarlyWait(_clock((wait.inMilliseconds + 999) ~/ 1000)),
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Palette.chromeDim, fontSize: 12.5),
+            ),
+          ],
           const SizedBox(height: 10),
           // The same gold as the rest: two ways into a live game, and
           // neither is the lesser of them.
@@ -1148,7 +1159,7 @@ class _WaitingView extends StatelessWidget {
     // two are seated together at the pool's ten seconds.
     final choosing = !patient && !eager && others == 0 && waitedMs < queue.botsAfterMs;
     final line = patient
-        ? l10n.waitingForPersonLine('${waited ~/ 60}:${(waited % 60).toString().padLeft(2, '0')}', others)
+        ? l10n.waitingForPersonLine(_clock(waited), others)
         : eager
             ? null
             : l10n.waitedLine(waited, others);
@@ -1340,3 +1351,6 @@ class _Rated extends StatelessWidget {
     );
   }
 }
+
+/// [seconds] as a clock says them: minutes, then seconds of two digits.
+String _clock(int seconds) => '${seconds ~/ 60}:${(seconds % 60).toString().padLeft(2, '0')}';

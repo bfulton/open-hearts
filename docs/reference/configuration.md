@@ -194,6 +194,7 @@ The row `config|app` in `OH_STORE`, which the `config` handler serves to every d
 | `feedback` | An `https:` URL or a `mailto:` address | The project's issues | Where "Tell us what's broken" sends a report. |
 | `table` | See [Table clocks](#table-clocks). All fields pass, or none is served. | The standard table | The clocks of tables this device starts. |
 | `waits` | See the next table. | The app's own | How long the app waits on the network. |
+| `leftEarlyMin` | A whole number from 0 to 60 (`LEFT_EARLY_BOUNDS`, held equal to `RemoteConfig.leftEarlyBounds` by `service/functions/config.test.mjs`). Served only when set. | The app's own: 5 | Minutes Play live waits before it seats a device again, after it left a game early ([the wait after leaving early](../explanation/live-play.md#the-wait-after-leaving-early)). 0 is no wait. The support page's answer on leaving early says "a few minutes", and the dialog before leaving says the number. |
 
 Beside the row's fields, the `config` handler serves `notices`: each document's newest material or price change in `site/ledger.json`, for 60 days from the day it was published, as `[{document, date, revision, summary}]` with the summary in each language and `revision` only for a day's second version or later (`noticesOf` in `service/functions/notices.mjs`). The row can't set it.
 

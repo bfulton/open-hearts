@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="{{lang}}">
+<head>
+{{> head}}
+<title>{{strategy.meta.title}}</title>
+<meta name="description" content="{{strategy.meta.description}}">
+<meta property="og:title" content="{{strategy.meta.title}}">
+<meta property="og:description" content="{{strategy.meta.description}}">
+<link rel="stylesheet" href="/page.css">
+</head>
+<body>
+
+<a class="skip" href="#main">{{common.skip}}</a>
+
+<header class="bar">
+  <div class="wrap">
+    <div class="title">
+      <h1>{{strategy.header.title}}</h1>
+      <a class="logo" href="{{base}}/" aria-label="Open Hearts"><svg viewBox="0 0 100 100" aria-hidden="true"><path fill="currentColor" d="M50 92C6 62 2 34 20 16C35 2 46 12 50 26C54 12 65 2 80 16C98 34 94 62 50 92Z"/></svg></a>
+    </div>
+    <p class="tagline">{{strategy.header.tagline}}</p>
+  </div>
+</header>
+
+<main id="main" class="wrap">
+  <section>
+    <h2>{{strategy.passing}}</h2>
+
+    <h3 id="short"><a class="anchor" href="#short">{{strategy.short.title}}</a></h3>
+    <p>{{strategy.short.p1}}</p>
+
+    <h3 id="high"><a class="anchor" href="#high">{{strategy.high.title}}</a></h3>
+    <p>{{strategy.high.p1}}</p>
+
+    <h3 id="queen"><a class="anchor" href="#queen">{{strategy.queen.title}}</a></h3>
+    <p>{{strategy.queen.p1}}</p>
+    <p>{{strategy.queen.p2}}</p>
+
+    <h3 id="remember"><a class="anchor" href="#remember">{{strategy.remember.title}}</a></h3>
+    <p>{{strategy.remember.p1}}</p>
+  </section>
+
+  <section>
+    <h2>{{strategy.playing}}</h2>
+
+    <h3 id="first"><a class="anchor" href="#first">{{strategy.first.title}}</a></h3>
+    <p>{{strategy.first.p1}}</p>
+
+    <h3 id="duck"><a class="anchor" href="#duck">{{strategy.duck.title}}</a></h3>
+    <p>{{strategy.duck.p1}}</p>
+
+    <h3 id="last"><a class="anchor" href="#last">{{strategy.last.title}}</a></h3>
+    <p>{{strategy.last.p1}}</p>
+
+    <h3 id="void"><a class="anchor" href="#void">{{strategy.void.title}}</a></h3>
+    <p>{{strategy.void.p1}}</p>
+
+    <h3 id="spades"><a class="anchor" href="#spades">{{strategy.spades.title}}</a></h3>
+    <p>{{strategy.spades.p1}}</p>
+
+    <h3 id="count"><a class="anchor" href="#count">{{strategy.count.title}}</a></h3>
+    <p>{{strategy.count.p1}}</p>
+
+    <h3 id="moon"><a class="anchor" href="#moon">{{strategy.moon.title}}</a></h3>
+    <p>{{strategy.moon.p1}}</p>
+  </section>
+
+  <section>
+    <h2>{{strategy.late}}</h2>
+
+    <h3 id="score"><a class="anchor" href="#score">{{strategy.score.title}}</a></h3>
+    <p>{{strategy.score.p1}}</p>
+    <p>{{strategy.score.p2}}</p>
+
+    <h3 id="bots"><a class="anchor" href="#bots">{{strategy.bots.title}}</a></h3>
+    <p>{{strategy.bots.p1}}</p>
+
+    <p class="go"><a href="{{play}}">{{home.playNow}}</a></p>
+  </section>
+
+  <nav class="learn" aria-labelledby="learn">
+    <h2 id="learn">{{common.learn}}</h2>
+{{> learn}}
+  </nav>
+</main>
+
+{{> footer}}
+
+</body>
+</html>

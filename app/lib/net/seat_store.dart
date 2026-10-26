@@ -2,8 +2,9 @@
 /// page reloaded mid-game comes back to it (live/lobby.dart; packages/
 /// table, journal.dart).
 ///
-/// What is kept: the table (its spec, and the names and looks it was
-/// started with), when this device was last at it, and the table's
+/// What is kept: the table (its spec, the names and looks it was
+/// started with, and whether Play live seated it with strangers), when
+/// this device was last at it, and the table's
 /// journal — every event this device signed there, one key each,
 /// appended as it is signed, and each hand's deal secret. Written
 /// before an event goes out: localStorage takes a write at once, so a
@@ -22,11 +23,16 @@ import '../avatar.dart';
 
 /// A seat kept from before a reload.
 class KeptSeat {
-  const KeptSeat({required this.spec, required this.names, required this.avatars, required this.at, required this.journal});
+  const KeptSeat(
+      {required this.spec, required this.names, required this.avatars, required this.at, required this.journal, this.strangers = false});
 
   final TableSpec spec;
   final Map<int, String> names;
   final Map<int, Avatar> avatars;
+
+  /// Whether Play live seated the table, rather than a friends' room:
+  /// leaving its game early is waited out (live/left_early.dart).
+  final bool strangers;
 
   /// When this device was last at the table, in milliseconds.
   final int at;
@@ -56,12 +62,13 @@ class SeatStore {
   /// Starts keeping a new table, in place of any kept before; the
   /// journal its client writes to, already writing here. [journal] is
   /// one read back by [load], whose events are here already.
-  TableJournal keep(TableSpec spec, Map<int, String> names, Map<int, Avatar> avatars, {TableJournal? journal}) {
+  TableJournal keep(TableSpec spec, Map<int, String> names, Map<int, Avatar> avatars, {TableJournal? journal, bool strangers = false}) {
     if (journal == null) clear();
     _prefs.setString(_table, jsonEncode({
       'spec': spec.toJson(),
       'names': {for (final e in names.entries) '${e.key}': e.value},
       'avatars': {for (final e in avatars.entries) '${e.key}': e.value.toJson(withPicture: false)},
+      if (strangers) 'strangers': true,
     }));
     here();
     final j = journal ?? TableJournal();
@@ -79,8 +86,11 @@ class SeatStore {
   void here() => _prefs.setInt(_at, DateTime.now().millisecondsSinceEpoch);
 
   /// The seat kept, or null for none — or one too long ago to come back
-  /// to, which is cleared on the way.
-  KeptSeat? load({DateTime? now}) {
+  /// to, which is cleared on the way, and told to [gone] first: this
+  /// device was away from a game it never finished for longer than the
+  /// table waits (live/left_early.dart). Without its journal, which
+  /// nothing will read again.
+  KeptSeat? load({DateTime? now, void Function(KeptSeat seat)? gone}) {
     final raw = _prefs.getString(_table);
     if (raw == null) return null;
     try {
@@ -89,6 +99,9 @@ class SeatStore {
       final at = _prefs.getInt(_at) ?? 0;
       final ago = (now ?? DateTime.now()).millisecondsSinceEpoch - at;
       if (spec == null || ago < 0 || ago > comeBackWithin.inMilliseconds) {
+        if (spec != null && ago > comeBackWithin.inMilliseconds) {
+          gone?.call(KeptSeat(spec: spec, names: const {}, avatars: const {}, at: at, journal: TableJournal(), strangers: m['strangers'] == true));
+        }
         clear();
         return null;
       }
@@ -104,6 +117,7 @@ class SeatStore {
         avatars: {for (final e in (m['avatars'] as Map).entries) int.parse(e.key as String): Avatar.fromJson(e.value)},
         at: at,
         journal: TableJournal(said: said, secrets: secrets),
+        strangers: m['strangers'] == true,
       );
     } catch (_) {
       clear();

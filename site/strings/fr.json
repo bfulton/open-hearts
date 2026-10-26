@@ -9,7 +9,12 @@
     "terms": "Conditions",
     "languages": "Langues",
     "ogImageAlt": "Open Hearts : les quatre couleurs sur un tapis vert",
-    "translationNote": "<p class=\"note\">Cette page est une traduction ; en cas de différence avec la version anglaise, c'est la version anglaise qui prévaut.</p>"
+    "translationNote": "<p class=\"note\">Cette page est une traduction ; en cas de différence avec la version anglaise, c'est la version anglaise qui prévaut.</p>",
+    "learn": "En savoir plus sur la Dame de pique",
+    "howToPlay": "Comment jouer",
+    "rules": "Règles",
+    "moon": "Le grand chelem",
+    "strategy": "Stratégie"
   },
   "home": {
     "title": "Open Hearts — jeu de cartes open source, sans pub",
@@ -60,7 +65,11 @@
       "text": "Consultez la <a href=\"{{base}}/support\">page d'aide</a>, écrivez à <a href=\"mailto:help@openhearts.game\">help@openhearts.game</a> ou utilisez <i>Signaler un problème</i> dans le menu du jeu.",
       "menuAlt": "Le menu du jeu, ouvert, avec le pointeur sur Signaler un problème"
     },
-    "soon": "Les applications pour téléphone arrivent bientôt."
+    "soon": "Les applications pour téléphone arrivent bientôt.",
+    "learn": {
+      "title": "Vous découvrez la Dame de pique ?",
+      "text": "Le jeu s'apprend en quelques minutes, et il vous apprend une donne pendant que vous la jouez : choisissez <i>Apprendre à jouer</i> dans son menu."
+    }
   },
   "support": {
     "meta": {
@@ -81,7 +90,7 @@
     "faq": {
       "title": "Questions",
       "p1": "Comment jouer ?",
-      "p2": "Allez sur <a href=\"{{play}}\">play.openhearts.game</a>, ou (bientôt) cherchez « Open Hearts » sur l'{{appStore}} ou {{googlePlay}}.",
+      "p2": "Allez sur <a href=\"{{play}}\">play.openhearts.game</a>, ou (bientôt) cherchez « Open Hearts » sur l'{{appStore}} ou {{googlePlay}}. Vous découvrez la Dame de pique ? <a href=\"{{base}}/how-to-play\">Comment jouer</a> explique le jeu en quelques minutes, et <i>Apprendre à jouer</i>, dans le menu du jeu, vous apprend une donne.",
       "p5": "Comment s'abonner ?",
       "p6": "Touchez le bouton <i>S'abonner</i> sous <i>Jouer en direct</i>. Sur le <a href=\"{{app}}/subscription?lang={{code}}\">web</a>, le paiement se fait sur la page de Stripe, et c'est Link, société affiliée à Stripe, qui vend l'abonnement. Dans les applications mobiles, il passe par l'App Store ou Google Play, qui le facturent et le renouvellent. S'abonner crée votre compte : votre nom, votre image, votre classement et vos parties le suivent sur tout appareil que vous ajoutez (jusqu'à 5), et une modification de votre profil sur l'un d'eux s'affiche sur tous.",
       "p7": "Comment résilier ?",
@@ -101,7 +110,9 @@
       "p16": "Le jeu suit la langue de votre appareil. Sur le web, choisissez-en une autre sous <i>Langue</i>, sur la page <i>À propos</i> du jeu, ou avec le menu des langues en bas de ce site. Sur un téléphone, utilisez le réglage du téléphone pour chaque application : sur un iPhone, Réglages, puis Open Hearts, puis Langue ; sur Android 13 et plus, Paramètres, puis Système, puis Langues, puis Langues des applications.",
       "p17": "Comment savoir que la donne est honnête ?",
       "p19": "Que deviennent mes données ?",
-      "p20": "En solo, rien ne quitte votre appareil. En direct, votre nom, votre image, votre numéro de compte et vos résultats sont publics. Rien n'est vendu ni utilisé pour la publicité. Plus dans la <a href=\"{{base}}/privacy\">politique de confidentialité</a>."
+      "p20": "En solo, rien ne quitte votre appareil. En direct, votre nom, votre image, votre numéro de compte et vos résultats sont publics. Rien n'est vendu ni utilisé pour la publicité. Plus dans la <a href=\"{{base}}/privacy\">politique de confidentialité</a>.",
+      "p27": "Et si je quitte une partie en direct avant la fin ?",
+      "p28": "Un bot prend votre place aussitôt et la joue jusqu'au bout, pour que la partie continue pour les autres. Une partie classée compte comme si vous aviez fini à la dernière place. Et si c'est <i>Jouer en direct</i> qui vous a trouvé cette table, avec d'autres personnes encore assises, il attend quelques minutes avant de vous en trouver une autre, et affiche le temps restant ; jouer seul et entre amis restent possibles. Une place qu'un bot prend parce que votre temps s'est écoulé, ou que votre appareil ne répondait plus, compte de la même façon qu'une place que vous avez quittée."
     },
     "rules": {
       "title": "Quelles sont les règles de la Dame de pique ?",
@@ -113,7 +124,7 @@
       "r6": "Chaque cœur vaut un point ; la dame de pique en vaut treize.",
       "r7": "Prenez les vingt-six pour faire le grand chelem : ils vont à tous les autres.",
       "r8": "Jouez en cinquante ou en cent points. Le score le plus bas gagne.",
-      "more": "Pour en savoir plus sur les règles et l'histoire du jeu, voir <a href=\"{{support.rules.wikipedia}}\">Wikipédia</a>.",
+      "more": "Les règles complètes, avec les variantes que ce jeu laisse de côté, sont sur <a href=\"{{base}}/rules\">leur propre page</a>. Pour l'histoire du jeu, voir <a href=\"{{support.rules.wikipedia}}\">Wikipédia</a>.",
       "wikipedia": "https://fr.wikipedia.org/wiki/Dame_de_pique_(jeu)"
     },
     "cancelAlt": "Le menu du jeu avec le pointeur sur Abonnement, puis la page de l'abonnement avec le pointeur sur Gérer l'abonnement",
@@ -134,6 +145,257 @@
       "witness": "<b>Sous témoins.</b> Chaque main tire au sort des jurés : des inconnus choisis au hasard parmi les autres joueurs en ligne, sans enjeu à la table. Ils jouent les places des bots et gardent des morceaux des clés de chaque joueur, pour qu'une main puisse se terminer si quelqu'un part, sans que personne ne puisse seul ouvrir les cartes d'un autre. Quand trop peu d'autres joueurs sont en ligne pour former un jury, les jurés de réserve de notre service complètent le nombre. Comme tout juré, ils ne peuvent pas voir vos cartes seuls, seulement avec un autre joueur de votre table : pour ces mains, vous nous faites confiance pour ne pas nous entendre avec lui.",
       "audit": "<b>Vérifié.</b> Après chaque main, chaque appareil publie son secret : la partie entière peut être rejouée et chaque mélange, carte et coup vérifiés. Après une partie en direct, <i>Voir toute la partie</i> fait cette vérification pour vous ; après une partie en solo, <i>Copier le relevé</i> la conserve.",
       "more": "Tout le fonctionnement est expliqué dans <a href=\"https://github.com/bfulton/open-hearts/blob/main/docs/explanation/fair-deal.md\">la description</a>."
+    }
+  },
+  "howToPlay": {
+    "meta": {
+      "title": "Comment jouer à la Dame de pique — Open Hearts",
+      "description": "Comment jouer à la Dame de pique (Hearts), le jeu de cartes, en quelques minutes : passer trois cartes, fournir la couleur, remporter des plis, pourquoi chaque cœur compte contre vous, et comment on gagne une partie."
+    },
+    "header": {
+      "title": "Comment jouer à la Dame de pique",
+      "tagline": "Tout le jeu en quelques minutes, de la distribution au dernier pli."
+    },
+    "game": "Le jeu",
+    "aim": {
+      "title": "Le but",
+      "p1": "La Dame de pique est un jeu de cartes pour quatre joueurs, chacun pour soi. Les cartes que vous ramassez comptent des points contre vous : un par cœur, et treize pour la dame de pique. À la fin de la partie, le score le plus bas gagne."
+    },
+    "deal": {
+      "title": "La distribution",
+      "p1": "Les 52 cartes sont distribuées, treize à chaque joueur. Dans chaque couleur, l'as est la plus forte et le deux la plus faible, et il n'y a pas d'atout."
+    },
+    "pass": {
+      "title": "Passer trois cartes",
+      "p1": "Avant chaque donne, chacun passe trois cartes : à la première donne au joueur de gauche, à la deuxième au joueur de droite, à la troisième au joueur d'en face, et à la quatrième personne ne passe. Puis l'ordre recommence. Vous choisissez vos trois cartes avant de voir celles qui vous arrivent."
+    },
+    "tricks": {
+      "title": "Les plis",
+      "p1": "Le joueur qui a le 2 de trèfle l'entame au premier pli. Puis chacun à son tour, vers la gauche, joue une carte. Vous devez fournir : jouer une carte de la couleur entamée, si vous en avez. Si vous n'en avez pas, vous pouvez jouer n'importe quelle carte, et c'est l'occasion de vous débarrasser de cœurs et de la dame de pique.",
+      "p2": "La plus haute carte de la couleur entamée remporte le pli, avec les points qu'il contient. Une carte d'une autre couleur ne remporte jamais un pli, aussi haute soit-elle. Qui remporte un pli entame le suivant, jusqu'à ce que les treize soient joués."
+    },
+    "breaking": {
+      "title": "Ouvrir les cœurs",
+      "p1": "Personne ne peut jouer un cœur ni la dame de pique au premier pli, sauf s'il n'a rien d'autre. Et personne ne peut entamer à cœur tant qu'aucun cœur n'a été joué, ce qu'on appelle ouvrir les cœurs, sauf s'il ne lui reste que des cœurs. La dame de pique n'ouvre pas les cœurs, et peut être entamée à tout moment."
+    },
+    "score": {
+      "title": "Le score",
+      "p1": "Une fois les treize plis joués, chaque joueur compte les points des plis qu'il a remportés : un par cœur et treize pour la dame de pique, 26 en tout pour les quatre. Ils s'ajoutent à son score."
+    },
+    "moon": {
+      "title": "Le grand chelem",
+      "p1": "Prenez les 26 points d'une donne et vous faites le grand chelem : vous ne marquez rien pour la donne, et tous les autres marquent 26. Mais s'il vous manque un seul cœur, vous gardez les 25 autres. Pour en savoir plus : <a href=\"{{base}}/shooting-the-moon\">le grand chelem</a>."
+    },
+    "end": {
+      "title": "La fin de la partie",
+      "p1": "La partie se termine après la donne où le score de quelqu'un atteint 50 ou plus, ou 100 dans une partie longue. Le score le plus bas gagne, et les joueurs à égalité se partagent la victoire."
+    },
+    "here": "Jouer ici",
+    "learn": {
+      "title": "Apprendre en jouant",
+      "p1": "Le jeu vous apprend une donne : choisissez <i>Apprendre à jouer</i> dans son menu, et jouez une donne contre trois bots, avec une note à chaque nouveauté quand elle se présente."
+    },
+    "solo": {
+      "title": "Seul",
+      "p1": "<i>Jouer seul</i> vous distribue une partie contre trois bots : gratuite, sans pub et sans inscription, et elle fonctionne hors ligne."
+    },
+    "live": {
+      "title": "Avec d'autres",
+      "p1": "Le jeu en direct demande un abonnement. <i>Jouer en direct</i> vous place avec trois personnes proches de votre classement, et <i>Jouer entre amis</i> ouvre un salon pour les personnes à qui vous envoyez son lien. <i>Options de partie</i> permet de choisir 50 ou 100 points, et si une partie en direct est classée. Ce qui change à une table en direct est dans <a href=\"{{base}}/rules#live\">les règles</a>."
+    }
+  },
+  "rules": {
+    "meta": {
+      "title": "Les règles complètes de la Dame de pique — Open Hearts",
+      "description": "Les règles complètes de la Dame de pique (Hearts) telles qu'Open Hearts les joue : la distribution, le passage des cartes, le premier pli, l'ouverture des cœurs, le score, le grand chelem et la fin de la partie, avec les variantes laissées de côté."
+    },
+    "header": {
+      "title": "Les règles de la Dame de pique",
+      "tagline": "Toutes les règles, telles qu'on les joue ici, et les variantes laissées de côté."
+    },
+    "game": "Les règles",
+    "cards": {
+      "title": "Joueurs et cartes",
+      "p1": "Quatre joueurs, chacun pour soi, avec un jeu standard de 52 cartes, sans joker. Dans chaque couleur, les cartes vont de l'as, la plus forte, en passant par le roi, la dame, le valet et le dix, jusqu'au deux, la plus faible. Il n'y a pas d'atout."
+    },
+    "deal": {
+      "title": "La distribution",
+      "p1": "À chaque donne, le paquet est mélangé et entièrement distribué, treize cartes à chaque joueur. Quand vous jouez seul, c'est votre appareil qui mélange. À une table en direct, chaque appareil mélange à son tour, si bien que la donne est équitable pourvu qu'un seul d'entre eux soit honnête : <a href=\"{{base}}/support#fair\">comment ça marche</a>."
+    },
+    "pass": {
+      "title": "Le passage des cartes",
+      "p1": "Avant le premier pli, chaque joueur choisit trois cartes et les passe face cachée. Le sens suit un cycle de quatre : à la première donne on passe à gauche, à la deuxième à droite, à la troisième en face, et à la quatrième on ne passe pas. À la cinquième, on passe de nouveau à gauche. Tout le monde choisit avant que quiconque voie ce qu'il reçoit."
+    },
+    "lead": {
+      "title": "La première entame",
+      "p1": "Le joueur qui a le 2 de trèfle après le passage l'entame au premier pli. Le jeu tourne vers la gauche, chacun ajoutant une carte au pli."
+    },
+    "follow": {
+      "title": "Fournir",
+      "p1": "Chaque joueur doit jouer une carte de la couleur entamée s'il en a une. Un joueur qui n'en a pas peut jouer n'importe quelle carte, dans les limites des deux règles qui suivent."
+    },
+    "firstTrick": {
+      "title": "Pas de points au premier pli",
+      "p1": "Aucun cœur ne peut être joué au premier pli, ni la dame de pique. La seule exception est un joueur sans trèfle dont la main ne contient que des cœurs et la dame de pique : il joue l'une de ces cartes."
+    },
+    "breaking": {
+      "title": "Ouvrir les cœurs",
+      "p1": "On ne peut pas entamer à cœur tant qu'un cœur n'a pas été joué dans un pli précédent ; les cœurs sont alors ouverts. Un joueur qui n'a que des cœurs peut quand même en entamer un. La dame de pique n'ouvre pas les cœurs, et peut être entamée à tout moment."
+    },
+    "taking": {
+      "title": "Remporter un pli",
+      "p1": "La plus haute carte de la couleur entamée remporte le pli. Une carte d'une autre couleur ne peut pas le remporter, aussi haute soit-elle. Qui remporte un pli garde ses cartes et entame le suivant. Une donne compte treize plis."
+    },
+    "scoring": {
+      "title": "Le score",
+      "p1": "À la fin de chaque donne, chaque cœur qu'un joueur a ramassé lui compte un point, et la dame de pique treize. Aucune autre carte ne compte. Les points d'une donne font toujours 26 au total, et ceux de chaque joueur s'ajoutent à son score."
+    },
+    "moon": {
+      "title": "Le grand chelem",
+      "p1": "Un joueur qui prend les 26 points d'une donne ne marque rien pour elle, et chacun des trois autres marque 26. Pour en savoir plus : <a href=\"{{base}}/shooting-the-moon\">le grand chelem</a>."
+    },
+    "end": {
+      "title": "La fin de la partie",
+      "p1": "Une partie se joue en 50 points, ou en 100 si on l'a choisi dans <i>Options de partie</i> avant de commencer. Elle se termine après la donne où le score de quelqu'un atteint ce nombre ou le dépasse, jamais au milieu d'une donne. Le score le plus bas gagne, et les joueurs à égalité se partagent la victoire."
+    },
+    "live": "À une table en direct",
+    "seating": {
+      "title": "Avec qui vous jouez",
+      "p1": "<i>Jouer en direct</i> réunit des personnes de classement proche, et <i>Jouer entre amis</i> réunit les personnes présentes dans le salon. Les places que personne n'occupe vont à des bots, et chaque bot est signalé comme tel."
+    },
+    "clock": {
+      "title": "L'horloge",
+      "p1": "Chaque décision a quelques secondes de grâce, et chaque donne une réserve de temps que l'on entame en réfléchissant au-delà de la grâce. Une fois la grâce d'un joueur écoulée, sa place affiche le temps qui lui reste. Quand la réserve de quelqu'un est épuisée, les autres peuvent l'exclure, et un bot prend sa place."
+    },
+    "leaving": {
+      "title": "Partir",
+      "p1": "Un joueur qui part, est exclu ou ne répond plus est aussitôt remplacé par un bot, qui joue sa place jusqu'à la fin de la partie ; la place ne lui revient pas. Dans une partie classée, un joueur parti compte comme arrivé à la dernière place. <a href=\"{{base}}/support#leaving\">En savoir plus sur le départ en cours de partie</a>."
+    },
+    "rated": {
+      "title": "Parties classées",
+      "p1": "Une partie classée fait bouger votre classement selon la façon dont votre score final se compare à celui de chacun des trois autres : le score le plus bas gagne chaque paire, et des scores égaux la partagent. Les bots assis dès la distribution sont classés de la même façon. Une partie non classée ne change aucun classement."
+    },
+    "variants": {
+      "title": "Variantes qu'on ne joue pas ici",
+      "p1": "La Dame de pique se joue de bien des façons. Voici les variantes courantes que ce jeu laisse de côté.",
+      "jack": "<b>Le valet de carreau.</b> Dans l'Omnibus Hearts, celui qui ramasse le valet de carreau retire dix points de son score. Ici, il ne compte pas.",
+      "queen": "<b>La dame ouvre les cœurs.</b> À certaines tables, la dame de pique ouvre aussi les cœurs. Ici, seul un cœur le fait.",
+      "first": "<b>Des points au premier pli.</b> Certaines tables permettent de jouer des cœurs et la dame de pique au premier pli. Ici, c'est impossible, sauf pour un joueur qui n'a rien d'autre.",
+      "moon": "<b>Un choix au grand chelem.</b> Certaines tables laissent le joueur qui fait le grand chelem retirer plutôt 26 points de son propre score. Ici, ce sont toujours les autres qui prennent les 26.",
+      "pass": "<b>D'autres passages.</b> Certaines tables passent quatre cartes, ou dans un autre ordre. Ici, c'est toujours trois : à gauche, à droite, en face, puis aucun.",
+      "lead": "<b>D'autres entames.</b> À certaines tables, le joueur à gauche du donneur entame avec n'importe quelle carte. Ici, c'est toujours le 2 de trèfle qui entame.",
+      "players": "<b>Trois ou cinq joueurs.</b> On peut jouer à trois ou à cinq en retirant une ou deux cartes du paquet. Ici, on est toujours quatre."
+    }
+  },
+  "moon": {
+    "meta": {
+      "title": "Le grand chelem à la Dame de pique — Open Hearts",
+      "description": "Le grand chelem à la Dame de pique (shooting the moon) : ce que c'est, comment il se compte, quand le tenter et comment arrêter un joueur qui le tente."
+    },
+    "header": {
+      "title": "Le grand chelem",
+      "tagline": "Prenez tous les points d'une donne, et ce sont les autres qui les prennent."
+    },
+    "rule": "La règle",
+    "what": {
+      "title": "Ce que c'est",
+      "p1": "À la Dame de pique, vous essayez de prendre le moins de points possible. Le grand chelem renverse les choses : prenez-les tous. Un joueur qui ramasse tous les cœurs et la dame de pique dans une donne, les 26 points, ne marque rien pour elle, et chacun des trois autres marque 26. En anglais, on dit « shooting the moon »."
+    },
+    "example": {
+      "title": "Un exemple",
+      "p1": "Dans une partie en 50 points, Ana, Ben, Cleo et Dev ont 18, 22, 31 et 9 points. À la donne suivante, Ben ramasse les treize cœurs et la dame de pique. Ben ne marque rien, et Ana, Cleo et Dev marquent 26 chacun.",
+      "p2": "Cela donne 44, 22, 57 et 35. Cleo a dépassé 50, la partie se termine donc, et Ben, qui était troisième, la gagne."
+    },
+    "play": "Le tenter",
+    "gamble": {
+      "title": "Pourquoi c'est un pari",
+      "p1": "Un grand chelem doit prendre tous les points. Si un seul cœur va à quelqu'un d'autre, il échoue, et celui qui l'a tenté garde tout ce qu'il a pris : jusqu'à 25 points en une seule donne."
+    },
+    "when": {
+      "title": "Quand le tenter",
+      "p1": "Cherchez une main qui peut remporter des plis et continuer à en remporter : des cœurs hauts ; la dame de pique, ou l'as et le roi de pique pour la capturer ; et des couleurs longues menées par leurs plus hautes cartes. Les petites cartes sont le danger, car chacune peut donner la main à quelqu'un qui ne vous la rendra pas.",
+      "p2": "Mieux vaut commencer discrètement. Remportez des plis comme n'importe qui le ferait, et ne dévoilez votre jeu que lorsqu'il est trop tard pour vous arrêter."
+    },
+    "stop": {
+      "title": "Comment l'arrêter",
+      "p1": "Si un joueur a pris tous les points jusqu'ici, il tente peut-être le grand chelem. Pour l'arrêter, un seul cœur suffit : remportez un pli qui contient un cœur, ou gardez un cœur assez haut pour en remporter un en fin de donne. Quelques points sur votre score coûtent bien moins que 26.",
+      "p2": "Ne vous débarrassez donc pas de votre plus haut cœur simplement parce que les cœurs sont mauvais : en fin de donne, ce peut être la seule carte capable d'arrêter le grand chelem."
+    },
+    "more": "Ici et ailleurs",
+    "here": {
+      "title": "Sur Open Hearts",
+      "p1": "Quand quelqu'un fait le grand chelem, la table tremble autour de cette personne, et la feuille de score indique qui l'a fait. Votre profil compte, pour vos parties en solo, les grands chelems que vous avez réussis et ceux que vous avez bloqués : des donnes où quelqu'un d'autre a pris la dame et dix cœurs ou plus, et où vous avez pris l'un des autres."
+    },
+    "variants": {
+      "title": "D'autres façons de le compter",
+      "p1": "Certaines tables laissent celui qui fait le grand chelem retirer plutôt 26 points de son propre score, ce qui compte quand ajouter 26 aux autres terminerait la partie alors qu'il est encore derrière. D'autres comptent davantage le fait de remporter les treize plis, « shooting the sun ». Ici, le grand chelem se compte toujours de la même façon : rien pour celui qui le fait, et 26 pour tous les autres."
+    }
+  },
+  "strategy": {
+    "meta": {
+      "title": "Stratégie à la Dame de pique : bien jouer — Open Hearts",
+      "description": "Stratégie et conseils pour la Dame de pique : quoi passer, comment gérer la dame de pique, quand laisser passer un pli, compter les cartes, arrêter un grand chelem et jouer selon le score."
+    },
+    "header": {
+      "title": "Stratégie à la Dame de pique",
+      "tagline": "Ce que font les bons joueurs, du passage des cartes au dernier pli."
+    },
+    "passing": "Le passage",
+    "short": {
+      "title": "Raccourcissez une couleur",
+      "p1": "Le passage est votre meilleure chance de façonner votre main. Passez toutes les cartes d'une couleur courte et vous en êtes vide : quand elle est entamée, vous pouvez vous défausser d'un cœur ou de la dame de pique. Deux ou trois trèfles ou carreaux sont les plus faciles à écouler."
+    },
+    "high": {
+      "title": "Passez vos cartes hautes",
+      "p1": "Les as, les rois et les dames remportent des plis dont vous ne voulez pas. Les petites cartes, du deux au cinq, vous permettent de passer sous tout le monde : gardez-les, et surtout les petits cœurs."
+    },
+    "queen": {
+      "title": "La dame de pique",
+      "p1": "Avec la dame et seulement un ou deux autres piques, passez-la, sinon elle risque de vous être arrachée sur un pli que vous remportez. Avec quatre piques ou plus en dessous d'elle, il est plus sûr de la garder : vous fournissez à pique avec les petits, et vous la placez sur le pli de quelqu'un d'autre dès que vous êtes vide dans une couleur.",
+      "p2": "Sans la dame, l'as et le roi de pique sont un danger : celui qui détient la dame la jettera dessus. Passez-les si vous avez peu d'autres piques."
+    },
+    "remember": {
+      "title": "Souvenez-vous de ce que vous avez passé",
+      "p1": "Vous connaissez trois cartes de la main d'un autre joueur. Si vous avez passé la dame de pique, vous savez qui l'a."
+    },
+    "playing": "Jouer les cartes",
+    "first": {
+      "title": "Le premier pli est sans danger",
+      "p1": "Aucun point ne peut être joué au premier pli : c'est le moment le plus sûr pour vous débarrasser de votre plus haut trèfle."
+    },
+    "duck": {
+      "title": "Passez dessous avec votre plus haute carte sûre",
+      "p1": "Quand vous ne voulez pas d'un pli, jouez la plus haute carte qui perd encore contre celle qui le mène. Vos petites cartes valent davantage plus tard dans la donne, quand il y a plus de points en jeu."
+    },
+    "last": {
+      "title": "Dernier à jouer, prenez haut",
+      "p1": "Vous jouez en dernier sur un pli sans points que vous allez remporter de toute façon ? Remportez-le avec votre plus haute carte de la couleur, pas une petite, tant que vous avez ensuite de quoi entamer sans risque."
+    },
+    "void": {
+      "title": "Vide dans une couleur, défaussez le pire",
+      "p1": "Quand vous ne pouvez pas fournir, défaussez la carte qui vous ferait le plus de tort plus tard : la dame de pique si vous l'avez, puis vos plus hauts cœurs, puis les cartes hautes des couleurs qui vous restent."
+    },
+    "spades": {
+      "title": "Entamez pique pour faire tomber la dame",
+      "p1": "Sans la dame, et sans pique au-dessus du valet, entamer pique est sans danger pour vous et dangereux pour qui la détient : chaque pli à pique lui coûte un pique de plus, jusqu'à ce que la dame doive sortir."
+    },
+    "count": {
+      "title": "Comptez les cartes",
+      "p1": "Suivez les cœurs et les piques déjà joués, et qui n'a plus quelle couleur. Un joueur vide dans une couleur se défaussera de points quand elle sera entamée, et vous le saurez avant de l'entamer."
+    },
+    "moon": {
+      "title": "Surveillez le grand chelem",
+      "p1": "Si un joueur prend tous les points, prenez-en un vous-même, même si cela vous en coûte quelques-uns : un cœur coûte moins cher que 26. Pour en savoir plus : <a href=\"{{base}}/shooting-the-moon#stop\">arrêter un grand chelem</a>."
+    },
+    "late": "Le score",
+    "score": {
+      "title": "Jouez selon le score",
+      "p1": "La partie se termine quand quelqu'un atteint l'objectif, alors vers la fin, le score change ce que vous voulez. Si vous avez le score le plus bas, plus tôt elle finit, mieux c'est : des points au joueur le plus proche de l'objectif peuvent la terminer. Si vous êtes derrière, faites durer la partie, et envoyez des points à celui qui mène.",
+      "p2": "C'est aussi là qu'un grand chelem pèse le plus : 26 pour chacun des autres peuvent terminer la partie en une seule donne, que celui qui le réussit soit en tête ou non."
+    },
+    "bots": {
+      "title": "Entraînez-vous contre les bots",
+      "p1": "Les bots d'ici sont des amoureux célèbres, chacun avec sa manière : Romeo ne sait pas garder une dame, et Don Juan tente le grand chelem avec des mains où personne d'autre ne le ferait. <i>Jouer seul</i> est gratuit, aussi souvent que vous voulez."
     }
   },
   "privacy": {

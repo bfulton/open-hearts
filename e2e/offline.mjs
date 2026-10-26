@@ -21,7 +21,7 @@ import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { chromium } from './browser.mjs';
-import { act, agreedToTerms, click, freePort, has, labelOf, licensed, log, playUntil, root, serveApp, sleep, texts, type, waitFor, waitGone } from './drive.mjs';
+import { act, agreedToTerms, click, freePort, has, labelOf, licensed, log, playUntil, pressable, root, serveApp, sleep, texts, type, waitFor, waitGone } from './drive.mjs';
 import { flowRelay, runFlows } from './pool.mjs';
 
 const phone = { width: 390, height: 844 };
@@ -103,16 +103,6 @@ async function gone(page, re, seconds, what) {
   }
   throw new Error(`timed out waiting for ${what} within ${seconds} s\nsaw: ${(await texts(page)).join(' | ')}`);
 }
-
-/// Whether the node labelled [re] can be pressed: a way in that is
-/// being opened is disabled, and one that has given up is not.
-const pressable = (page, re) =>
-  page.evaluate(`((src) => {
-    const labelOf = ${labelOf};
-    const re = new RegExp(src);
-    const e = [...document.querySelectorAll('flt-semantics')].find((e) => re.test(labelOf(e)));
-    return !!e && e.getAttribute('aria-disabled') !== 'true';
-  })(${JSON.stringify(re.source)})`);
 
 async function name(page) {
   await click(page, /^Your profile$/);
@@ -402,6 +392,9 @@ flow('the network gone at a live table, and back', async ({ context, open, relay
   await click(page, /^Menu$/);
   await waitFor(page, /^Leave the table$/, { what: 'the menu' });
   await click(page, /^Leave the table$/);
+  // Asked first, the game being on.
+  await waitFor(page, /^Leave the table\?$/, { what: 'the question' });
+  await click(page, /^Leave$/);
   await waitFor(page, /^Play live, /, { timeout: 20000, what: 'the door, counting' });
   await within(page, /^Play live, nobody else online$/, 10, 'the count, the backup jurors left out');
   return page;

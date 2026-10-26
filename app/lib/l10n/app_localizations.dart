@@ -212,6 +212,42 @@ abstract class AppLocalizations {
   /// **'Leave the table'**
   String get leaveTheTable;
 
+  /// Title of the question asked before leaving a live game that is still going, from the menu or by going back.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave the table?'**
+  String get leaveTableTitle;
+
+  /// In the question before leaving a live game: what happens to the seat.
+  ///
+  /// In en, this message translates to:
+  /// **'A bot takes your seat for the rest of the game.'**
+  String get leaveTableBot;
+
+  /// In the question before leaving a live game, when the game is rated: the player who leaves finishes last.
+  ///
+  /// In en, this message translates to:
+  /// **'The game is rated, and counts as one you finished last.'**
+  String get leaveTableRated;
+
+  /// In the question before leaving a live game Play live seated, with other people still playing: how long, in whole minutes, before Play live seats the player again.
+  ///
+  /// In en, this message translates to:
+  /// **'{minutes, plural, =1{Play live won\'t seat you again for a minute.} other{Play live won\'t seat you again for {minutes} minutes.}}'**
+  String leaveTableWait(int minutes);
+
+  /// Button in the question before leaving a live game: stay at the table.
+  ///
+  /// In en, this message translates to:
+  /// **'Stay'**
+  String get stay;
+
+  /// Under the Play live button, while Play live waits after a live game the player did not finish: how long is left, as minutes:seconds.
+  ///
+  /// In en, this message translates to:
+  /// **'You didn\'t finish your last live game: Play live opens again in {time}.'**
+  String leftEarlyWait(String time);
+
   /// Menu item and page title: about the app.
   ///
   /// In en, this message translates to:
@@ -638,7 +674,7 @@ abstract class AppLocalizations {
   /// **'Start now'**
   String get startNow;
 
-  /// Button: leave the table before it starts.
+  /// Button: leave the table, before it starts, or during a game once asked whether to.
   ///
   /// In en, this message translates to:
   /// **'Leave'**

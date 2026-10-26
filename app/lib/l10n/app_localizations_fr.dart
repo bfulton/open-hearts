@@ -120,6 +120,37 @@ class AppLocalizationsFr extends AppLocalizations {
   String get leaveTheTable => 'Quitter la table';
 
   @override
+  String get leaveTableTitle => 'Quitter la table ?';
+
+  @override
+  String get leaveTableBot =>
+      'Un bot prend votre place pour le reste de la partie.';
+
+  @override
+  String get leaveTableRated =>
+      'La partie est classée, et compte comme si vous aviez fini à la dernière place.';
+
+  @override
+  String leaveTableWait(int minutes) {
+    String _temp0 = intl.Intl.pluralLogic(
+      minutes,
+      locale: localeName,
+      other:
+          'Jouer en direct ne vous trouvera pas d\'autre table avant $minutes minutes.',
+      one: 'Jouer en direct ne vous trouvera pas d\'autre table avant une minute.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get stay => 'Rester';
+
+  @override
+  String leftEarlyWait(String time) {
+    return 'Vous n\'avez pas terminé votre dernière partie en direct : Jouer en direct rouvre dans $time.';
+  }
+
+  @override
   String get about => 'À propos';
 
   @override

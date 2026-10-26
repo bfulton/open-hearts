@@ -290,6 +290,7 @@ class RemoteConfig {
     this.notices = const [],
     this.table = TableTiming.standard,
     this.waits = AppWaits.standard,
+    this.leftEarly = standardLeftEarly,
   });
 
   /// No config at all: the build as it was made.
@@ -340,6 +341,18 @@ class RemoteConfig {
   /// gives up: its own patience, not a table's, so each is taken or
   /// left on its own ([AppWaits]).
   final AppWaits waits;
+
+  /// How long Play live waits before it seats this device again, after
+  /// it left a game Play live seated it at while other people were
+  /// still playing (live/left_early.dart). `leftEarlyMin`, in whole
+  /// minutes within [leftEarlyBounds]; zero is no wait at all.
+  final Duration leftEarly;
+
+  static const standardLeftEarly = Duration(minutes: 5);
+
+  /// Least and most for `leftEarlyMin`. The service serves it by the
+  /// same (LEFT_EARLY_BOUNDS, service/functions/config.mjs).
+  static const leftEarlyBounds = (0, 60);
 
   /// Whether [published] — this build's day, or "dev" — is a build the
   /// operator asks to be updated. A local build has no day and never is.
@@ -398,6 +411,10 @@ class RemoteConfig {
       notices: [if (json['notices'] case final List<Object?> list) ...list.map(LegalNotice.parse).nonNulls.take(2)],
       table: TableTiming.parse(json['table']),
       waits: AppWaits.parse(json['waits']),
+      leftEarly: switch (json['leftEarlyMin']) {
+        final int m when m >= leftEarlyBounds.$1 && m <= leftEarlyBounds.$2 => Duration(minutes: m),
+        _ => standardLeftEarly,
+      },
     );
   }
 

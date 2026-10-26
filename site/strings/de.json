@@ -9,7 +9,12 @@
     "terms": "Bedingungen",
     "languages": "Sprachen",
     "ogImageAlt": "Open Hearts: die vier Farben auf grünem Filz",
-    "translationNote": "<p class=\"note\">Diese Seite ist eine Übersetzung; wo sie von der englischen Fassung abweicht, ist die englische Fassung maßgeblich.</p>"
+    "translationNote": "<p class=\"note\">Diese Seite ist eine Übersetzung; wo sie von der englischen Fassung abweicht, ist die englische Fassung maßgeblich.</p>",
+    "learn": "Mehr über Hearts",
+    "howToPlay": "So wird gespielt",
+    "rules": "Regeln",
+    "moon": "Durchmarsch",
+    "strategy": "Strategie"
   },
   "home": {
     "title": "Open Hearts — Open-Source-Kartenspiel, ohne Werbung",
@@ -60,7 +65,11 @@
       "text": "Sieh auf der <a href=\"{{base}}/support\">Hilfeseite</a> nach, schreib an <a href=\"mailto:help@openhearts.game\">help@openhearts.game</a> oder nutze <i>Sag uns, was kaputt ist</i> im Menü des Spiels.",
       "menuAlt": "Das Menü des Spiels, geöffnet, mit dem Zeiger auf Sag uns, was kaputt ist"
     },
-    "soon": "Die Apps für Handys kommen bald."
+    "soon": "Die Apps für Handys kommen bald.",
+    "learn": {
+      "title": "Neu bei Hearts?",
+      "text": "Es ist in wenigen Minuten gelernt, und das Spiel bringt dir eine Runde bei, während du sie spielst: Wähle <i>Spielen lernen</i> im Menü."
+    }
   },
   "support": {
     "meta": {
@@ -81,7 +90,7 @@
     "faq": {
       "title": "Fragen",
       "p1": "Wie spiele ich?",
-      "p2": "Geh auf <a href=\"{{play}}\">play.openhearts.game</a>, oder such (demnächst) im {{appStore}} oder bei {{googlePlay}} nach „Open Hearts“.",
+      "p2": "Geh auf <a href=\"{{play}}\">play.openhearts.game</a>, oder such (demnächst) im {{appStore}} oder bei {{googlePlay}} nach „Open Hearts“. Neu bei Hearts? <a href=\"{{base}}/how-to-play\">So wird gespielt</a> erklärt das Spiel in wenigen Minuten, und <i>Spielen lernen</i> im Menü des Spiels bringt dir eine Runde bei.",
       "p5": "Wie abonniere ich?",
       "p6": "Tippe unter <i>Live spielen</i> auf <i>Abonnieren</i>. Im <a href=\"{{app}}/subscription?lang={{code}}\">Web</a> bezahlst du auf der Seite von Stripe, und das Abo verkauft dir Link, ein verbundenes Unternehmen von Stripe. In den Apps fürs Handy läuft es über den App Store oder Google Play, die das Abo abrechnen und verlängern. Mit dem Abo bekommst du dein Konto: Dein Name, dein Bild, deine Wertung und deine Spiele kommen damit auf jedes Gerät, das du hinzufügst (bis zu 5), und eine Änderung an deinem Profil auf einem davon erscheint auf allen.",
       "p7": "Wie kündige ich?",
@@ -101,7 +110,9 @@
       "p16": "Das Spiel folgt der Sprache deines Geräts. Im Web wählst du eine andere unter <i>Sprache</i> auf der Seite <i>Über</i> im Spiel, oder mit dem Sprachmenü unten auf dieser Website. Auf dem Handy nimmst du die Einstellung des Handys für jede App: auf dem iPhone Einstellungen, dann Open Hearts, dann Sprache; ab Android 13 Einstellungen, dann System, dann Sprachen, dann App-Sprachen.",
       "p17": "Woher weiß ich, dass das Austeilen fair ist?",
       "p19": "Was passiert mit meinen Daten?",
-      "p20": "Allein verlässt nichts dein Gerät. Live sind dein Name, dein Bild, die Nummer deines Kontos und deine Ergebnisse öffentlich. Nichts wird verkauft oder für Werbung genutzt. Mehr in der <a href=\"{{base}}/privacy\">Datenschutzerklärung</a>."
+      "p20": "Allein verlässt nichts dein Gerät. Live sind dein Name, dein Bild, die Nummer deines Kontos und deine Ergebnisse öffentlich. Nichts wird verkauft oder für Werbung genutzt. Mehr in der <a href=\"{{base}}/privacy\">Datenschutzerklärung</a>.",
+      "p27": "Was passiert, wenn ich ein Live-Spiel vorzeitig verlasse?",
+      "p28": "Ein Bot übernimmt sofort deinen Platz und spielt ihn bis zum Ende, damit das Spiel für alle anderen weitergeht. Ein gewertetes Spiel zählt, als wärst du auf dem letzten Platz gelandet. Und wenn <i>Live spielen</i> dich dort hingesetzt hat und noch andere Menschen am Tisch waren, wartet es ein paar Minuten, bevor es dich wieder an einen Tisch setzt, und zeigt, wie lange noch; allein und mit Freunden spielen bleibt offen. Ein Platz, den ein Bot übernimmt, weil deine Zeit abgelaufen ist oder dein Gerät nicht mehr antwortet, zählt genauso wie einer, den du verlassen hast."
     },
     "rules": {
       "title": "Was sind die Regeln von Hearts?",
@@ -113,7 +124,7 @@
       "r6": "Jedes Herz zählt einen Punkt, die Pik-Dame dreizehn.",
       "r7": "Nimm alle sechsundzwanzig für einen Durchmarsch: Dann bekommen sie alle anderen.",
       "r8": "Gespielt wird bis fünfzig oder hundert. Die niedrigste Punktzahl gewinnt.",
-      "more": "Mehr zu den Regeln und zur Geschichte des Spiels steht bei <a href=\"{{support.rules.wikipedia}}\">Wikipedia</a>.",
+      "more": "Die vollständigen Regeln, mit den Varianten, die dieses Spiel weglässt, stehen auf <a href=\"{{base}}/rules\">einer eigenen Seite</a>. Zur Geschichte des Spiels siehe <a href=\"{{support.rules.wikipedia}}\">Wikipedia</a>.",
       "wikipedia": "https://de.wikipedia.org/wiki/Hearts"
     },
     "cancelAlt": "Das Menü des Spiels mit dem Zeiger auf Abo, dann die Abo-Seite mit dem Zeiger auf Abo verwalten",
@@ -134,6 +145,257 @@
       "witness": "<b>Bezeugt.</b> Jede Hand lost Geschworene aus: Fremde, zufällig gewählt unter anderen Spielern, die online sind, ohne Einsatz am Tisch. Sie spielen die Plätze der Bots und verwahren Teile der Schlüssel jedes Spielers, damit eine Hand zu Ende gespielt werden kann, wenn jemand geht, ohne dass einer allein die Karten eines anderen öffnen kann. Sind zu wenige andere Spieler online, um Geschworene zu stellen, ergänzt unser Dienst sie mit Ersatzgeschworenen. Wie alle Geschworenen können sie deine Karten nicht allein sehen, nur zusammen mit einem anderen Spieler an deinem Tisch – in diesen Händen vertraust du also darauf, dass wir uns nicht absprechen.",
       "audit": "<b>Geprüft.</b> Nach jeder Hand veröffentlicht jedes Gerät sein Geheimnis, sodass sich die ganze Partie nachspielen und jedes Mischen, jede Karte und jeder Zug prüfen lässt. Nach einer Live-Partie übernimmt <i>Die ganze Partie ansehen</i> diese Prüfung für dich; nach einer Partie allein bewahrt <i>Protokoll kopieren</i> sie auf.",
       "more": "Wie alles funktioniert, steht in <a href=\"https://github.com/bfulton/open-hearts/blob/main/docs/explanation/fair-deal.md\">der Beschreibung</a>."
+    }
+  },
+  "howToPlay": {
+    "meta": {
+      "title": "So spielt man Hearts — Open Hearts",
+      "description": "So spielt man Hearts, das Kartenspiel, in wenigen Minuten erklärt: drei Karten weitergeben, Farbe bedienen, Stiche nehmen, warum jedes Herz gegen dich zählt und wie man ein Spiel gewinnt."
+    },
+    "header": {
+      "title": "So spielt man Hearts",
+      "tagline": "Das ganze Spiel in wenigen Minuten, vom Austeilen bis zum letzten Stich."
+    },
+    "game": "Das Spiel",
+    "aim": {
+      "title": "Das Ziel",
+      "p1": "Hearts ist ein Kartenspiel für vier Spieler, und jeder spielt für sich. Die Karten, die du nimmst, zählen Punkte gegen dich: einen für jedes Herz und dreizehn für die Pik-Dame. Wenn das Spiel endet, gewinnt die niedrigste Punktzahl."
+    },
+    "deal": {
+      "title": "Das Austeilen",
+      "p1": "Alle 52 Karten werden ausgeteilt, dreizehn an jeden Spieler. In jeder Farbe ist das Ass die höchste und die Zwei die niedrigste Karte, und es gibt keinen Trumpf."
+    },
+    "pass": {
+      "title": "Drei Karten weitergeben",
+      "p1": "Vor jeder Runde gibt jeder drei Karten weiter: in der ersten Runde an den Spieler links von sich, in der zweiten an den Spieler rechts, in der dritten an den Spieler gegenüber, und in der vierten gibt niemand etwas weiter. Dann beginnt die Reihenfolge von vorn. Du wählst deine drei, bevor du siehst, welche zu dir kommen."
+    },
+    "tricks": {
+      "title": "Stiche",
+      "p1": "Wer die Kreuz 2 hat, spielt sie zum ersten Stich aus. Dann spielt jeder der Reihe nach, nach links, eine Karte. Du musst bedienen: Spiel eine Karte der ausgespielten Farbe, wenn du eine hast. Hast du keine, darfst du jede Karte spielen, und das ist deine Chance, Herz und die Pik-Dame abzuwerfen.",
+      "p2": "Die höchste Karte der ausgespielten Farbe nimmt den Stich, samt allen Punkten darin. Eine Karte einer anderen Farbe nimmt nie einen Stich, egal wie hoch sie ist. Wer einen Stich nimmt, spielt den nächsten aus, bis alle dreizehn gespielt sind."
+    },
+    "breaking": {
+      "title": "Herz brechen",
+      "p1": "Im ersten Stich darf niemand ein Herz oder die Pik-Dame spielen, außer man hat nichts anderes. Und niemand darf Herz ausspielen, bevor ein Herz gespielt wurde (das nennt man Herz brechen), außer man hat nur noch Herz. Die Pik-Dame bricht Herz nicht und darf jederzeit ausgespielt werden."
+    },
+    "score": {
+      "title": "Die Wertung",
+      "p1": "Wenn alle dreizehn Stiche gespielt sind, zählt jeder die Punkte in den Stichen, die er genommen hat: einen für jedes Herz und dreizehn für die Pik-Dame, 26 für alle vier zusammen. Die kommen auf den eigenen Punktestand."
+    },
+    "moon": {
+      "title": "Der Durchmarsch",
+      "p1": "Nimm alle 26 Punkte in einer Runde, und du schaffst den Durchmarsch: Du bekommst für diese Runde nichts, und alle anderen bekommen 26. Fehlt dir aber ein einziges Herz, behältst du die übrigen 25. Mehr zum <a href=\"{{base}}/shooting-the-moon\">Durchmarsch</a>."
+    },
+    "end": {
+      "title": "Das Ende des Spiels",
+      "p1": "Das Spiel endet nach der Runde, in der jemand 50 Punkte oder mehr erreicht, oder 100 in einem längeren Spiel. Die niedrigste Punktzahl gewinnt, und wer dabei gleichauf liegt, teilt sich den Sieg."
+    },
+    "here": "Hier spielen",
+    "learn": {
+      "title": "Beim Spielen lernen",
+      "p1": "Das Spiel bringt dir eine Runde bei: Wähle <i>Spielen lernen</i> im Menü und spiel eine Runde gegen drei Bots, mit einem Hinweis zu allem Neuen, sobald es vorkommt."
+    },
+    "solo": {
+      "title": "Allein",
+      "p1": "<i>Allein spielen</i> teilt dir ein Spiel gegen drei Bots aus: kostenlos, ohne Werbung und ohne Anmeldung, und es funktioniert offline."
+    },
+    "live": {
+      "title": "Mit anderen",
+      "p1": "Live-Spiele brauchen ein Abo. <i>Live spielen</i> setzt dich mit drei Menschen an einen Tisch, deren Wertung deiner nahe ist, und <i>Mit Freunden spielen</i> öffnet einen Raum für die, denen du den Link schickst. In den <i>Spieloptionen</i> wählst du 50 oder 100 Punkte und ob ein Live-Spiel gewertet ist. Was sich an einem Live-Tisch ändert, steht in <a href=\"{{base}}/rules#live\">den Regeln</a>."
+    }
+  },
+  "rules": {
+    "meta": {
+      "title": "Die vollständigen Hearts-Regeln — Open Hearts",
+      "description": "Die vollständigen Regeln von Hearts, wie Open Hearts sie spielt: Austeilen, Weitergeben, der erste Stich, Herz brechen, Wertung, Durchmarsch und das Spielende, mit den Varianten, die es weglässt."
+    },
+    "header": {
+      "title": "Die Regeln von Hearts",
+      "tagline": "Jede Regel, so wie hier gespielt wird, und die Varianten, die es hier nicht gibt."
+    },
+    "game": "Die Regeln",
+    "cards": {
+      "title": "Spieler und Karten",
+      "p1": "Vier Spieler, jeder für sich, mit einem gewöhnlichen Blatt aus 52 Karten ohne Joker. In jeder Farbe reichen die Karten vom Ass, der höchsten, über König, Dame, Bube und Zehn bis zur Zwei, der niedrigsten. Es gibt keinen Trumpf."
+    },
+    "deal": {
+      "title": "Das Austeilen",
+      "p1": "Für jede Runde wird das Blatt gemischt und ganz ausgeteilt, dreizehn Karten an jeden Spieler. Spielst du allein, mischt dein Gerät. An einem Live-Tisch mischt jedes Gerät der Reihe nach, sodass das Austeilen fair ist, solange eines davon ehrlich ist: <a href=\"{{base}}/support#fair\">wie das funktioniert</a>."
+    },
+    "pass": {
+      "title": "Das Weitergeben",
+      "p1": "Vor dem ersten Stich wählt jeder Spieler drei Karten und gibt sie verdeckt weiter. Die Richtung wechselt im Viererrhythmus: In der ersten Runde geht es nach links, in der zweiten nach rechts, in der dritten nach gegenüber, und in der vierten wird nichts weitergegeben. In der fünften geht es wieder nach links. Alle wählen, bevor jemand sieht, was er bekommt."
+    },
+    "lead": {
+      "title": "Das erste Ausspielen",
+      "p1": "Wer nach dem Weitergeben die Kreuz 2 hat, spielt sie zum ersten Stich aus. Gespielt wird nach links, und jeder legt eine Karte zum Stich."
+    },
+    "follow": {
+      "title": "Bedienen",
+      "p1": "Jeder muss eine Karte der ausgespielten Farbe spielen, wenn er eine hat. Wer keine hat, darf jede Karte spielen, im Rahmen der beiden folgenden Regeln."
+    },
+    "firstTrick": {
+      "title": "Keine Punkte im ersten Stich",
+      "p1": "Im ersten Stich darf kein Herz gespielt werden, und auch nicht die Pik-Dame. Die einzige Ausnahme ist ein Spieler ohne Kreuz, dessen Hand nur aus Herz und der Pik-Dame besteht: Er spielt eine dieser Karten."
+    },
+    "breaking": {
+      "title": "Herz brechen",
+      "p1": "Herz darf erst ausgespielt werden, wenn in einem früheren Stich ein Herz gespielt wurde; dann ist Herz gebrochen. Wer nur noch Herz hat, darf trotzdem eines ausspielen. Die Pik-Dame bricht Herz nicht und darf jederzeit ausgespielt werden."
+    },
+    "taking": {
+      "title": "Einen Stich nehmen",
+      "p1": "Die höchste Karte der ausgespielten Farbe nimmt den Stich. Eine Karte einer anderen Farbe kann ihn nicht nehmen, egal wie hoch sie ist. Wer einen Stich nimmt, behält seine Karten und spielt den nächsten aus. Eine Runde hat dreizehn Stiche."
+    },
+    "scoring": {
+      "title": "Die Wertung",
+      "p1": "Am Ende jeder Runde zählt jedes Herz, das ein Spieler genommen hat, einen Punkt für ihn, und die Pik-Dame dreizehn. Keine andere Karte zählt. Die Punkte einer Runde ergeben immer 26, und die jedes Spielers kommen auf seinen Punktestand."
+    },
+    "moon": {
+      "title": "Der Durchmarsch",
+      "p1": "Wer in einer Runde alle 26 Punkte nimmt, bekommt dafür nichts, und jeder der anderen drei bekommt 26. Mehr zum <a href=\"{{base}}/shooting-the-moon\">Durchmarsch</a>."
+    },
+    "end": {
+      "title": "Das Ende des Spiels",
+      "p1": "Gespielt wird bis 50 Punkte, oder bis 100, wenn das vor Spielbeginn in den <i>Spieloptionen</i> gewählt wurde. Das Spiel endet nach der Runde, in der jemand diese Zahl erreicht oder überschreitet, nie mitten in einer Runde. Die niedrigste Punktzahl gewinnt, und wer dabei gleichauf liegt, teilt sich den Sieg."
+    },
+    "live": "An einem Live-Tisch",
+    "seating": {
+      "title": "Mit wem du spielst",
+      "p1": "<i>Live spielen</i> setzt Menschen mit ähnlicher Wertung zusammen, und <i>Mit Freunden spielen</i> setzt alle zusammen, die im Raum sind. Plätze, die niemand füllt, bekommen Bots, und jeder Bot ist als Bot gekennzeichnet."
+    },
+    "clock": {
+      "title": "Die Uhr",
+      "p1": "Jede Entscheidung hat ein paar Sekunden Schonfrist, und jede Runde ein Zeitkonto, das verbraucht, wer über die Schonfrist hinaus nachdenkt. Ist die Schonfrist eines Spielers vorbei, zeigt sein Platz, wie viel Zeit noch übrig ist. Ist jemandes Zeitkonto leer, können die anderen ihn rauswerfen, und ein Bot übernimmt seinen Platz."
+    },
+    "leaving": {
+      "title": "Gehen",
+      "p1": "Wer geht, rausgeworfen wird oder nicht mehr antwortet, wird sofort durch einen Bot ersetzt, der den Platz bis zum Ende des Spiels spielt; der Platz geht nicht an die Person zurück. In einem gewerteten Spiel landet, wer gegangen ist, auf dem letzten Platz. <a href=\"{{base}}/support#leaving\">Mehr dazu, ein Spiel vorzeitig zu verlassen</a>."
+    },
+    "rated": {
+      "title": "Gewertete Spiele",
+      "p1": "Ein gewertetes Spiel verändert deine Wertung danach, wie dein Endstand im Vergleich mit jedem der drei anderen abschneidet: Die niedrigere Punktzahl gewinnt jedes Paar, und gleiche Punktzahlen teilen es. Bots, die ab dem Austeilen dabei waren, werden genauso gewertet. Ein ungewertetes Spiel ändert keine Wertung."
+    },
+    "variants": {
+      "title": "Varianten, die hier nicht gespielt werden",
+      "p1": "Hearts wird auf viele Arten gespielt. Das sind die üblichen Varianten, die dieses Spiel weglässt.",
+      "jack": "<b>Der Karo-Bube.</b> Bei Omnibus Hearts zieht sich, wer den Karo-Buben nimmt, zehn Punkte ab. Hier zählt er nichts.",
+      "queen": "<b>Die Dame bricht Herz.</b> An manchen Tischen bricht auch die Pik-Dame Herz. Hier tut das nur ein Herz.",
+      "first": "<b>Punkte im ersten Stich.</b> An manchen Tischen dürfen Herz und die Pik-Dame im ersten Stich gespielt werden. Hier nicht, außer man hat nichts anderes.",
+      "moon": "<b>Eine Wahl beim Durchmarsch.</b> Manche lassen den, der den Durchmarsch schafft, stattdessen 26 von seinem eigenen Punktestand abziehen. Hier bekommen immer die anderen die 26.",
+      "pass": "<b>Anders weitergeben.</b> An manchen Tischen werden vier Karten weitergegeben, oder in anderer Reihenfolge. Hier sind es immer drei: nach links, nach rechts, nach gegenüber, dann keine.",
+      "lead": "<b>Anders ausspielen.</b> An manchen Tischen spielt der Spieler links vom Geber eine beliebige Karte aus. Hier spielt immer die Kreuz 2 aus.",
+      "players": "<b>Drei oder fünf Spieler.</b> Hearts lässt sich auch zu dritt oder zu fünft spielen, wenn man eine oder zwei Karten aus dem Blatt nimmt. Hier sind es immer vier."
+    }
+  },
+  "moon": {
+    "meta": {
+      "title": "Der Durchmarsch bei Hearts — Open Hearts",
+      "description": "Der Durchmarsch bei Hearts (Shoot the Moon): was er ist, wie er gewertet wird, wann er sich lohnt und wie man jemanden aufhält, der es versucht."
+    },
+    "header": {
+      "title": "Der Durchmarsch",
+      "tagline": "Nimm alle Punkte einer Runde, und alle anderen bekommen sie stattdessen."
+    },
+    "rule": "Die Regel",
+    "what": {
+      "title": "Was er ist",
+      "p1": "Bei Hearts versuchst du, so wenige Punkte wie möglich zu nehmen. Der Durchmarsch dreht das um: Nimm alle. Wer in einer Runde jedes Herz und die Pik-Dame nimmt, alle 26 Punkte, bekommt dafür nichts, und jeder der anderen drei bekommt 26. Auf Englisch heißt das „Shooting the Moon“."
+    },
+    "example": {
+      "title": "Ein Beispiel",
+      "p1": "In einem Spiel bis 50 haben Ana, Ben, Cleo und Dev 18, 22, 31 und 9 Punkte. In der nächsten Runde nimmt Ben alle dreizehn Herz und die Pik-Dame. Ben bekommt nichts, und Ana, Cleo und Dev bekommen je 26.",
+      "p2": "Das macht 44, 22, 57 und 35. Cleo ist über 50, also endet das Spiel, und Ben, der Dritter war, gewinnt es."
+    },
+    "play": "Auf den Durchmarsch spielen",
+    "gamble": {
+      "title": "Warum er ein Wagnis ist",
+      "p1": "Ein Durchmarsch muss jeden Punkt nehmen. Geht ein einziges Herz an jemand anderen, ist er gescheitert, und wer es versucht hat, behält alles andere, was er genommen hat: bis zu 25 Punkte in einer Runde."
+    },
+    "when": {
+      "title": "Wann er sich lohnt",
+      "p1": "Such eine Hand, die Stiche gewinnen kann und weiter gewinnt: hohe Herz; die Pik-Dame, oder Pik-Ass und Pik-König, um sie zu fangen; und lange Farben, angeführt von ihren höchsten Karten. Niedrige Karten sind die Gefahr, denn jede kann das Ausspielen an jemanden abgeben, der es dir nicht zurückgibt.",
+      "p2": "Es hilft, unauffällig anzufangen. Nimm Stiche, wie es jeder tun würde, und zeig dein Spiel erst, wenn es zu spät ist, dich aufzuhalten."
+    },
+    "stop": {
+      "title": "Wie man ihn aufhält",
+      "p1": "Hat ein Spieler bisher jeden Punkt genommen, spielt er vielleicht auf einen Durchmarsch. Um ihn aufzuhalten, reicht ein Herz: Gewinn einen Stich, in dem ein Herz liegt, oder behalte ein Herz, das hoch genug ist, um spät in der Runde einen zu gewinnen. Ein paar Punkte auf deinem eigenen Konto kosten viel weniger als 26.",
+      "p2": "Wirf also dein höchstes Herz nicht weg, nur weil Herz schlecht ist: Spät in der Runde kann es die einzige Karte sein, die den Durchmarsch aufhält."
+    },
+    "more": "Hier und anderswo",
+    "here": {
+      "title": "Bei Open Hearts",
+      "p1": "Wenn jemand den Durchmarsch schafft, bebt der Tisch um diese Person herum, und die Punkteliste sagt, wer es war. Dein Profil zählt bei deinen Spielen allein die Durchmärsche, die du geschafft hast, und die, die du verhindert hast: Runden, in denen jemand anderes die Dame und zehn Herz oder mehr nahm und du eines der übrigen."
+    },
+    "variants": {
+      "title": "Andere Wertungen",
+      "p1": "An manchen Tischen darf, wer den Durchmarsch schafft, stattdessen 26 von seinem eigenen Punktestand abziehen. Das zählt, wenn 26 für alle anderen das Spiel beenden würden, während er noch hinten liegt. Manche werten es höher, alle dreizehn Stiche zu nehmen („Shooting the Sun“). Hier wird der Durchmarsch immer gleich gewertet: nichts für den, der ihn schafft, und 26 für alle anderen."
+    }
+  },
+  "strategy": {
+    "meta": {
+      "title": "Hearts-Strategie: so spielst du gut — Open Hearts",
+      "description": "Hearts-Strategie und Tipps: was du weitergibst, wie du mit der Pik-Dame umgehst, wann du dich unter einem Stich wegduckst, Karten zählen, einen Durchmarsch verhindern und auf den Punktestand spielen."
+    },
+    "header": {
+      "title": "Hearts-Strategie",
+      "tagline": "Was gute Spieler tun, vom Weitergeben bis zum letzten Stich."
+    },
+    "passing": "Das Weitergeben",
+    "short": {
+      "title": "Mach eine Farbe kurz",
+      "p1": "Das Weitergeben ist deine beste Chance, deine Hand zu formen. Gib alle Karten einer kurzen Farbe weiter, und du bist darin blank: Wird sie ausgespielt, kannst du ein Herz oder die Pik-Dame abwerfen. Zwei oder drei Kreuz oder Karo wirst du am leichtesten los."
+    },
+    "high": {
+      "title": "Gib hohe Karten weiter",
+      "p1": "Asse, Könige und Damen gewinnen Stiche, die du nicht willst. Niedrige Karten, Zweien bis Fünfen, lassen dich unter allen anderen bleiben, also behalte sie, vor allem niedrige Herz."
+    },
+    "queen": {
+      "title": "Die Pik-Dame",
+      "p1": "Hast du die Dame und nur ein oder zwei weitere Pik, gib sie weiter, sonst wird sie dir wahrscheinlich in einen Stich herausgezwungen, den du selbst nimmst. Mit vier oder mehr Pik unter ihr ist sie sicherer behalten: Du bedienst Pik mit den kleinen und wirfst sie in den Stich eines anderen, sobald du in einer Farbe blank bist.",
+      "p2": "Ohne die Dame sind Pik-Ass und Pik-König eine Gefahr: Wer die Dame hat, wird sie darauf werfen. Gib sie weiter, wenn du wenig andere Pik hast."
+    },
+    "remember": {
+      "title": "Merk dir, was du weitergegeben hast",
+      "p1": "Du kennst drei Karten aus der Hand eines anderen Spielers. Hast du die Pik-Dame weitergegeben, weißt du, wer sie hat."
+    },
+    "playing": "Die Karten spielen",
+    "first": {
+      "title": "Der erste Stich ist sicher",
+      "p1": "Im ersten Stich dürfen keine Punkte gespielt werden, also ist er der sicherste Moment, dein höchstes Kreuz loszuwerden."
+    },
+    "duck": {
+      "title": "Duck dich mit deiner höchsten sicheren Karte",
+      "p1": "Wenn du einen Stich nicht willst, spiel die höchste Karte, die noch gegen die führende verliert. Deine niedrigen Karten sind später in der Runde mehr wert, wenn mehr Punkte unterwegs sind."
+    },
+    "last": {
+      "title": "Als Letzter: hoch gewinnen",
+      "p1": "Du spielst als Letzter zu einem Stich ohne Punkte, den du sowieso gewinnst? Gewinn ihn mit deiner höchsten Karte der Farbe, nicht mit einer niedrigen, solange du danach etwas Sicheres zum Ausspielen hast."
+    },
+    "void": {
+      "title": "Blank in einer Farbe: wirf das Schlimmste ab",
+      "p1": "Wenn du nicht bedienen kannst, wirf die Karte ab, die dir später am meisten schaden würde: die Pik-Dame, wenn du sie hast, dann deine höchsten Herz, dann hohe Karten in den Farben, die du noch hast."
+    },
+    "spades": {
+      "title": "Spiel Pik aus, um die Dame zu holen",
+      "p1": "Ohne die Dame und ohne ein Pik über dem Buben ist Pik ausspielen sicher für dich und gefährlich für den, der sie hat: Jeder Pik-Stich kostet ihn ein weiteres Pik, bis die Dame herausmuss."
+    },
+    "count": {
+      "title": "Zähl die Karten",
+      "p1": "Behalte im Blick, welche Herz und Pik schon gespielt wurden und wer in welcher Farbe blank ist. Wer in einer Farbe blank ist, wirft Punkte ab, wenn sie ausgespielt wird, und du weißt das, bevor du sie ausspielst."
+    },
+    "moon": {
+      "title": "Achte auf den Durchmarsch",
+      "p1": "Nimmt ein Spieler jeden Punkt, nimm selbst einen, auch wenn dich das ein paar kostet: Ein Herz ist billiger als 26. Mehr dazu, wie man <a href=\"{{base}}/shooting-the-moon#stop\">einen Durchmarsch aufhält</a>."
+    },
+    "late": "Der Punktestand",
+    "score": {
+      "title": "Spiel auf den Punktestand",
+      "p1": "Das Spiel endet, wenn jemand das Ziel erreicht, also ändert der Punktestand gegen Ende, was du willst. Hast du die niedrigste Punktzahl, ist ein frühes Ende besser: Punkte für den, der dem Ziel am nächsten ist, können das Spiel beenden. Liegst du hinten, halte es am Laufen und schick Punkte an den, der vorn liegt.",
+      "p2": "Dann zählt auch ein Durchmarsch am meisten: 26 für jeden der anderen können das Spiel in einer Runde beenden, ob der, der ihn schafft, dann vorn liegt oder nicht."
+    },
+    "bots": {
+      "title": "Üb gegen die Bots",
+      "p1": "Die Bots hier sind berühmte Liebende, jeder mit seiner eigenen Art: Romeo kann keine Dame halten, und Don Juan geht mit Händen auf den Durchmarsch, mit denen es sonst niemand täte. <i>Allein spielen</i> ist kostenlos, so oft du willst."
     }
   },
   "privacy": {

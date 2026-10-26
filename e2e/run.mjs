@@ -26,6 +26,7 @@ import {
   licensed,
   log,
   playUntil,
+  pressable,
   serveApp,
   sleep,
   startRelay,
@@ -202,16 +203,59 @@ async function main() {
     log('matched: three together, one with bots');
     await playUntil(pages, handOver(1), { timeout: aHand });
     log('a matched hand played on every screen');
-    // Back to the front door for the rest: leave by the menu. The score
-    // sheet goes on its own after a few seconds, so it may be gone by
-    // the time a page is reached.
-    for (const page of pages) {
+    // Back to the front door for the rest: leave by the menu, which
+    // asks first while the game goes on. The score sheet goes on its
+    // own after a few seconds, so it may be gone by the time a page is
+    // reached.
+    for (const [i, page] of pages.entries()) {
       await dismiss(page, /^On with it$/);
+      if (i === 1) {
+        // Bao goes by the browser's own Back, which asks as the menu
+        // does: Stay keeps him at the table, its address back in the
+        // bar. Back again, and Leave: said to the table, with Cara still
+        // playing — so Play live waits for him too — and nothing kept
+        // to come back to.
+        await page.goBack();
+        await waitFor(page, /^Leave the table\?$/, { what: 'Bao asked, by Back' });
+        await waitFor(page, /^A bot takes your seat for the rest of the game\. Play live won't seat you again for 5 minutes\.$/, { what: 'what Bao leaving costs' });
+        await click(page, /^Stay$/);
+        await waitFor(page, /^\d of \d here  ·  unrated$/, { what: 'Bao still at the table' });
+        await page
+          .waitForURL((url) => url.pathname === '/live', { waitUntil: 'commit', timeout: 10000 })
+          .catch(() => {
+            throw new Error(`Bao stayed, but the address is not the table's: ${page.url()}`);
+          });
+        await page.goBack();
+        await waitFor(page, /^Leave the table\?$/, { what: 'Bao asked again' });
+        await click(page, /^Leave$/);
+        await waitFor(page, /^Play friends$/, { what: 'Bao at the door, by Back' });
+        await waitFor(page, /^You didn't finish your last live game: Play live opens again in [45]:\d\d\.$/, { what: 'Bao\'s wait' });
+        if (await page.evaluate(() => localStorage.getItem('flutter.seat.table')) !== null) throw new Error('Bao\'s seat is still kept to come back to');
+        continue;
+      }
       await click(page, /^Menu$/);
       await waitFor(page, /^Leave the table$/, { what: 'the menu' });
       await click(page, /^Leave the table$/);
+      await waitFor(page, /^Leave the table\?$/, { what: 'the question first' });
+      // What leaving costs, said: for Ada, the first of three people to
+      // leave a table Play live seated, Play live's wait; for Dee, alone
+      // with bots at a rated table, the rated game, and no wait, since
+      // she leaves nobody's game. Cara leaves as the others' leaves
+      // land, and whether anybody is left to wait for is the table's
+      // to say by then.
+      if (i === 0) await waitFor(page, /^A bot takes your seat for the rest of the game\. Play live won't seat you again for 5 minutes\.$/, { what: 'what Ada leaving costs' });
+      if (i === 3) await waitFor(page, /^A bot takes your seat for the rest of the game\. The game is rated, and counts as one you finished last\.$/, { what: 'what Dee leaving costs' });
+      await click(page, /^Leave$/);
       await waitFor(page, /^Play friends$/, { what: 'the home screen again' });
     }
+    // Ada left people in their game: Play live waits for her, and says
+    // until when, and the friends' way stays open. Dee left only bots.
+    await waitFor(pages[0], /^You didn't finish your last live game: Play live opens again in [45]:\d\d\.$/, { what: 'Ada\'s wait' });
+    if (await pressable(pages[0], /^Play live/)) throw new Error('Play live is open to Ada during her wait');
+    if (!(await pressable(pages[0], /^Play friends$/))) throw new Error('Play friends is shut to Ada during her wait');
+    if (await has(pages[3], /^You didn't finish/)) throw new Error('Dee is kept waiting after leaving only bots');
+    if (!(await pressable(pages[3], /^Play live/))) throw new Error('Play live is shut to Dee');
+    log('Ada waits after leaving people in their game; Dee, who left only bots, does not');
 
     // Ada picks an avatar first: her profile opens from the icon in the
     // corner, an icon is chosen, and Done keeps it.

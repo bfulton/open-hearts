@@ -39,6 +39,7 @@ import '../net/standing.dart';
 import '../net/turn.dart';
 import '../pace_store.dart';
 import '../pictures.dart';
+import 'left_early.dart';
 import 'live_controller.dart';
 
 /// Whether live play is open on this device: whether it holds a
@@ -112,7 +113,13 @@ class Lobby extends ChangeNotifier {
     required this.seat,
     required this.addressChanged,
     required this.openRoom,
-  });
+  }) {
+    unawaited(LeftEarly.load().then((at) {
+      if (_disposed || at == null) return;
+      _leftEarlyAt = max(at, _leftEarlyAt ?? at);
+      _timeTheWait();
+    }));
+  }
 
   /// Who this device is to everyone else, as the front door has it now.
   final ({String name, Avatar avatar}) Function() who;
@@ -233,6 +240,43 @@ class Lobby extends ChangeNotifier {
     if (!_disposed) notifyListeners();
   }
 
+  /// When this device last left a game early (left_early.dart); null
+  /// while there is no wait after it.
+  int? _leftEarlyAt;
+  Timer? _waitAfterLeaving;
+
+  /// What is left of Play live's wait after a game left early: null when
+  /// there is none. Playing alone and with friends never wait.
+  Duration? get leftEarlyWait =>
+      LeftEarly.left(atMs: _leftEarlyAt, nowMs: LeftEarly.nowMs(), wait: RemoteSettings.current.config.leftEarly);
+
+  /// This device left a game early at [atMs]: kept, and waited out —
+  /// unless the wait after it is over already, a game come back to long
+  /// after it was left.
+  void _leftEarly(int atMs) {
+    if (LeftEarly.left(atMs: atMs, nowMs: LeftEarly.nowMs(), wait: RemoteSettings.current.config.leftEarly) == null) return;
+    _leftEarlyAt = max(atMs, _leftEarlyAt ?? atMs);
+    unawaited(LeftEarly.mark(atMs));
+    _timeTheWait();
+  }
+
+  /// The door counts the wait down a second at a time, and once it is
+  /// over lets the time go.
+  void _timeTheWait() {
+    _waitAfterLeaving?.cancel();
+    _waitAfterLeaving = null;
+    if (leftEarlyWait == null) {
+      if (_leftEarlyAt != null) unawaited(LeftEarly.clear());
+      _leftEarlyAt = null;
+    } else {
+      _waitAfterLeaving = Timer.periodic(const Duration(seconds: 1), (_) {
+        if (leftEarlyWait == null) _timeTheWait();
+        _changed();
+      });
+    }
+    _changed();
+  }
+
   /// This device on duty (net/duty.dart): online to everyone, and a
   /// juror when drawn. The one it is already on, after the first.
   Duty _duty(Signer signer) => Duty.on(_relays, signer, log: _dutyLog, crypto: dealCrypto, dealWorker: dealWorker);
@@ -241,12 +285,20 @@ class Lobby extends ChangeNotifier {
   /// seat, if it can still be this device's. The table may have given it
   /// to a bot meanwhile, and then the table says so once it has caught
   /// this device up (live/live_page.dart).
+  ///
+  /// A seat away from for longer than a table waits was a game left
+  /// early, when Play live seated it and somebody else sat there: it is
+  /// waited out from when this device was last at the table.
   Future<void> _comeBack(Signer signer) async {
     final seats = _seats = await SeatStore.open();
-    final kept = seats.load();
+    final kept = seats.load(gone: (seat) {
+      final mine = seat.spec.seatOf(signer.publicKey);
+      final others = [for (final (s, h) in seat.spec.seats.indexed) if (s != mine && h is HumanSeat) h];
+      if (seat.strangers && mine != null && others.isNotEmpty) _leftEarly(seat.at);
+    });
     if (kept == null || _disposed) return;
     if (kept.spec.seatOf(signer.publicKey) == null || (kept.spec.sealed && !dealReady)) return seats.clear();
-    _toTable(kept.spec, kept.names, kept.avatars, journal: kept.journal);
+    _toTable(kept.spec, kept.names, kept.avatars, journal: kept.journal, strangers: kept.strangers);
   }
 
   /// Online from the front door, not only from a table: this device is
@@ -321,6 +373,7 @@ class Lobby extends ChangeNotifier {
     _disposed = true;
     _closeLobby(address: false);
     _onlineClock?.cancel();
+    _waitAfterLeaving?.cancel();
     _refusalSub?.cancel();
     super.dispose();
   }
@@ -467,9 +520,10 @@ class Lobby extends ChangeNotifier {
   /// Into the pool the options ask for, and wait to be seated — by
   /// whoever among the waiting has the lowest key, this device
   /// included. Everyone in a pool wants the same game, so the score it
-  /// plays to is part of the pool's own name.
+  /// plays to is part of the pool's own name. Not while the wait after
+  /// a game left early runs: the door says so, and offers nothing.
   Future<void> play() async {
-    if (livePaused || _withoutDeal()) return;
+    if (livePaused || leftEarlyWait != null || _withoutDeal()) return;
     final options = this.options();
     final transport = await _connect(poolTag(options.pool, target: options.target), Opening.live);
     if (transport == null) return;
@@ -510,7 +564,7 @@ class Lobby extends ChangeNotifier {
         final picture = queue.pictures[h.key];
         avatars[s] = picture == null ? chosen : chosen.copyWith(picture: Avatar.fromJson({'picture': picture}).picture);
       }
-      _toTable(spec, queue.seatNames, avatars, again: play);
+      _toTable(spec, queue.seatNames, avatars, again: play, strangers: true);
     });
     // The longest this queue has been willing to wait past the pool's
     // own wait, kept once chosen: taking bots after waiting for a person
@@ -558,8 +612,10 @@ class Lobby extends ChangeNotifier {
   /// leaving the table comes back there.
   ///
   /// [again] begins another game the way this one began, for the end
-  /// of game's Play again.
-  void _toTable(TableSpec spec, Map<int, String> seatNames, Map<int, Avatar> seatAvatars, {TableJournal? journal, VoidCallback? again}) {
+  /// of game's Play again. [strangers] is a table Play live seated,
+  /// whose game left early is waited out (left_early.dart).
+  void _toTable(TableSpec spec, Map<int, String> seatNames, Map<int, Avatar> seatAvatars,
+      {TableJournal? journal, VoidCallback? again, bool strangers = false}) {
     final signer = _signer!;
     final relays = _relays;
     final relay = RelayTransport(relays: relays, signer: signer, table: spec.id, log: _relayLog, pinned: pinnedRelays(relays));
@@ -599,9 +655,20 @@ class Lobby extends ChangeNotifier {
       },
       pictures: pictures,
       canPlayAgain: again != null,
-      journal: _seats?.keep(spec, seatNames, seatAvatars, journal: journal),
+      strangers: strangers,
+      journal: _seats?.keep(spec, seatNames, seatAvatars, journal: journal, strangers: strangers),
     );
     if (_debugging) controller.client.log = (l) => debugPrint('table: $l');
+    // A game left early, by the player's word or the table's, is
+    // waited out, from the moment this device knows it — unless the
+    // account went to another device, which is the player using it
+    // there, not leaving (net/in_use.dart).
+    var leftEarly = false;
+    controller.addListener(() {
+      if (leftEarly || !controller.leftEarly || InUse.current.shut) return;
+      leftEarly = true;
+      _leftEarly(LeftEarly.nowMs());
+    });
     // Kept for coming back to while the seat is this device's; let go
     // once the game is over or the seat is not (net/seat_store.dart).
     var hereAt = 0;
@@ -671,13 +738,21 @@ class Lobby extends ChangeNotifier {
     // account from a game (net/in_use.dart).
     Duty.seated = true;
     InUse.current.seatedAt(spec.id);
-    unawaited(seat(controller).whenComplete(() {
+    // Off the table, whichever way: by one of its own ways out, which
+    // the page closes with, or by a browser's Back, which closes
+    // nothing here, so the table's controller says so as it goes.
+    var off = false;
+    void offTheTable() {
+      if (off) return;
+      off = true;
       Duty.seated = false;
       if (!InUse.current.shut) InUse.current.seatedAt(null);
       watch.close();
       // Off the table by choice: nothing to come back to.
       _seats?.clear();
-    }).then((playAgain) {
+    }
+    controller.onClosed = offTheTable;
+    unawaited(seat(controller).whenComplete(offTheTable).then((playAgain) {
       if (playAgain == true && !_disposed) again?.call();
     }));
   }

@@ -10,6 +10,29 @@ squashed from a pull request, the pull request's number.
 
 ### Added
 
+- Four pages for people who search for the game: how to play Hearts,
+  the rules in full (with the variants this game leaves out), shooting
+  the moon, and strategy, at `/how-to-play`, `/rules`,
+  `/shooting-the-moon` and `/strategy`, in all five languages, and in
+  the sitemap. The front page has them under "New to Hearts?", every
+  page's footer links How to play and Rules, and each of the four links
+  the others and ends with Play now. The support page's answer to "How
+  do I play?" links How to play, and its rules in brief link the rules
+  in full. (2026-10-26, #40)
+
+- A wait after leaving a live game early. A device that leaves a game
+  Play live seated it at, while somebody else is still playing it,
+  waits five minutes before Play live seats it again; the front door
+  says until when, and playing alone and with friends stay open. A seat
+  the table gives to a bot, its clock run out or the device gone quiet,
+  counts the same, and so does the app closed mid-game for longer than
+  a table waits. Leaving a friends' room, a game with only bots left in
+  it, or a game that failed for everyone does not. The wait is kept on
+  the device and nowhere else, and the operator can change it, or set
+  it to none, with the remote config's `leftEarlyMin`. The support page
+  has a new answer, "What if I leave a live game early?". (2026-10-26,
+  #40)
+
 - On the phones, a moment after you win a game, the app asks the App
   Store or Google Play for its own prompt to rate the app, at most once
   every four months. Whether the prompt shows is the store's to decide,
@@ -246,6 +269,10 @@ squashed from a pull request, the pull request's number.
 
 ### Changed
 
+- Leaving a live game while it is on asks first, from the menu or by
+  Back, a phone's or a browser's, and says what leaving costs: the
+  seat, a rated game counted as last, and Play live's wait where there
+  would be one. (2026-10-26, #40)
 - The front door's top corner has your rating, the number alone, just
   left of your picture, from your first rated game; the sentence under
   the game options that said it is gone. A screen reader hears it as
@@ -377,6 +404,12 @@ squashed from a pull request, the pull request's number.
 
 ### Fixed
 
+- A browser's own Back at a live table now asks, as the menu does, and
+  leaving by it is signed and told to the table at once. Before, the
+  page closed without a word, the others waited at the seat's turn
+  until the table counted it silent, and the front door never heard
+  the table was gone, so the seat was still kept to come back to.
+  (2026-10-26, #40)
 - A live table no longer says "Your connection is down — reconnecting"
   as it opens. Its line opens a moment after the table does, and until
   then the table took itself for cut off and said so: in a browser on

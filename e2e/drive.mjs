@@ -515,6 +515,16 @@ export async function waitGone(page, re, { timeout = 30000, what = String(re) } 
   throw new Error(`timed out waiting for ${what}\nsaw: ${(await texts(page)).join(' | ')}`);
 }
 
+/// Whether the node labelled [re] can be pressed: a way in that is
+/// being opened is disabled, and one that has given up is not.
+export const pressable = (page, re) =>
+  page.evaluate(`((src) => {
+    const labelOf = ${labelOf};
+    const re = new RegExp(src);
+    const e = [...document.querySelectorAll('flt-semantics')].find((e) => re.test(labelOf(e)));
+    return !!e && e.getAttribute('aria-disabled') !== 'true';
+  })(${JSON.stringify(re.source)})`);
+
 /// Clicks the first semantics node whose label or text matches, if
 /// there is one: for a thing that goes on its own — the score sheet,
 /// a few seconds after a hand — and may be gone by the time it is

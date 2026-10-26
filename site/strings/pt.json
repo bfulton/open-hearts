@@ -9,7 +9,12 @@
     "terms": "Termos",
     "languages": "Idiomas",
     "ogImageAlt": "Open Hearts: os quatro naipes sobre feltro verde",
-    "translationNote": "<p class=\"note\">Esta página é uma tradução; onde ela diferir da versão em inglês, vale a versão em inglês.</p>"
+    "translationNote": "<p class=\"note\">Esta página é uma tradução; onde ela diferir da versão em inglês, vale a versão em inglês.</p>",
+    "learn": "Mais sobre Copas",
+    "howToPlay": "Como jogar",
+    "rules": "Regras",
+    "moon": "Atirar na lua",
+    "strategy": "Estratégia"
   },
   "home": {
     "title": "Open Hearts — jogo de cartas de código aberto, sem anúncios",
@@ -60,7 +65,11 @@
       "text": "Veja a <a href=\"{{base}}/support\">página de suporte</a>, escreva para <a href=\"mailto:help@openhearts.game\">help@openhearts.game</a> ou use <i>Conte o que está quebrado</i> no menu do jogo.",
       "menuAlt": "O menu do jogo, aberto, com o ponteiro sobre Conte o que está quebrado"
     },
-    "soon": "Os apps para celular chegam em breve."
+    "soon": "Os apps para celular chegam em breve.",
+    "learn": {
+      "title": "Primeira vez no Copas?",
+      "text": "Dá para aprender em poucos minutos, e o próprio jogo ensina uma mão enquanto você joga: escolha <i>Aprender a jogar</i> no menu."
+    }
   },
   "support": {
     "meta": {
@@ -81,7 +90,7 @@
     "faq": {
       "title": "Perguntas",
       "p1": "Como eu jogo?",
-      "p2": "Acesse <a href=\"{{play}}\">play.openhearts.game</a> ou (em breve) procure “Open Hearts” na {{appStore}} ou no {{googlePlay}}.",
+      "p2": "Acesse <a href=\"{{play}}\">play.openhearts.game</a> ou (em breve) procure “Open Hearts” na {{appStore}} ou no {{googlePlay}}. Primeira vez no Copas? <a href=\"{{base}}/how-to-play\">Como jogar</a> explica o jogo em poucos minutos, e <i>Aprender a jogar</i>, no menu do jogo, ensina uma mão.",
       "p5": "Como eu assino?",
       "p6": "Toque no botão <i>Assinar</i>, em <i>Jogar ao vivo</i>. Na <a href=\"{{app}}/subscription?lang={{code}}\">web</a>, o pagamento é feito na página da Stripe, e quem vende a assinatura é a Link, afiliada da Stripe. Nos apps para celular, é pela App Store ou pelo Google Play, que cobram e renovam a assinatura. Assinar cria a sua conta: seu nome, sua imagem, seu rating e suas partidas vão com ela para qualquer aparelho que você adicionar (até 5), e uma mudança no seu perfil em um deles aparece em todos.",
       "p7": "Como eu cancelo?",
@@ -101,7 +110,9 @@
       "p16": "O jogo segue o idioma do seu aparelho. Na web, escolha outro em <i>Idioma</i>, na página <i>Sobre</i> do jogo, ou no menu de idiomas no rodapé deste site. No celular, use o ajuste do próprio celular para cada app: no iPhone, Ajustes, depois Open Hearts, depois Idioma; no Android 13 ou mais recente, Configurações, depois Sistema, depois Idiomas, depois Idiomas dos apps.",
       "p17": "Como sei que a distribuição é justa?",
       "p19": "O que acontece com os meus dados?",
-      "p20": "Jogando sozinho, nada sai do seu aparelho. Ao vivo, seu nome, imagem, número da conta e resultados são públicos. Nada é vendido nem usado para anúncios. Mais na <a href=\"{{base}}/privacy\">política de privacidade</a>."
+      "p20": "Jogando sozinho, nada sai do seu aparelho. Ao vivo, seu nome, imagem, número da conta e resultados são públicos. Nada é vendido nem usado para anúncios. Mais na <a href=\"{{base}}/privacy\">política de privacidade</a>.",
+      "p27": "E se eu sair de uma partida ao vivo antes do fim?",
+      "p28": "Um bot assume o seu lugar na hora e joga até o fim, para que a partida continue para os outros. Uma partida ranqueada conta como se você tivesse terminado em último lugar. E se foi o <i>Jogar ao vivo</i> que colocou você ali, com outras pessoas ainda na mesa, ele espera alguns minutos antes de colocar você numa mesa de novo, e mostra quanto falta; jogar sozinho e com amigos continuam liberados. Um lugar que um bot assume porque o seu tempo acabou, ou porque o seu aparelho parou de responder, conta do mesmo jeito que um lugar que você deixou."
     },
     "rules": {
       "title": "Quais são as regras de Copas?",
@@ -113,7 +124,7 @@
       "r6": "Cada copa vale um ponto; a dama de espadas vale treze.",
       "r7": "Leve todos os vinte e seis pontos para atirar na lua: eles vão para todos os outros.",
       "r8": "Jogue até cinquenta ou cem. Vence a menor pontuação.",
-      "more": "Para mais detalhes sobre as regras e a história do jogo, veja a <a href=\"{{support.rules.wikipedia}}\">Wikipédia</a>.",
+      "more": "As regras completas, com as variantes que este jogo deixa de fora, estão em <a href=\"{{base}}/rules\">uma página própria</a>. Para a história do jogo, veja a <a href=\"{{support.rules.wikipedia}}\">Wikipédia</a>.",
       "wikipedia": "https://pt.wikipedia.org/wiki/Copas_(jogo_de_cartas)"
     },
     "cancelAlt": "O menu do jogo com o ponteiro sobre Assinatura, e depois a página da assinatura com o ponteiro sobre Gerenciar assinatura",
@@ -134,6 +145,257 @@
       "witness": "<b>Com testemunhas.</b> Cada mão sorteia jurados: desconhecidos escolhidos ao acaso entre outros jogadores online, sem nada em jogo na mesa. Eles jogam os lugares dos bots e guardam pedaços das chaves de cada jogador, para que a mão possa terminar se alguém sair sem que ninguém, sozinho, consiga abrir as cartas de outro. Quando há poucos jogadores online para formar um júri, os jurados reserva do nosso serviço completam o número. Como qualquer jurado, eles não conseguem ver as suas cartas sozinhos, só junto com outro jogador da sua mesa; então, nessas mãos, você confia que não vamos fazer conluio.",
       "audit": "<b>Auditado.</b> Depois de cada mão, cada aparelho publica o seu segredo, então a partida inteira pode ser refeita e cada embaralhada, carta e jogada conferida. Depois de uma partida ao vivo, <i>Ver a partida inteira</i> faz essa conferência por você; depois de uma partida sozinho, <i>Copiar registro</i> a guarda.",
       "more": "Como tudo funciona está <a href=\"https://github.com/bfulton/open-hearts/blob/main/docs/explanation/fair-deal.md\">nesta explicação</a>."
+    }
+  },
+  "howToPlay": {
+    "meta": {
+      "title": "Como jogar Copas — Open Hearts",
+      "description": "Como jogar Copas, o jogo de cartas, em poucos minutos: passar três cartas, seguir o naipe, levar vazas, por que cada carta de copas conta contra você e como se vence uma partida."
+    },
+    "header": {
+      "title": "Como jogar Copas",
+      "tagline": "O jogo inteiro em poucos minutos, da distribuição à última vaza."
+    },
+    "game": "O jogo",
+    "aim": {
+      "title": "O objetivo",
+      "p1": "Copas é um jogo de cartas para quatro jogadores, cada um por si. As cartas que você leva contam pontos contra você: um por carta de copas, e treze pela dama de espadas. Quando a partida termina, vence a menor pontuação."
+    },
+    "deal": {
+      "title": "A distribuição",
+      "p1": "As 52 cartas são distribuídas, treze para cada jogador. Em todo naipe o ás é a carta mais alta e o dois a mais baixa, e não há trunfo."
+    },
+    "pass": {
+      "title": "Passar três cartas",
+      "p1": "Antes de cada mão, todos passam três cartas: na primeira mão para o jogador à esquerda, na segunda para o jogador à direita, na terceira para o jogador da frente, e na quarta ninguém passa. Depois a ordem recomeça. Você escolhe as suas três antes de ver as que vêm para você."
+    },
+    "tricks": {
+      "title": "As vazas",
+      "p1": "Quem tem o 2 de paus abre com ele a primeira vaza. Depois, cada jogador na sua vez, seguindo para a esquerda, joga uma carta. Você precisa seguir o naipe: jogue uma carta do naipe que abriu a vaza, se tiver. Se não tiver, pode jogar qualquer carta, e essa é a sua chance de se livrar de copas e da dama de espadas.",
+      "p2": "A carta mais alta do naipe que abriu leva a vaza, com os pontos que houver nela. Uma carta de outro naipe nunca leva uma vaza, por mais alta que seja. Quem leva uma vaza abre a próxima, até as treze serem jogadas."
+    },
+    "breaking": {
+      "title": "Quebrar as copas",
+      "p1": "Ninguém pode jogar uma carta de copas nem a dama de espadas na primeira vaza, a não ser que não tenha outra opção. E ninguém pode abrir com copas até alguma copa ter sido jogada, o que se chama quebrar as copas, a não ser que só tenha copas na mão. A dama de espadas não quebra as copas, e pode abrir uma vaza a qualquer momento."
+    },
+    "score": {
+      "title": "A pontuação",
+      "p1": "Quando as treze vazas foram jogadas, cada jogador soma os pontos das vazas que levou: um por carta de copas e treze pela dama de espadas, 26 entre os quatro. Esses pontos vão para a pontuação de cada um."
+    },
+    "moon": {
+      "title": "Atirar na lua",
+      "p1": "Leve todos os 26 pontos numa mão e você atira na lua: não marca nada nessa mão, e todos os outros marcam 26. Mas, se faltar uma única copa, você fica com os outros 25. Tem mais sobre <a href=\"{{base}}/shooting-the-moon\">atirar na lua</a>."
+    },
+    "end": {
+      "title": "O fim da partida",
+      "p1": "A partida termina depois da mão em que alguém chega a 50 pontos ou mais, ou a 100 numa partida longa. Vence a menor pontuação, e quem empata nela divide a vitória."
+    },
+    "here": "Jogar aqui",
+    "learn": {
+      "title": "Aprender jogando",
+      "p1": "O jogo ensina uma mão para você: escolha <i>Aprender a jogar</i> no menu e jogue uma mão contra três bots, com uma nota a cada coisa nova que aparece."
+    },
+    "solo": {
+      "title": "Sozinho",
+      "p1": "<i>Jogar sozinho</i> distribui uma partida contra três bots: de graça, sem anúncios e sem cadastro, e funciona offline."
+    },
+    "live": {
+      "title": "Com outras pessoas",
+      "p1": "Partidas ao vivo exigem uma assinatura. <i>Jogar ao vivo</i> coloca você numa mesa com três pessoas de rating parecido, e <i>Jogar com amigos</i> abre uma sala para as pessoas a quem você mandar o link. Em <i>Opções da partida</i> você escolhe 50 ou 100 pontos, e se uma partida ao vivo é ranqueada. O que muda numa mesa ao vivo está nas <a href=\"{{base}}/rules#live\">regras</a>."
+    }
+  },
+  "rules": {
+    "meta": {
+      "title": "Regras completas de Copas — Open Hearts",
+      "description": "As regras completas de Copas como o Open Hearts joga: a distribuição, o passe, a primeira vaza, quebrar as copas, a pontuação, atirar na lua e o fim da partida, com as variantes que ficam de fora."
+    },
+    "header": {
+      "title": "As regras de Copas",
+      "tagline": "Todas as regras, do jeito que o jogo é jogado aqui, e as variantes que ficam de fora."
+    },
+    "game": "As regras",
+    "cards": {
+      "title": "Jogadores e cartas",
+      "p1": "Quatro jogadores, cada um por si, com um baralho comum de 52 cartas, sem coringas. Em todo naipe as cartas vão do ás, a mais alta, passando pelo rei, a dama, o valete e o dez, até o dois, a mais baixa. Não há trunfo."
+    },
+    "deal": {
+      "title": "A distribuição",
+      "p1": "A cada mão o baralho é embaralhado e distribuído inteiro, treze cartas para cada jogador. Jogando sozinho, quem embaralha é o seu aparelho. Numa mesa ao vivo, cada aparelho embaralha por sua vez, então a distribuição é justa desde que um deles seja honesto: <a href=\"{{base}}/support#fair\">como isso funciona</a>."
+    },
+    "pass": {
+      "title": "O passe",
+      "p1": "Antes da primeira vaza, cada jogador escolhe três cartas e as passa viradas para baixo. A direção segue um ciclo de quatro: na primeira mão o passe é para a esquerda, na segunda para a direita, na terceira para a frente, e na quarta não há passe. Na quinta, volta a ser para a esquerda. Todos escolhem antes que alguém veja o que recebe."
+    },
+    "lead": {
+      "title": "A primeira saída",
+      "p1": "Quem tem o 2 de paus depois do passe abre com ele a primeira vaza. O jogo segue para a esquerda, e cada jogador põe uma carta na vaza."
+    },
+    "follow": {
+      "title": "Seguir o naipe",
+      "p1": "Cada jogador deve jogar uma carta do naipe que abriu a vaza, se tiver uma. Quem não tem pode jogar qualquer carta, dentro das duas regras a seguir."
+    },
+    "firstTrick": {
+      "title": "Nada de pontos na primeira vaza",
+      "p1": "Nenhuma carta de copas pode ser jogada na primeira vaza, nem a dama de espadas. A única exceção é um jogador sem paus cuja mão só tem copas e a dama de espadas: ele joga uma dessas cartas."
+    },
+    "breaking": {
+      "title": "Quebrar as copas",
+      "p1": "Ninguém pode abrir com copas até que uma carta de copas tenha sido jogada numa vaza anterior; aí as copas estão quebradas. Quem só tem copas na mão pode abrir com uma mesmo assim. A dama de espadas não quebra as copas, e pode abrir uma vaza a qualquer momento."
+    },
+    "taking": {
+      "title": "Levar uma vaza",
+      "p1": "A carta mais alta do naipe que abriu leva a vaza. Uma carta de outro naipe não pode levá-la, por mais alta que seja. Quem leva uma vaza fica com as cartas dela e abre a próxima. Uma mão tem treze vazas."
+    },
+    "scoring": {
+      "title": "A pontuação",
+      "p1": "No fim de cada mão, cada carta de copas que um jogador levou vale um ponto para ele, e a dama de espadas vale treze. Nenhuma outra carta vale pontos. Os pontos de uma mão sempre somam 26, e os de cada jogador vão para a sua pontuação."
+    },
+    "moon": {
+      "title": "Atirar na lua",
+      "p1": "Quem leva todos os 26 pontos de uma mão não marca nada nela, e cada um dos outros três marca 26. Tem mais sobre <a href=\"{{base}}/shooting-the-moon\">atirar na lua</a>."
+    },
+    "end": {
+      "title": "O fim da partida",
+      "p1": "Uma partida vai até 50 pontos, ou até 100 se isso for escolhido em <i>Opções da partida</i> antes de começar. Ela termina depois da mão em que alguém chega a esse número ou passa dele, nunca no meio de uma mão. Vence a menor pontuação, e quem empata nela divide a vitória."
+    },
+    "live": "Numa mesa ao vivo",
+    "seating": {
+      "title": "Com quem você joga",
+      "p1": "<i>Jogar ao vivo</i> junta pessoas de rating parecido, e <i>Jogar com amigos</i> junta quem estiver na sala. Os lugares que ninguém ocupa ficam com bots, e todo bot vem marcado como bot."
+    },
+    "clock": {
+      "title": "O relógio",
+      "p1": "Cada decisão tem alguns segundos de tolerância, e cada mão tem uma reserva de tempo que vai sendo gasta quando se pensa além da tolerância. Quando a tolerância de um jogador acaba, o lugar dele mostra quanto tempo resta. Quando a reserva de alguém se esgota, os outros podem expulsar essa pessoa, e um bot fica com o lugar dela."
+    },
+    "leaving": {
+      "title": "Sair",
+      "p1": "Quem sai, é expulso ou para de responder é substituído na hora por um bot, que joga no lugar dessa pessoa até o fim da partida; o lugar não volta para ela. Numa partida ranqueada, quem saiu conta como se tivesse terminado em último lugar. <a href=\"{{base}}/support#leaving\">Mais sobre sair de uma partida antes do fim</a>."
+    },
+    "rated": {
+      "title": "Partidas ranqueadas",
+      "p1": "Uma partida ranqueada mexe no seu rating conforme a sua pontuação final se compara com a de cada um dos outros três: a menor pontuação vence cada par, e pontuações iguais empatam. Os bots que se sentaram desde a distribuição entram na conta do mesmo jeito. Uma partida não ranqueada não muda nenhum rating."
+    },
+    "variants": {
+      "title": "Variantes que não se jogam aqui",
+      "p1": "Copas é jogado de muitas maneiras. Estas são as variantes comuns que este jogo deixa de fora.",
+      "jack": "<b>O valete de ouros.</b> No Omnibus Hearts, quem leva o valete de ouros tira dez pontos da própria pontuação. Aqui ele não vale nada.",
+      "queen": "<b>A dama quebra as copas.</b> Em algumas mesas, a dama de espadas também quebra as copas. Aqui só uma carta de copas quebra.",
+      "first": "<b>Pontos na primeira vaza.</b> Algumas mesas deixam jogar copas e a dama de espadas na primeira vaza. Aqui não pode, a não ser que o jogador não tenha outra opção.",
+      "moon": "<b>Escolha na lua.</b> Em algumas, quem atira na lua pode tirar 26 da própria pontuação em vez disso. Aqui os outros sempre levam os 26.",
+      "pass": "<b>Outros passes.</b> Algumas mesas passam quatro cartas, ou passam em outra ordem. Aqui são sempre três: para a esquerda, para a direita, para a frente e depois nenhum.",
+      "lead": "<b>Outras saídas.</b> Em algumas mesas, quem abre é o jogador à esquerda de quem dá as cartas, com qualquer carta. Aqui o 2 de paus sempre abre.",
+      "players": "<b>Três ou cinco jogadores.</b> Copas pode ser jogado por três ou por cinco, tirando uma ou duas cartas do baralho. Aqui são sempre quatro."
+    }
+  },
+  "moon": {
+    "meta": {
+      "title": "Atirar na lua no Copas — Open Hearts",
+      "description": "Atirar na lua no Copas: o que é, como se pontua, quando vale a pena tentar e como impedir quem está tentando."
+    },
+    "header": {
+      "title": "Atirar na lua",
+      "tagline": "Leve todos os pontos de uma mão, e eles vão para todos os outros."
+    },
+    "rule": "A regra",
+    "what": {
+      "title": "O que é",
+      "p1": "No Copas você tenta levar o mínimo de pontos possível. Atirar na lua vira isso do avesso: leve todos. Quem leva todas as cartas de copas e a dama de espadas numa mão, os 26 pontos, não marca nada nela, e cada um dos outros três marca 26."
+    },
+    "example": {
+      "title": "Um exemplo",
+      "p1": "Numa partida até 50, Ana, Ben, Cleo e Dev têm 18, 22, 31 e 9 pontos. Na mão seguinte, Ben leva as treze cartas de copas e a dama de espadas. Ben não marca nada, e Ana, Cleo e Dev marcam 26 cada um.",
+      "p2": "Isso dá 44, 22, 57 e 35. Cleo passou de 50, então a partida termina, e Ben, que estava em terceiro, vence."
+    },
+    "play": "Tentando a lua",
+    "gamble": {
+      "title": "Por que é uma aposta",
+      "p1": "Um tiro na lua precisa levar todos os pontos. Se uma única copa for para outra pessoa, o tiro falha, e quem tentou fica com tudo o mais que levou: até 25 pontos numa mão só."
+    },
+    "when": {
+      "title": "Quando tentar",
+      "p1": "Procure uma mão que consiga ganhar vazas e continuar ganhando: copas altas; a dama de espadas, ou o ás e o rei de espadas para pegá-la; e naipes longos encabeçados pelas cartas mais altas. As cartas baixas são o perigo, porque cada uma pode entregar a saída a alguém que não vai devolvê-la.",
+      "p2": "Ajuda começar com discrição. Leve vazas como qualquer um levaria, e só mostre o seu jogo quando já for tarde para impedirem você."
+    },
+    "stop": {
+      "title": "Como impedir",
+      "p1": "Se um jogador levou todos os pontos até agora, pode ser uma tentativa de lua. Para impedir basta uma copa: ganhe uma vaza com uma copa dentro, ou guarde uma copa alta o bastante para ganhar uma no fim da mão. Alguns pontos na sua conta custam bem menos que 26.",
+      "p2": "Então não jogue fora a sua copa mais alta só porque copas são ruins: no fim da mão, ela pode ser a única carta capaz de impedir a lua."
+    },
+    "more": "Aqui e em outros lugares",
+    "here": {
+      "title": "No Open Hearts",
+      "p1": "Quando alguém atira na lua, a mesa treme em volta dessa pessoa, e o placar da mão diz quem foi. O seu perfil conta, nas suas partidas sozinho, as luas que você atirou e as que bloqueou: mãos em que outra pessoa levou a dama e dez copas ou mais, e você levou uma das outras."
+    },
+    "variants": {
+      "title": "Outras formas de pontuar",
+      "p1": "Algumas mesas deixam quem atira tirar 26 da própria pontuação em vez disso, o que faz diferença quando somar 26 aos outros terminaria a partida com quem atirou ainda atrás. Outras dão mais valor a levar as treze vazas, “atirar no sol”. Aqui a lua é sempre pontuada do mesmo jeito: nada para quem atira, e 26 para todos os outros."
+    }
+  },
+  "strategy": {
+    "meta": {
+      "title": "Estratégia de Copas: como jogar bem — Open Hearts",
+      "description": "Estratégia e dicas de Copas: o que passar, como lidar com a dama de espadas, quando fugir de uma vaza, contar cartas, impedir uma lua e jogar de olho no placar."
+    },
+    "header": {
+      "title": "Estratégia de Copas",
+      "tagline": "O que os bons jogadores fazem, do passe à última vaza."
+    },
+    "passing": "O passe",
+    "short": {
+      "title": "Fique curto num naipe",
+      "p1": "O passe é a sua melhor chance de moldar a mão. Passe todas as cartas que você tem de um naipe curto e você fica sem ele: quando ele for aberto, você pode descartar uma copa ou a dama de espadas. Duas ou três cartas de paus ou de ouros são as mais fáceis de despachar."
+    },
+    "high": {
+      "title": "Passe cartas altas",
+      "p1": "Ases, reis e damas ganham vazas que você não quer. As cartas baixas, do dois ao cinco, deixam você jogar por baixo de todo mundo, então guarde-as, sobretudo as copas baixas."
+    },
+    "queen": {
+      "title": "A dama de espadas",
+      "p1": "Com a dama e só uma ou duas outras espadas, passe-a, ou é provável que ela seja arrancada de você numa vaza que você leva. Com quatro ou mais espadas abaixo dela, é mais seguro ficar com ela: você segue espadas com as pequenas, e a descarta na vaza de outra pessoa quando ficar sem algum naipe.",
+      "p2": "Sem a dama, o ás e o rei de espadas são um perigo: quem estiver com a dama vai descartá-la em cima deles. Passe-os se você tiver poucas outras espadas."
+    },
+    "remember": {
+      "title": "Lembre-se do que passou",
+      "p1": "Você conhece três cartas da mão de outro jogador. Se passou a dama de espadas, você sabe quem está com ela."
+    },
+    "playing": "Jogando as cartas",
+    "first": {
+      "title": "A primeira vaza é segura",
+      "p1": "Nenhum ponto pode ser jogado na primeira vaza, então é o momento mais seguro para se livrar da sua carta de paus mais alta."
+    },
+    "duck": {
+      "title": "Fuja com a sua carta segura mais alta",
+      "p1": "Quando você não quer uma vaza, jogue a carta mais alta que ainda perde para a que está ganhando. As suas cartas baixas valem mais no fim da mão, quando há mais pontos em jogo."
+    },
+    "last": {
+      "title": "Último a jogar, ganhe alto",
+      "p1": "Você é o último numa vaza sem pontos que vai ganhar de qualquer jeito? Ganhe com a sua carta mais alta do naipe, não com uma baixa, desde que tenha algo seguro para abrir depois."
+    },
+    "void": {
+      "title": "Sem o naipe, descarte a pior",
+      "p1": "Quando não puder seguir o naipe, descarte a carta que mais prejudicaria você depois: a dama de espadas, se estiver com ela, depois as suas copas mais altas, e depois cartas altas dos naipes que ainda tem."
+    },
+    "spades": {
+      "title": "Abra com espadas para tirar a dama",
+      "p1": "Sem a dama, e sem nenhuma espada acima do valete, abrir com espadas é seguro para você e um perigo para quem está com ela: cada vaza de espadas gasta mais uma espada dessa pessoa, até a dama ter que sair."
+    },
+    "count": {
+      "title": "Conte as cartas",
+      "p1": "Acompanhe as copas e as espadas que já foram jogadas, e quem ficou sem qual naipe. Um jogador sem um naipe vai descartar pontos quando ele for aberto, e você vai saber disso antes de abrir."
+    },
+    "moon": {
+      "title": "Fique de olho na lua",
+      "p1": "Se um jogador está levando todos os pontos, leve um você, mesmo que custe alguns: uma copa sai mais barata que 26. Tem mais sobre <a href=\"{{base}}/shooting-the-moon#stop\">como impedir uma lua</a>."
+    },
+    "late": "O placar",
+    "score": {
+      "title": "Jogue de olho no placar",
+      "p1": "A partida termina quando alguém chega ao alvo, então perto do fim o placar muda o que você quer. Se você tem a menor pontuação, quanto antes acabar, melhor: pontos para quem está mais perto do alvo podem encerrar a partida. Se você está atrás, mantenha a partida viva, e mande pontos para quem está ganhando.",
+      "p2": "É também quando uma lua mais pesa: 26 para cada um dos outros podem encerrar a partida numa mão só, com quem atirou na frente ou não."
+    },
+    "bots": {
+      "title": "Treine contra os bots",
+      "p1": "Os bots daqui são amantes famosos, cada um com o seu jeito: Romeo não consegue segurar uma dama, e Don Juan tenta a lua com mãos com que ninguém mais tentaria. <i>Jogar sozinho</i> é de graça, quantas vezes você quiser."
     }
   },
   "privacy": {

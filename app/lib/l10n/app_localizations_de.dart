@@ -127,6 +127,38 @@ class AppLocalizationsDe extends AppLocalizations {
   String get leaveTheTable => 'Tisch verlassen';
 
   @override
+  String get leaveTableTitle => 'Tisch verlassen?';
+
+  @override
+  String get leaveTableBot =>
+      'Ein Bot übernimmt deinen Platz für den Rest des Spiels.';
+
+  @override
+  String get leaveTableRated =>
+      'Das Spiel ist gewertet und zählt, als wärst du auf dem letzten Platz gelandet.';
+
+  @override
+  String leaveTableWait(int minutes) {
+    String _temp0 = intl.Intl.pluralLogic(
+      minutes,
+      locale: localeName,
+      other:
+          'Live spielen setzt dich erst in $minutes Minuten wieder an einen Tisch.',
+      one:
+          'Live spielen setzt dich erst in einer Minute wieder an einen Tisch.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get stay => 'Bleiben';
+
+  @override
+  String leftEarlyWait(String time) {
+    return 'Du hast dein letztes Live-Spiel nicht beendet: Live spielen ist in $time wieder offen.';
+  }
+
+  @override
   String get about => 'Über';
 
   @override
