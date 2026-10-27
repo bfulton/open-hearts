@@ -108,11 +108,7 @@ void main() {
     expect(quick.bank.graceMs, 3000);
     expect(quick.bank.bankMs, 30000);
     expect(quick.botActsMs, TableTiming.standard.botActsMs, reason: 'a field not named is the standard');
-    // This build's standard, not what a start that says nothing means
-    // to every build (TableTiming.unsaid): the silence is where the two
-    // differ.
     expect(quick.silenceMs, TableTiming.standard.silenceMs);
-    expect(quick.silenceMs, isNot(TableTiming.unsaid.silenceMs));
     expect(RemoteConfig.parse({'table': {'graceMs': 3000, 'bankMs': 1}}).table, TableTiming.standard, reason: 'all or nothing');
     expect(RemoteConfig.parse({'table': 'fast'}).table, TableTiming.standard);
     expect(RemoteConfig.parse({'live': false, 'table': {'graceMs': 1}}).live, isFalse, reason: 'and the rest of the row stands');

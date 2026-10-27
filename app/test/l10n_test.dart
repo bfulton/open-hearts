@@ -309,12 +309,7 @@ void main() {
           List<String> notes(AppLocalizations words) => [
             words.noRelayTakesEvents('blocked: rate-limited, slow down a…'),
             words.waitingToReconnect,
-            words.askingTheJury,
-            words.noJurorOnline,
-            words.waitingForTheJury,
             words.openingDepartedHand,
-            words.nobodyClaimsTwo,
-            words.waitingForJurors,
             words.dealingKeys,
             words.shuffling(3),
             words.dealingTheCards,

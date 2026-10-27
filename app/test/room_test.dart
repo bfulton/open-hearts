@@ -57,6 +57,13 @@ class BusChannel implements RoomChannel {
 /// A table id as a leader names one.
 const _table = '0123456789abcdef0123456789abcdef';
 
+/// The house the rooms here play with.
+const _house = 'dd308afec5777e13121fa72b9cc1b7cc0139715309b086c960e18fd969774eb8';
+
+/// What a start says besides its seats for it to be a table this build
+/// sits at: the house, and the clocks in full.
+final _inFull = {'house': _house, 'timing': TableTiming.standard.toJson()};
+
 void main() {
   test('a code is eight characters, none of them a lookalike, and no two alike', () {
     expect(Room.validCode('ABCDEFGH'), isTrue);
@@ -82,13 +89,13 @@ void main() {
       final bus = Bus();
       final signers = [FakeSigner('a'), FakeSigner('b')];
       int now() => async.elapsed.inMilliseconds;
-      final a = Room(canDeal: true, channel: bus.attach(signers[0]), code: 'ROOM', myName: 'Ada', nowMs: now);
+      final a = Room(house: _house, canDeal: true, channel: bus.attach(signers[0]), code: 'ROOM', myName: 'Ada', nowMs: now);
       async.elapse(const Duration(seconds: 3));
       expect(a.members.map((m) => m.name), ['Ada']);
       expect(a.amLeader, isTrue, reason: 'alone, you lead');
       expect(a.secondsToStart, isNull);
 
-      final b = Room(canDeal: true, channel: bus.attach(signers[1]), code: 'ROOM', myName: 'Bao', nowMs: now);
+      final b = Room(house: _house, canDeal: true, channel: bus.attach(signers[1]), code: 'ROOM', myName: 'Bao', nowMs: now);
       async.elapse(const Duration(seconds: 3));
       expect(a.members.map((m) => m.name), ['Ada', 'Bao'], reason: 'arrival order');
       expect(b.members.map((m) => m.name), ['Ada', 'Bao']);
@@ -121,12 +128,12 @@ void main() {
     fakeAsync((async) {
       final bus = Bus();
       int now() => async.elapsed.inMilliseconds;
-      final rooms = [for (final n in ['Ada', 'Bao', 'Cara', 'Dee']) Room(canDeal: true, channel: bus.attach(FakeSigner(n)), code: 'ROOM', myName: n, nowMs: now)];
+      final rooms = [for (final n in ['Ada', 'Bao', 'Cara', 'Dee']) Room(house: _house, canDeal: true, channel: bus.attach(FakeSigner(n)), code: 'ROOM', myName: n, nowMs: now)];
       async.elapse(const Duration(seconds: 3));
       expect(rooms.every((r) => r.spec != null), isTrue, reason: 'four is a table');
       expect(rooms.every((r) => r.seated), isTrue);
       expect(rooms.first.spec!.seats.whereType<BotSeat>(), isEmpty);
-      final late = Room(canDeal: true, channel: bus.attach(FakeSigner('Eve')), code: 'ROOM', myName: 'Eve', nowMs: now);
+      final late = Room(house: _house, canDeal: true, channel: bus.attach(FakeSigner('Eve')), code: 'ROOM', myName: 'Eve', nowMs: now);
       async.elapse(const Duration(seconds: 3));
       expect(late.spec, isNotNull, reason: 'the start is on the relay');
       expect(late.seated, isFalse);
@@ -145,11 +152,11 @@ void main() {
       // the front door and sitting in a room that will never fill.
       final bus = Bus();
       int now() => async.elapsed.inMilliseconds;
-      final rooms = [for (final n in ['Ada', 'Bao', 'Cara', 'Dee']) Room(canDeal: true, channel: bus.attach(FakeSigner(n)), code: 'ROOM', myName: n, nowMs: now)];
+      final rooms = [for (final n in ['Ada', 'Bao', 'Cara', 'Dee']) Room(house: _house, canDeal: true, channel: bus.attach(FakeSigner(n)), code: 'ROOM', myName: n, nowMs: now)];
       async.elapse(const Duration(seconds: 3));
       expect(rooms.every((r) => r.seated), isTrue);
 
-      final late = Room(canDeal: true, channel: bus.attach(FakeSigner('Eve')), code: 'ROOM', myName: 'Eve', nowMs: now);
+      final late = Room(house: _house, canDeal: true, channel: bus.attach(FakeSigner('Eve')), code: 'ROOM', myName: 'Eve', nowMs: now);
       expect(late.spec, isNotNull, reason: 'decided in the constructor, before anyone listens');
       var told = 0;
       late.addListener(() => told++);
@@ -170,7 +177,7 @@ void main() {
       // starts the table has a say, and everyone plays that game.
       final rooms = [
         for (final n in ['Ada', 'Bao'])
-          Room(canDeal: true, channel: bus.attach(FakeSigner(n)), code: 'ROOM', myName: n, target: n == 'Ada' ? 100 : 50, nowMs: now)
+          Room(house: _house, canDeal: true, channel: bus.attach(FakeSigner(n)), code: 'ROOM', myName: n, target: n == 'Ada' ? 100 : 50, nowMs: now)
       ];
       async.elapse(const Duration(seconds: 14));
       final leader = rooms.firstWhere((r) => r.amLeader);
@@ -194,6 +201,7 @@ void main() {
       final rooms = [
         for (final n in ['Ada', 'Bao'])
           Room(
+              house: _house,
               canDeal: true,
               channel: bus.attach(FakeSigner(n)),
               code: 'ROOM',
@@ -212,20 +220,28 @@ void main() {
     });
   });
 
-  // What every build reads it as (TableTiming.unsaid), not this build's
-  // standard: a start by an older build says no timing for its own
-  // standard, which was that.
-  test('a start that says no timing, or one out of bounds, is the table every build reads it as', () {
-    for (final said in <Object?>[null, {'graceMs': 500}, {'bankMs': '45000'}, 'quick']) {
+  test('a start that names another house, or none, or says its clocks short of in full, is another build\'s; a build that names none sits at nothing', () {
+    final timing = TableTiming.standard.toJson();
+    final said = <(String?, Map<String, Object?>)>[
+      (_house, {'timing': timing}),
+      (_house, {'house': 'ab' * 32, 'timing': timing}),
+      (_house, {'house': _house}),
+      (_house, {'house': _house, 'timing': {...timing}..remove('silenceMs')}),
+      (_house, {'house': _house, 'timing': {...timing, 'graceMs': 500}}),
+      (_house, {'house': _house, 'timing': 'quick'}),
+      // A build that names no house: a table it sat at would have none
+      // to deal its bots, and no referee would take it.
+      (null, {'timing': timing}),
+      (null, {'house': _house, 'timing': timing}),
+    ];
+    for (final (ours, extra) in said) {
       fakeAsync((async) {
         final bus = Bus();
         int now() => async.elapsed.inMilliseconds;
         final ada = FakeSigner('Ada');
         final zed = FakeSigner('Zed');
-        final room = Room(canDeal: true, channel: bus.attach(ada), code: 'ROOM', myName: 'Ada', nowMs: now);
+        final room = Room(house: ours, canDeal: true, channel: bus.attach(ada), code: 'ROOM', myName: 'Ada', nowMs: now);
         async.elapse(const Duration(seconds: 1));
-        // A start by another build: everything a start says, and the
-        // timing as given.
         bus.attach(zed).announce({
           'kind': 'start',
           'table': _table,
@@ -240,14 +256,35 @@ void main() {
           'sealed': true,
           'target': 50,
           'at': now(),
-          'timing': ?said,
+          ...extra,
         });
         async.elapse(const Duration(seconds: 1));
-        expect(room.spec, isNotNull, reason: '$said');
-        expect(room.spec!.timing, TableTiming.unsaid, reason: '$said');
+        expect(room.spec, isNull, reason: '$ours $extra');
+        expect(room.refusal, RoomRefusal.otherBuild, reason: '$ours $extra');
         room.dispose();
       });
     }
+  });
+
+  test('a table started here names the house, and a build that names none starts nothing', () {
+    fakeAsync((async) {
+      final bus = Bus();
+      int now() => async.elapsed.inMilliseconds;
+      final rooms = [for (final n in ['Ada', 'Bao']) Room(house: _house, canDeal: true, channel: bus.attach(FakeSigner(n)), code: 'ROOM', myName: n, nowMs: now)];
+      async.elapse(const Duration(seconds: 14));
+      for (final r in rooms) {
+        expect(r.spec?.house, _house);
+        expect(r.spec?.timing, TableTiming.standard);
+        r.dispose();
+      }
+      final bare = Bus();
+      final none = [for (final n in ['Ada', 'Bao']) Room(canDeal: true, channel: bare.attach(FakeSigner(n)), code: 'ROOM', myName: n, nowMs: now)];
+      async.elapse(const Duration(seconds: 30));
+      expect(bare.stored.where((e) => (jsonDecode(e.content) as Map)['kind'] == 'start'), isEmpty);
+      for (final r in none) {
+        r.dispose();
+      }
+    });
   });
 
   test('a start without a table id of its own, or with a guessable one, is another build\'s', () {
@@ -257,9 +294,10 @@ void main() {
         int now() => async.elapsed.inMilliseconds;
         final ada = FakeSigner('Ada');
         final zed = FakeSigner('Zed');
-        final room = Room(canDeal: true, channel: bus.attach(ada), code: 'ROOM', myName: 'Ada', nowMs: now);
+        final room = Room(house: _house, canDeal: true, channel: bus.attach(ada), code: 'ROOM', myName: 'Ada', nowMs: now);
         async.elapse(const Duration(seconds: 1));
         bus.attach(zed).announce({
+          ..._inFull,
           'kind': 'start',
           'table': ?id,
           'seed': 7,
@@ -290,7 +328,7 @@ void main() {
       fakeAsync((async) {
         final bus = Bus();
         int now() => async.elapsed.inMilliseconds;
-        final rooms = [for (final n in ['Ada', 'Bao', 'Cara', 'Dee']) Room(canDeal: true, channel: bus.attach(FakeSigner(n)), code: code, myName: n, nowMs: now)];
+        final rooms = [for (final n in ['Ada', 'Bao', 'Cara', 'Dee']) Room(house: _house, canDeal: true, channel: bus.attach(FakeSigner(n)), code: code, myName: n, nowMs: now)];
         async.elapse(const Duration(seconds: 3));
         final spec = rooms.first.spec!;
         expect(spec.seats.whereType<HumanSeat>(), hasLength(4), reason: 'everyone is seated');
@@ -312,12 +350,12 @@ void main() {
     fakeAsync((async) {
       final bus = Bus();
       int now() => async.elapsed.inMilliseconds;
-      final a = Room(canDeal: true, channel: bus.attach(FakeSigner('a')), code: 'ROOM', myName: 'Ada', nowMs: now);
+      final a = Room(house: _house, canDeal: true, channel: bus.attach(FakeSigner('a')), code: 'ROOM', myName: 'Ada', nowMs: now);
       async.elapse(const Duration(seconds: 1));
       a.start();
       async.elapse(const Duration(seconds: 1));
       expect(a.spec, isNull, reason: 'alone');
-      final b = Room(canDeal: true, channel: bus.attach(FakeSigner('b')), code: 'ROOM', myName: 'Bao', nowMs: now);
+      final b = Room(house: _house, canDeal: true, channel: bus.attach(FakeSigner('b')), code: 'ROOM', myName: 'Bao', nowMs: now);
       async.elapse(const Duration(seconds: 3));
       final follower = a.amLeader ? b : a;
       final leader = a.amLeader ? a : b;
@@ -337,8 +375,8 @@ void main() {
     fakeAsync((async) {
       final bus = Bus();
       int now() => async.elapsed.inMilliseconds;
-      final a = Room(canDeal: true, channel: bus.attach(FakeSigner('a')), code: 'ROOM', myName: 'Ada', nowMs: now);
-      final b = Room(canDeal: true, channel: bus.attach(FakeSigner('b')), code: 'ROOM', myName: 'Bao', nowMs: now);
+      final a = Room(house: _house, canDeal: true, channel: bus.attach(FakeSigner('a')), code: 'ROOM', myName: 'Ada', nowMs: now);
+      final b = Room(house: _house, canDeal: true, channel: bus.attach(FakeSigner('b')), code: 'ROOM', myName: 'Bao', nowMs: now);
       async.elapse(const Duration(seconds: 3));
       final leader = a.amLeader ? a : b;
       final other = a.amLeader ? b : a;
@@ -352,7 +390,7 @@ void main() {
       expect(other.amLeader, isTrue);
       expect(other.spec, isNull, reason: 'alone again, nothing starts');
       // A third arrives: the countdown runs from them.
-      final c = Room(canDeal: true, channel: bus.attach(FakeSigner('c')), code: 'ROOM', myName: 'Cara', nowMs: now);
+      final c = Room(house: _house, canDeal: true, channel: bus.attach(FakeSigner('c')), code: 'ROOM', myName: 'Cara', nowMs: now);
       async.elapse(const Duration(seconds: 3));
       expect(other.members.map((m) => m.name).toSet(), {other.myName, 'Cara'});
       async.elapse(const Duration(seconds: 9));
@@ -368,7 +406,7 @@ void main() {
     fakeAsync((async) {
       final bus = Bus();
       int now() => async.elapsed.inMilliseconds;
-      final three = [for (final n in ['Ada', 'Bao', 'Cara']) Room(canDeal: true, channel: bus.attach(FakeSigner(n)), code: 'ROOM', myName: n, nowMs: now)];
+      final three = [for (final n in ['Ada', 'Bao', 'Cara']) Room(house: _house, canDeal: true, channel: bus.attach(FakeSigner(n)), code: 'ROOM', myName: n, nowMs: now)];
       async.elapse(const Duration(seconds: 3));
       expect(three.every((r) => r.spec == null), isTrue, reason: 'three is not a table on its own');
 
@@ -377,7 +415,7 @@ void main() {
       // room four — which starts the table at once, from a device
       // whose beat has not come round again. Waiting for that beat is
       // waiting for a room everyone else has just left.
-      final last = Room(canDeal: true, channel: bus.attach(FakeSigner('Dee')), code: 'ROOM', myName: 'Dee', nowMs: now);
+      final last = Room(house: _house, canDeal: true, channel: bus.attach(FakeSigner('Dee')), code: 'ROOM', myName: 'Dee', nowMs: now);
       async.elapse(const Duration(seconds: 12));
 
       expect(three.every((r) => r.seated), isTrue, reason: 'the three are at it');
@@ -399,10 +437,10 @@ void main() {
       // any beat of the sender's has come round again.
       final bus = Bus();
       final ada = FakeSigner('a');
-      final b = Room(canDeal: true, channel: bus.attach(FakeSigner('b')), code: 'ROOM', myName: 'Bao', nowMs: now);
+      final b = Room(house: _house, canDeal: true, channel: bus.attach(FakeSigner('b')), code: 'ROOM', myName: 'Bao', nowMs: now);
       async.elapse(const Duration(seconds: 1));
       bus.publish(NostrEvent.sign(ada, kind: 4244, content: jsonEncode({
-        'kind': 'start', 'table': _table, 'seed': 1, 'policy': botPolicyVersion, 'sealed': true, 'at': now(),
+        ..._inFull, 'kind': 'start', 'table': _table, 'seed': 1, 'policy': botPolicyVersion, 'sealed': true, 'at': now(),
         'seats': [
           {'key': ada.publicKey, 'name': 'Ada'}, {'key': b.me, 'name': 'Bao'}, {'bot': 'Westley'}, {'bot': 'Romeo'},
         ],
@@ -417,10 +455,10 @@ void main() {
       // least here, and dropped when none comes.
       final bus2 = Bus();
       final ghost = FakeSigner('ghost');
-      final c = Room(canDeal: true, channel: bus2.attach(FakeSigner('c')), code: 'ROOM', myName: 'Cara', nowMs: now);
+      final c = Room(house: _house, canDeal: true, channel: bus2.attach(FakeSigner('c')), code: 'ROOM', myName: 'Cara', nowMs: now);
       async.elapse(const Duration(seconds: 1));
       bus2.publish(NostrEvent.sign(ghost, kind: 4244, content: jsonEncode({
-        'kind': 'start', 'table': _table, 'seed': 1, 'policy': botPolicyVersion, 'sealed': true, 'at': now(),
+        ..._inFull, 'kind': 'start', 'table': _table, 'seed': 1, 'policy': botPolicyVersion, 'sealed': true, 'at': now(),
         'seats': [
           {'key': c.me, 'name': 'Cara'}, {'bot': 'Han'}, {'bot': 'Westley'}, {'bot': 'Romeo'},
         ],
@@ -433,10 +471,10 @@ void main() {
       c.dispose();
 
       final bus3 = Bus();
-      final d = Room(canDeal: true, channel: bus3.attach(FakeSigner('d')), code: 'ROOM', myName: 'Dee', nowMs: now);
+      final d = Room(house: _house, canDeal: true, channel: bus3.attach(FakeSigner('d')), code: 'ROOM', myName: 'Dee', nowMs: now);
       async.elapse(const Duration(seconds: 1));
       bus3.publish(NostrEvent.sign(ghost, kind: 4244, content: jsonEncode({
-        'kind': 'start', 'table': _table, 'seed': 1, 'policy': botPolicyVersion, 'sealed': true, 'at': now(),
+        ..._inFull, 'kind': 'start', 'table': _table, 'seed': 1, 'policy': botPolicyVersion, 'sealed': true, 'at': now(),
         'seats': [
           {'key': d.me, 'name': 'Dee'}, {'bot': 'Han'}, {'bot': 'Westley'}, {'bot': 'Romeo'},
         ],
@@ -453,10 +491,10 @@ void main() {
       final bus4 = Bus();
       final before = now();
       async.elapse(const Duration(seconds: 6));
-      final e = Room(canDeal: true, channel: bus4.attach(FakeSigner('e')), code: 'ROOM', myName: 'Eve', nowMs: now);
+      final e = Room(house: _house, canDeal: true, channel: bus4.attach(FakeSigner('e')), code: 'ROOM', myName: 'Eve', nowMs: now);
       async.elapse(const Duration(seconds: 1));
       bus4.publish(NostrEvent.sign(ghost, kind: 4244, content: jsonEncode({
-        'kind': 'start', 'table': _table, 'seed': 1, 'policy': botPolicyVersion, 'sealed': true, 'at': before,
+        ..._inFull, 'kind': 'start', 'table': _table, 'seed': 1, 'policy': botPolicyVersion, 'sealed': true, 'at': before,
         'seats': [
           {'key': ghost.publicKey, 'name': 'Ghost'}, {'key': e.me, 'name': 'Eve'}, {'bot': 'Westley'}, {'bot': 'Romeo'},
         ],
@@ -472,14 +510,14 @@ void main() {
       final bus = Bus();
       int now() => async.elapsed.inMilliseconds;
       final picture = Uint8List.fromList(List.generate(200, (i) => (i * 7) % 256));
-      final a = Room(canDeal: true, channel: bus.attach(FakeSigner('a')), code: 'ROOM', myName: 'Ada', myAvatar: Avatar(icon: 'rocket', color: 3, picture: picture), nowMs: now);
-      final b = Room(canDeal: true, channel: bus.attach(FakeSigner('b')), code: 'ROOM', myName: 'Bao', myAvatar: const Avatar(icon: 'cake'), nowMs: now);
+      final a = Room(house: _house, canDeal: true, channel: bus.attach(FakeSigner('a')), code: 'ROOM', myName: 'Ada', myAvatar: Avatar(icon: 'rocket', color: 3, picture: picture), nowMs: now);
+      final b = Room(house: _house, canDeal: true, channel: bus.attach(FakeSigner('b')), code: 'ROOM', myName: 'Bao', myAvatar: const Avatar(icon: 'cake'), nowMs: now);
       async.elapse(const Duration(seconds: 3));
       final adaAtB = b.members.firstWhere((m) => m.name == 'Ada');
       expect(adaAtB.avatar, Avatar(icon: 'rocket', color: 3, picture: picture), reason: 'icon, colour and picture');
       expect(a.members.firstWhere((m) => m.name == 'Bao').avatar, const Avatar(icon: 'cake'));
       // A third arrives after the picture went by: the relay kept it.
-      final c = Room(canDeal: true, channel: bus.attach(FakeSigner('c')), code: 'ROOM', myName: 'Cara', nowMs: now);
+      final c = Room(house: _house, canDeal: true, channel: bus.attach(FakeSigner('c')), code: 'ROOM', myName: 'Cara', nowMs: now);
       async.elapse(const Duration(seconds: 3));
       expect(c.members.firstWhere((m) => m.name == 'Ada').avatar.picture, picture);
       async.elapse(const Duration(seconds: 10));
@@ -499,7 +537,7 @@ void main() {
       final bus = Bus();
       int now() => async.elapsed.inMilliseconds;
       final hidden = base64Encode(Uint8List.fromList(List.generate(200, (i) => (i * 3) % 256)));
-      final b = Room(canDeal: true, channel: bus.attach(FakeSigner('b')), code: 'ROOM', myName: 'Bao', nowMs: now);
+      final b = Room(house: _house, canDeal: true, channel: bus.attach(FakeSigner('b')), code: 'ROOM', myName: 'Bao', nowMs: now);
       final changed = FakeSigner('changed');
       async.elapse(const Duration(seconds: 1));
       // A changed app's beat, with a picture where the app never puts one.
@@ -525,8 +563,8 @@ void main() {
         final c = Map<String, Object?>.from(jsonDecode(e.content) as Map);
         if (c['kind'] == 'start') said.add(c);
       });
-      final a = Room(canDeal: true, channel: bus.attach(FakeSigner('a')), code: 'ROOM', myName: 'Ada', nowMs: now);
-      final b = Room(canDeal: true, channel: bus.attach(FakeSigner('b')), code: 'ROOM', myName: 'Bao', nowMs: now);
+      final a = Room(house: _house, canDeal: true, channel: bus.attach(FakeSigner('a')), code: 'ROOM', myName: 'Ada', nowMs: now);
+      final b = Room(house: _house, canDeal: true, channel: bus.attach(FakeSigner('b')), code: 'ROOM', myName: 'Bao', nowMs: now);
       async.elapse(const Duration(seconds: 12));
       expect(said, isNotEmpty, reason: 'the leader started the table');
       expect(said.every((c) => c['sealed'] == true), isTrue, reason: 'every live table is sealed');
@@ -539,11 +577,11 @@ void main() {
       // sat at: its cards could be read by anyone at the table.
       final bus2 = Bus();
       final ghost = FakeSigner('ghost');
-      final c = Room(canDeal: true, channel: bus2.attach(FakeSigner('c')), code: 'ROOM', myName: 'Cara', nowMs: now);
+      final c = Room(house: _house, canDeal: true, channel: bus2.attach(FakeSigner('c')), code: 'ROOM', myName: 'Cara', nowMs: now);
       bus2.attach(ghost).announce({'kind': 'here', 'name': 'Ghost', 'seed': 1, 'since': now(), 'policy': botPolicyVersion}, ephemeral: true);
       async.elapse(const Duration(seconds: 1));
       bus2.publish(NostrEvent.sign(ghost, kind: 4244, content: jsonEncode({
-        'kind': 'start', 'table': _table, 'seed': 1, 'policy': botPolicyVersion, 'sealed': false, 'at': now(),
+        ..._inFull, 'kind': 'start', 'table': _table, 'seed': 1, 'policy': botPolicyVersion, 'sealed': false, 'at': now(),
         'seats': [
           {'key': ghost.publicKey, 'name': 'Ghost'}, {'key': c.me, 'name': 'Cara'}, {'bot': 'Westley'}, {'bot': 'Romeo'},
         ],
@@ -567,8 +605,8 @@ void main() {
       // The lowest key leads, so a device that cannot deal is given the
       // lead here: it is the one that would have started the table.
       final signers = [FakeSigner('0'), FakeSigner('1')]..sort((x, y) => x.publicKey.compareTo(y.publicKey));
-      final lead = Room(canDeal: false, channel: bus.attach(signers[0]), code: 'ROOM', myName: 'Ada', nowMs: now);
-      final other = Room(canDeal: true, channel: bus.attach(signers[1]), code: 'ROOM', myName: 'Bao', nowMs: now);
+      final lead = Room(house: _house, canDeal: false, channel: bus.attach(signers[0]), code: 'ROOM', myName: 'Ada', nowMs: now);
+      final other = Room(house: _house, canDeal: true, channel: bus.attach(signers[1]), code: 'ROOM', myName: 'Bao', nowMs: now);
       async.elapse(const Duration(seconds: 12));
       expect(lead.refusal, RoomRefusal.noDeal, reason: 'said before any start');
       expect(said.where((c) => (c['seats'] as List).any((s) => (s as Map)['key'] == lead.me)), isEmpty,
@@ -578,11 +616,11 @@ void main() {
       // Handed a sealed start that seats it, it still does not sit.
       final ghost = FakeSigner('ghost');
       final bus2 = Bus();
-      final c = Room(canDeal: false, channel: bus2.attach(FakeSigner('c')), code: 'ROOM', myName: 'Cara', nowMs: now);
+      final c = Room(house: _house, canDeal: false, channel: bus2.attach(FakeSigner('c')), code: 'ROOM', myName: 'Cara', nowMs: now);
       bus2.attach(ghost).announce({'kind': 'here', 'name': 'Ghost', 'seed': 1, 'since': now(), 'policy': botPolicyVersion}, ephemeral: true);
       async.elapse(const Duration(seconds: 1));
       bus2.publish(NostrEvent.sign(ghost, kind: 4244, content: jsonEncode({
-        'kind': 'start', 'table': _table, 'seed': 1, 'policy': botPolicyVersion, 'sealed': true, 'at': now(),
+        ..._inFull, 'kind': 'start', 'table': _table, 'seed': 1, 'policy': botPolicyVersion, 'sealed': true, 'at': now(),
         'seats': [
           {'key': ghost.publicKey, 'name': 'Ghost'}, {'key': c.me, 'name': 'Cara'}, {'bot': 'Westley'}, {'bot': 'Romeo'},
         ],
@@ -603,18 +641,18 @@ void main() {
       // The relay still holds the start of a game under this code an
       // hour ago, by someone who is not here.
       bus.stored.add(NostrEvent.sign(ghost, kind: 4244, content: jsonEncode({
-        'kind': 'start', 'table': _table, 'seed': 1, 'policy': botPolicyVersion, 'sealed': true, 'at': now() - 3600000,
+        ..._inFull, 'kind': 'start', 'table': _table, 'seed': 1, 'policy': botPolicyVersion, 'sealed': true, 'at': now() - 3600000,
         'seats': [
           {'key': ghost.publicKey, 'name': 'Ghost'}, {'bot': 'Westley'}, {'bot': 'Romeo'}, {'bot': 'Juliet'},
         ],
       }), tags: const [['t', 'ROOM']]));
-      final a = Room(canDeal: true, channel: bus.attach(FakeSigner('a')), code: 'ROOM', myName: 'Ada', nowMs: now);
+      final a = Room(house: _house, canDeal: true, channel: bus.attach(FakeSigner('a')), code: 'ROOM', myName: 'Ada', nowMs: now);
       async.elapse(const Duration(seconds: 2));
       expect(a.spec, isNull);
       expect(a.members.length, 1);
       // And a recent one from someone not present: still not a table.
       bus.publish(NostrEvent.sign(ghost, kind: 4244, content: jsonEncode({
-        'kind': 'start', 'table': _table, 'seed': 1, 'policy': botPolicyVersion, 'sealed': true, 'at': now(),
+        ..._inFull, 'kind': 'start', 'table': _table, 'seed': 1, 'policy': botPolicyVersion, 'sealed': true, 'at': now(),
         'seats': [
           {'key': a.me, 'name': 'Ada'}, {'bot': 'Westley'}, {'bot': 'Romeo'}, {'bot': 'Juliet'},
         ],

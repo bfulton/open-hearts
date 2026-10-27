@@ -14,7 +14,7 @@ import 'dart:convert';
 import 'package:table/table.dart';
 import 'package:table_sim/table_sim.dart';
 
-/// The house the browser rig's build plays with: BIP-340's second
+/// The house the browser rig's build plays with: BIP-340's third
 /// published pair, a key known to everyone and so to nothing that
 /// matters (e2e/build.sh).
 const rigHouseSecret = 'c90fdaa22168c234c4c6628b80dc1cd129024e088a67cc74020bbea63b14e5c9';
@@ -25,7 +25,7 @@ Future<void> main() async {
   // ones (package:deal/memo.dart).
   final crypto = await rememberedCrypto();
   // Each seat an account's, by a licence the browser rig's service
-  // signed: BIP-340's first published pair (e2e/build.sh, e2e/drive.mjs),
+  // signed: BIP-340's second published pair (e2e/build.sh, e2e/drive.mjs),
   // whose key the rig's build checks every seat by (licence.dart).
   const rigSecret = 'b7e151628aed2a6abf7158809cf4f3c762e7160f38b4da56a784d9045190cfef';
   Licence licenceOf(PublicKey key) {

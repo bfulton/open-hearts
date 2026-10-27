@@ -173,6 +173,10 @@ class TableClient {
   /// further on, by this side before a reload, and nothing is said.
   bool get _caughtUp => line.up && rules.waitingToTake == 0;
 
+  /// The same, for a view of the table: what came while this side was
+  /// catching up is shown at once, not at a person's pace.
+  bool get caughtUp => _caughtUp;
+
   /// The referee's time now, as near as this side can tell: the time of
   /// the last entry, and how long ago that came.
   int get refereeNow => _lastT + (clock.nowMs - _lastAt);

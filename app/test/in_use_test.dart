@@ -15,8 +15,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:open_hearts/entitlement.dart';
 import 'package:open_hearts/identity.dart';
 import 'package:open_hearts/l10n/l10n.dart';
-import 'package:open_hearts/net/duty.dart';
 import 'package:open_hearts/net/in_use.dart';
+import 'package:open_hearts/net/online.dart';
 import 'package:open_hearts/net/relays.dart' show ourRelay;
 import 'package:open_hearts/ui/in_use_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -151,7 +151,7 @@ void main() {
     expect(Entitlement.current.suspended, isFalse);
   });
 
-  test('suspended, as a relay says: live play shut here, the duty with it, and the licence; let back, open again', () async {
+  test('suspended, as a relay says: live play shut here, presence with it, and the licence; let back, open again', () async {
     final stand = standUp();
     final me = await Identity.signer();
     // As the app wires them (main.dart).
@@ -160,15 +160,15 @@ void main() {
     expect(Entitlement.current.live, isTrue);
     stand.says('activate', {'activation': activationFor(me.publicKey)});
     expect(await InUse.current.open(me), Use.here);
-    final duty = Duty.on([Uri.parse(ourRelay)], me);
-    addTearDown(duty.close);
+    final online = Online.on([Uri.parse(ourRelay)], me);
+    addTearDown(online.close);
 
     InUse.current.turnedAway('suspended: this account is suspended from live play');
     await pumpEventQueue();
     expect(InUse.current.standing, Use.suspended);
     expect(InUse.current.shut, isTrue);
     expect(InUse.current.elsewhere, isFalse, reason: 'not "in use on another device"');
-    expect(Duty.current, isNull, reason: 'no juror, and online to nobody');
+    expect(Online.current, isNull, reason: 'online to nobody');
     expect(InUse.current.credentials(me.publicKey), isNull, reason: 'nothing to show a relay any more');
     expect(Entitlement.current.suspended, isTrue);
     expect(Entitlement.current.live, isFalse);

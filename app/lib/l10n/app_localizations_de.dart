@@ -577,7 +577,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get whatMoneyPaysFor =>
-      'Allein spielen ist kostenlos, genau wie die Protokolle, die Engine und jede Zeile hiervon, und wir haben nicht vor, das zu ändern. Das Geld bezahlt den Teil, dessen Betrieb uns etwas kostet: euch miteinander zu verbinden, ein Relay, wenn zwei Geräte keinen direkten Weg finden, und einen Juror, wenn ein Tisch allein gelassen wird.';
+      'Allein spielen ist kostenlos, genau wie die Protokolle, die Engine und jede Zeile hiervon, und wir haben nicht vor, das zu ändern. Das Geld bezahlt den Teil, dessen Betrieb uns etwas kostet: euch miteinander zu verbinden, und den Server, der an jedem Live-Tisch die Karten gibt und für die Bots spielt.';
 
   @override
   String webRenewal(String price) {
@@ -953,27 +953,8 @@ class AppLocalizationsDe extends AppLocalizations {
       'Deine Verbindung ist unterbrochen — verbinde neu';
 
   @override
-  String get askingTheJury => 'Frage die Jury';
-
-  @override
-  String get noJurorOnline =>
-      'Niemand online für eine Jury — warte auf jemanden';
-
-  @override
-  String get waitingForTheJury => 'Warte auf die Jury';
-
-  @override
   String get openingDepartedHand =>
       'Öffne die Hand eines Spielers, der gegangen ist';
-
-  @override
-  String get nobodyClaimsTwo =>
-      'Niemand meldet die Kreuz 2 — das Austeilen hängt';
-
-  @override
-  String bootPlayer(String name) {
-    return '$name rauswerfen';
-  }
 
   @override
   String get cannotDealTitle => 'Dieses Gerät kann nicht austeilen';
@@ -990,11 +971,11 @@ class AppLocalizationsDe extends AppLocalizations {
   String get connectionFailure => 'Verbindungsfehler';
 
   @override
-  String get jurorQuorumLost => 'Zu wenige Juroren';
+  String get houseGone => 'Der Spielserver antwortet nicht mehr';
 
   @override
-  String get jurorQuorumLostWhy =>
-      'Zu wenige der Juroren, die die Bot-Plätze halten, sind noch online, darum kann die Runde nicht weitergehen. Das Spiel endet hier ohne Wertung.';
+  String get houseGoneWhy =>
+      'Der Server, der die Karten gibt und für die Bots spielt, antwortet nicht mehr, darum kann das Spiel nicht weitergehen. Es endet hier ohne Wertung.';
 
   @override
   String get onWithIt => 'Weiter';
@@ -1020,9 +1001,6 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get back => 'Zurück';
-
-  @override
-  String get waitingForJurors => 'Warte auf die Jury…';
 
   @override
   String get dealing => 'Teile aus';
@@ -1498,7 +1476,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get openElsewhereBody =>
-      'Dein Konto spielt auf einem Gerät zur Zeit, und das zuletzt geöffnete gilt. Dieses ist zurückgetreten: weg vom Tisch, aus der Jury und aus der Warteschlange. Nutze es hier, dann tritt das andere zurück.';
+      'Dein Konto spielt auf einem Gerät zur Zeit, und das zuletzt geöffnete gilt. Dieses ist zurückgetreten: weg vom Tisch und aus der Warteschlange. Nutze es hier, dann tritt das andere zurück.';
 
   @override
   String get inGameElsewhereTitle =>

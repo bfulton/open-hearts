@@ -1,12 +1,13 @@
 /// The live table, driven by thumb, with three simulated people around
-/// it: the protocol on a virtual clock and a simulated network, the
-/// widgets real. The player sits at seat 2, so the table is drawn
-/// rotated — the same screen as solo play, from a different chair.
-/// The sealed tables and the jury's seats are live_page_sealed_test.dart's,
+/// it: the table's referee and its house on a virtual clock
+/// (packages/table_sim), the widgets real. The player sits at seat 2, so
+/// the table is drawn rotated — the same screen as solo play, from a
+/// different chair. The sealed tables are live_page_sealed_test.dart's,
 /// on the harness here, so the two run side by side.
 library;
 
 import 'dart:async';
+import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:deal/deal.dart';
@@ -19,6 +20,7 @@ import 'package:open_hearts/live/live_controller.dart';
 import 'package:open_hearts/live/live_page.dart';
 import 'package:open_hearts/net/remote_config.dart';
 import 'package:open_hearts/net/report_error.dart' show noticed;
+import 'package:open_hearts/pacing.dart' show Pacing;
 import 'package:open_hearts/pictures.dart';
 import 'package:open_hearts/report.dart';
 import 'package:open_hearts/router.dart';
@@ -30,7 +32,7 @@ import 'package:table/table.dart';
 import 'package:table_sim/table_sim.dart';
 
 import 'drawn.dart';
-import 'table_page_test.dart' show fanCards, tapCard;
+import 'table_page_test.dart' show fanCards, sliverOf, tapCard;
 
 const _me = 2;
 
@@ -45,13 +47,14 @@ class LiveHarness {
     int target = engine.gameOverScore,
     bool rated = false,
     Set<int> botSeats = const {},
-    int jurors = 0,
     bool workers = false,
     bool canPlayAgain = false,
     bool strangers = false,
     int seed = 21,
-    Transport Function(Transport line)? myLine,
-  }) {
+    Map<int, SeatConduct> conducts = const {},
+    bool lineHeld = false,
+    RefereeLine Function(SimLine line)? myLine,
+  }) : _crypto = crypto {
     // Each device's deal work in a worker of its own, taking a
     // browser's time over each job, as the app's does.
     SimDealWorker? worker() => workers && crypto != null ? SimDealWorker(crypto, clock) : null;
@@ -66,58 +69,88 @@ class LiveHarness {
         ],
         sealed: crypto != null,
         rated: rated,
-        target: target);
-    // Jurors to draw from, for the seats a bot sits in: at a sealed
-    // table those are a juror's to hold and play, and their hands are
-    // not this screen's to see (docs/explanation/live-play.md).
-    if (jurors > 0) {
-      final p = presence = SimPresence(net, clock);
-      for (var j = 0; j < jurors; j++) {
-        final juror = SimJuror(FakeSigner('juror$j'), net, clock, crypto: crypto, dealWorker: worker());
-        this.jurors.add(juror);
-        p.register(juror);
-      }
-      p.start();
-    }
+        target: target,
+        house: houseSigner.publicKey);
+    // The house at every table, as at the relay: it plays a sealed
+    // table's bots, and says how any game came out, which is what a
+    // rating is folded from.
+    referee = SimReferee(clock, house: houseSigner.publicKey);
+    house = _newHouse(seed);
+    referee.onStart = (s) => house.serve(s.id);
     for (var s = 0; s < engine.seatCount; s++) {
       if (botSeats.contains(s)) continue;
+      final line = referee.line(signers[s].publicKey);
+      lines[s] = line;
       if (s == _me) {
-        controller = LiveController(
-          spec: spec,
-          seatNames: const {0: 'Ada', 1: 'Bao', 3: 'Dee'},
-          seatAvatars: avatars,
-          pictures: pictures,
-          signer: signers[s],
-          transport: (myLine ?? (line) => line)(net.attach(signers[s].publicKey)),
-          clock: clock,
-          crypto: crypto,
-          dealWorker: myWorker = worker(),
-          presence: presence,
-          // A rated table reads its ratings from this device's own
-          // ledger and folds the finished game into it, as the front
-          // door does off the relays (net/standing.dart).
-          ratingOf: rated ? ledger.of : null,
-          onResult: rated ? ledger.apply : null,
-          canPlayAgain: canPlayAgain,
-          strangers: strangers,
-          reactions: reactions.lane(signers[s].publicKey),
-          reactionClock: reactions.nowMs,
-        );
+        if (lineHeld) line.hold();
+        _seated = (line, random) => LiveController(
+              spec: spec,
+              seatNames: const {0: 'Ada', 1: 'Bao', 3: 'Dee'},
+              seatAvatars: avatars,
+              pictures: pictures,
+              signer: signers[_me],
+              line: (myLine ?? (l) => l)(line),
+              clock: clock,
+              crypto: crypto,
+              dealWorker: myWorker = worker(),
+              journal: journal,
+              random: random,
+              // A rated table reads its ratings from this device's own
+              // ledger and folds the house's word on the finished game
+              // into it, as the front door does off the relays
+              // (net/standing.dart).
+              ratingOf: rated ? ledger.of : null,
+              onResult: rated ? ledger.apply : null,
+              canPlayAgain: canPlayAgain,
+              strangers: strangers,
+              reactions: reactions.lane(signers[_me].publicKey),
+              reactionClock: reactions.nowMs,
+            );
+        controller = _seated(line, Random(seed * 10 + s));
       } else {
         final client = TableClient(
+            tableId: spec.id,
             spec: spec,
             signer: signers[s],
-            transport: net.attach(signers[s].publicKey),
+            line: line,
             clock: clock,
             crypto: crypto,
             dealWorker: worker(),
-            presence: presence);
-        final person = ScriptedHuman(client, net, clock, persona: engine.Persona.westley, thinkMs: 300);
+            conduct: conducts[s] ?? const SeatConduct(),
+            random: Random(seed * 10 + s));
+        final person = ScriptedHuman(client, line, clock, persona: engine.Persona.westley, thinkMs: 300);
         people[s] = person;
         person.start();
       }
     }
   }
+
+  final DealCrypto? _crypto;
+
+  /// This device seated on `line`, as the front door seats it.
+  late final LiveController Function(SimLine line, Random random) _seated;
+
+  /// This device reloaded: its page gone with its controller, which the
+  /// caller has seen to, and a new one made from what the device kept,
+  /// on a new line that reads the log from its start.
+  LiveController reload() {
+    final line = referee.line(keys[_me]);
+    lines[_me] = line;
+    return controller = _seated(line, Random(spec.seed * 10 + _me + 7919));
+  }
+
+  House _newHouse(int seed) => House(
+        signer: houseSigner,
+        secret: Uint8List.fromList(List.generate(32, (i) => i + seed)),
+        lineFor: (_) => referee.line(houseSigner.publicKey),
+        clock: clock,
+        crypto: _crypto,
+        random: Random(seed * 10 + 9),
+        onResult: (_, signed) => results.add(signed),
+      );
+
+  /// What each person's device keeps across a reload: this one's.
+  final journal = TableJournal();
 
   /// What this device does with the others' pictures, where a test
   /// cares.
@@ -131,10 +164,23 @@ class LiveHarness {
   final ledger = Ledger();
 
   final clock = VirtualClock();
-  late final SimNetwork net = SimNetwork(clock, seed: 3);
+  late final SimReferee referee;
+
+  /// The house and its key.
+  final houseSigner = FakeSigner('house');
+  late House house;
+
+  /// The results the house said, signed.
+  final List<NostrEvent> results = [];
 
   /// Each seat's device's key, by seat.
   late final List<PublicKey> keys;
+
+  /// Each person's line to the referee, by seat; this device's at [harnessSeat].
+  final Map<int, SimLine> lines = {};
+
+  /// This device's line.
+  SimLine get myLine => lines[_me]!;
 
   /// The players' reactions (packages/table, reactions.dart): what
   /// anyone at the table says, this device hears. On the screen's own
@@ -146,16 +192,17 @@ class LiveHarness {
   void reactFrom(int seat, Reaction reaction) =>
       reactions.sayAs(keys[seat], ReactionSaid(reaction, hand: controller.client.game.handNumber, turn: 0).encode());
 
-  /// Who is online to be drawn as a juror, and the jurors themselves.
-  SimPresence? presence;
-  final List<SimJuror> jurors = [];
   late final TableSpec spec;
-  late final LiveController controller;
+  late LiveController controller;
   final Map<int, ScriptedHuman> people = {};
+
+  /// The table begun, as its page opens: a start sent, and the
+  /// referee's first entries back.
+  Future<void> begin(WidgetTester tester) => advance(tester, 200);
 
   /// Lets [ms] of virtual time pass at the table and on the screen
   /// alike — the view paces itself by timers of its own, and a screen
-  /// that fell behind the table would be booted from it — and the
+  /// that fell behind the table would have its clock run out — and the
   /// widgets catch up.
   Future<void> advance(WidgetTester tester, int ms) async {
     clock.advance(ms);
@@ -182,58 +229,70 @@ Future<LiveHarness> pumpLive(WidgetTester tester,
     int target = engine.gameOverScore,
     bool rated = false,
     Set<int> botSeats = const {},
-    int jurors = 0,
     bool workers = false,
     bool strangers = false,
-    Transport Function(Transport line)? myLine,
+    int seed = 21,
+    Map<int, SeatConduct> conducts = const {},
+    bool lineHeld = false,
+    RefereeLine Function(SimLine line)? myLine,
     ReportSender? report}) async {
   tester.view
     ..physicalSize = const Size(390, 844)
     ..devicePixelRatio = 1.0;
   addTearDown(tester.view.reset);
-  final live =
-      LiveHarness(
-          crypto: crypto,
-          pictures: pictures,
-          avatars: avatars,
-          target: target,
-          rated: rated,
-          botSeats: botSeats,
-          jurors: jurors,
-          workers: workers,
-          strangers: strangers,
-          myLine: myLine);
+  final live = LiveHarness(
+      crypto: crypto,
+      pictures: pictures,
+      avatars: avatars,
+      target: target,
+      rated: rated,
+      botSeats: botSeats,
+      workers: workers,
+      strangers: strangers,
+      seed: seed,
+      conducts: conducts,
+      lineHeld: lineHeld,
+      myLine: myLine);
   await tester.pumpWidget(MaterialApp(
       theme: buildTheme(), home: LivePage(controller: live.controller, report: report ?? (_) async => throw StateError('no report expected'))));
   await tester.pumpAndSettle();
+  await live.begin(tester);
   return live;
 }
 
-/// This device's line as a table's first opens: a socket not open yet
-/// sends nothing, hears nothing and is cut off (packages/table,
-/// relays.dart), until [open]; and as the network has it after.
-class OpeningLine implements Transport {
-  OpeningLine(this.line);
-  final Transport line;
-  bool open = false;
+/// This device's line, as the referee might have turned it away: what
+/// the relay says of a device another of its account has taken over,
+/// or of one whose account is suspended (packages/table, relays.dart).
+class TurnedAway implements RefereeLine {
+  TurnedAway(this.line);
+  final SimLine line;
+  void Function(bool up)? _onUp;
 
-  @override
-  bool get cutOff => !open || line.cutOff;
-  @override
-  void broadcast(Map<String, Object?> message, {bool everywhere = false}) {
-    if (open) line.broadcast(message, everywhere: everywhere);
+  /// Why the referee turned this device away, once it has; and the line
+  /// down from then, as the app's is.
+  String? get why => _why;
+  String? _why;
+  set why(String? v) {
+    _why = v;
+    _onUp?.call(up);
   }
 
   @override
-  late final incoming = line.incoming.where((_) => open);
+  void open(int from, void Function(LogEntry entry) onEntry) => line.open(from, onEntry);
   @override
-  Stream<PublicKey> get disconnected => line.disconnected;
+  void send(TableEvent event) => line.send(event);
   @override
-  List<String> get paths => line.paths;
+  void tick() => line.tick();
   @override
-  void heard(PublicKey peer, List<String> paths) => line.heard(peer, paths);
+  bool get up => why == null && line.up;
   @override
-  void reach(Set<PublicKey> peers) => line.reach(peers);
+  set onUp(void Function(bool up)? f) {
+    _onUp = f;
+    line.onUp = f;
+  }
+
+  @override
+  String? get refused => why;
   @override
   void close() => line.close();
 }
@@ -274,11 +333,168 @@ void main() {
       await live.advance(tester, 500);
     }
     expect(live.controller.game.handNumber, 1, reason: 'the first hand finished');
+    expect(live.controller.myCardMs, hasLength(13), reason: 'the player\'s own time over each card they tapped');
     // The score sheet of the hand just finished shows, and dismisses.
     expect(find.text('On with it'), findsOneWidget);
     await tester.tap(find.text('On with it'));
     await tester.pumpAndSettle();
     expect(find.text('On with it'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('the table has the bots\' cards the moment they are owed, and the screen shows them one at a time, each after its think',
+      (tester) async {
+    final live = await pumpLive(tester, botSeats: const {0, 1, 3});
+    final c = live.controller;
+    int atTable() => c.client.rules.moves.where((m) => m.hand == c.client.game.handNumber && !m.isPass).length;
+    await act(tester, live);
+    for (var guard = 0; guard < 100 && !c.awaitingPlay; guard++) {
+      await live.advance(tester, 500);
+    }
+    expect(c.awaitingPlay, isTrue, reason: 'the player\'s turn, the screen caught up');
+    // The player's card, and the log carrying it back: at the table the
+    // bots after it play at once, as the rules work them out.
+    final shownBefore = c.playedThisHand.length;
+    final playable = fanCards(tester).where((card) => !card.dimmed).toList();
+    await tester.tapAt(sliverOf(tester, playable.first.card));
+    await tester.pump();
+    live.clock.advance(200);
+    await tester.pump();
+    expect(atTable(), greaterThanOrEqualTo(shownBefore + 2), reason: 'the table is cards ahead');
+    expect(c.playedThisHand.length, shownBefore + 1, reason: 'the screen has the player\'s own card, and no more yet');
+    // And the rest come one at a time, never closer than a bot's
+    // quickest think.
+    var at = 0;
+    final landed = <int>[];
+    var shown = c.playedThisHand.length;
+    for (var guard = 0; guard < 400 && c.playedThisHand.length < atTable(); guard++) {
+      await tester.pump(const Duration(milliseconds: 50));
+      at += 50;
+      final now = c.playedThisHand.length;
+      if (now == shown) continue;
+      expect(now, shown + 1, reason: 'one card at a time, at ${at}ms');
+      landed.add(at);
+      shown = now;
+    }
+    expect(c.playedThisHand.length, atTable(), reason: 'the screen caught the table up');
+    expect(landed, isNotEmpty);
+    for (var i = 1; i < landed.length; i++) {
+      expect(landed[i] - landed[i - 1], greaterThanOrEqualTo(engine.BotPace.quick.minMs), reason: 'card $i after its think: $landed');
+    }
+    expect(landed.first, greaterThanOrEqualTo(engine.BotPace.quick.minMs), reason: 'the first bot thought too: $landed');
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('the others\' cards come a beat apart however quickly they land, and a full trick stays a moment before it is swept',
+      (tester) async {
+    final live = await pumpLive(tester);
+    final c = live.controller;
+    const step = 10;
+    // Each card of the others' after one the screen showed, how long
+    // after it; how long each full trick stayed on the felt; and the
+    // moments a full trick showed with the table waiting on the player.
+    final gaps = <int>[];
+    final holds = <int>[];
+    var heldOnMe = 0;
+    for (var turn = 0; turn < 13 && (gaps.length < 3 || holds.isEmpty || heldOnMe == 0); turn++) {
+      for (var guard = 0; guard < 100 && !c.awaitingPass && !c.awaitingPlay; guard++) {
+        await live.advance(tester, 500);
+      }
+      final playing = c.awaitingPlay;
+      final hand = c.game.handNumber;
+      await act(tester, live);
+      await tester.pump();
+      // The table far ahead of the screen: the others play as quickly
+      // as they do, and the screen shows it at its own pace.
+      live.clock.advance(5000);
+      var at = 0;
+      int? lastCard = playing ? 0 : null;
+      int? fullAt = c.game.pendingTrick != null ? 0 : null;
+      var shown = c.playedThisHand.length;
+      for (var guard = 0; guard < 2000 && !c.awaitingPlay && c.game.handNumber == hand; guard++) {
+        await tester.pump(const Duration(milliseconds: step));
+        at += step;
+        final now = c.playedThisHand.length;
+        if (now != shown) {
+          expect(now, shown + 1, reason: 'one card at a time, at ${at}ms');
+          if (lastCard != null) gaps.add(at - lastCard);
+          lastCard = at;
+          shown = now;
+        }
+        final full = c.game.pendingTrick != null;
+        if (full && fullAt == null) fullAt = at;
+        if (!full && fullAt != null) {
+          holds.add(at - fullAt);
+          fullAt = null;
+        }
+        // A trick the player won, held on the felt: the table waits on
+        // their lead, and the screen does not ask for it until the
+        // trick is swept.
+        if (full && c.client.awaitingMyPlay) {
+          heldOnMe++;
+          expect(c.awaitingPlay, isFalse, reason: 'asked to lead with the last trick on the felt, at ${at}ms');
+        }
+      }
+    }
+    expect(gaps.length, greaterThanOrEqualTo(3), reason: 'the others played: $gaps');
+    expect(holds, isNotEmpty, reason: 'a trick was swept');
+    expect(heldOnMe, greaterThan(0), reason: 'the player won a trick and led the next');
+    for (final g in gaps) {
+      expect(g, greaterThanOrEqualTo(LiveController.cardBeat.inMilliseconds - step), reason: 'a beat after the card before: $gaps');
+    }
+    for (final h in holds) {
+      expect(h, greaterThanOrEqualTo(Pacing.trickHold.inMilliseconds - step), reason: 'held before it is swept: $holds');
+    }
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('back from a reload, the screen is at the table as it is now, at once', (tester) async {
+    final live = await pumpLive(tester);
+    for (var guard = 0; guard < 200 && live.controller.client.game.tricksPlayed < 3; guard++) {
+      await act(tester, live);
+      await live.advance(tester, 500);
+    }
+    expect(live.controller.client.game.tricksPlayed, greaterThanOrEqualTo(3));
+    final was = live.controller.client.game;
+    final where = (hand: was.handNumber, tricks: was.tricksPlayed);
+    // The page gone, and a new one on what the device kept.
+    await tester.pumpWidget(const SizedBox());
+    final again = live.reload();
+    await tester.pumpWidget(MaterialApp(theme: buildTheme(), home: LivePage(controller: again)));
+    // The log read again from its start, with none of the screen's own
+    // time gone by: no beat to think, no trick held. What the others
+    // play from here comes at its pace again.
+    live.clock.advance(200);
+    await tester.pump();
+    expect(again.client.rules.log, isNotEmpty);
+    expect(again.game.handNumber, where.hand, reason: again.behind);
+    expect(again.game.tricksPlayed, greaterThanOrEqualTo(where.tricks), reason: 'the table as it stood, at once: ${again.behind}');
+    expect(again.handJustEnded, isNull, reason: 'no sheet for anything caught up on');
+    // And on from there as before.
+    for (var guard = 0; guard < 400 && again.game.handNumber == 0; guard++) {
+      await act(tester, live);
+      await live.advance(tester, 500);
+    }
+    expect(again.game.handNumber, 1, reason: 'the hand played out');
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('back from a reload in a later hand, the hand before is not shown again: no beat for it, no sheet', (tester) async {
+    final live = await pumpLive(tester);
+    for (var guard = 0; guard < 900 && live.controller.client.game.handNumber < 1; guard++) {
+      await act(tester, live);
+      await live.advance(tester, 500);
+    }
+    expect(live.controller.client.game.handNumber, 1);
+    await tester.pumpWidget(const SizedBox());
+    final again = live.reload();
+    await tester.pumpWidget(MaterialApp(theme: buildTheme(), home: LivePage(controller: again)));
+    // The whole first hand and its end read again from the log, with
+    // none of the screen's own time gone by.
+    live.clock.advance(200);
+    await tester.pump();
+    expect(again.game.handNumber, 1, reason: 'the table as it stands, at once: ${again.behind}');
+    expect(again.handJustEnded, isNull, reason: 'no sheet for a hand caught up on');
     expect(tester.takeException(), isNull);
   });
 
@@ -323,6 +539,7 @@ void main() {
       closed = true;
     }));
     await tester.pumpAndSettle();
+    await live.begin(tester);
     for (var guard = 0; guard < 400 && !live.controller.gameOverDue; guard++) {
       await act(tester, live);
       await live.advance(tester, 500);
@@ -355,14 +572,14 @@ void main() {
     expect(find.textContaining('Rating'), findsNothing, reason: 'nothing was at stake, so there is nothing to report');
   });
 
-  testWidgets('a person who leaves becomes a bot; a person who goes quiet on turn can be booted', (tester) async {
+  testWidgets('a person who leaves becomes a bot; one silent at their turn becomes one when their clock runs out', (tester) async {
     final live = await pumpLive(tester);
     await act(tester, live);
     await live.advance(tester, 2000);
     expect(find.byType(BotMark), findsNothing, reason: 'four people, no bot');
 
     // Ada, at seat 0, leaves.
-    live.people[0]!.depart(Exit.leave);
+    live.people[0]!.depart(Going.leave);
     await live.advance(tester, 500);
     expect(live.controller.personaAt(0), isNotNull, reason: 'a bot holds seat 0');
     expect(find.textContaining('3 of 4 here'), findsOneWidget);
@@ -371,60 +588,39 @@ void main() {
     expect(find.byIcon(Icons.smart_toy).hitTestable(), findsOneWidget);
     expect(find.bySemanticsLabel(RegExp('^${live.controller.names[0]}, a bot: ')), findsOneWidget);
 
-    // Bao, at seat 1, goes quiet. When it is Bao's turn the clock runs,
-    // and at fifteen seconds the Boot button appears.
-    live.people[1]!.depart(Exit.idle);
-    for (var guard = 0; guard < 200 && !live.controller.canBoot(1); guard++) {
+    // Bao, at seat 1, is there and does nothing. At Bao's turn the clock
+    // runs on Bao's badge, and when it runs out the table gives the seat
+    // to a bot: nobody has to ask for it.
+    live.people[1]!.depart(Going.idle);
+    var clockSeen = false;
+    for (var guard = 0; guard < 200 && live.controller.personaAt(1) == null; guard++) {
       await act(tester, live);
       await live.advance(tester, 1000);
+      if (live.controller.clockMs(1) != null) clockSeen = true;
     }
-    expect(live.controller.canBoot(1), isTrue);
-    expect(find.text('Boot Bao'), findsOneWidget);
-
-    await tester.tap(find.text('Boot Bao'));
-    await live.advance(tester, 3000); // Dee agrees on her own clock
+    expect(clockSeen, isTrue, reason: 'Bao\'s clock showed first');
     expect(live.controller.personaAt(1), isNotNull, reason: 'a bot holds seat 1');
+    expect(live.controller.client.rules.removals[1]?.exit, Exit.booted);
     expect(find.textContaining('2 of 4 here'), findsOneWidget);
     expect(live.controller.tableState, TableState.playing);
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('a device no relay will take neither offers a Boot nor settles one', (tester) async {
-    final live = await pumpLive(tester);
+  testWidgets('a device the referee turned away says so, and why', (tester) async {
+    late TurnedAway line;
+    final live = await pumpLive(tester, myLine: (l) => line = TurnedAway(l));
     await act(tester, live);
     await live.advance(tester, 2000);
-    live.people[0]!.depart(Exit.leave);
+    expect(find.textContaining('No relay will take'), findsNothing);
+    // The relay's word on a device whose account another device took
+    // over, which the table hears nothing more from.
+    line.why = 'superseded: this account is in use on another device';
     await live.advance(tester, 500);
-
-    // This device's own events are going nowhere: every relay refuses
-    // them. What looks from here like Bao's silence may be this
-    // device's own deafness, and a claim it made would not reach the
-    // table anyway. So while it is cut off it neither offers the Boot
-    // nor countersigns the one Dee raises, and Bao keeps the seat.
-    live.controller.client.writesRefused = true;
-    live.people[1]!.depart(Exit.idle);
-    for (var guard = 0; guard < 80; guard++) {
-      await act(tester, live);
-      await live.advance(tester, 1000);
-    }
-    expect(live.controller.canBoot(1), isFalse, reason: 'cut off, so not this device to judge');
-    expect(find.text('Boot Bao'), findsNothing, reason: 'and no button to press');
-    expect(live.controller.personaAt(1), isNull, reason: 'and nothing settles Bao out of the seat');
-
-    // A relay takes its events again: it judges again, and the seat
-    // settles.
-    live.controller.client.writesRefused = false;
-    for (var guard = 0; guard < 30 && live.controller.personaAt(1) == null; guard++) {
-      await act(tester, live);
-      await live.advance(tester, 1000);
-    }
-    expect(live.controller.personaAt(1), isNotNull, reason: 'a bot holds seat 1');
+    expect(find.text("No relay will take this device's events: superseded: this account is in use on a…"), findsOneWidget,
+        reason: 'said, before anything the table seems to wait on');
     expect(tester.takeException(), isNull);
   });
 
-  // A line whose way in has stalled while its way out still carries, as
-  // a plane's satellite link did: the table is still there, and this
-  // device is the one not hearing it (packages/table, transport.dart).
   testWidgets('a device that hears nothing back says its own connection is down, and no more once it is back', (tester) async {
     final live = await pumpLive(tester);
     await act(tester, live);
@@ -435,15 +631,17 @@ void main() {
     noticed = (message, attributes) => lines.add((message, attributes));
     addTearDown(() => noticed = null);
 
-    live.net.deafen(live.keys[harnessSeat]);
+    live.myLine.hold();
+    await live.advance(tester, 1000);
+    expect(find.text(down), findsNothing, reason: 'a socket made again takes a moment, and is not news');
     for (var s = 0; s < 15 && find.text(down).evaluate().isEmpty; s++) {
       await live.advance(tester, 1000);
     }
-    expect(live.controller.client.cutOff, isTrue);
+    expect(live.controller.client.lineDown, isTrue);
     expect(find.text(down), findsOneWidget, reason: 'said under the felt, over whatever the table seems to wait on');
     expect(lines, isEmpty, reason: 'a minute or two down is not told of');
 
-    live.net.hearAgain(live.keys[harnessSeat]);
+    live.myLine.release();
     for (var s = 0; s < 15 && find.text(down).evaluate().isNotEmpty; s++) {
       await act(tester, live);
       await live.advance(tester, 1000);
@@ -453,30 +651,25 @@ void main() {
   });
 
   // A table's line opens a moment after the table does: in a browser on
-  // the rig, a second or so, with the line up all along. Sealed, as
-  // every table people play at is, so that its deal waits on the line;
-  // and with bots, as most are, whose jury it has not heard yet either.
+  // the rig, a second or so. Sealed, as every table people play at is,
+  // so that its deal waits on the line; and with bots, as most are.
   for (final bots in [false, true]) {
     testWidgets('a table${bots ? ' with bots' : ''} whose line is still opening says nothing of it, nor of the others, until it has tried as long as a line is given',
         (tester) async {
-      late OpeningLine line;
-      final live = await pumpLive(tester,
-          crypto: await rememberedCrypto(), botSeats: bots ? const {1, 3} : const {}, jurors: bots ? 4 : 0, myLine: (l) => line = OpeningLine(l));
+      final live = await pumpLive(tester, crypto: await rememberedCrypto(), botSeats: bots ? const {1, 3} : const {}, lineHeld: true);
       const down = 'Your connection is down — reconnecting';
       for (var s = 0; s < 10; s++) {
         expect(find.text(down), findsNothing, reason: '$s s in, never up');
-        // Nobody heard yet: nothing said of the others, or of a jury —
-        // the deal's own note, and that alone.
+        // Nobody heard yet: nothing said of the others — the deal's own
+        // note, and that alone.
         expect(find.text(live.controller.dealNote!), findsOneWidget, reason: '$s s in: the deal, all there is to say');
-        for (final note in ['Waiting for the others to reconnect', 'Asking the jury', 'Nobody online to draw a jury from — waiting for one', 'Waiting for the jury']) {
-          expect(find.text(note), findsNothing, reason: '$s s in: $note');
-        }
+        expect(find.text('Waiting for the others to reconnect'), findsNothing, reason: '$s s in');
         await live.advance(tester, 1000);
       }
-      expect(live.controller.client.cutOff, isTrue);
+      expect(live.controller.client.lineDown, isTrue);
       expect(find.text(down), findsOneWidget, reason: 'ten seconds without the line is the line down, as it is once up');
 
-      line.open = true;
+      live.myLine.release();
       for (var s = 0; s < 5 && find.text(down).evaluate().isNotEmpty; s++) {
         await live.advance(tester, 1000);
       }
@@ -489,21 +682,22 @@ void main() {
     });
   }
 
-  testWidgets('a line that has been up says it is down as soon as it is cut off, however soon after the table opened', (tester) async {
-    late OpeningLine line;
-    final live = await pumpLive(tester, crypto: await rememberedCrypto(), myLine: (l) => line = OpeningLine(l));
+  testWidgets('a line that has been up says it is down a moment after it is cut off, however soon after the table opened', (tester) async {
+    final live = await pumpLive(tester, crypto: await rememberedCrypto(), lineHeld: true);
     const down = 'Your connection is down — reconnecting';
     await live.advance(tester, 1000);
-    line.open = true;
+    live.myLine.release();
     await live.advance(tester, 1000);
-    expect(live.controller.client.cutOff, isFalse);
+    expect(live.controller.client.lineDown, isFalse);
     expect(find.text(down), findsNothing);
 
     // Its socket drops, two seconds in: no longer opening, but down.
-    line.open = false;
+    live.myLine.hold();
     await live.advance(tester, 1000);
-    expect(find.text(down), findsOneWidget, reason: 'down at once, as a socket that drops is');
-    line.open = true;
+    expect(find.text(down), findsNothing, reason: 'not at once: a socket made again takes a moment');
+    await live.advance(tester, 2000);
+    expect(find.text(down), findsOneWidget, reason: 'and then said, as for any line that was up');
+    live.myLine.release();
     for (var s = 0; s < 5 && find.text(down).evaluate().isNotEmpty; s++) {
       await live.advance(tester, 1000);
     }
@@ -519,7 +713,7 @@ void main() {
     noticed = (message, attributes) => lines.add((message, attributes));
     addTearDown(() => noticed = null);
 
-    live.net.deafen(live.keys[harnessSeat]);
+    live.myLine.hold();
     for (var s = 0; s < 200 && lines.isEmpty; s++) {
       await live.advance(tester, 1000);
     }
@@ -527,47 +721,44 @@ void main() {
     final (message, attributes) = lines.single;
     expect(message, startsWith('live: line down 1'));
     expect(attributes['table'], 'widget');
-    expect(attributes['seen'], contains('cut off now'));
+    expect(attributes['seen'], allOf(startsWith('playing at #'), endsWith('line down')));
     expect(attributes['line'], isNotNull);
     expect(attributes['build'], isNotNull);
-    for (final k in live.keys) {
+    for (final k in [...live.keys, live.houseSigner.publicKey]) {
       expect('$attributes', isNot(contains(k.substring(0, 6))), reason: 'no key in it');
     }
     for (var s = 0; s < 60; s++) {
       await live.advance(tester, 1000);
     }
     expect(lines, hasLength(1), reason: 'and once only');
-    live.net.hearAgain(live.keys[harnessSeat]);
+    live.myLine.release();
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('a game lost with the line up is told of, once, as lost and not as a line down', (tester) async {
+  testWidgets('a table waiting on someone whose line is down says so, and no more once they are back', (tester) async {
     final live = await pumpLive(tester);
     await act(tester, live);
     await live.advance(tester, 2000);
-    final lines = <(String, Map<String, String>)>[];
-    noticed = (message, attributes) => lines.add((message, attributes));
-    addTearDown(() => noticed = null);
-
-    // Everyone else gone at once, this device's own line fine: the
-    // last person at the table, who ends the game once the rest have
-    // been silent as long as a person is given.
-    for (final s in [0, 1, 3]) {
-      live.net.goOffline(live.keys[s]);
+    const waiting = 'Waiting for the others to reconnect';
+    // Ada's phone off the network for twenty seconds: short of the
+    // half minute a closed line is waited for at its turn.
+    live.people[0]!
+      ..backAfterMs = 20000
+      ..depart(Going.offline);
+    var said = false;
+    for (var guard = 0; guard < 60 && !said; guard++) {
+      await act(tester, live);
+      await live.advance(tester, 500);
+      if (find.text(waiting).evaluate().isNotEmpty) said = true;
     }
-    for (var s = 0; s < 300 && live.controller.client.failure == null; s++) {
+    expect(said, isTrue, reason: 'at Ada\'s turn, with her line down, the line under the felt says what the table waits on');
+    expect(live.controller.waitingOnSomeoneDown, isTrue);
+    for (var guard = 0; guard < 60 && find.text(waiting).evaluate().isNotEmpty; guard++) {
       await live.advance(tester, 1000);
     }
-    expect(live.controller.client.failure, isNotNull, reason: live.controller.client.describe());
-    await live.advance(tester, 1000);
-    expect(lines, hasLength(1));
-    final (message, attributes) = lines.single;
-    expect(message, 'live: game lost: juror quorum lost');
-    expect(attributes['seen'], contains('line up, cut off 0 times'));
-    for (var s = 0; s < 10; s++) {
-      await live.advance(tester, 1000);
-    }
-    expect(lines, hasLength(1), reason: 'once');
+    expect(find.text(waiting), findsNothing, reason: 'back, and the note gone');
+    expect(live.controller.personaAt(0), isNull, reason: 'and still in her seat');
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('holding a badge hides that player\'s picture on this device, and nothing else', (tester) async {
@@ -702,17 +893,18 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('a seat the others boot sees no table, only that a bot took it', (tester) async {
+  testWidgets('a seat whose clock runs out sees no table, only that a bot took it', (tester) async {
     final live = await pumpLive(tester);
     await act(tester, live);
     await live.advance(tester, 2000);
     expect(live.controller.game.phase, engine.Phase.playing);
-    // Say nothing on turn: the others' clocks on this seat run out,
-    // they boot it, and a bot has the seat.
+    // Say nothing on turn: this seat's clock runs out, and the table
+    // gives the seat to a bot.
     for (var guard = 0; guard < 200 && live.controller.amSeated; guard++) {
       await live.advance(tester, 1000);
     }
-    expect(live.controller.amSeated, isFalse, reason: 'the others booted this seat');
+    expect(live.controller.amSeated, isFalse, reason: 'the table gave this seat away');
+    expect(live.controller.client.rules.removals[_me]?.exit, Exit.booted);
     expect(find.text('A bot took your seat'), findsOneWidget);
     expect(find.text('Back'), findsOneWidget);
     expect(find.byType(TableView), findsNothing, reason: 'no table to watch');
@@ -750,7 +942,6 @@ void main() {
     expect(live.controller.clockMs(0), isNotNull, reason: 'Ada is on turn and past her grace');
     expect(find.bySemanticsLabel(RegExp(r'^Ada: .*, on turn, \d+ s on the clock, (on your left|across from you|on your right)$')), findsOneWidget);
     expect(drawn(find.byType(ClockText)), findsOneWidget);
-    expect(find.text('Boot Ada'), findsNothing, reason: 'the bank is not spent');
     expect(find.textContaining(' has '), findsNothing, reason: 'the old note is gone');
 
     // Your own: dawdle on your turn past the grace, and the score line says so.
@@ -787,6 +978,7 @@ void main() {
       await tester.pumpWidget(MaterialApp.router(theme: buildTheme(), routerConfig: router));
       final closed = door.push<bool>('/live', extra: live.controller);
       await tester.pumpAndSettle();
+      await live.begin(tester);
       expect(find.byType(LivePage), findsOneWidget);
       return (router: router, closed: closed);
     }
@@ -998,7 +1190,7 @@ void main() {
       for (final strangers in [true, false]) {
         final live = await pumpLive(tester, strangers: strangers);
         await intoTheGame(tester, live);
-        // Say nothing on turn: the others boot this seat.
+        // Say nothing on turn: the clock gives this seat to a bot.
         for (var guard = 0; guard < 200 && live.controller.amSeated; guard++) {
           await live.advance(tester, 1000);
         }

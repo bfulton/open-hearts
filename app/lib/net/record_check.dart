@@ -10,6 +10,7 @@ library;
 
 import 'dart:convert';
 
+import 'package:deal/deal.dart';
 import 'package:table/table.dart';
 
 import 'record_check_io.dart' if (dart.library.js_interop) 'record_check_web.dart' as platform;
@@ -46,11 +47,16 @@ class KeptGame {
   factory KeptGame.of(GameRecord record) => KeptGame(spec: record.spec, names: record.names, text: jsonEncode(record.toJson()));
 
   /// [text] as far as the page reads it: the table and the names, and
-  /// none of the events. Null when it is not a record.
+  /// none of the events. A game of either form: played at a refereed
+  /// table, or kept before the referee. Null when it is not a record.
   static KeptGame? read(String text) {
     try {
       final json = jsonDecode(text) as Map<String, Object?>;
-      final head = GameRecord.parse({...json, 'record': const <Object?>[], 'juries': const <Object?>[], 'releases': const <Object?>[]});
+      if (GameRecord.versionOf(json) == GameRecord.version) {
+        final head = GameRecord.parse({...json, 'log': const <Object?>[]});
+        return head == null ? null : KeptGame(spec: head.spec, names: head.names, text: text);
+      }
+      final head = GameRecordV2.parse({...json, 'record': const <Object?>[], 'juries': const <Object?>[], 'releases': const <Object?>[]});
       return head == null ? null : KeptGame(spec: head.spec, names: head.names, text: text);
     } catch (_) {
       return null;
@@ -75,21 +81,53 @@ Stream<RecordCheck> Function(KeptGame game) checkRecord = platform.checkRecord;
 /// with.
 const unsignedRecord = 'an event whose signature does not check';
 
+/// A kept game's record as the check reads it: a game played at a
+/// refereed table (`v3`), or one kept before the referee (`v2`); or why
+/// there is nothing to check (`failed`).
+typedef ReadRecord = ({GameRecord? v3, GameRecordV2? v2, RecordChecked? failed});
+
 /// The check's reading of a kept game's record: every event, every
-/// signature checked. A record whose events read but are not all signed
-/// by their authors does not check out — it is a record, and a false
-/// one — and what is not a record at all cannot be checked.
-({GameRecord? record, RecordChecked? failed}) readRecord(String text) {
+/// signature checked. A record kept before the referee whose events
+/// read but are not all signed by their authors does not check out — it
+/// is a record, and a false one — and what is not a record at all
+/// cannot be checked. In a refereed table's log an event whose
+/// signature does not check is an entry that changes nothing, as at the
+/// table; the house signed for the log as it was, and a log changed
+/// since is not that one ([verifyRecord]).
+ReadRecord readRecord(String text) {
+  const notARecord = (v3: null, v2: null, failed: RecordChecked(ok: false));
   final Object? json;
   try {
     json = jsonDecode(text);
   } catch (_) {
-    return (record: null, failed: const RecordChecked(ok: false));
+    return notARecord;
   }
-  final record = GameRecord.parse(json);
-  if (record != null) return (record: record, failed: null);
-  if (GameRecord.parse(json, verifySignatures: false) != null) {
-    return (record: null, failed: const RecordChecked(ok: false, reason: unsignedRecord));
+  if (GameRecord.versionOf(json) == GameRecord.version) {
+    final record = GameRecord.parse(json);
+    return record == null ? notARecord : (v3: record, v2: null, failed: null);
   }
-  return (record: null, failed: const RecordChecked(ok: false));
+  final record = GameRecordV2.parse(json);
+  if (record != null) return (v3: null, v2: record, failed: null);
+  if (GameRecordV2.parse(json, verifySignatures: false) != null) {
+    return (v3: null, v2: null, failed: const RecordChecked(ok: false, reason: unsignedRecord));
+  }
+  return notARecord;
+}
+
+/// The check of a record [readRecord] read, with the deal's [crypto],
+/// for this build's [house]: each hand told to [hand] as its check is
+/// done, and then the verdict. A sealed game is not checked without the
+/// deal.
+RecordChecked checkRead(ReadRecord read, {required DealCrypto? crypto, PublicKey? house, void Function(TableReplayHand hand)? hand}) {
+  final failed = read.failed;
+  if (failed != null) return failed;
+  final replay = TableReplay(onHand: hand);
+  final v3 = read.v3;
+  if (v3 != null) {
+    final v = verifyRecord(v3, crypto: crypto, house: house, replay: replay);
+    return RecordChecked(ok: v.ok, reason: v.ok ? null : v.reason, winners: v.winners);
+  }
+  final v2 = read.v2!;
+  final v = verifyRecordV2(v2.spec, v2.record, juries: v2.juries, releases: v2.releases, crypto: crypto, allowPartial: true, replay: replay);
+  return RecordChecked(ok: v.ok, reason: v.ok ? null : v.reason, winners: v.winners);
 }

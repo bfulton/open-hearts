@@ -16,6 +16,7 @@ import 'package:open_hearts/theme.dart';
 import 'package:open_hearts/ui/card_view.dart';
 import 'package:open_hearts/ui/hand_fan.dart';
 import 'package:open_hearts/ui/table_view.dart';
+import 'package:table/table.dart' show EventKind;
 
 import 'live_page_test.dart' show pumpLive, act;
 
@@ -347,6 +348,8 @@ void main() {
 
     final watched = _watchPlays(c);
     final left = c.handShown.length;
+    final timed = c.myCardMs.length;
+    expect(timed, greaterThan(0), reason: 'the cards the player tapped, timed');
     await tester.tap(find.byType(Switch));
     await tester.pump();
     expect(c.pendingPlay, isNotNull, reason: 'the turn is played at once, as a tap plays it');
@@ -358,13 +361,14 @@ void main() {
     for (final MapEntry(key: trick, value: card) in watched.rightmost.entries) {
       expect(watched.played[trick], card, reason: 'trick ${trick + 1}: the rightmost legal card');
     }
-    // Each of the player's cards once in the table's record, no more.
+    // Each of the player's cards once in the table's log, no more.
     final mine = [
-      for (final d in c.client.record)
-        if (d.turn.hand == hand && d.event.seat == c.mySeat && d.event.body['card'] != null) d.event.body['card'],
+      for (final e in c.client.rules.log)
+        if (e.event case final ev? when ev.kind == EventKind.play && ev.hand == hand && ev.author == c.client.signer.publicKey) ev.body['card'],
     ];
     expect(mine, hasLength(13));
     expect(mine.toSet(), hasLength(13));
+    expect(c.myCardMs, hasLength(timed), reason: 'the switch\'s cards are not the player\'s to time');
     expect(c.autoPlay, isFalse, reason: 'off for the next hand');
     expect(tester.takeException(), isNull);
   });

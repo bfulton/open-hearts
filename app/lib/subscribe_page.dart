@@ -3,10 +3,9 @@
 ///
 /// Everything else is free and stays free — the bots, the records, the
 /// verifiable deal, the engine itself. What is paid for is the part
-/// that costs us money to run: relaying people to each other, a TURN
-/// server when a direct path will not form, and a juror when a table
-/// is left alone. That is worth saying on the page rather than leaving
-/// a price on a padlock.
+/// that costs us money to run: relaying people to each other, and the
+/// server that deals and plays the bots at every live table. That is
+/// worth saying on the page rather than leaving a price on a padlock.
 library;
 
 import 'dart:async';

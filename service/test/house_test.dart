@@ -15,7 +15,7 @@ import 'package:table/table.dart';
 import 'package:test/test.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
-/// BIP-340's second published pair: the house of these tests, as of the
+/// BIP-340's third published pair: the house of these tests, as of the
 /// browser rig's (packages/table, tool/game_fixture.dart).
 const _houseSecret = 'c90fdaa22168c234c4c6628b80dc1cd129024e088a67cc74020bbea63b14e5c9';
 const _house = 'dd308afec5777e13121fa72b9cc1b7cc0139715309b086c960e18fd969774eb8';

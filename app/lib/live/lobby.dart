@@ -1,8 +1,8 @@
 /// The way from the front door to a live table (home_page.dart): the
 /// relays this device connects to, the pool it waits in or the room it
 /// sits in, and the table they open — and, from the moment a relay
-/// answers, this device online to everyone and a juror when drawn
-/// (net/duty.dart, docs/explanation/live-play.md).
+/// answers, this device online to everyone (net/online.dart,
+/// docs/explanation/live-play.md).
 ///
 /// The front door shows it and asks it: who this device is, the game it
 /// asks for, a name when it has none, the words to say things in, and
@@ -25,18 +25,17 @@ import '../identity.dart';
 import '../l10n/l10n.dart';
 import '../net/account_profile.dart';
 import '../net/address.dart';
-import '../net/duty.dart';
 import '../net/game_records.dart';
 import '../net/household.dart';
 import '../net/in_use.dart';
-import '../net/mesh_transport.dart';
+import '../net/licence.dart' show houseKey;
 import '../net/network.dart';
+import '../net/online.dart';
 import '../net/relays.dart';
 import '../net/remote_config.dart';
 import '../net/room.dart';
 import '../net/seat_store.dart';
 import '../net/standing.dart';
-import '../net/turn.dart';
 import '../pace_store.dart';
 import '../pictures.dart';
 import 'left_early.dart';
@@ -59,10 +58,14 @@ bool get livePaused => !RemoteSettings.current.config.live;
 /// relays is the build's business (net/relays.dart), not the lobby's.
 void _relayLog(String line) => debugPrint('relay: $line');
 
-/// In a build being driven (net/address.dart) the table's every
-/// transition and the mesh's every channel change go to the console too.
+/// In a build being driven (net/address.dart) the table's every entry
+/// and what presence does go to the console too.
 final _debugging = driven(Uri.base);
-final _dutyLog = _debugging ? (String l) => debugPrint('duty: $l') : null;
+final _onlineLog = _debugging ? (String l) => debugPrint('online: $l') : null;
+
+/// The house this build seats live tables with (net/licence.dart), or
+/// null in a build that names none, which seats nobody live.
+PublicKey? get _house => RegExp(r'^[0-9a-f]{64}$').hasMatch(houseKey) ? houseKey : null;
 
 /// How often a seated device notes that it is still at its table
 /// (net/seat_store.dart, here): often enough that the note is never far
@@ -216,11 +219,6 @@ class Lobby extends ChangeNotifier {
   /// is back.
   String? get cutOff => _relayNote ?? (deviceOffline() ? words().noRelayAnswered : null);
 
-  /// The ICE servers for this device's next table, fetched once the
-  /// relays answer (turn.dart); none until then, and none at all on
-  /// localhost.
-  List<Map<String, Object?>>? _iceServers;
-
   /// Since when this device has been listening on the relays for who
   /// is online; null until they answer. The count is not shown for the
   /// first announcement period after, since the announcements are
@@ -277,9 +275,9 @@ class Lobby extends ChangeNotifier {
     _changed();
   }
 
-  /// This device on duty (net/duty.dart): online to everyone, and a
-  /// juror when drawn. The one it is already on, after the first.
-  Duty _duty(Signer signer) => Duty.on(_relays, signer, log: _dutyLog, crypto: dealCrypto, dealWorker: dealWorker);
+  /// This device online to everyone (net/online.dart). The same, after
+  /// the first.
+  Online _online(Signer signer) => Online.on(_relays, signer, log: _onlineLog);
 
   /// Back from a reload in the middle of a game: straight back into the
   /// seat, if it can still be this device's. The table may have given it
@@ -302,8 +300,7 @@ class Lobby extends ChangeNotifier {
   }
 
   /// Online from the front door, not only from a table: this device is
-  /// a juror to draw on as soon as the app is open, and it sees who
-  /// else is about.
+  /// counted as soon as the app is open, and it sees who else is about.
   ///
   /// First, this device takes its account up (net/in_use.dart): the
   /// relay carries only the account's device in use, and one at a time.
@@ -315,9 +312,9 @@ class Lobby extends ChangeNotifier {
     _signer = signer;
     _changed();
     if (InUse.current.standing != Use.here) await InUse.current.open(signer);
-    if (_disposed || InUse.current.shut || Duty.current != null) return;
+    if (_disposed || InUse.current.shut || Online.current != null) return;
     unawaited(_comeBack(signer));
-    unawaited(_duty(signer).presence.ready.then((_) {
+    unawaited(_online(signer).presence.ready.then((_) {
       if (_disposed) return;
       _listeningSinceMs = DateTime.now().millisecondsSinceEpoch;
       _changed();
@@ -327,8 +324,8 @@ class Lobby extends ChangeNotifier {
   }
 
   /// Another device of the account took it up (net/in_use.dart): nothing
-  /// live is left open here. The pool or the room goes, and the duty and
-  /// any table go with their own listeners (net/duty.dart,
+  /// live is left open here. The pool or the room goes, and presence and
+  /// any table go with their own listeners (net/online.dart,
   /// live/live_page.dart).
   void stepBack() {
     _closeLobby();
@@ -340,19 +337,17 @@ class Lobby extends ChangeNotifier {
 
   /// How many other people's devices are online, once this device has
   /// listened long enough to have heard everyone; null before. Others,
-  /// so that alone is 0: the number is who there is to play with. And
-  /// people's only: the backup jurors are online too while a table
-  /// might want them, and nobody to play with (packages/table,
-  /// presence_relay.dart).
+  /// so that alone is 0: the number is who there is to play with
+  /// (packages/table, presence_relay.dart).
   ///
   /// And null while the device says it has no network: the beats it
   /// heard before are not who is here now, and it hears nobody new.
   int? get othersOnline {
     final since = _listeningSinceMs;
-    final duty = Duty.current;
-    if (since == null || duty == null || deviceOffline()) return null;
-    if (DateTime.now().millisecondsSinceEpoch - since < duty.presence.everyMs + 1500) return null;
-    return duty.presence.people(withinMs: 15000).difference({duty.presence.signer.publicKey}).length;
+    final online = Online.current;
+    if (since == null || online == null || deviceOffline()) return null;
+    if (DateTime.now().millisecondsSinceEpoch - since < online.presence.everyMs + 1500) return null;
+    return online.presence.online(withinMs: 15000).difference({online.presence.signer.publicKey}).length;
   }
 
   /// Ratings, from the relays that just answered — never from an
@@ -465,15 +460,8 @@ class Lobby extends ChangeNotifier {
         return null;
       }
       // A relay answered: from here on this device is online to
-      // everyone, and a juror when drawn.
-      _duty(signer);
-      _iceServers ??= const [];
-      unawaited(iceServersFor(signer).then((servers) {
-        _iceServers = servers;
-        // The same credentials serve this device's juror duty, whose
-        // channels are made when a table summons it (net/duty.dart).
-        Duty.ice = servers;
-      }));
+      // everyone.
+      _online(signer);
       if (_standing == null) await _loadStanding(relays, signer);
       if (_disposed) {
         transport.close();
@@ -508,11 +496,12 @@ class Lobby extends ChangeNotifier {
   }
 
   /// Every live table is sealed, and a device that cannot run the deal
-  /// does not sit down (docs/explanation/fair-deal.md). It says so
-  /// at the door, rather than connecting to find out; true when it has.
+  /// does not sit down (docs/explanation/fair-deal.md), nor one whose
+  /// build names no house to seat it with. It says so at the door,
+  /// rather than connecting to find out; true when it has.
   bool _withoutDeal() {
-    if (dealReady) return false;
-    _error = Room.noDeal(words());
+    if (dealReady && _house != null) return false;
+    _error = dealReady ? words().roomOtherBuild : Room.noDeal(words());
     _changed();
     return true;
   }
@@ -543,6 +532,9 @@ class Lobby extends ChangeNotifier {
       // every seat's account with it, and every seat checks them all.
       licence: Entitlement.current.licence,
       sealed: true,
+      // Every table it seats names this build's house, and it sits at
+      // none that names another.
+      house: _house,
       // The tables this device hosts keep its remote config's clocks.
       timing: RemoteSettings.current.config.table,
       avatar: me.avatar.isDefault ? null : me.avatar.toJson(withPicture: false),
@@ -607,9 +599,11 @@ class Lobby extends ChangeNotifier {
     unawaited(askHandler('waiting', signer, {'pool': queue.pool, 'target': queue.target}, null, what: '${queue.pool} ${queue.target}'));
   }
 
-  /// The seated table has its own tag on the relays: a fresh transport
-  /// there, WebRTC over it, and the live page over the front door — so
-  /// leaving the table comes back there.
+  /// The seated table is its own tag on the relay, whose object is the
+  /// table's referee: a line to it for the table's log, the table's
+  /// other lanes beside it — who is watching, and the players' reactions
+  /// — and the live page over the front door, so leaving the table
+  /// comes back there.
   ///
   /// [again] begins another game the way this one began, for the end
   /// of game's Play again. [strangers] is a table Play live seated,
@@ -618,47 +612,37 @@ class Lobby extends ChangeNotifier {
       {TableJournal? journal, VoidCallback? again, bool strangers = false}) {
     final signer = _signer!;
     final relays = _relays;
-    final relay = RelayTransport(relays: relays, signer: signer, table: spec.id, log: _relayLog, pinned: pinnedRelays(relays));
-    final peers = [for (final h in spec.seats) if (h is HumanSeat) h.key];
-    final mesh = MeshTransport(
-      relay: relay,
-      peers: peers,
-      iceServers: _iceServers ?? const [],
-      log: _debugging ? (l) => debugPrint('mesh: $l') : null,
-    );
+    final line = RelayLine(relays: relays, signer: signer, table: spec.id, log: _debugging ? (l) => debugPrint('line: $l') : null);
+    // The watch lane and the reactions beside it, and nothing of the
+    // table's own, which is the line's (packages/table, watch.dart,
+    // reactions.dart).
+    final lanes = RelayTransport(relays: relays, signer: signer, table: spec.id, log: _relayLog, pinned: pinnedRelays(relays), watchOnly: true);
     final ledger = _standing?.ledger ?? Ledger();
     final controller = LiveController(
       spec: spec,
       seatNames: seatNames,
       seatAvatars: seatAvatars,
       signer: signer,
-      transport: mesh,
-      relay: relay,
-      lineHealth: () => mesh.health,
-      // The players' reactions ride the table's own tag, beside its
-      // events and outside them (packages/table, reactions.dart).
-      reactions: relay,
-      presence: _duty(signer).presence,
+      line: line,
+      reactions: lanes,
       crypto: dealCrypto,
       dealWorker: dealWorker,
       ratingOf: spec.rated ? (id) => ledger.of(id) : null,
-      onResult: (result) {
-        // The fold that turns results into ratings is arithmetic this
-        // device does itself, so the game's own sheet can say what it
-        // did to your rating without waiting to hear the result back
-        // off a relay — and the door behind the table has the new
-        // rating on it when you get there.
-        ledger.apply(result);
-        unawaited(Standing.publish(relays, signer, result).then((taken) {
-          if (!taken) debugPrint('result: no relay took it, after every try');
-        }));
-      },
+      // The house's word on the finished game, folded here as the ledger
+      // folds it off the relay (net/standing.dart): the game's own sheet
+      // says what it did to your rating, and the door behind the table
+      // has the new rating on it when you get there. The house says it on
+      // the results tag itself.
+      onResult: ledger.apply,
       pictures: pictures,
       canPlayAgain: again != null,
       strangers: strangers,
+      // What the table's rules make of the log, for a driven build's
+      // console: the browser suites read why a table went as it did
+      // (e2e/drive.mjs).
+      trace: _debugging ? (l) => debugPrint('table: $l') : null,
       journal: _seats?.keep(spec, seatNames, seatAvatars, journal: journal, strangers: strangers),
     );
-    if (_debugging) controller.client.log = (l) => debugPrint('table: $l');
     // A game left early, by the player's word or the table's, is
     // waited out, from the moment this device knows it — unless the
     // account went to another device, which is the player using it
@@ -694,8 +678,8 @@ class Lobby extends ChangeNotifier {
     // table sees (packages/table, watch.dart).
     final said = words();
     final watch = WatchBroadcast(
-      heard: relay.watch,
-      say: relay.sayWatch,
+      heard: lanes.watch,
+      say: lanes.sayWatch,
       view: () => WatchedTable.of(controller.client, [
         for (final (s, holder) in controller.client.holders.indexed)
           switch (holder) {
@@ -715,28 +699,33 @@ class Lobby extends ChangeNotifier {
     controller.addListener(() {
       if (!controller.client.done || _paced) return;
       _paced = true;
-      // The game, kept for anyone to look at afterwards by its address
-      // (net/game_records.dart): every player's device sends it, and the
-      // first is kept.
-      unawaited(keepGame(signer, GameRecord.of(controller.client, names: seatNames)).then((kept) {
-        if (!kept) debugPrint('record: not kept');
-      }));
-      unawaited(PaceStore.fold(controller.client.myCardMs).then((folded) {
+      unawaited(PaceStore.fold(controller.myCardMs).then((folded) {
         if (_disposed) return;
         pace = folded;
         _changed();
       }));
     });
     _paced = false;
+    // The game, kept for anyone to look at afterwards by its address
+    // (net/game_records.dart): every player's device sends it, and the
+    // first is kept. Once the house's word on how it came out is in the
+    // log, which a kept game is checked against (packages/table,
+    // record.dart); a game that failed has none, and is kept as it ends.
+    var kept = false;
+    controller.addListener(() {
+      final c = controller.client;
+      if (kept || !c.done || (c.rules.result == null && c.state != TableState.failed)) return;
+      kept = true;
+      unawaited(keepGame(signer, GameRecord.of(c, names: seatNames)).then((taken) {
+        if (!taken) debugPrint('record: not kept');
+      }));
+    });
     _closeLobby(address: false);
     _changed();
-    // Online *and* at a table, which another table's draw prefers:
-    // somebody mid-game has a reason to still be here in a minute
-    // (docs/explanation/live-play.md). Cleared on the way back
-    // to the front door, however the table ended. And said to the
-    // service: another device of the account asks before taking the
-    // account from a game (net/in_use.dart).
-    Duty.seated = true;
+    // At a table, as the service is told: another device of the account
+    // asks before taking the account from a game (net/in_use.dart).
+    // Cleared on the way back to the front door, however the table
+    // ended.
     InUse.current.seatedAt(spec.id);
     // Off the table, whichever way: by one of its own ways out, which
     // the page closes with, or by a browser's Back, which closes
@@ -745,9 +734,9 @@ class Lobby extends ChangeNotifier {
     void offTheTable() {
       if (off) return;
       off = true;
-      Duty.seated = false;
       if (!InUse.current.shut) InUse.current.seatedAt(null);
       watch.close();
+      lanes.close();
       // Off the table by choice: nothing to come back to.
       _seats?.clear();
     }
@@ -776,6 +765,7 @@ class Lobby extends ChangeNotifier {
         avatar: me.avatar,
         target: options().target,
         timing: RemoteSettings.current.config.table,
+        house: _house,
         licence: Entitlement.current.licence,
         // Ten seconds, unless the address asks for longer and is
         // allowed to (net/address.dart).

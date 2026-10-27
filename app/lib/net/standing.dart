@@ -1,7 +1,8 @@
-/// Ratings, as this device knows them: every result on the relays,
-/// folded into a ledger, and this device's account's line in it. A
-/// rating is an account's, whichever of its devices played
-/// (packages/table, results.dart).
+/// Ratings, as this device knows them: every result on the relays that
+/// stands — the house's word on each game since the referee, and the
+/// people's on each before — folded into a ledger, and this device's
+/// account's line in it. A rating is an account's, whichever of its
+/// devices played (packages/table, results.dart).
 library;
 
 import 'dart:async';
@@ -10,8 +11,13 @@ import 'dart:math';
 import 'package:engine/engine.dart';
 import 'package:table/table.dart';
 
+import 'licence.dart' show houseKey;
 import 'relays.dart';
 import 'remote_config.dart' show waits;
+
+/// The house whose results this build counts (licence.dart): none
+/// counts in a build that names none.
+PublicKey? get _house => RegExp(r'^[0-9a-f]{64}$').hasMatch(houseKey) ? houseKey : null;
 
 class Standing {
   Standing(this.ledger, this.me);
@@ -32,37 +38,9 @@ class Standing {
     try {
       await t.ready.timeout(waits.standing);
       await t.allReady.timeout(waits.standingAll).catchError((_) {});
-      return Standing(Ledger.from(t.lobbySoFar, prior: prior), account);
+      return Standing(Ledger.from(t.lobbySoFar, house: _house, prior: prior), account);
     } finally {
       t.close();
-    }
-  }
-
-  /// Publishes a finished game's result, signed by this device, and
-  /// waits for a relay to say it has it. A result stands only when a
-  /// majority of the table's people published it — at a table of two,
-  /// both (packages/table, results.dart) — so one that went nowhere
-  /// costs the game its rating, and nobody would know. Tried again on a
-  /// fresh connection after each of [retries]
-  /// while no relay has taken it; true once one has.
-  static Future<bool> publish(
-    List<Uri> relays,
-    Signer signer,
-    GameResult result, {
-    List<Duration> retries = const [Duration(seconds: 5), Duration(seconds: 20), Duration(minutes: 1)],
-  }) async {
-    for (var attempt = 0;; attempt++) {
-      final t = RelayTransport(relays: relays, signer: signer, table: GameResult.tag, pinned: pinnedRelays(relays));
-      try {
-        await t.ready.timeout(waits.standing);
-        if (await t.announceTaken(result.toJson())) return true;
-      } on TimeoutException {
-        // No relay answered at all: the same as none taking it.
-      } finally {
-        t.close();
-      }
-      if (attempt == retries.length) return false;
-      await Future<void>.delayed(retries[attempt]);
     }
   }
 

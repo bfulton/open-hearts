@@ -297,8 +297,8 @@ class RemoteConfig {
   static const none = RemoteConfig();
 
   /// The kill switch: false shuts the doors to live play — the buttons,
-  /// a link to a table, and this device's turn as a juror — for every
-  /// device that reads it. A game already at a table plays on.
+  /// and a link to a table — for every device that reads it. A game
+  /// already at a table plays on.
   final bool live;
 
   /// Whether the paid tier is offered to a device that has not bought
@@ -331,7 +331,7 @@ class RemoteConfig {
   final List<LegalNotice> notices;
 
   /// The clocks of a table this device starts — a person's grace and
-  /// bank, a held bot seat's deadlines, the waits on a jury — carried
+  /// bank, the house's deadlines, the wait on a closed line — carried
   /// in the start event, so every seat plays by the starter's
   /// (packages/table, timing.dart). A table someone else starts keeps
   /// theirs.

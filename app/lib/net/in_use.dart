@@ -3,7 +3,7 @@
 /// An account is a person, and a person plays on one device at a time:
 /// the newest device to take the account up is the one in use, at once,
 /// and the one before steps back — off the relays, out of any table it
-/// sat at, off juror duty, out of the pool and out of anything it was
+/// sat at, offline to everyone, out of the pool and out of anything it was
 /// watching — and says so, with a way to take the account back. Which
 /// device is in use is the service's to say: it gives the one in use an
 /// activation (packages/table, licence.dart), renewed while it is open,
@@ -80,7 +80,7 @@ class InUse extends ChangeNotifier {
 
   /// Whether live play is shut here: this device stepped back for
   /// another, or the account is suspended. Nothing live stays open
-  /// while it is: the pool or the room, the duty, a table or a watch.
+  /// while it is: the pool or the room, presence, a table or a watch.
   bool get shut => elsewhere || _standing == Use.suspended;
 
   /// Whether the person has put the screen saying so aside for now; it

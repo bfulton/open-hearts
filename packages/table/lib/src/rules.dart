@@ -265,6 +265,18 @@ class TableRules {
   void Function(int n)? onSettled;
   int _settledAt = -1;
 
+  /// Told the table as it stands after each change a person could see:
+  /// what a view of the table shows, one change at a time and at a pace
+  /// of its own, without working anything out (app/lib/live,
+  /// live_controller.dart). Nothing is copied while nobody listens.
+  void Function(Frame frame)? onFrame;
+
+  void _frame(FrameChange change, [int? seat]) {
+    final f = onFrame;
+    if (f == null) return;
+    f(Frame(change, game: game.lookahead(), holders: List.unmodifiable(_holders), played: Set.unmodifiable(Set.of(played)), seat: seat));
+  }
+
   TableTiming get timing => _spec!.timing;
 
   // ---- feeding ------------------------------------------------------------
@@ -532,6 +544,7 @@ class TableRules {
     trace?.call('hand ${game.handNumber} given up: a departed hand could not be opened');
     game.abandonHand();
     _startHand();
+    _frame(FrameChange.givenUp);
   }
 
   void _fail() {
@@ -584,6 +597,7 @@ class TableRules {
       _state = TableState.ended;
       _owed.clear();
     }
+    _frame(FrameChange.seat, seat);
   }
 
   /// The hand's deal built again from what the log has taken, and
@@ -763,12 +777,14 @@ class TableRules {
           }
           g.setPass(s, cards);
           moves.add(Move(g.handNumber, s, passed: cards));
+          _frame(FrameChange.passed, s);
           return true;
         }
         return false;
       case Phase.playing:
         if (g.trick.length == seatCount) {
           g.collectTrick();
+          _frame(FrameChange.collected);
           return true;
         }
         final s = g.currentSeat;
@@ -780,6 +796,7 @@ class TableRules {
         g.play(s, card);
         played.add(card);
         moves.add(Move(g.handNumber, s, card: card));
+        _frame(FrameChange.played, s);
         return true;
       case Phase.handOver || Phase.gameOver:
         if (d != null) {
@@ -796,6 +813,7 @@ class TableRules {
         }
         g.nextHand();
         _startHand();
+        _frame(FrameChange.nextHand);
         return true;
     }
   }
@@ -843,6 +861,7 @@ class TableRules {
       if (_state != TableState.playing) return false;
       game.abandonHand();
       _startHand();
+      _frame(FrameChange.givenUp);
       return true;
     }
     game.declareLeader(leader);
@@ -854,6 +873,7 @@ class TableRules {
         },
     ]);
     trace?.call('dealt hand ${game.handNumber}, seat $leader to lead');
+    _frame(FrameChange.dealt);
     return true;
   }
 
@@ -1054,12 +1074,14 @@ class TableRules {
         final seen = cards.length == positions.length ? cards : null;
         g.setPass(seat, seen);
         moves.add(Move(g.handNumber, seat, passed: seen, hidden: seen == null));
+        _frame(FrameChange.passed, seat);
         return true;
       }
       final cards = [for (final c in ev.body['cards'] as List) Card.parse(c as String)];
       if (cards.length != passSize || cards.toSet().length != passSize || !cards.every(g.handOf(seat).contains)) return false;
       g.setPass(seat, cards);
       moves.add(Move(g.handNumber, seat, passed: cards));
+      _frame(FrameChange.passed, seat);
       return true;
     } catch (e) {
       trace?.call('a pass that does not read: $e');
@@ -1084,6 +1106,7 @@ class TableRules {
       g.play(seat, card);
       played.add(card);
       moves.add(Move(g.handNumber, seat, card: card));
+      _frame(FrameChange.played, seat);
       return true;
     } catch (e) {
       trace?.call('a play that does not read: $e');
@@ -1188,4 +1211,53 @@ class Move {
   final bool hidden;
 
   bool get isPass => card == null;
+}
+
+/// What changed in a [Frame].
+enum FrameChange {
+  /// The hand's cards dealt: at a sealed table, as this side sees them.
+  dealt,
+
+  /// [Frame.seat]'s pass taken.
+  passed,
+
+  /// [Frame.seat]'s card played.
+  played,
+
+  /// A finished trick swept to whoever took it.
+  collected,
+
+  /// The next hand begun, after one scored.
+  nextHand,
+
+  /// A hand given up where it stood, and the next one begun in its
+  /// place: nobody could lead it, or a departed hand could not be
+  /// opened.
+  givenUp,
+
+  /// [Frame.seat] held by somebody else: a person gone, a bot in their
+  /// place.
+  seat,
+}
+
+/// The table just after one change a person could see ([TableRules.onFrame]).
+class Frame {
+  const Frame(this.change, {required this.game, required this.holders, required this.played, this.seat});
+  final FrameChange change;
+
+  /// The game as it stood then: a copy, which the table goes on without
+  /// (HeartsGame.lookahead).
+  final HeartsGame game;
+
+  /// Who held each seat then.
+  final List<SeatHolder> holders;
+
+  /// The cards played in the hand by then.
+  final Set<Card> played;
+
+  /// The seat that passed, played or changed hands.
+  final int? seat;
+
+  @override
+  String toString() => 'Frame(${change.name}${seat == null ? '' : ' $seat'}, hand ${game.handNumber} ${game.phase.name})';
 }

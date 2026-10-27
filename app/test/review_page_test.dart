@@ -4,6 +4,7 @@ library;
 
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:engine/engine.dart' show Card, Phase, twoOfClubs;
 import 'package:flutter/material.dart' hide Card;
@@ -11,6 +12,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:open_hearts/crypto/deal.dart';
 import 'package:open_hearts/entitlement.dart';
 import 'package:open_hearts/net/in_use.dart';
+import 'package:open_hearts/net/licence.dart' show houseKey;
 import 'package:open_hearts/net/record_check.dart';
 import 'package:open_hearts/net/remote_config.dart' show waits;
 import 'package:open_hearts/net/watching.dart';
@@ -32,11 +34,18 @@ void main() {
   final checked = <RecordCheck>[];
   setUpAll(() async {
     dealCrypto = await rememberedCrypto();
-    final t = SimTable(humans: 4, seed: 3, crypto: dealCrypto);
+    // A game to a hundred, a few hands of it, its house the one this
+    // build plays with for as long as this file runs: the simulator's,
+    // whose stand-in key shares an escrow with the people's stand-ins as
+    // a real key would not (packages/table_sim, fake_signer.dart).
+    final t = SimTable(humans: 4, seed: 3, crypto: dealCrypto, target: 100);
+    final buildHouse = houseKey;
+    houseKey = t.houseSigner.publicKey;
+    addTearDown(() => houseKey = buildHouse);
     t.start();
     expect(t.run(), isTrue);
     played = GameRecord.of(t.people.first.client, names: {0: 'Ada', 1: 'Bao', 2: 'Cy', 3: 'Dee'});
-    t.stop();
+    t.close();
     kept = KeptGame.of(played);
     await checkRecord(kept).forEach(checked.add);
   });
@@ -87,29 +96,89 @@ void main() {
     semantics.dispose();
   });
 
-  testWidgets('a record changed after the game does not check out, and nothing of it is shown', (tester) async {
+  /// The kept game as text, with [swap] done to its log first.
+  String changed({void Function(List<Object?> log)? swap}) {
     final json = jsonDecode(jsonEncode(played.toJson())) as Map<String, Object?>;
-    // Two decisions swapped: every signature still checks, the game does not.
-    final record = json['record'] as List;
-    final a = record[30];
-    record[30] = record[31];
-    record[31] = a;
-    await pumpReview(tester, KeptGame.read(jsonEncode(json)));
+    swap?.call(json['log'] as List);
+    return jsonEncode(json);
+  }
+
+  testWidgets('a record changed after the game does not check out, and nothing of it is shown', (tester) async {
+    // Two moves swapped in the log, each entry numbered where it was:
+    // every signature still checks, the game does not, and neither does
+    // the log the house signed for.
+    final text = changed(swap: (log) {
+      final (a, b) = (log[60] as Map, log[61] as Map);
+      final e = a['e'];
+      a['e'] = b['e'];
+      b['e'] = e;
+    });
+    await pumpReview(tester, KeptGame.read(text));
     expect(find.textContaining('does not check out'), findsOneWidget);
     expect(find.text('Trick 1'), findsNothing);
   });
 
-  testWidgets('a record with a signature that does not check does not check out: the page reads none of them, the check every one', (tester) async {
-    final json = jsonDecode(jsonEncode(played.toJson())) as Map<String, Object?>;
-    final event = ((json['record'] as List)[30] as Map)['event'] as Map;
-    final sig = event['sig'] as String;
-    event['sig'] = '${sig.substring(0, sig.length - 1)}${sig.endsWith('0') ? '1' : '0'}';
-    final forged = KeptGame.read(jsonEncode(json));
+  testWidgets('a record with a signature that does not check does not check out, and nothing of it is shown', (tester) async {
+    final text = changed(swap: (log) {
+      final event = (log[60] as Map)['e'] as Map;
+      final sig = event['sig'] as String;
+      event['sig'] = '${sig.substring(0, sig.length - 1)}${sig.endsWith('0') ? '1' : '0'}';
+    });
+    final forged = KeptGame.read(text);
     expect(forged, isNotNull, reason: 'the page reads the table and the names, and nothing it would have to check');
     await pumpReview(tester, forged);
     expect(find.textContaining('does not check out'), findsOneWidget);
-    expect(find.textContaining(unsignedRecord), findsOneWidget);
     expect(find.text('Trick 1'), findsNothing);
+  });
+
+  test('a game whose house is not this build\'s does not check out', () async {
+    // Every signature in it checks, and its house signed for its log:
+    // the house of another build, whose word on a game this one does
+    // not take (net/licence.dart, houseKey).
+    final was = houseKey;
+    houseKey = 'ab' * 32;
+    addTearDown(() => houseKey = was);
+    final verdict = await checkRecord(kept).last;
+    expect(verdict, isA<RecordChecked>().having((v) => v.ok, 'ok', isFalse));
+  });
+
+  group('a game kept before the referee', () {
+    // As the library before it wrote one: four people to the end of the
+    // game (packages/table, test/fixtures, legacy/v2_record.dart).
+    late String text;
+    setUpAll(() => text = utf8.decode(gzip.decode(File('../packages/table/test/fixtures/sealed_four.json.gz').readAsBytesSync())));
+
+    test('and one kept before it was over is checked as far as it went, as it was', () async {
+      // The second half of its events gone, every one left signed by
+      // its author: the game as a device that stopped halfway kept it.
+      final json = jsonDecode(text) as Map<String, Object?>;
+      final record = json['record'] as List;
+      json['record'] = record.sublist(0, record.length ~/ 2);
+      final kept = KeptGame.read(jsonEncode(json));
+      expect(kept, isNotNull);
+      final verdict = await checkRecord(kept!).last;
+      expect(verdict, isA<RecordChecked>().having((v) => v.ok, 'ok', isTrue));
+    });
+
+    test('is read and checked as it was', () async {
+      final kept = KeptGame.read(text);
+      expect(kept, isNotNull);
+      final verdict = await checkRecord(kept!).last;
+      expect(verdict, isA<RecordChecked>().having((v) => v.ok, 'ok', isTrue));
+    });
+
+    testWidgets('with a signature that does not check, does not check out: the page reads none of them, the check every one', (tester) async {
+      final json = jsonDecode(text) as Map<String, Object?>;
+      final event = ((json['record'] as List)[30] as Map)['event'] as Map;
+      final sig = event['sig'] as String;
+      event['sig'] = '${sig.substring(0, sig.length - 1)}${sig.endsWith('0') ? '1' : '0'}';
+      final forged = KeptGame.read(jsonEncode(json));
+      expect(forged, isNotNull, reason: 'the page reads the table and the names, and nothing it would have to check');
+      await pumpReview(tester, forged);
+      expect(find.textContaining('does not check out'), findsOneWidget);
+      expect(find.textContaining(unsignedRecord), findsOneWidget);
+      expect(find.text('Trick 1'), findsNothing);
+    });
   });
 
   testWidgets('no game kept at the address: said so', (tester) async {

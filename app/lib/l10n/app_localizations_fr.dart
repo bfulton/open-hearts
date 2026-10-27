@@ -566,7 +566,7 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get whatMoneyPaysFor =>
-      'Jouer seul est gratuit, tout comme les relevés, le moteur et chaque ligne de ce code, et nous n\'avons pas l\'intention de changer cela. L\'argent paie ce qui nous coûte à faire tourner : vous mettre en relation, un relais quand deux appareils ne trouvent pas de chemin direct, et un juré quand une table est laissée seule.';
+      'Jouer seul est gratuit, tout comme les relevés, le moteur et chaque ligne de ce code, et nous n\'avons pas l\'intention de changer cela. L\'argent paie ce qui nous coûte à faire tourner : vous mettre en relation, et le serveur qui distribue les cartes et joue pour les bots à chaque table en direct.';
 
   @override
   String webRenewal(String price) {
@@ -941,26 +941,7 @@ class AppLocalizationsFr extends AppLocalizations {
   String get connectionDown => 'Votre connexion est coupée — reconnexion';
 
   @override
-  String get askingTheJury => 'Consultation du jury';
-
-  @override
-  String get noJurorOnline =>
-      'Personne en ligne pour former un jury — en attente';
-
-  @override
-  String get waitingForTheJury => 'En attente du jury';
-
-  @override
   String get openingDepartedHand => 'Ouverture de la main d\'un joueur parti';
-
-  @override
-  String get nobodyClaimsTwo =>
-      'Personne n\'annonce le 2♣ — la donne est bloquée';
-
-  @override
-  String bootPlayer(String name) {
-    return 'Exclure $name';
-  }
 
   @override
   String get cannotDealTitle => 'Cet appareil ne peut pas distribuer';
@@ -977,11 +958,11 @@ class AppLocalizationsFr extends AppLocalizations {
   String get connectionFailure => 'Échec de connexion';
 
   @override
-  String get jurorQuorumLost => 'Quorum de jurés perdu';
+  String get houseGone => 'Le serveur de la partie ne répond plus';
 
   @override
-  String get jurorQuorumLostWhy =>
-      'Trop peu des jurés qui tiennent les places des bots sont encore en ligne, la donne ne peut donc pas continuer. La partie s\'arrête ici, sans être comptée.';
+  String get houseGoneWhy =>
+      'Le serveur qui distribue les cartes et joue pour les bots ne répond plus, la partie ne peut donc pas continuer. Elle s\'arrête ici, sans être comptée.';
 
   @override
   String get onWithIt => 'Continuer';
@@ -1007,9 +988,6 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get back => 'Retour';
-
-  @override
-  String get waitingForJurors => 'En attente du jury…';
 
   @override
   String get dealing => 'Distribution';
@@ -1487,7 +1465,7 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get openElsewhereBody =>
-      'Votre compte joue sur un appareil à la fois, et le dernier ouvert l\'emporte. Celui-ci s\'est retiré : de la table, du jury et de l\'attente. Utilisez-le ici, et c\'est l\'autre qui se retire.';
+      'Votre compte joue sur un appareil à la fois, et le dernier ouvert l\'emporte. Celui-ci s\'est retiré : de la table et de l\'attente. Utilisez-le ici, et c\'est l\'autre qui se retire.';
 
   @override
   String get inGameElsewhereTitle =>

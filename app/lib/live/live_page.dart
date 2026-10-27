@@ -1,7 +1,7 @@
-/// A live table: the same screen as solo play, driven by the protocol.
-/// What is different is on the felt and its line — who is connected,
-/// the boot clock on a seat that is holding everyone up, a pause and
-/// why — and what leaving means: a bot takes the seat.
+/// A live table: the same screen as solo play, driven by the referee's
+/// log. What is different is on the felt and its line — who is
+/// connected, the clock on a seat that is holding everyone up, what the
+/// table waits on — and what leaving means: a bot takes the seat.
 library;
 
 import 'dart:async';
@@ -100,7 +100,7 @@ class _LivePageState extends State<LivePage> {
   /// The table's own address, for somebody to watch it from: the game
   /// as it is played, and the whole of it once it is over.
   Future<void> _shareToWatch() async {
-    final link = tableLink(_c.client.spec.id);
+    final link = tableLink(_c.spec.id);
     if (await shareLink(link)) return;
     await copyText(link.toString());
     if (mounted) _say(context.l10n.linkCopied);
@@ -211,7 +211,7 @@ class _LivePageState extends State<LivePage> {
         await pictures?.unblock(about.key);
       case _AboutPlayer.report:
         await showReport(context,
-            about: about.key, name: about.name, shown: shown, picture: picture, table: _c.client.spec.id, send: widget.report);
+            about: about.key, name: about.name, shown: shown, picture: picture, table: _c.spec.id, send: widget.report);
     }
   }
 
@@ -230,10 +230,10 @@ class _LivePageState extends State<LivePage> {
     if (await askToLeave(context, _c) && mounted) _leave();
   }
 
-  /// In a build being driven (net/address.dart), the client's own account of the table
-  /// (participants, open races, who was heard when) sits in the
-  /// accessibility tree, invisible: for a test or a tool driving the
-  /// app, and for anyone reading a stuck table.
+  /// In a build being driven (net/address.dart), the rules' own account
+  /// of the table (where the log is, what is owed, who has gone) sits
+  /// in the accessibility tree, invisible: for a test or a tool driving
+  /// the app, and for anyone reading a stuck table.
   Widget _debugState() {
     if (!driven(Uri.base)) return const SizedBox.shrink();
     return Opacity(
@@ -241,7 +241,7 @@ class _LivePageState extends State<LivePage> {
       alwaysIncludeSemantics: true,
       child: SizedBox(
         height: 1,
-        child: Text('debug: ${_c.client.describe()}${_screenState()}', overflow: TextOverflow.clip, maxLines: 1),
+        child: Text('debug: ${_c.client.rules.describe()}${_screenState()}', overflow: TextOverflow.clip, maxLines: 1),
       ),
     );
   }
@@ -259,58 +259,29 @@ class _LivePageState extends State<LivePage> {
   /// Who is still here: people at the table, out of those who sat down,
   /// red while anybody is missing.
   ({String text, Color tone}) _presence(BuildContext context) {
-    final humans = [for (var s = 0; s < seatCount; s++) if (_c.client.spec.seats[s] is HumanSeat) s];
+    final humans = [for (var s = 0; s < seatCount; s++) if (_c.spec.seats[s] is HumanSeat) s];
     final here = _c.here;
     return (
-      text: context.l10n.hereCount(here, humans.length, _c.client.spec.rated ? 'rated' : 'unrated'),
+      text: context.l10n.hereCount(here, humans.length, _c.spec.rated ? 'rated' : 'unrated'),
       tone: here == humans.length ? Palette.chromeDim : Palette.danger,
     );
   }
 
-  /// The line under the felt: a pause and why, or a boot clock on the
-  /// seat holding everyone up, or nothing special.
+  /// The line under the felt: what the table waits on, if it waits on
+  /// something a clock does not show, or what the deal is doing.
   Widget? _liveNote() {
     final l10n = context.l10n;
-    // Cut off from every relay comes first: it is the cause of most of
-    // what follows, and the one thing the player can act on.
+    // Turned away by the referee comes first: nothing this device says
+    // reaches the table, and the player can act on it.
     final refused = _c.relayRefusal;
     if (refused != null) return _note(l10n.noRelayTakesEvents(_short(refused)));
     // Its own line down: whatever the table seems to wait on, it is
-    // this device not hearing it, and the game waits for the line.
+    // this device not hearing it, and the table waits for the line.
     if (_c.lineDown) return _note(l10n.connectionDown);
-    if (_c.pause == Pause.waitingForPeers) return _note(l10n.waitingToReconnect);
-    if (_c.pause == Pause.waitingForJury) {
-      if (_c.jury.live > 0) return _note(l10n.askingTheJury);
-      if (_c.needsJuror) return _note(l10n.noJurorOnline);
-      return _note(l10n.waitingForTheJury);
-    }
-    if (_c.pause == Pause.openingHand) return _note(l10n.openingDepartedHand);
-    if (_c.pause == Pause.waitingForLead) return _note(l10n.nobodyClaimsTwo);
-    // The seat everyone is waiting on, if it is a person other than me
-    // and its clock has run out — during the deal as much as the play:
-    // a seat that never sends its keys is the one thing that stalls a
-    // deal, and Boot is the way past it.
-    for (var seat = 0; seat < seatCount; seat++) {
-      if (seat == _c.mySeat || _c.personaAt(seat) != null) continue;
-      if (_c.bootCountdownMs(seat) == null) continue;
-      if (_c.canBoot(seat)) {
-        // Sized to the line, which is thirty pixels: a button at its
-        // default height is clipped top and bottom.
-        return TextButton.icon(
-          onPressed: () => _c.boot(seat),
-          icon: const Icon(Icons.timer_off_outlined, size: 15),
-          label: Text(l10n.bootPlayer(_c.names[seat]), style: const TextStyle(fontSize: 12)),
-          style: TextButton.styleFrom(
-            foregroundColor: Palette.danger,
-            visualDensity: VisualDensity.compact,
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            minimumSize: const Size(0, 26),
-            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-          ),
-        );
-      }
-      // The seat's own badge shows its clock running; nothing more here.
-    }
+    if (_c.openingHand) return _note(l10n.openingDepartedHand);
+    // A turn owed by somebody whose line is down. Their badge's clock
+    // runs as it does for anyone slow; this says why nothing comes.
+    if (_c.waitingOnSomeoneDown) return _note(l10n.waitingToReconnect);
     final dealing = _c.dealNote;
     if (dealing != null) return _note(dealing);
     return null;
@@ -359,8 +330,8 @@ class _LivePageState extends State<LivePage> {
         ),
       );
     }
-    // A seat that is no longer this player's — booted, or ruled absent
-    // by a jury — shows no table at all: watching a bot play your cards
+    // A seat that is no longer this player's — their clock ran out, or
+    // their line was down at their turn — shows no table at all: watching a bot play your cards
     // is not a thing to look at. Just what happened, and the way back.
     if (!_c.amSeated) {
       return Scaffold(
@@ -372,20 +343,15 @@ class _LivePageState extends State<LivePage> {
     }
     // A game that cannot go on ends, and says why: unscored, and
     // nothing left at the table to do but go.
-    final failure = _c.client.failure;
-    if (failure != null) {
+    if (_c.failed) {
       return Scaffold(
         body: Container(
           decoration: const BoxDecoration(gradient: Felt.gradient),
           child: SafeArea(
             child: _Failed(
               title: context.l10n.connectionFailure,
-              label: switch (failure) {
-                Failure.jurorQuorumLost => context.l10n.jurorQuorumLost,
-              },
-              why: switch (failure) {
-                Failure.jurorQuorumLost => context.l10n.jurorQuorumLostWhy,
-              },
+              label: context.l10n.houseGone,
+              why: context.l10n.houseGoneWhy,
               onHome: () => Navigator.of(context).pop(),
             ),
           ),
@@ -475,7 +441,7 @@ class _LivePageState extends State<LivePage> {
                   // The game is kept as it ends (lobby.dart), and its
                   // address is the table's: in place of this one, so back
                   // is home either way.
-                  onSeeGame: () => context.pushReplacement(located(tablePath(_c.client.spec.id))),
+                  onSeeGame: () => context.pushReplacement(located(tablePath(_c.spec.id))),
                 ),
             ],
           ),
@@ -507,7 +473,7 @@ Future<bool> askToLeave(BuildContext context, LiveController c) async {
         title: Text(l10n.leaveTableTitle),
         content: Text([
           l10n.leaveTableBot,
-          if (c.client.spec.rated) l10n.leaveTableRated,
+          if (c.spec.rated) l10n.leaveTableRated,
           if (c.strangers && c.othersPlaying && wait > Duration.zero) l10n.leaveTableWait(wait.inMinutes),
         ].join(' ')),
         actions: [

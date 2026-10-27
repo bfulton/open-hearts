@@ -4,7 +4,7 @@
 library;
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:open_hearts/net/duty.dart';
+import 'package:open_hearts/net/online.dart';
 import 'package:open_hearts/net/relays.dart';
 import 'package:open_hearts/net/remote_config.dart';
 import 'package:table/table.dart';
@@ -43,9 +43,9 @@ void main() {
       expect(t.relays.single.host, 'relay.openhearts.game');
       expect(t.relays.single.pathSegments.single, tag, reason: 'the tag written in, not the mark');
     }
-    final duty = Duty.on(deployed, FakeSigner('door'));
-    addTearDown(duty.close);
-    expect(duty.presence.relays.single.pathSegments.single, 'online');
+    final online = Online.on(deployed, FakeSigner('door'));
+    addTearDown(online.close);
+    expect(online.presence.relays.single.pathSegments.single, 'online');
   });
 
   test('served from localhost, the local relay', () {

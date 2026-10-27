@@ -3,18 +3,19 @@
 // players' devices sends it, kept in R2 (OH_RECORDS) under the table's
 // id, packed.
 //
-// Nothing here vouches for a record. Every event in it is signed, and
-// whoever looks at one replays it through the verifier — every
-// signature, every step of the deal — before showing a card of it
-// (packages/table, game_record.dart, record.dart). What is checked here
-// is what decides whose copy is kept, since the first copy is the one
-// kept and a table's other players are told it is in: the sender is
-// a subscriber's device in use (worker.mjs, recordRoute), a seat at
-// the table, and has signed moves of its own at this table into it —
-// an event of the record whose author is the sender, whose id is the
-// hash of its own content, and whose signature checks. A record made
-// up by somebody who never played there has none, and neither has a
-// copy of somebody else's game with one's key written into a seat.
+// Nothing here vouches for a record. Every event in it is signed, the
+// house's word on the end names the log as it stood, and whoever looks
+// at one replays it through the verifier — every signature, every step
+// of the deal — before showing a card of it (packages/table,
+// record.dart). What is checked here is what decides whose copy is
+// kept, since the first copy is the one kept and a table's other
+// players are told it is in: the sender is a subscriber's device in
+// use (worker.mjs, recordRoute), a seat at the table, and has signed
+// moves of its own at this table into it — an event of the log whose
+// author is the sender, whose id is the hash of its own content, and
+// whose signature checks. A record made up by somebody who never
+// played there has none, and neither has a copy of somebody else's
+// game with one's key written into a seat.
 // And its seats are ones the app would show: each person's carries the
 // service's licence for its key (licenceProblem), which is what ties a
 // name beside the record to an account, for forgetting one.
@@ -25,16 +26,16 @@ import { dayOf } from './rows.mjs';
 /// A table's id (packages/table, spec.dart, newTableId).
 export const tableIdShape = /^[0-9a-f]{32}$/;
 
-/// The most a record may be, unpacked. A full sealed game to a hundred
-/// is some 700 KB; this is room over that, and a bound on what a
+/// The most a record may be, unpacked: room over a full sealed game to
+/// a hundred (docs/explanation/live-play.md), and a bound on what a
 /// device can make the bucket hold.
 export const recordMost = 2 * 1024 * 1024;
 
-/// The form of record kept (packages/table, game_record.dart,
-/// GameRecord.version): one whose removals carry the signed word of
-/// everyone who backed them. Games kept in the form before stay as
-/// they were; none is kept in it now.
-export const recordVersion = 2;
+/// The form of record kept (packages/table, record.dart,
+/// GameRecord.version): the table's spec and its referee's log, every
+/// entry as it came. Games kept in the forms before the referee stay as
+/// they were (legacy/v2_record.dart there); none is kept in them now.
+export const recordVersion = 3;
 
 const keyIn = (table) => `tables/${table}.json`;
 
@@ -99,12 +100,12 @@ async function licenceProblem(seats, service, verify) {
 /// any one that checks is enough, and a record is mostly the sender's.
 const triedAtMost = 8;
 
-/// Whether [record] holds an event [key] signed at [table]. [verify] is
-/// the service's BIP-340 check (licence.mjs, signerOn).
+/// Whether [record]'s log holds an event [key] signed at [table].
+/// [verify] is the service's BIP-340 check (licence.mjs, signerOn).
 async function signedInto(record, key, table, verify) {
   let tried = 0;
-  for (const d of record.record) {
-    const e = d?.event;
+  for (const entry of record.log) {
+    const e = entry?.e;
     if (e?.author !== key || typeof e.id !== 'string' || typeof e.sig !== 'string' || typeof e.kind !== 'string') continue;
     if (!e.body || typeof e.body !== 'object' || Array.isArray(e.body)) continue;
     if (tried++ >= triedAtMost) return false;
@@ -133,7 +134,7 @@ export async function keepRecord(bucket, key, table, text, { verify, service = n
   }
   if (record?.v !== recordVersion) return { status: 400, body: { error: `a record of form ${recordVersion}` } };
   const spec = record?.spec;
-  if (spec?.id !== table || !Array.isArray(spec?.seats) || !Array.isArray(record?.record)) {
+  if (spec?.id !== table || !Array.isArray(spec?.seats) || !Array.isArray(record?.log)) {
     return { status: 400, body: { error: 'not this table\'s record' } };
   }
   if (!spec.seats.some((s) => s?.key === key)) return { status: 403, body: { error: 'only a player at the table sends its record' } };

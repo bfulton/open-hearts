@@ -567,7 +567,7 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get whatMoneyPaysFor =>
-      'Jogar sozinho é grátis, assim como os registros, o motor e cada linha disto, e não temos planos de mudar isso. O que o dinheiro paga é a parte que custa para mantermos: colocar vocês em contato, um relay quando dois aparelhos não acham um caminho direto, e um júri quando uma mesa fica sozinha.';
+      'Jogar sozinho é grátis, assim como os registros, o motor e cada linha disto, e não temos planos de mudar isso. O que o dinheiro paga é a parte que custa para mantermos: colocar vocês em contato, e o servidor que distribui as cartas e joga pelos bots em cada mesa ao vivo.';
 
   @override
   String webRenewal(String price) {
@@ -939,25 +939,7 @@ class AppLocalizationsPt extends AppLocalizations {
   String get connectionDown => 'Sua conexão caiu — reconectando';
 
   @override
-  String get askingTheJury => 'Consultando o júri';
-
-  @override
-  String get noJurorOnline =>
-      'Ninguém online para formar um júri — esperando alguém';
-
-  @override
-  String get waitingForTheJury => 'Esperando o júri';
-
-  @override
   String get openingDepartedHand => 'Abrindo a mão de um jogador que saiu';
-
-  @override
-  String get nobodyClaimsTwo => 'Ninguém diz ter o 2♣ — a distribuição travou';
-
-  @override
-  String bootPlayer(String name) {
-    return 'Expulsar $name';
-  }
 
   @override
   String get cannotDealTitle => 'Este aparelho não consegue distribuir';
@@ -974,11 +956,11 @@ class AppLocalizationsPt extends AppLocalizations {
   String get connectionFailure => 'Falha de conexão';
 
   @override
-  String get jurorQuorumLost => 'Júri sem quórum';
+  String get houseGone => 'O servidor da partida parou de responder';
 
   @override
-  String get jurorQuorumLostWhy =>
-      'Poucos dos jurados que guardam os lugares dos bots ainda estão online, então a mão não pode continuar. A partida termina aqui, sem pontuação.';
+  String get houseGoneWhy =>
+      'O servidor que distribui as cartas e joga pelos bots parou de responder, então a partida não pode continuar. Ela termina aqui, sem pontuação.';
 
   @override
   String get onWithIt => 'Continuar';
@@ -1004,9 +986,6 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get back => 'Voltar';
-
-  @override
-  String get waitingForJurors => 'Esperando o júri…';
 
   @override
   String get dealing => 'Distribuindo';
@@ -1483,7 +1462,7 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get openElsewhereBody =>
-      'Sua conta joga em um aparelho por vez, e vale o último aberto. Este saiu de cena: da mesa, do júri e da espera. Use-o aqui, e quem sai de cena é o outro.';
+      'Sua conta joga em um aparelho por vez, e vale o último aberto. Este saiu de cena: da mesa e da espera. Use-o aqui, e quem sai de cena é o outro.';
 
   @override
   String get inGameElsewhereTitle => 'Você está numa partida em outro aparelho';

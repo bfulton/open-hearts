@@ -38,6 +38,17 @@ import 'http.dart' as http;
 /// licensed by whoever asks first.
 const serviceKey = String.fromEnvironment('OH_SERVICE_KEY');
 
+/// The house every live table this build seats names: the operator's
+/// side of the table, which deals and plays its bot seats, holds half of
+/// each person's escrow and says how the game came out (packages/table,
+/// house.dart). Named at build time — `--dart-define=OH_HOUSE_KEY=<64
+/// hex>` — from config/openhearts.json (houseKey), as deploy.sh and the
+/// phone builds pass it; the browser suite names its rig's (e2e/build.sh).
+/// A build that names none seats nobody live: a sealed table without its
+/// house is one no relay referees. Settable for a test, which is built
+/// with none (test/flutter_test_config.dart).
+String houseKey = const String.fromEnvironment('OH_HOUSE_KEY');
+
 // The licence itself — this device's key, its account, a date and the
 // plan, signed by the service — is the table package's (licence.dart
 // there): every peer at a table checks every seat's by it.

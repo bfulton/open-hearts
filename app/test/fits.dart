@@ -581,7 +581,7 @@ const _liveDeal = 3;
 /// A live table on the protocol's clock, from the pass to the end of
 /// the first hand: its sheet, or [toTheEnd], the game's. On the way the
 /// seat on the left dawdles over her first card, long enough for her
-/// clock to show on her badge and the Boot to be offered on the line.
+/// clock to show on her badge.
 Future<List<String>> _walkLive(WidgetTester tester, {required Size size, required double scale, required String locale, required bool toTheEnd}) async {
   late _Walk walk;
   final errors = await _errors(() async {
@@ -601,9 +601,8 @@ Future<List<String>> _walkLive(WidgetTester tester, {required Size size, require
       // And each moment again as it is with the player's own reaction
       // up, or the button in its place.
       walk.look('$situation · ${c.reactionAt(c.mySeat) == null ? 'the button' : 'your reaction'}');
-      if (c.clockMs(0) != null) walk.look('a clock on a badge');
-      if (c.canBoot(0)) {
-        walk.look('Boot offered');
+      if (c.clockMs(0) != null) {
+        walk.look('a clock on a badge');
         live.people[0]!.thinkMs = 300;
       }
       if (!_act(c)) {
@@ -617,7 +616,7 @@ Future<List<String>> _walkLive(WidgetTester tester, {required Size size, require
     expect(_sheetUp(), isTrue, reason: 'the hand came to its end');
     walk.look(toTheEnd ? 'game over' : 'hand over');
   });
-  expect(walk.seen, containsAll({..._phases, 'a clock on a badge', 'Boot offered', toTheEnd ? 'game over' : 'hand over'}),
+  expect(walk.seen, containsAll({..._phases, 'a clock on a badge', toTheEnd ? 'game over' : 'hand over'}),
       reason: 'the walk went through every phase');
   expect(walk.seen.where((s) => s.endsWith(' · your reaction')), isNotEmpty, reason: 'seen with a reaction at every seat');
   expect(walk.seen.where((s) => s.endsWith(' · the button')), isNotEmpty, reason: 'seen with the button beside the player');
