@@ -181,9 +181,11 @@ class Filter {
 /// the table's own repeat-and-catch-up is what recovers a dropped
 /// message.
 abstract final class TableKinds {
-  /// A table event (events.dart) as the content, tagged `t` with the
-  /// table id. Signed by the sender, who may be relaying.
-  static const table = 24242;
+  /// A table event (events.dart) for the table's log, as the content,
+  /// tagged `t` with the table id and signed by its author. Taken by the
+  /// table's referee, which numbers it and stamps it with its time
+  /// (log.dart); nobody else stores or forwards it.
+  static const log = 4250;
 
   /// WebRTC signalling — an offer, answer or ICE candidate — tagged `p`
   /// with the recipient and `t` with the table id.

@@ -356,7 +356,7 @@ Playing live on a preview of the app: the secrets previews keep for themselves, 
 oh preview secrets [--apply]
 ```
 
-Makes the secrets previews keep for themselves, new, and shows them to nobody: the service key pair previews sign with, and the preview relay's backup jurors' secret. The pair's secret is set on the Pages project's preview environment as OH_SERVICE_SECRET, and its public half written to config/openhearts.json as preview.serviceKey: commit it. None of them is production's, since a preview runs whatever branch was deployed to it. A preview built before keeps the key it was built with: deploy the preview relay and each preview again afterwards.
+Makes the secrets previews keep for themselves, new, and shows them to nobody: the service key pair previews sign with, and the key pair of the previews' house. The service pair's secret is set on the Pages project's preview environment as OH_SERVICE_SECRET, the house's on the preview relay as OH_HOUSE_SECRET, and their public halves written to config/openhearts.json as preview.serviceKey and preview.houseKey: commit them. None of them is production's, since a preview runs whatever branch was deployed to it. A preview built before keeps the keys it was built with: deploy the preview relay and each preview again afterwards.
 
 - **Needs:** `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, Dart, and dart pub get in service/
 - **How-to:** [deploy.md](../how-to/deploy.md#play-live-on-a-preview)
@@ -477,6 +477,18 @@ Sets a secret wherever infra/cloudflare.mjs says it lives, from what you type (n
 - **Needs:** `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`
 - **How-to:** [rotate-the-service-key.md](../how-to/rotate-the-service-key.md)
 - **Example:** `oh secret set OH_SERVICE_SECRET --apply`
+
+### oh house key
+
+```bash
+oh house key [--apply]
+```
+
+Makes the house a new key pair and shows its secret to nobody: set on the relay worker as OH_HOUSE_SECRET, its public half written to config/openhearts.json as houseKey. Commit config/openhearts.json, then deploy the relay and the site from it: the relay takes results from that key and referees sealed tables only for it, and the app names it in every table it seats. A table started under the old key is one no house serves any more, so make it with no table playing.
+
+- **Needs:** `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, Dart, and dart pub get in service/
+- **How-to:** [deploy.md](../how-to/deploy.md#before-you-begin)
+- **Example:** `oh house key --apply`
 
 ### oh key mint
 

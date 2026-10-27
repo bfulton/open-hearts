@@ -1,9 +1,11 @@
-/// A whole simulated table, ready to run: the harness the matrix and
-/// the trace tool share.
+/// A whole simulated table, ready to run: people in the first seats (or
+/// the last, with `botsFirst`), bots in the rest, a referee, and the
+/// house serving it.
 library;
 
 import 'dart:convert';
 import 'dart:math';
+import 'dart:typed_data';
 
 import 'package:deal/deal.dart';
 import 'package:engine/engine.dart';
@@ -12,186 +14,231 @@ import 'package:table/table.dart';
 import 'fake_signer.dart';
 import 'scripted_human.dart';
 import 'sim_deal_worker.dart';
-import 'sim_juror.dart';
-import 'sim_network.dart';
-import 'sim_presence.dart';
+import 'sim_referee.dart';
 import 'virtual_clock.dart';
 
-/// A simulated table: [humans] scripted people in the first seats,
-/// bots in the rest — or the bots first, with `botsFirst`. With
-/// [crypto] the table is sealed: the cards come from the verifiable
-/// deal, run for real on the virtual clock; with `workers` as well,
-/// each device makes the deal's slow calls in a worker of its own
-/// that takes a browser's time over them ([SimDealWorker]), where
-/// otherwise they take none. With `sweepJurors` a
-/// juror lets go of the table once it has served, as the duty does,
-/// and a later summons starts it again from the first hand.
 class SimTable {
   SimTable({
     required this.humans,
     int seed = 1,
-    int netSeed = 1,
-    int jurors = 0,
-    bool lastResort = false,
-    int? lastResorts,
-    bool withPresence = false,
     int target = gameOverScore,
     this.crypto,
     TableTiming timing = TableTiming.standard,
-    TimeBank? timeBank,
     bool botsFirst = false,
-    bool sweepJurors = false,
     bool workers = false,
+    this.latencyMs = 30,
+    int? houseLatencyMs,
+    bool rated = false,
+    Map<int, SeatConduct> conducts = const {},
     String? id,
     List<Signer>? keys,
-    Map<int, TableJournal>? journals,
+    Signer? houseKey,
     Licence? Function(PublicKey key)? licenceOf,
-  })  : journals = journals ?? {},
-        clock = VirtualClock(),
-        // Fake keys unless told otherwise: a table played for a record
-        // a real device will check needs real signatures.
-        signers = keys ?? [for (var i = 0; i < humans; i++) FakeSigner('p$i-$seed')] {
-    net = SimNetwork(clock, seed: netSeed);
-    SimDealWorker? workerFor(PublicKey key) {
-      final c = crypto;
-      if (!workers || c == null) return null;
-      return dealWorkers[key] = SimDealWorker(c, clock);
-    }
-
-    if (jurors > 0 || lastResort || (lastResorts ?? 0) > 0 || withPresence) {
-      final p = presence = SimPresence(net, clock);
-      for (var j = 0; j < jurors; j++) {
-        final signer = FakeSigner('juror$j-$seed');
-        final juror = SimJuror(signer, net, clock, crypto: crypto, dealWorker: workerFor(signer.publicKey))..sweeps = sweepJurors;
-        this.jurors.add(juror);
-        p.register(juror);
-      }
-      // Several backup jurors, not one: a table that needs its bot
-      // seats held needs [juryToHoldBots] of them, and when it calls too
-      // few others are online to make that up (docs/explanation/live-play.md).
-      final bench = lastResorts ?? (lastResort ? juryToHoldBots : 0);
-      for (var b = 0; b < bench; b++) {
-        final signer = FakeSigner('last-resort$b-$seed');
-        final juror = SimJuror(signer, net, clock, crypto: crypto, dealWorker: workerFor(signer.publicKey))..sweeps = sweepJurors;
-        this.jurors.add(juror);
-        p.register(juror);
-        p.lastResorts.add(juror);
-      }
+    this.traces = false,
+  }) : clock = VirtualClock() {
+    final sealed = crypto != null;
+    houseSigner = houseKey ?? FakeSigner('house-$seed');
+    referee = SimReferee(clock, house: houseSigner.publicKey);
+    signers = keys ?? [for (var i = 0; i < humans; i++) FakeSigner('p$i-$seed')];
+    final seats = <SeatHolder>[];
+    for (var s = 0; s < seatCount; s++) {
+      final person = botsFirst ? s >= seatCount - humans : s < humans;
+      seats.add(person
+          ? HumanSeat(signers[botsFirst ? s - (seatCount - humans) : s].publicKey,
+              licence: licenceOf?.call(signers[botsFirst ? s - (seatCount - humans) : s].publicKey))
+          : BotSeat(Persona.roster[(s + seed) % Persona.roster.length]));
     }
     spec = TableSpec(
       id: id ?? 'table-$seed',
       seed: seed,
-      sealed: crypto != null,
+      seats: seats,
+      sealed: sealed,
       target: target,
-      timing: timeBank == null ? timing : timing.withBank(timeBank),
-      seats: [
-        for (var s = 0; s < seatCount; s++)
-          if (botsFirst ? s >= seatCount - humans : s < humans)
-            HumanSeat(signers[botsFirst ? s - (seatCount - humans) : s].publicKey,
-                licence: licenceOf?.call(signers[botsFirst ? s - (seatCount - humans) : s].publicKey))
-          else
-            BotSeat(Persona.roster[(s + seed) % Persona.roster.length]),
-      ],
+      timing: timing,
+      rated: rated,
+      house: sealed ? houseSigner.publicKey : null,
     );
-    for (var i = 0; i < humans; i++) {
-      final client = TableClient(
-          spec: spec,
-          signer: signers[i],
-          transport: net.attach(signers[i].publicKey),
+    DealWorker? workerFor() => workers && crypto != null ? SimDealWorker(crypto!, clock) : null;
+    _newHouse = () => House(
+          signer: houseSigner,
+          secret: Uint8List.fromList(utf8.encode('house secret $seed').take(32).toList()),
+          lineFor: (_) => referee.line(houseSigner.publicKey, latencyMs: houseLatencyMs ?? latencyMs),
           clock: clock,
-          presence: presence,
           crypto: crypto,
-          dealWorker: workerFor(signers[i].publicKey),
-          journal: this.journals[i],
-          random: Random(seed * 1000 + i));
-      people.add(ScriptedHuman(client, net, clock, persona: Persona.roster[(i * 3 + seed) % Persona.roster.length]));
+          // The house runs the deal natively, on a server: its slow calls
+          // are not a browser's.
+          random: Random(seed * 1000 + 999 + _houses++),
+          onResult: (result, signed) => results.add(signed),
+          onSide: (side) => _watch(side, 'house${_houses > 1 ? '.$_houses' : ''} ${side.role == Role.houseFollower ? 'follower' : 'seat ${side.seat}'}'),
+          trace: traces ? (t, l) => _log(l) : null,
+        );
+    if (sealed) {
+      house = _newHouse();
+      referee.onStart = (s) => house!.serve(s.id);
+    }
+    _workerFor = workerFor;
+    for (var i = 0; i < humans; i++) {
+      final conduct = conducts[i] ?? const SeatConduct();
+      _conducts.add(conduct);
+      journals.add(TableJournal());
+      final line = referee.line(signers[i].publicKey, latencyMs: latencyMs);
+      lines.add(line);
+      people.add(ScriptedHuman(_watch(_client(i, line, Random(seed * 1000 + i)), 'p$i'), line, clock,
+          persona: Persona.roster[(i * 3 + seed) % Persona.roster.length]));
     }
   }
 
-  final int humans;
+  /// The results the house published, signed, as it published them.
+  final List<NostrEvent> results = [];
 
-  /// Journals for the people who keep one, by their place in [people]:
-  /// what a person's device needs to come back after a reload
-  /// ([TableJournal], [reload]).
-  final Map<int, TableJournal> journals;
+  /// What each side saw of the table after each entry it took, by side
+  /// and entry ([TableRules.settledView]).
+  final Map<String, Map<int, String>> views = {};
 
-  /// Person [i]'s page reloaded: the process gone at once, as a tab
-  /// closing is, and after [awayMs] a new client built from the journal
-  /// alone, on a new link, with nothing else of the old one.
-  void reload(int i, {int awayMs = 5000, Random? random}) {
-    final old = people[i];
-    final key = old.client.signer.publicKey;
-    net.crash(key);
-    old.stop();
-    old.client.close();
-    old.gone = true;
-    clock.advance(awayMs);
-    net.revive(key);
-    final journal = TableJournal.parse(jsonDecode(jsonEncode(journals[i]!.toJson())))!;
-    journals[i] = journal;
-    final client = TableClient(
-        spec: spec,
-        signer: old.client.signer,
-        transport: net.attach(key),
-        clock: clock,
-        presence: presence,
-        crypto: crypto,
-        dealWorker: dealWorkers[key],
-        journal: journal,
-        random: random ?? Random(i + 7919));
-    people[i] = ScriptedHuman(client, net, clock, persona: old.persona)..start();
+  TableClient _watch(TableClient c, String name) {
+    var side = name;
+    for (var k = 2; views.containsKey(side); k++) {
+      side = '$name.$k';
+    }
+    final seen = views[side] = {};
+    c.rules.onSettled = (n) => seen[n] = c.rules.settledView();
+    return c;
   }
 
-  /// The deal's primitives, at a sealed table.
-  final DealCrypto? crypto;
+  /// Every entry after which two sides saw the table differently, with
+  /// what each saw: none, at a table every side plays by the same rules
+  /// from the same log.
+  ///
+  /// [except] are sides left out: a seat that lies takes its own word
+  /// unchecked, so its own view is not the table's.
+  List<String> lockstepProblems({int most = 5, Set<String> except = const {}}) {
+    final out = <String>[];
+    final ns = {for (final v in views.values) ...v.keys}.toList()..sort();
+    for (final n in ns) {
+      final at = {
+        for (final e in views.entries)
+          if (e.value.containsKey(n) && !except.contains(e.key.split('.').first)) e.key: e.value[n]!,
+      };
+      if (at.values.toSet().length <= 1) continue;
+      out.add('#$n:\n${[for (final e in at.entries) '  ${e.key}: ${e.value}'].join('\n')}');
+      if (out.length >= most) break;
+    }
+    return out;
+  }
 
-  /// Each device's deal worker, by its key, when the table has them.
-  final Map<PublicKey, SimDealWorker> dealWorkers = {};
+  late final DealWorker? Function() _workerFor;
+  late final House Function() _newHouse;
+  int _houses = 0;
+  final List<SeatConduct> _conducts = [];
+
+  TableClient _client(int i, SimLine line, Random random) => TableClient(
+        tableId: spec.id,
+        signer: signers[i],
+        line: line,
+        clock: clock,
+        spec: spec,
+        crypto: crypto,
+        dealWorker: _workerFor(),
+        journal: journals[i],
+        conduct: _conducts[i],
+        random: random,
+        trace: traces ? (l) => _log('p$i: $l') : null,
+      );
+
+  /// What each person's device keeps across a reload, by their place in
+  /// [people].
+  final List<TableJournal> journals = [];
+
+  /// Person [i]'s device reloaded: the client gone, as closing the tab
+  /// is, and after [awayMs] a new one built from what the device kept —
+  /// the journal, through its JSON — reading the log from its start.
+  ///
+  /// [lastWordsLandAfterMs] has what the old client had in flight reach
+  /// the referee that long from now, and [latencyMs] gives the new line
+  /// its own latency.
+  void reload(int i, {int awayMs = 5000, int? lastWordsLandAfterMs, int? latencyMs}) {
+    final before = people[i];
+    before.stop();
+    if (lastWordsLandAfterMs != null) lines[i].closeLeaving(landAfterMs: lastWordsLandAfterMs);
+    before.client.close();
+    final journal = TableJournal.parse(jsonDecode(jsonEncode(journals[i].toJson())))!;
+    journals[i] = journal;
+    clock.schedule(awayMs, () {
+      final line = referee.line(signers[i].publicKey, latencyMs: latencyMs ?? this.latencyMs);
+      lines[i] = line;
+      final again = ScriptedHuman(_watch(_client(i, line, Random(spec.seed * 1000 + i + 7919)), 'p$i'), line, clock, persona: before.persona);
+      people[i] = again;
+      again.start();
+    });
+  }
+
+  final int humans;
+  final DealCrypto? crypto;
   final VirtualClock clock;
-  final List<Signer> signers;
-  late final SimNetwork net;
+  final int latencyMs;
+  final bool traces;
+  late final SimReferee referee;
   late final TableSpec spec;
+  /// The people's keys, by their place in [people]: the simulator's
+  /// stand-ins unless real ones were given.
+  late final List<Signer> signers;
+  late final Signer houseSigner;
+  House? house;
+  final List<SimLine> lines = [];
   final List<ScriptedHuman> people = [];
 
-  /// Strangers online who can be drawn as jurors; the last is the
-  /// backup juror when there is one.
-  final List<SimJuror> jurors = [];
-  SimPresence? presence;
+  /// Every line the traces said, in order.
+  final List<String> trace = [];
+  void _log(String l) => trace.add('${clock.nowMs} $l');
 
-  /// Jurors still up: not gone, and not crashed or quiet.
-  Iterable<SimJuror> get liveJurors => jurors.where((j) => !j.gone && net.isUp(j.signer.publicKey));
+  List<TableClient> get clients => [for (final p in people) p.client];
 
-  Iterable<TableClient> get clients => people.map((p) => p.client);
-
-  /// Clients of people who have not left, crashed or gone quiet, and
-  /// still seat themselves. A client that applies the record sees its
-  /// own removal in it and drops out of here with the rest of the
-  /// table; a modified one whose record parted from the table's never
-  /// does, and stays a survivor to itself alone. A test with such a
-  /// client at the table names the honest set itself rather than ask
-  /// here — see the lie tests in packages/table/test/sealed_lies_test.dart.
-  Iterable<TableClient> get survivors =>
-      people.where((p) => !p.gone && p.client.amSeated).map((p) => p.client);
+  /// The clients still reading the log: all but those whose app is gone
+  /// or whose phone is off the network for good.
+  List<TableClient> get following => [for (final p in people) if (p.following) p.client];
 
   void start() {
-    presence?.start();
     for (final p in people) {
       p.start();
     }
   }
 
-  /// Runs until every survivor's game is over, or [limitMs] of virtual
-  /// time. Returns whether all finished.
-  bool run({int limitMs = 3 * 60 * 60 * 1000}) =>
-      clock.runUntil(() => survivors.every((c) => c.done), limitMs: limitMs);
+  /// Runs until every client still following has the game over and, at
+  /// a sealed table whose house is up, the house's word on it, and the
+  /// house has let the table go; or [limitMs] of virtual time.
+  bool run({int limitMs = 6 * 60 * 60 * 1000}) => clock.runUntil(
+      () =>
+          following.every((c) => c.done && (house == null || houseDown || c.rules.result != null)) &&
+          (house?.serving.isEmpty ?? true),
+      limitMs: limitMs);
 
-  void stop() {
+  /// Whether the house was taken down ([killHouse]).
+  bool houseDown = false;
+
+  /// The house gone: every line it has to the table closed, and nothing
+  /// more said for it.
+  void killHouse() {
+    houseDown = true;
+    house?.close();
+  }
+
+  /// The house back after [afterMs], as the service is after a restart:
+  /// the same key and secret, nothing else, reading the log from its
+  /// start.
+  void restartHouse({required int afterMs}) {
+    house?.close();
+    houseDown = true;
+    clock.schedule(afterMs, () {
+      houseDown = false;
+      house = _newHouse()..serve(spec.id);
+    });
+  }
+
+  void close() {
     for (final p in people) {
       p.stop();
       p.client.close();
     }
-    for (final j in jurors) {
-      j.stop();
-    }
+    house?.close();
   }
 }

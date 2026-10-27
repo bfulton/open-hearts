@@ -1,6 +1,6 @@
 /// A person at a simulated table: plays like a bot after a moment's
-/// thought, presses Boot when it appears, and leaves — politely, by
-/// crashing, or by going quiet — when the scenario says.
+/// thought, and leaves — politely, by crashing, by going quiet, or by
+/// losing the network — when the scenario says.
 library;
 
 import 'dart:async';
@@ -8,7 +8,7 @@ import 'dart:async';
 import 'package:engine/engine.dart';
 import 'package:table/table.dart';
 
-import 'sim_network.dart';
+import 'sim_referee.dart';
 import 'virtual_clock.dart';
 
 /// When in a game something should happen to a player.
@@ -26,39 +26,55 @@ class Moment {
   static final midTrick = Moment('mid-trick', (c) => c.awaitingMyPlay && c.game.trick.isNotEmpty);
   static final lastTrick = Moment('last trick', (c) => c.awaitingMyPlay && c.game.tricksPlayed == 12);
   static final duringPass = Moment('during the pass', (c) => c.awaitingMyPass);
+  static final duringDeal = Moment('during the deal', (c) => c.game.phase == Phase.dealing);
+
   /// The first trick of a hand about to be led: after the deal and the
   /// pass, before a card is played.
   static final handBoundary = Moment('at a hand boundary', (c) => c.game.phase == Phase.playing && c.game.tricksPlayed == 0 && c.game.trick.isEmpty);
 
-  static final all = [onOwnTurn, offTurn, midTrick, lastTrick, duringPass, handBoundary];
+  static final all = [onOwnTurn, offTurn, midTrick, lastTrick, duringPass, duringDeal, handBoundary];
 
   @override
   String toString() => name;
 }
 
-enum Exit { leave, crash, idle }
+/// How a person goes.
+enum Going {
+  /// Their own leave, from the menu.
+  leave,
+
+  /// The app gone: its line closed, never back.
+  crash,
+
+  /// There, and doing nothing: the clock has them.
+  idle,
+
+  /// The phone off the network: the line down, and back after [ScriptedHuman.backAfterMs].
+  offline,
+}
 
 class ScriptedHuman {
-  ScriptedHuman(this.client, this.net, this.clock, {required this.persona, this.thinkMs = 800, this.pressBootMs = 500});
+  ScriptedHuman(this.client, this.line, this.clock, {required this.persona, this.thinkMs = 800, this.backAfterMs});
 
   final TableClient client;
-  final SimNetwork net;
+  final SimLine line;
   final VirtualClock clock;
   final Persona persona;
-  /// How long a move takes; a test makes one person slower than the
-  /// rest to put a departure after the others have acted.
-  int thinkMs;
-  final int pressBootMs;
 
-  Exit? exit;
-  Moment? exitAt;
+  /// How long a move takes.
+  int thinkMs;
+
+  /// For [Going.offline]: how long until the line is back, or never.
+  int? backAfterMs;
+
+  Going? going;
+  Moment? goAt;
   bool gone = false;
-  int? leftAtHand;
+  int? goneAtHand;
 
   late final Bot _bot = Bot(persona: persona);
   StreamSubscription<void>? _sub;
   bool _thinking = false;
-  final Set<int> _pressed = {};
 
   void start() {
     client.start();
@@ -67,71 +83,72 @@ class ScriptedHuman {
   }
 
   void _react() {
-    if (gone) return;
-    final at = exitAt;
+    if (gone || !client.started) return;
+    final at = goAt;
     if (at != null && client.game.handNumber >= at.fromHand && at.holds(client)) {
+      // Once: a phone back on the network carries on.
+      goAt = null;
       _go();
       return;
     }
-    if (client.awaitingMyPass || client.awaitingMyPlay) {
-      if (_thinking) return;
-      _thinking = true;
-      clock.schedule(thinkMs, () {
-        _thinking = false;
-        if (gone) return;
-        if (client.awaitingMyPass) {
-          client.pass(_bot.choosePass(client.game.handOf(client.mySeat!)));
-        } else if (client.awaitingMyPlay) {
-          final seat = client.mySeat!;
-          final view = BotView(
-            seat: seat,
-            hand: client.game.handOf(seat),
-            trick: client.game.trick,
-            played: client.played,
-            heartsBroken: client.game.heartsBroken,
-            isFirstTrick: client.game.isFirstTrick,
-            taken: client.game.taken,
-          );
-          client.play(_bot.chooseCard(view, client.game.legalPlaysFor(seat)));
-        }
-        _react();
-      });
-    }
-    for (var seat = 0; seat < seatCount; seat++) {
-      if (client.canBoot(seat) && _pressed.add(seat * 1000 + client.step)) {
-        clock.schedule(pressBootMs, () {
-          if (gone) return;
-          if (client.canBoot(seat)) {
-            client.boot(seat);
-          } else {
-            _pressed.remove(seat * 1000 + client.step); // not now; maybe later
-          }
-        });
+    if (!client.awaitingMyPass && !client.awaitingMyPlay) return;
+    if (_thinking) return;
+    _thinking = true;
+    clock.schedule(thinkMs, () {
+      _thinking = false;
+      if (gone) return;
+      final seat = client.mySeat!;
+      final g = client.game;
+      if (client.awaitingMyPass) {
+        client.pass(_bot.choosePass(g.handOf(seat)));
+      } else if (client.awaitingMyPlay) {
+        final view = BotView(
+          seat: seat,
+          hand: g.handOf(seat),
+          trick: g.trick,
+          played: client.rules.played,
+          heartsBroken: g.heartsBroken,
+          isFirstTrick: g.isFirstTrick,
+          taken: g.taken,
+        );
+        client.play(_bot.chooseCard(view, g.legalPlaysFor(seat)));
       }
-    }
+      _react();
+    });
   }
 
-  /// Leaves now, by [how], whatever the scenario said.
-  void depart(Exit how) {
+  /// Goes now, by [how], whatever the scenario said.
+  void depart(Going how) {
     if (gone) return;
-    exit = how;
+    going = how;
     _go();
   }
 
   void _go() {
     gone = true;
-    leftAtHand = client.game.handNumber;
-    switch (exit!) {
-      case Exit.leave:
+    goneAtHand = client.started ? client.game.handNumber : 0;
+    switch (going!) {
+      case Going.leave:
         client.leave();
-      case Exit.crash:
-        net.crash(client.signer.publicKey);
-      case Exit.idle:
-        net.goOffline(client.signer.publicKey);
+      case Going.crash:
+        line.close();
+      case Going.idle:
+        break;
+      case Going.offline:
+        line.hold();
+        final back = backAfterMs;
+        if (back != null) {
+          clock.schedule(back, () {
+            line.release();
+            gone = false;
+          });
+        }
     }
   }
 
-  void stop() {
-    _sub?.cancel();
-  }
+  /// Whether this person's client still reads the log: not crashed, and
+  /// not off the network for good.
+  bool get following => !gone || !(going == Going.crash || (going == Going.offline && line.held && backAfterMs == null));
+
+  void stop() => _sub?.cancel();
 }

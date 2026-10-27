@@ -35,21 +35,21 @@ void main() {
   }
 
   test('the tag goes in the path, and the tag is what everyone meets on', () async {
-    final object = JsRelay();
+    final object = Relay();
     await object.serve();
-    final marked = Uri.parse('${object.url}/$tagMark');
+    final marked = object.url;
     final a = RelayPresence(relays: [marked], signer: SchnorrSigner.generate(), everyMs: 300);
     final b = RelayPresence(relays: [marked], signer: SchnorrSigner.generate(), everyMs: 300);
     // The mark is gone by the time a socket is opened: presence put
     // its own topic where the object's name goes.
-    expect(a.relays.single, Uri.parse('${object.url}/${RelayPresence.topic}'));
+    expect(a.relays.single, object.url.replace(pathSegments: [RelayPresence.topic]));
     await Future.wait([a.ready, b.ready]).timeout(const Duration(seconds: 10));
     await until('the two devices did not see each other on the object',
         () => a.online(withinMs: 3000).contains(b.signer.publicKey) && b.online(withinMs: 3000).contains(a.signer.publicKey));
 
     // A client that opens the same host without a tag is somewhere
     // else: an object is reached by its name and by nothing else.
-    final elsewhere = RelayPresence(relays: [object.url], signer: SchnorrSigner.generate(), everyMs: 300);
+    final elsewhere = RelayPresence(relays: [object.url.replace(pathSegments: [])], signer: SchnorrSigner.generate(), everyMs: 300);
     await elsewhere.ready.timeout(const Duration(seconds: 10));
     await Future<void>.delayed(const Duration(milliseconds: 1500));
     expect(elsewhere.online(withinMs: 3000), {elsewhere.signer.publicKey});
@@ -81,11 +81,11 @@ void main() {
   });
 
   test('a device on the object and a device on the relays alone still see each other', () async {
-    final object = JsRelay();
+    final object = Relay();
     final relay = Relay();
     await object.serve();
     await relay.serve();
-    final both = [Uri.parse('${object.url}/$tagMark'), relay.url];
+    final both = [object.url, relay.url];
     final ours = RelayPresence(relays: both, signer: SchnorrSigner.generate(), everyMs: 300);
     // A filtered network, a device that simply cannot reach the
     // object: it reads the other relay and nothing else.

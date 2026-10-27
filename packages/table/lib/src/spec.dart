@@ -56,8 +56,14 @@ bool validTableId(String id) => RegExp(r'^[0-9a-f]{32}$').hasMatch(id);
 
 class TableSpec {
   const TableSpec(
-      {required this.id, required this.seed, required this.seats, this.rated = false, this.sealed = false, this.target = gameOverScore,
-      this.timing = TableTiming.standard});
+      {required this.id,
+      required this.seed,
+      required this.seats,
+      this.rated = false,
+      this.sealed = false,
+      this.target = gameOverScore,
+      this.timing = TableTiming.standard,
+      this.house});
 
   final String id;
 
@@ -87,24 +93,28 @@ class TableSpec {
   final TableTiming timing;
 
   /// The deal's seed at an unsealed table, where every seat can compute
-  /// every hand from it; at a sealed one, the randomness of the jury
-  /// draw and of the bots' public deal secrets.
+  /// every hand from it; at a sealed one, the randomness of the public
+  /// deal secret a seat takes when its person goes before its keys.
   final int seed;
+
+  /// The house's key at a sealed table: the operator's service, which
+  /// holds the bot seats and a piece of every person's escrow, and says
+  /// how the game came out (docs/explanation/live-play.md). The key the
+  /// build was made with; a table naming another is not sat at.
+  final PublicKey? house;
 
   /// Seat order, four holders.
   final List<SeatHolder> seats;
 
-  /// The spec on the wire: a start event's shape, and a summons's.
+  /// The spec on the wire, as the log's start carries it.
   Map<String, Object?> toJson() => {
         'id': id,
         'seed': seed,
         'rated': rated,
         'sealed': sealed,
         'target': target,
-        // Left out only where it is what every build reads a spec with
-        // none as (timing.dart): the standard has moved on from it, and
-        // a juror on another build reads this spec from a summons.
-        if (timing != TableTiming.unsaid) 'timing': timing.toJson(),
+        'timing': timing.toJson(),
+        if (house != null) 'house': house,
         'seats': [
           for (final h in seats)
             switch (h) {
@@ -114,8 +124,10 @@ class TableSpec {
         ],
       };
 
-  /// Null for anything that is not a four-seat spec.
-  static TableSpec? parse(Object? json) {
+  /// Null for anything that is not a four-seat spec. [legacy] reads the
+  /// spec of a game kept before the referee (legacy/v2_record.dart),
+  /// whose clocks nothing checks any more, with whatever timing it says.
+  static TableSpec? parse(Object? json, {bool legacy = false}) {
     try {
       final m = json as Map;
       final seats = <SeatHolder>[];
@@ -133,7 +145,8 @@ class TableSpec {
           rated: m['rated'] == true,
           sealed: m['sealed'] == true,
           target: m['target'] as int? ?? gameOverScore,
-          timing: TableTiming.parse(m['timing']));
+          timing: legacy ? TableTiming.parse(m['timing']) : TableTiming.exactly(m['timing']) ?? (throw const FormatException('timing')),
+          house: m['house'] as String?);
     } catch (_) {
       return null;
     }

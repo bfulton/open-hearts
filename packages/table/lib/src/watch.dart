@@ -28,7 +28,6 @@ import 'dart:async';
 import 'package:engine/engine.dart';
 
 import 'client.dart';
-import 'events.dart';
 import 'licence.dart';
 import 'signing.dart';
 import 'spec.dart';
@@ -93,18 +92,15 @@ class WatchedTable {
   /// What [client] shows anyone at its table now, with [names] by seat.
   factory WatchedTable.of(TableClient client, List<String> names) {
     final game = client.game;
-    final plays = <({int seat, Card card})>[];
-    for (final d in client.record) {
-      final e = d.event;
-      if (d.removal || e.kind != EventKind.play || d.turn.hand != game.handNumber) continue;
-      try {
-        plays.add((seat: e.body['seat'] as int, card: Card.parse(e.body['card'] as String)));
-      } catch (_) {}
-    }
+    final plays = [
+      for (final m in client.rules.moves)
+        if (m.hand == game.handNumber && m.card != null) (seat: m.seat, card: m.card!),
+    ];
+    final spec = client.tableSpec!;
     return WatchedTable(
-      table: client.spec.id,
-      target: client.spec.target,
-      seq: client.record.length,
+      table: spec.id,
+      target: spec.target,
+      seq: client.rules.log.length,
       hand: game.handNumber,
       phase: game.phase,
       names: names,
@@ -280,13 +276,13 @@ class WatchBroadcast {
   void close() => _sub.cancel();
 
   /// Whether [me] is the one to answer watchers at [client]'s table: of
-  /// the seats still held in person, the lowest key among those heard
-  /// from lately.
+  /// the seats still held in person, the lowest key among those whose
+  /// line to the referee is open.
   static bool answers(TableClient client, PublicKey me) {
-    final here = client.heardLately;
+    final down = client.rules.down;
     final seated = [
       for (final h in client.holders)
-        if (h is HumanSeat && here.contains(h.key)) h.key,
+        if (h is HumanSeat && (h.key == me || !down.containsKey(h.key))) h.key,
     ]..sort();
     return seated.isNotEmpty && seated.first == me;
   }

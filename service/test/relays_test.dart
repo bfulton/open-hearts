@@ -27,7 +27,7 @@ void main() {
 
   /// The next table message [t] hears, within a few seconds.
   Future<Map<String, Object?>> next(RelayTransport t) =>
-      t.incoming.first.then((m) => m.message).timeout(const Duration(seconds: 5));
+      t.watch.first.then((m) => m.content).timeout(const Duration(seconds: 5));
 
   test('peers writing to different relays hear each other, listening on both', () async {
     final a = SchnorrSigner.generate();
@@ -40,10 +40,10 @@ void main() {
     expect(ta.relays.first, isNot(tb.relays.first));
 
     final heardByB = next(tb);
-    ta.broadcast({'n': 1});
+    ta.sayWatch({'n': 1});
     expect(await heardByB, {'n': 1});
     final heardByA = next(ta);
-    tb.broadcast({'n': 2});
+    tb.sayWatch({'n': 2});
     expect(await heardByA, {'n': 2});
     expect(ta.refusal, isNull);
     expect(tb.refusal, isNull);
@@ -88,7 +88,7 @@ void main() {
     // takes; the message gets through either way, and with one relay
     // taking it, nothing is reported.
     final heard = next(tb);
-    ta.broadcast({'n': 1});
+    ta.sayWatch({'n': 1});
     expect(await heard, {'n': 1});
     expect(ta.refusal, isNull);
 
@@ -101,7 +101,7 @@ void main() {
       return 'pow: 28 bits needed';
     };
     final heard2 = next(tb);
-    ta.broadcast({'n': 2});
+    ta.sayWatch({'n': 2});
     expect(await heard2, {'n': 2});
     expect(refusalsAtR1, 0);
     ta.close();
@@ -120,7 +120,7 @@ void main() {
     await Future.wait([ta.allReady, tb.allReady]).timeout(const Duration(seconds: 5));
 
     final said = ta.refusals.first.timeout(const Duration(seconds: 5));
-    ta.broadcast({'n': 1});
+    ta.sayWatch({'n': 1});
     final reason = await said;
     expect(reason, isNotNull);
     expect(reason, anyOf(startsWith('pow:'), startsWith('rate-limited:')));
@@ -129,8 +129,8 @@ void main() {
     // Both relays are out of the running now: the next event goes
     // nowhere, quietly.
     var heardAny = false;
-    final sub = tb.incoming.listen((_) => heardAny = true);
-    ta.broadcast({'n': 2});
+    final sub = tb.watch.listen((_) => heardAny = true);
+    ta.sayWatch({'n': 2});
     await Future<void>.delayed(const Duration(milliseconds: 400));
     expect(heardAny, isFalse);
     await sub.cancel();
@@ -141,7 +141,7 @@ void main() {
     await Future<void>.delayed(const Duration(milliseconds: 800));
     final unsaid = ta.refusals.where((r) => r == null).first.timeout(const Duration(seconds: 5));
     final heard = next(tb);
-    ta.broadcast({'n': 3});
+    ta.sayWatch({'n': 3});
     expect(await heard, {'n': 3});
     await unsaid;
     expect(ta.refusal, isNull);

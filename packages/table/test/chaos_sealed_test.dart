@@ -1,11 +1,8 @@
-/// Sealed walks drawing from nine strangers rather than four, at seeds
-/// that exercise a verifier reading a hand's juries in another order
-/// than the table, a hand whose draws arrive out of order (with jurors
-/// let go of and summoned again, too), and an ending judged by jurors
-/// out of reach (`tool/chaos.dart --jurors 9`, docs/explanation/table-states.md). A
-/// file of their own, since a sealed walk takes a minute or two with
-/// every proof made afresh (seconds when the deal's answers are kept,
-/// package:deal/memo.dart) and the tests of one file run one after
+/// Sealed walks: the verifiable deal run for real, the house holding
+/// the bot seats, with its restarts and a slow line among the faults,
+/// and a seat that lies (`tool/chaos.dart --sealed`). A file of their
+/// own, since a sealed walk takes seconds with the deal's answers kept
+/// (package:deal/memo.dart) and the tests of one file run one after
 /// another.
 @Tags(['slow'])
 library;
@@ -17,9 +14,9 @@ import 'package:test/test.dart';
 void main() {
   late DealCrypto crypto;
   setUpAll(() async => crypto = await rememberedCrypto());
-  for (final (seed, sweep) in [(1, false), (2, false), (3, true), (4, false)]) {
-    test('sealed chaos $seed, nine strangers${sweep ? ', let go and summoned again' : ''}',
-        () => expect(walkChaos(seed, crypto: crypto, jurors: 9, sweep: sweep), isNull),
-        timeout: const Timeout(Duration(minutes: 10)));
+  for (var seed = 0; seed < 12; seed++) {
+    test('sealed chaos $seed', () => expect(walkChaos(seed, crypto: crypto), isNull), timeout: const Timeout(Duration(minutes: 10)));
   }
+  test('sealed chaos with the deal\'s slow calls on a worker', () => expect(walkChaos(3, crypto: crypto, workers: true), isNull),
+      timeout: const Timeout(Duration(minutes: 10)));
 }

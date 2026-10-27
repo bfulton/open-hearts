@@ -27,11 +27,11 @@ Activation activationFor(PublicKey key, String account, int epoch) {
 
 void main() {
   setUpAll(() => installNativeSchnorr());
-  late JsRelay relay;
+  late Relay relay;
   final shown = <PublicKey, Activation>{};
   final turnedAway = <String>[];
   setUp(() async {
-    relay = JsRelay(gate: _service);
+    relay = Relay(gate: _service);
     await relay.serve();
     shown.clear();
     turnedAway.clear();
@@ -50,7 +50,7 @@ void main() {
 
   /// The next table message [t] hears, or null within [ms].
   Future<Map<String, Object?>?> next(RelayTransport t, {int ms = 3000}) =>
-      t.incoming.first.then<Map<String, Object?>?>((m) => m.message).timeout(Duration(milliseconds: ms), onTimeout: () => null);
+      t.watch.first.then<Map<String, Object?>?>((m) => m.content).timeout(Duration(milliseconds: ms), onTimeout: () => null);
 
   test('a device with no activation is carried nothing; one with one is', () async {
     final stranger = SchnorrSigner.generate();
@@ -60,13 +60,13 @@ void main() {
     final speaking = RelayTransport(relays: [relay.url], signer: stranger, table: 't1');
     await listening.ready.timeout(const Duration(seconds: 5));
     final heard = next(listening);
-    speaking.broadcast({'from': 'nobody'});
+    speaking.sayWatch({'from': 'nobody'});
     expect(await heard, isNull, reason: 'a device the service has not vouched for says nothing here');
     shown[stranger.publicKey] = activationFor(stranger.publicKey, _bao, 1);
     final other = RelayTransport(relays: [relay.url], signer: stranger, table: 't1');
     await other.ready.timeout(const Duration(seconds: 5));
     final heardNow = next(listening);
-    other.broadcast({'from': 'bao'});
+    other.sayWatch({'from': 'bao'});
     expect(await heardNow, {'from': 'bao'});
     for (final t in [listening, speaking, other]) {
       t.close();
@@ -83,7 +83,7 @@ void main() {
     final atBao = RelayTransport(relays: [relay.url], signer: bao, table: 't2');
     await Future.wait([onPhone.ready, atBao.ready]).timeout(const Duration(seconds: 5));
     final first = next(atBao);
-    onPhone.broadcast({'n': 1});
+    onPhone.sayWatch({'n': 1});
     expect(await first, {'n': 1});
 
     // The laptop takes the account up.
@@ -95,10 +95,10 @@ void main() {
     }
     expect(turnedAway, [startsWith('superseded:')], reason: 'the phone is told, once');
     final after = next(atBao, ms: 1500);
-    onPhone.broadcast({'n': 2});
+    onPhone.sayWatch({'n': 2});
     expect(await after, isNull, reason: 'and carried nothing from then on');
     final fromLaptop = next(atBao);
-    onLaptop.broadcast({'n': 3});
+    onLaptop.sayWatch({'n': 3});
     expect(await fromLaptop, {'n': 3});
     // Nor does it come back on what it was given: it does not try, and
     // the relay holds the other two.

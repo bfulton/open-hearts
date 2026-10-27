@@ -19,9 +19,9 @@ void main() {
     t.start();
     // Into the play of the first hand: some tricks in, the hand not over.
     final c = t.people.first.client;
-    expect(t.clock.runUntil(() => c.game.phase == Phase.playing && c.game.tricksPlayed >= 2, limitMs: 10 * 60 * 1000), isTrue);
+    expect(t.clock.runUntil(() => c.started && c.game.phase == Phase.playing && c.game.tricksPlayed >= 2, limitMs: 10 * 60 * 1000), isTrue);
     final v = WatchedTable.of(c, names);
-    expect(v.table, c.spec.id);
+    expect(v.table, c.tableSpec!.id);
     expect(v.hand, c.game.handNumber);
     expect(v.phase, Phase.playing);
     expect(v.plays.length, greaterThanOrEqualTo(8));
@@ -36,7 +36,7 @@ void main() {
     expect(v.keys, [for (final h in c.holders) h is HumanSeat ? h.key : null]);
     expect(v.accounts, [for (final h in c.holders) h is HumanSeat ? h.account : null]);
     final json = jsonEncode(v.toJson());
-    final back = WatchedTable.parse(jsonDecode(json), table: c.spec.id)!;
+    final back = WatchedTable.parse(jsonDecode(json), table: c.tableSpec!.id)!;
     expect(back.toJson(), v.toJson());
     expect(WatchedTable.parse(jsonDecode(json), table: 'another table'), isNull, reason: 'a view of one table is not another\'s');
 
@@ -45,7 +45,7 @@ void main() {
     final end = WatchedTable.of(c, names);
     expect(end.over, isTrue);
     expect(end.winners, c.game.winners);
-    t.stop();
+    t.close();
   });
 
   test('nonsense does not read as a view', () {
@@ -148,6 +148,6 @@ void main() {
         if (WatchBroadcast.answers(p.client, p.client.signer.publicKey)) p.client.signer.publicKey,
     ];
     expect(answering, [keys.first], reason: 'exactly one, the lowest');
-    t.stop();
+    t.close();
   });
 }

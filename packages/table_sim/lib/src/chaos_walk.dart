@@ -1,527 +1,216 @@
-/// One random walk through the simulator's faults, and the invariants
-/// that must hold whatever happens: survivors never hold conflicting
-/// decisions, every record verifies as far as it goes, and as kept once
-/// the walk is over, every observed state change is one the model in
-/// the table's model.dart allows, and once the faults stop and the
-/// network heals no two sides still up hold a held seat's escrow
-/// differently, and the table finishes — or is paused for the one
-/// reason left, the jury gone and nobody online to draw another, or has
-/// ended for it once that went on long enough. The test walks forty
-/// seeds on every commit; the tool walks as many as asked, sealed too.
+/// A random walk through what can go wrong at a refereed table, one seed
+/// each: a table of one to four people, sealed or not, and faults thrown
+/// at it as it plays — people going every way at every moment, devices
+/// reloaded, sockets dropping, phones off the network for a while, a
+/// slow line, the house restarted, a seat that lies — and every
+/// invariant of the table checked when it is over. Deterministic: a
+/// seed that broke once breaks again (docs/how-to/run-the-chaos-walk.md).
 library;
 
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:deal/deal.dart';
 import 'package:engine/engine.dart';
 import 'package:table/table.dart';
 
-import 'scenarios.dart';
+import 'lies.dart';
+import 'scripted_human.dart';
 import 'sim_table.dart';
-import 'structure.dart';
 
-/// Transitive closure of a transition relation, so a state sampled
-/// after several steps is still checked against the model.
-Map<T, Set<T>> closure<T>(Map<T, Set<T>> direct) {
-  final out = {for (final e in direct.entries) e.key: Set.of(e.value)};
-  var changed = true;
-  while (changed) {
-    changed = false;
-    for (final from in out.keys) {
-      for (final mid in List.of(out[from]!)) {
-        for (final to in out[mid]!) {
-          if (out[from]!.add(to)) changed = true;
-        }
+/// Null when every invariant held at [seed]; what broke, and the faults
+/// that led there, when one did not. [crypto] runs it sealed; [workers]
+/// makes the deal's slow calls in a worker that takes a browser's time.
+/// [tally] counts what the walks did: how games ended, how seats were
+/// given up, the faults thrown.
+String? walkChaos(int seed, {DealCrypto? crypto, bool workers = false, bool traces = false, Map<String, int>? tally}) {
+  void count(String what) {
+    if (tally != null) tally[what] = (tally[what] ?? 0) + 1;
+  }
+
+  final r = Random(seed);
+  final sealed = crypto != null;
+  final humans = 1 + r.nextInt(4);
+  final faults = <String>[];
+  final conducts = <int, SeatConduct>{};
+  if (sealed && humans > 1 && r.nextInt(5) == 0) {
+    final liar = r.nextInt(humans);
+    final lie = [Lie.declare, Lie.withhold][r.nextInt(2)];
+    conducts[liar] = lie;
+    faults.add('p$liar lies: ${lie.name}');
+  }
+  final slowHouse = sealed && r.nextInt(5) == 0 ? 1000 + r.nextInt(5000) : null;
+  if (slowHouse != null) faults.add('the house ${slowHouse}ms away');
+  final t = SimTable(
+    humans: humans,
+    seed: seed,
+    crypto: crypto,
+    target: r.nextBool() ? 26 : gameOverScore,
+    botsFirst: r.nextBool(),
+    workers: workers,
+    latencyMs: 10 + r.nextInt(150),
+    houseLatencyMs: slowHouse,
+    conducts: conducts,
+    traces: traces,
+  );
+  final silence = t.spec.timing.silenceMs;
+
+  // What may take a person's seat: a way of going, a long silence, a
+  // lie told and found out.
+  final mayLose = <int>{};
+  final mayLeave = <int>{};
+  for (var i = 0; i < humans; i++) {
+    final p = t.people[i];
+    if (r.nextInt(5) < 2) {
+      final going = Going.values[r.nextInt(Going.values.length)];
+      final moments = [for (final m in Moment.all) if (sealed || m != Moment.duringDeal) m];
+      final m = moments[r.nextInt(moments.length)];
+      final at = Moment(m.name, m.holds, fromHand: r.nextInt(3));
+      p
+        ..going = going
+        ..goAt = at;
+      if (going == Going.offline) {
+        p.backAfterMs = [null, silence ~/ 2, silence + 15000][r.nextInt(3)];
       }
+      mayLose.add(i);
+      if (going == Going.leave) mayLeave.add(i);
+      faults.add('p$i goes by ${going.name} ${at.name} from hand ${at.fromHand}'
+          '${going == Going.offline ? ', back ${p.backAfterMs == null ? 'never' : 'after ${p.backAfterMs}ms'}' : ''}');
+    }
+    if (conducts[i] == Lie.declare) mayLose.add(i);
+    if (r.nextInt(5) == 0) {
+      final at = 5000 + r.nextInt(300000);
+      final away = 1000 + r.nextInt(14000);
+      faults.add('p$i reloads at ${at}ms, away ${away}ms');
+      t.clock.schedule(at, () => t.reload(i, awayMs: away));
+    }
+    for (var k = r.nextInt(4); k > 0; k--) {
+      final at = 2000 + r.nextInt(400000);
+      final back = 300 + r.nextInt(5000);
+      faults.add('p$i\'s socket drops at ${at}ms, back after ${back}ms');
+      t.clock.schedule(at, () {
+        t.lines[i]
+          ..reconnectMs = back
+          ..drop();
+      });
     }
   }
-  return out;
-}
-
-final turnClosure = closure(turnTransitions);
-final seatClosure = closure(seatTransitions);
-final tableClosure = closure(tableTransitions);
-final heldSeatClosure = closure({for (final e in heldSeatTransitions.entries) e.key: e.value.keys.toSet()});
-final handClosure = closure({for (final e in handTransitions.entries) e.key: e.value.keys.toSet()});
-
-/// Two records conflict when they settle the same turn differently: two
-/// different actions, or an action by a seat that the other record
-/// removed at that very turn instead. (A seat that passed and was then
-/// claimed gone at its pass position holds both, in that order, and
-/// that is one story, not two.)
-String? conflict(List<Decision> a, List<Decision> b) {
-  final actionsA = {for (final d in a) if (!d.removal) d.turn: d};
-  final actionsB = {for (final d in b) if (!d.removal) d.turn: d};
-  for (final t in actionsA.keys) {
-    final x = actionsA[t]!;
-    final y = actionsB[t];
-    if (y != null && x.key != y.key) return 'two actions at $t: ${x.event} vs ${y.event}';
-  }
-  String? instead(List<Decision> r, Map<TurnId, Decision> actions, Decision d) {
-    final removed = r.any((x) => x.removal && x.turn == d.turn && x.event.seat == d.event.seat);
-    final held = actions[d.turn]?.key == d.key;
-    if (removed && !held) return 'action by seat ${d.event.seat} at ${d.turn} vs its removal there';
-    return null;
-  }
-  for (final d in a) {
-    if (d.removal) continue;
-    final why = instead(b, actionsB, d);
-    if (why != null) return why;
-  }
-  for (final d in b) {
-    if (d.removal) continue;
-    final why = instead(a, actionsA, d);
-    if (why != null) return why;
-  }
-  return null;
-}
-
-class _Observed {
-  final Map<TurnId, TurnState> turns = {};
-  final Map<int, SeatState> seats = {};
-  TableState? table;
-
-  /// The hand last seen, where it stood, and its held bot seats.
-  int? hand;
-  HandState? handState;
-  final Map<int, HeldSeatState> held = {};
-}
-
-/// [c]'s record as a viewer reads it once kept: through its JSON
-/// ([GameRecord]), signatures checked. Null where it does not read back.
-GameRecord? keptOf(TableClient c) => GameRecord.parse(jsonDecode(jsonEncode(GameRecord.of(c).toJson())));
-
-bool _sameList(List<Object?> a, List<Object?> b) {
-  if (a.length != b.length) return false;
-  for (var i = 0; i < a.length; i++) {
-    if (a[i] != b[i]) return false;
-  }
-  return true;
-}
-
-/// Whether any two sides still following the table read a different
-/// juror for a bot seat, once everything has arrived.
-///
-/// The assignment is a function of the record — the hand's first jury
-/// and the seats that were bots when the hand began — so two sides
-/// that differ have read different records, and neither will take
-/// what the other says for the seat: one waits for keys the other
-/// juror is busy not making. It is legal for that to happen while a
-/// draw or a departure is still in flight, which is what
-/// `DealDriver.refixHolders` repairs; what is never legal is for it to stand
-/// after the faults have stopped and the network has healed.
-///
-/// A side that has heard no jury for the hand answers nothing, and
-/// that is not a disagreement — it is a side that has not been told
-/// yet.
-///
-/// The walk's other invariants are each about one side's own story:
-/// the states it passes through, the record it holds, whether it
-/// finishes. This is the one that asks two sides the same question.
-String? disagreed(SimTable t) {
-  final following = [
-    ...t.survivors,
-    for (final j in t.jurors)
-      if (!j.gone && j.client != null) j.client!,
-  ];
-  var lastHand = 0;
-  for (final c in following) {
-    if (c.game.handNumber > lastHand) lastHand = c.game.handNumber;
-  }
-  String held(Map<int, PublicKey> m) =>
-      (m.entries.map((e) => '${e.key}:${e.value.substring(0, 4)}').toList()..sort()).join(' ');
-  for (var hand = 0; hand <= lastHand; hand++) {
-    final answers = <String, List<String>>{};
-    for (final c in following) {
-      final h = c.botHolders(hand);
-      if (h.isEmpty) continue;
-      answers.putIfAbsent(held(h), () => []).add(c.signer.publicKey.substring(0, 4));
-    }
-    if (answers.length > 1) {
-      return 'hand $hand: two sides read different jurors for its bot seats\n'
-          '${answers.entries.map((e) => '  ${e.value.join(', ')}: ${e.key}').join('\n')}';
-    }
-  }
-  return null;
-}
-
-/// A juror drawn by the table from an account seated at it — another
-/// device of a player — or two devices of one account following the
-/// table at once: what accounts and one device at a time are there to
-/// stop (docs/explanation/live-play.md). A device that has gone does not count.
-String? accountTwice(SimTable t) {
-  final p = t.presence;
-  if (p == null) return null;
-  final seated = t.spec.accounts;
-  for (final c in [...t.clients, for (final j in t.jurors) if (j.client != null) j.client!]) {
-    for (final d in c.juries) {
-      for (final k in d.event.jurors) {
-        if (seated.contains(p.accountOf(k))) return 'a jury drew ${k.substring(0, 4)}, a device of an account seated at the table';
-      }
-    }
-  }
-  final following = <String, int>{};
-  for (final person in t.people) {
-    if (person.gone || !person.client.amSeated) continue;
-    final a = p.accountOf(person.client.signer.publicKey);
-    following[a] = (following[a] ?? 0) + 1;
-  }
-  for (final j in t.jurors) {
-    if (j.gone || j.client == null) continue;
-    final a = p.accountOf(j.signer.publicKey);
-    following[a] = (following[a] ?? 0) + 1;
-  }
-  for (final e in following.entries) {
-    if (e.value > 1) return '${e.key.substring(0, 4)} is at the table on ${e.value} devices at once';
-  }
-  return null;
-}
-
-/// Walks [seed] to its end — sealed, with the verifiable deal run for
-/// real, when [crypto] is given — and returns the first invariant it
-/// broke, with the faults that led there, or null when every one held.
-///
-/// [jurors] strangers to draw from, and with [sweep] each lets go of
-/// the table once it has served, as the duty does ([SimTable]); its
-/// clients' traces go to [jurorLog]. With [workers], every device
-/// makes the deal's slow calls in a worker taking a browser's time.
-String? walkChaos(int seed,
-    {DealCrypto? crypto,
-    StructureLog? structure,
-    int jurors = 4,
-    bool sweep = false,
-    bool workers = false,
-    bool twins = false,
-    void Function(String line)? jurorLog}) {
-  final sc = ChaosScenario(seed, crypto: crypto, jurors: jurors, sweepJurors: sweep, workers: workers, twins: twins);
-  final t = sc.table;
-  for (final j in t.jurors) {
-    j.log = jurorLog;
-  }
-  final observed = {for (final c in t.clients) c: _Observed()};
-  String faults() => sc.faults.join('; ');
-
-  // Up and following the table: a juror drawn whose summons never
-  // reached it has no client, holds no piece it could release and
-  // hears no appeal — and the table stops counting it thirty seconds
-  // after the draw, having never heard from it.
-  Set<PublicKey> upNow() => {for (final j in t.liveJurors) if (j.client != null) j.signer.publicKey};
-
-  // And of those, the ones [c] can reach just now. A juror across a
-  // partition is up and can do nothing for this side: nothing it says
-  // arrives, and the side ends the game on exactly that silence, which
-  // it cannot tell from a crash (docs/explanation/live-play.md).
-  Set<PublicKey> reachableFrom(TableClient c) =>
-      {for (final k in upNow()) if (t.net.canReach(c.signer.publicKey, k)) k};
-
-  // Taken the instant each side ends the game, not at the next check:
-  // a partition that heals in the five seconds between would make an
-  // ending over a silence look like one with a juror in reach.
-  final reachAtEnd = <TableClient, Set<PublicKey>>{};
-  for (final c in t.clients) {
-    c.changes.listen((_) {
-      if (c.failure != null && !reachAtEnd.containsKey(c)) reachAtEnd[c] = reachableFrom(c);
-    });
+  if (sealed && r.nextInt(5) == 0) {
+    final at = 10000 + r.nextInt(300000);
+    final away = 1000 + r.nextInt(t.spec.timing.houseGraceMs ~/ 2);
+    faults.add('the house restarts at ${at}ms, away ${away}ms');
+    t.clock.schedule(at, () => t.restartHouse(afterMs: away));
   }
 
-  // A seat a side is stopped at, or ended the game at, that nobody
-  // still up can open: a held seat with its own juror not among them
-  // and fewer of the jurors holding a piece of it than it takes to
-  // rebuild it; a departed person's with none of the jury the deal
-  // was sealed to. The table stopped there says so
-  // (docs/explanation/fair-deal.md), no juror up could end it, and after long
-  // enough the game ends (docs/explanation/live-play.md):
-  // at a play, waiting for the jury; at the audit or a departed
-  // seat's hand, stalled opening the hand. Judged here from who
-  // really is up, not from what the table believes.
-  bool unopenable(TableClient c, Set<PublicKey> up) {
-    final w = c.waitingOnGoneJury;
-    final f = c.failedAt;
-    final waits = [
-      if (w != null) (hand: w.turn.hand, seat: w.seat),
-      if (f != null) (hand: f.turn.hand, seat: f.seat),
-      for (final e in c.stalled.entries) (hand: e.key.hand, seat: e.value),
-    ];
-    if (waits.isEmpty) return false;
-    return waits.every((x) => !c.escrow.openableBy(x.hand, x.seat, up.contains));
+  for (final f in faults) {
+    count('fault: ${f.replaceAll(RegExp(r'p\d'), 'p').replaceAll(RegExp(r' (at|after|from hand) \S+'), '').replaceAll(RegExp(r', away \S+'), '').replaceAll(RegExp(r'\d+ms'), 'n')}');
   }
+  String broke(String what) => '$what\n  faults: ${faults.isEmpty ? 'none' : faults.join('; ')}'
+      '${traces ? '\n${t.trace.skip(max(0, t.trace.length - 60)).join('\n')}' : ''}';
 
-  // Stopped where nobody really up could move the table: a seat nobody
-  // up could open, or a turn put to the jury — split, or open while
-  // the table waits for want of a majority — with none of the hand's
-  // jurors up to rule on it. The game ends there
-  // (docs/explanation/live-play.md), and only there.
-  // Waiting for a jury that can hold the bot seats, with too few
-  // jurors up and in reach to make one: the hand is never dealt with
-  // its bots in the open, so the table waits and says so, and only a
-  // juror coming up moves it (docs/explanation/live-play.md). With enough of them up, the
-  // wait is a fault. Not counting the jurors the side has let go of
-  // for holding a seat's turn and not playing it, which it does not
-  // draw again (TableClient.letGo).
-  bool starved(TableClient c) => c.shortOfJurors && reachableFrom(c).difference(c.letGo).length < juryToHoldBots;
-
-  bool immovable(TableClient c, Set<PublicKey> up) {
-    if (unopenable(c, up)) return true;
-    final f = c.failedAt;
-    final hand = f?.turn.hand ?? c.game.handNumber;
-    final putToJury = f != null || c.tableState == TableState.pausedForJury || c.tableState == TableState.pausedForPeers;
-    return putToJury && !c.jurorsOf(hand).any(up.contains);
-  }
-
-  // A game ended for a lost quorum is judged the moment it is seen,
-  // against who is up then: a juror blipped away and back later would
-  // make it look premature at the end of the walk when it was not.
-  final judged = <TableClient>{};
-
-  String? check(String when) {
-    // Read only: what each side waits for, for docs/explanation/table-states.md.
-    structure?.take(t);
-    final twice = accountTwice(t);
-    if (twice != null) return '$when: $twice';
-    final survivors = t.survivors.toList();
-    for (final c in survivors) {
-      if (c.failure == null || !judged.add(c)) continue;
-      if (!immovable(c, reachAtEnd[c] ?? reachableFrom(c))) {
-        return '$when: ${c.signer.publicKey.substring(0, 6)} ended the game, ${c.failure!.label}, '
-            'with a juror it could reach that could move the table\n${c.describe()}';
-      }
-    }
-    for (var i = 0; i < survivors.length; i++) {
-      for (var j = i + 1; j < survivors.length; j++) {
-        final why = conflict(survivors[i].record, survivors[j].record);
-        if (why != null) return '$when: a fork between two survivors: $why';
-      }
-    }
-    for (final c in survivors) {
-      final v = verifyRecord(t.spec, c.record, allowPartial: true, juries: c.juries, crypto: t.crypto, releases: c.releases);
-      if (!v.ok) return '$when: ${c.signer.publicKey.substring(0, 6)} record: ${v.reason}';
-    }
-    // A juror has no part in a hand that was over before its summons,
-    // and every way of taking one is closed where it starts: the
-    // client's last refusal ([TableClient.saidBeforeSummons]) is never
-    // what stops it.
-    for (final j in t.jurors) {
-      if (j.saidBeforeSummons > 0) {
-        return '$when: juror ${j.signer.publicKey.substring(0, 4)} went to say something about a hand before its summons';
-      }
-    }
-    for (final c in t.clients) {
-      final o = observed[c]!;
-      for (final e in c.turnStates.entries) {
-        final before = o.turns[e.key];
-        if (before != null && before != e.value && !turnClosure[before]!.contains(e.value)) {
-          return '$when: turn ${e.key} went $before → ${e.value}';
-        }
-        o.turns[e.key] = e.value;
-      }
-      for (var s = 0; s < seatCount; s++) {
-        final now = c.seatStateOf(s);
-        final before = o.seats[s];
-        if (before != null && before != now && !seatClosure[before]!.contains(now)) {
-          return '$when: seat $s went $before → $now';
-        }
-        o.seats[s] = now;
-      }
-      final now = c.tableState;
-      final before = o.table;
-      if (before != null && before != now && !tableClosure[before]!.contains(now)) {
-        return '$when: table went $before → $now';
-      }
-      o.table = now;
-      // A hand moves as handTransitions allows; one this side has moved
-      // on from ended where its last state could reach, and for good.
-      final hand = c.game.handNumber;
-      final handNow = c.handState;
-      if (o.hand == hand) {
-        final was = o.handState!;
-        if (was != handNow && !handClosure[was]!.contains(handNow)) return '$when: hand $hand went $was → $handNow';
-      } else if (o.hand != null) {
-        final was = o.handState!;
-        final ended = c.handOutcome(o.hand!);
-        if (ended == null) return '$when: hand ${o.hand} left behind at $was with no ending';
-        if (ended != was && !handClosure[was]!.contains(ended)) return '$when: hand ${o.hand} went $was → $ended';
-        if (handTransitions[ended]!.isNotEmpty) return '$when: hand ${o.hand} left behind at $ended, which is not an end';
-        o.held.clear();
-      }
-      o.hand = hand;
-      o.handState = handNow;
-      // A held bot seat goes to the escrow for the rest of its hand and
-      // never comes back from it.
-      for (var s = 0; s < seatCount; s++) {
-        final heldNow = c.heldSeatState(s);
-        final was = o.held[s];
-        if (heldNow == null) {
-          if (was != null) return '$when: hand $hand held seat $s went $was → not held';
-          continue;
-        }
-        if (was != null && was != heldNow && !heldSeatClosure[was]!.contains(heldNow)) {
-          return '$when: hand $hand held seat $s went $was → $heldNow';
-        }
-        o.held[s] = heldNow;
-      }
-    }
-    return null;
-  }
-
+  t.start();
   try {
-    t.start();
-    sc.schedule();
-    var next = 5000;
-    while (t.clock.nowMs < sc.quietAt && !t.survivors.every((c) => c.done)) {
-      t.clock.advanceTo(next);
-      final why = check('t=${t.clock.nowMs} after [${faults()}]');
-      if (why != null) return why;
-      next += 5000;
+    if (!t.run(limitMs: 8 * 60 * 60 * 1000)) {
+      return broke('the game did not end: ${[for (final c in t.following) c.rules.describe()].join(' / ')}');
     }
-    sc.quiet();
-    t.run();
-    final why = check('at the end after [${faults()}]');
-    if (why != null) return why;
-    final apart = disagreed(t);
-    if (apart != null) return '$apart; faults were [${faults()}]';
-    // A held seat given to the escrow is on the record, so once the
-    // faults have stopped and the network has healed, two sides still
-    // playing at the same hand hold the seat alike: anything else is
-    // two records, not a message in flight (docs/explanation/table-states.md). Not a
-    // side whose game has ended for a lost quorum: it says nothing new,
-    // and a claim it carried just before is one the others may never
-    // hear — over a game that is over, and unscored.
-    final playing = [
-      for (final p in t.people)
-        if (!p.gone && p.client.failure == null) p.client,
-      for (final j in t.jurors)
-        if (!j.gone && j.client != null && j.client!.serving && j.client!.failure == null) j.client!,
-    ];
-    final byHand = <int, List<TableClient>>{};
-    for (final c in playing) {
-      byHand.putIfAbsent(c.game.handNumber, () => []).add(c);
-    }
-    for (final MapEntry(key: hand, value: at) in byHand.entries) {
-      for (var seat = 0; seat < seatCount; seat++) {
-        final states = {for (final c in at) c.heldSeatState(seat)}..remove(null);
-        if (states.length > 1) return 'apart on the escrow at the end: hand $hand seat $seat; faults were [${faults()}]';
-      }
-    }
-    // And the way each person went, on every record that has it — the
-    // jurors' beside the people's, those that have stopped serving and
-    // those whose game ended for a lost quorum among them, since a
-    // record holds only what carried. A leave is carried as a boot is,
-    // so a seat left on one record and booted on another is two
-    // majorities. The record's key for a removal names its turn and
-    // seat and not the door, so the door is compared here.
-    final records = [
-      for (final p in t.people) p.client,
-      for (final j in t.jurors)
-        if (j.client != null) j.client!,
-    ];
-    // Which ways out must read alike everywhere is what seatExits says
-    // of each (the table's model.dart): every one decided on the record.
-    const doors = {EventKind.leave: SeatState.left, EventKind.boot: SeatState.booted, EventKind.absent: SeatState.absent};
-    for (var seat = 0; seat < seatCount; seat++) {
-      final exits = <String, List<String>>{};
-      for (final c in records) {
-        for (final d in c.record) {
-          final door = doors[d.event.kind];
-          if (!d.removal || d.event.seat != seat || door == null || seatExits[door] != Decided.onRecord) continue;
-          exits.putIfAbsent('${d.event.kind.name} at ${d.turn}', () => []).add(c.signer.publicKey.substring(0, 4));
-        }
-      }
-      if (exits.length > 1) {
-        return 'apart on a seat at the end: seat $seat ${exits.entries.map((e) => '${e.key} at ${e.value.join(', ')}').join('; ')}; '
-            'faults were [${faults()}]';
-      }
-    }
-
-    final survivors = t.survivors.toList();
-    final finished = survivors.every((c) => c.done);
-    for (final c in survivors) {
-      final kept = keptOf(c);
-      if (kept == null) return '${c.signer.publicKey.substring(0, 6)} holds a record that does not read back as kept';
-      final v = verifyRecord(t.spec, kept.record, allowPartial: !finished, juries: kept.juries, crypto: t.crypto, releases: kept.releases);
-      if (!(v.ok && (v.complete || !finished))) {
-        return '${c.signer.publicKey.substring(0, 6)} record as kept does not verify${finished ? ' complete' : ''}: ${v.reason}';
-      }
-    }
-    if (survivors.isEmpty) {
-      // The last player still running was replaced while cut off, and
-      // then everyone else went: a dead table. Every client still
-      // running has to know it has no seat, and hold a sound record.
-      for (final p in t.people.where((p) => !p.gone)) {
-        if (p.client.amSeated) return 'a dead table, yet a client thinks it is seated; faults were [${faults()}]\n${p.client.describe()}';
-        final v = verifyRecord(t.spec, p.client.record, allowPartial: true, juries: p.client.juries, crypto: t.crypto, releases: p.client.releases);
-        if (!v.ok) return 'a dead table with an unsound record: ${v.reason}';
-      }
-    } else if (finished) {
-      final keysOf = [for (final c in survivors) c.record.map((d) => d.key).toList()];
-      for (final r in keysOf) {
-        if (!_sameList(r, keysOf.first)) return 'survivors hold different records; faults were [${faults()}]';
-      }
-      final v = verifyRecord(t.spec, survivors.first.record, juries: survivors.first.juries, crypto: t.crypto, releases: survivors.first.releases);
-      if (!(v.ok && v.complete)) return 'the finished record does not verify complete: ${v.reason}';
-    } else if (survivors.any((c) => c.done)) {
-      // Some sides finished, and the rest ended the game for themselves.
-      // A side cut off from the rest, with no juror it can reach, ends
-      // the game once everyone it cannot hear has been silent as long
-      // as a person is given, and by then the rest, a majority, have
-      // put it out at its turn and played on (docs/explanation/live-play.md).
-      // The sides that finished hold one record, complete, and every
-      // side that ended is out on it; its ending was judged when it
-      // was seen.
-      final over = [for (final c in survivors) if (c.done) c];
-      final keysOf = [for (final c in over) c.record.map((d) => d.key).toList()];
-      for (final r in keysOf) {
-        if (!_sameList(r, keysOf.first)) return 'survivors that finished hold different records; faults were [${faults()}]';
-      }
-      final v = verifyRecord(t.spec, over.first.record, juries: over.first.juries, crypto: t.crypto, releases: over.first.releases);
-      if (!(v.ok && v.complete)) return 'the finished record does not verify complete: ${v.reason}';
-      for (final c in survivors.where((c) => !c.done)) {
-        if (c.tableState != TableState.failed) {
-          return 'some finished, and ${c.signer.publicKey.substring(0, 6)} neither finished nor ended the game; '
-              'faults were [${faults()}]\n${c.describe()}';
-        }
-        if (over.first.holders[c.mySeat!] is HumanSeat) {
-          return '${c.signer.publicKey.substring(0, 6)} ended the game, and the record that finished it still seats it; '
-              'faults were [${faults()}]';
-        }
-      }
-    } else {
-      final up = upNow();
-      const paused = {TableState.pausedForJury, TableState.pausedForPeers, TableState.pausedForDeal};
-      for (final c in survivors) {
-        // Ended for a lost quorum, and judged fair when it was seen.
-        if (c.tableState == TableState.failed) continue;
-        if (c.tableState == TableState.playing && starved(c)) continue;
-        // Stopped for good where nobody up could move it: the game
-        // ends rather than wait on a jury that is gone.
-        if (immovable(c, up)) {
-          return 'stopped for good where nobody up could move the table, and the game did not end; '
-              'faults were [${faults()}]\n${c.describe()}';
-        }
-        if (!paused.contains(c.tableState)) {
-          return 'not finished, and not paused saying why; faults were [${faults()}]\n${c.describe()}';
-        }
-        if (c.tableState == TableState.pausedForDeal) {
-          // A departed seat's hand that no juror is left to open: the
-          // escrow's price, and only ever with the whole jury gone —
-          // which, left long enough, ends the game.
-          if (c.pause != Pause.openingHand) {
-            return 'paused for the deal for a reason other than an unopenable hand; faults were [${faults()}]\n${c.describe()}';
-          }
-          continue;
-        }
-        final notAMajority = survivors.length < c.participants.length ~/ 2 + 1;
-        if (!(notAMajority || c.stuckSplit != null || unopenable(c, up))) {
-          return 'paused for a reason other than no majority or an even split; faults were [${faults()}]\n${c.describe()}';
-        }
-      }
-      // With a jury there is no pause a live juror could not end — save
-      // the one above, which none could.
-      if (up.isNotEmpty && !survivors.where((c) => c.failure == null).every((c) => unopenable(c, up) || starved(c))) {
-        return 'paused with a juror still up; faults were [${faults()}]\n${survivors.first.describe()}';
-      }
-    }
-    return null;
+    final liars = {for (final e in conducts.entries) if (e.value == Lie.declare) e.key};
+    final problem = tableProblems(t, mayLose: mayLose, mayLeave: mayLeave, liars: liars, count: count);
+    return problem == null ? null : broke(problem);
+  } catch (e, st) {
+    return broke('threw: $e\n${st.toString().split('\n').take(8).join('\n')}');
   } finally {
-    t.stop();
+    t.close();
   }
+}
+
+/// What is wrong with [t] once it has run, or null: every side that
+/// still reads the log saw the same table after every entry and came to
+/// the same end; anyone reading the log alone comes there too; the game
+/// is over as the faults allow; nobody but [mayLose] lost a seat, nobody
+/// but [mayLeave] left and nobody but [liars] was found to lie; nothing
+/// was said twice; and at a sealed table the house's word on the end is
+/// in the log and true.
+String? tableProblems(SimTable t,
+    {Set<int> mayLose = const {}, Set<int> mayLeave = const {}, Set<int> liars = const {}, void Function(String what)? count}) {
+  // Every side that still reads the log saw the same table after every
+  // entry, and came to the same end.
+  final lockstep = t.lockstepProblems(most: 1);
+  if (lockstep.isNotEmpty) return 'sides saw different tables: ${lockstep.single}';
+  final following = t.following;
+  final sealed = t.spec.sealed;
+  final crypto = t.crypto;
+  final log = t.referee.log;
+  final first = following.isEmpty ? null : following.first.rules;
+  for (final c in following) {
+    if (c.rules.endHash != first!.endHash || c.state != first.state || c.game.totals.join() != first.game.totals.join()) {
+      return 'seat ${c.mySeat} ended elsewhere: ${c.rules.describe()} against ${first.describe()}';
+    }
+  }
+  // Anyone at all, from the log alone, comes to the same end.
+  final v = TableRules(tableId: t.spec.id, crypto: crypto);
+  for (final e in log) {
+    v.feed(e);
+    if (v.over && v.endN != null && v.log.length >= v.endN!) break;
+  }
+  if (first != null && (v.endHash != first.endHash || v.state != first.state)) {
+    return 'the log read alone ends elsewhere: ${v.describe()} against ${first.describe()}';
+  }
+  switch (v.state) {
+    case TableState.finished:
+      if (v.game.phase != Phase.gameOver) return 'finished short of the target: ${v.describe()}';
+    case TableState.ended:
+      if (v.anyoneHere) return 'ended with somebody seated: ${v.describe()}';
+    case TableState.failed:
+      return 'the game failed, with the house never gone for good: ${v.describe()}';
+    case TableState.waiting || TableState.playing:
+      // Nobody left to ask the referee the time, and no house: the
+      // table stays where it was, and nobody is waiting on it.
+      if (sealed || following.isNotEmpty) return 'not over: ${v.describe()}';
+  }
+  count?.call('ended ${v.state.name}');
+  // Nobody lost their seat but by a fault of their own.
+  for (final MapEntry(key: seat, value: removal) in v.removals.entries) {
+    count?.call('exit ${removal.exit.name}');
+    final i = t.signers.indexWhere((s) => s.publicKey == (t.spec.seats[seat] as HumanSeat).key);
+    if (removal.exit == Exit.left && !mayLeave.contains(i)) return 'p$i left without leaving';
+    if (removal.exit == Exit.lied && !liars.contains(i)) return 'p$i found to lie, and did not';
+    // A socket dropped for a few seconds, or a reload well inside the
+    // silence, is no reason to lose a seat.
+    if (!mayLose.contains(i)) return 'p$i lost their seat (${removal.exit.name}) with nothing wrong';
+  }
+  // Nothing said twice: a device says each turn's move once, and once
+  // more only for a move the log has not had.
+  final ids = <String>{};
+  for (final e in log) {
+    final id = e.event?.id ?? e.unread?['id'] as String?;
+    if (id != null && !ids.add(id)) return 'the referee took ${e.event ?? id} twice, at #${e.n}';
+  }
+  final said = <String, Set<String>>{};
+  for (final e in log) {
+    final ev = e.event;
+    if (ev == null || !{EventKind.deal, EventKind.pass, EventKind.play}.contains(ev.kind)) continue;
+    final forTurn = said.putIfAbsent('${ev.author.substring(0, 6)} ${ev.turn}', () => {})..add(ev.id);
+    if (forTurn.length > 1) return '${ev.author.substring(0, 6)} said ${ev.turn} twice';
+  }
+  // A sealed game the house saw through has its word on it in the log.
+  if (sealed) {
+    final said = [
+      for (final e in log)
+        if (e.event?.kind == EventKind.result && e.event!.author == t.houseSigner.publicKey) e.event!,
+    ];
+    if (said.isEmpty) return 'the house said nothing of how it came out';
+    final word = said.first.body;
+    if (word['n'] != v.endN || word['hash'] != v.endHash || word['state'] != v.state.name) {
+      return 'the house said another end: $word against ${v.describe()}';
+    }
+    if (first != null && first.result == null) return 'the house\'s word not taken: $word';
+    // And the result it published for the ratings is the one the log
+    // comes to, said once.
+    final made = GameResult.ofTable(v);
+    if (t.results.length != (made == null ? 0 : 1)) return 'the house published ${t.results.length} results';
+    if (made != null && jsonEncode(GameResult.parse(t.results.single)?.toJson()) != jsonEncode(made.toJson())) {
+      return 'the house published another result: ${t.results.single.content}';
+    }
+  }
+  return null;
 }

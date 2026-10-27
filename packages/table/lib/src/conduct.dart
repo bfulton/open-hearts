@@ -17,12 +17,11 @@ class SeatConduct {
   /// [honest], the word its deal gives.
   Map<String, Object?> declaration(Map<String, Object?> honest) => honest;
 
-  /// Who this seat takes to lead once its deal is done, given [known],
-  /// the seat its deal says.
-  int? leader(int? known) => known;
-
   /// The cards of this seat's pass as it sends them, given [sealed],
   /// each sealed to the seat it passes to; [random] for anything made
   /// up in their place.
   List<String> sealedPass(List<String> sealed, Random random) => sealed;
+
+  /// Whether this seat says its piece of a departed person's secret.
+  bool get releases => true;
 }

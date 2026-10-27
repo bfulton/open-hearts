@@ -13,6 +13,7 @@ Use this guide to publish the site, the web app and the service's handlers to Cl
 - To deploy the relay, you also need a linux/amd64 machine with Dart, Cargo (CI pins the Rust version in `.github/workflows/ci.yml`) and Docker running. Wrangler builds the backup jurors' image from `service/bench/Dockerfile` with binaries built on your machine (`service/bench/build.sh`). Run `dart pub get` in `service/` once. `./oh deploy relay` says which of these is missing.
 - Export `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`. For what else the scripts read, see [environment variables](../reference/configuration.md#deploying-and-operating).
 - For production, `serviceKey` must be set in `config/openhearts.json`: `deploy.sh` refuses a production deploy without it. To set it up, see [Mint or rotate the service key](rotate-the-service-key.md).
+- For production, `houseKey` must be set in `config/openhearts.json` too, and its secret on the relay worker: `./oh deploy relay` refuses without it. Make both with `./oh house key --apply`, then commit `config/openhearts.json`. Do it with no table playing: a table started under another house's key is one no house serves.
 
 ## Deploy production
 

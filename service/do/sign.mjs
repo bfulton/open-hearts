@@ -42,25 +42,23 @@ export async function signing(bytes) {
     const mem = new Uint8Array(memory.buffer);
     for (let i = 0; i < hex.length; i += 2) mem[at + i / 2] = parseInt(hex.slice(i, i + 2), 16);
   };
+  /// [key]'s BIP-340 signature over the 32 bytes [digest] is, in hex.
+  const over = (key, digest) => {
+    put(sk, key.secret);
+    put(msg, digest);
+    put(aux, '0'.repeat(64));
+    if (sign(sk, msg, aux, sig) !== 1) throw new Error('sign failed');
+    const bytes = new Uint8Array(memory.buffer).slice(sig, sig + 64);
+    return [...bytes].map((b) => b.toString(16).padStart(2, '0')).join('');
+  };
   return {
+    over,
+
     /// A signed event, the way NIP-01 builds one: the id is the hash of
     /// what it carries, and the signature is over the id.
     async event(key, { kind, content = '', tags = [], created_at = 1000 }) {
       const id = await idOf(key.public, created_at, kind, tags, content);
-      put(sk, key.secret);
-      put(msg, id);
-      put(aux, '0'.repeat(64));
-      if (sign(sk, msg, aux, sig) !== 1) throw new Error('sign failed');
-      const bytes = new Uint8Array(memory.buffer).slice(sig, sig + 64);
-      return {
-        id,
-        pubkey: key.public,
-        created_at,
-        kind,
-        tags,
-        content,
-        sig: [...bytes].map((b) => b.toString(16).padStart(2, '0')).join(''),
-      };
+      return { id, pubkey: key.public, created_at, kind, tags, content, sig: over(key, id) };
     },
   };
 }

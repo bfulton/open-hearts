@@ -154,7 +154,11 @@ export const turnKeys = [{ name: 'open-hearts-turn', uid: config.turnKeyId }];
 /// not by this script.
 export const relay = {
   wrangler: 'service/do/wrangler.toml',
-  secrets: ['OH_JUROR_SECRET'],
+  /// The house's secret (service/bin/house.dart).
+  secrets: ['OH_HOUSE_SECRET'],
+  /// What makes a secret that is not typed in: the house's is made with
+  /// its key, which goes into config/openhearts.json beside it.
+  madeBy: { OH_HOUSE_SECRET: './oh house key --apply' },
   /// Set once each is issued, and nothing is wrong until then: Arachnid
   /// Shield's credentials and PhotoDNA's key each turn on a check of
   /// each new picture against known images of child sexual abuse
@@ -170,7 +174,7 @@ export const relay = {
   preview: {
     env: 'preview',
     secrets: [],
-    ownSecrets: ['OH_JUROR_SECRET'],
+    ownSecrets: ['OH_HOUSE_SECRET'],
     optionalSecrets: [],
     /// relay-preview.openhearts.game is its only address.
     workersDev: false,

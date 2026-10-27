@@ -441,7 +441,7 @@ const liveRelay = () => ({
       { name: 'EMAIL', type: 'send_email' },
       { class_name: 'Household', name: 'HOUSEHOLD', namespace_id: 'a1c3', type: 'durable_object_namespace' },
       { class_name: 'KnownPictures', name: 'KNOWN', namespace_id: 'b2d4', type: 'durable_object_namespace' },
-      { name: 'OH_JUROR_SECRET', type: 'secret_text' },
+      { name: 'OH_HOUSE_SECRET', type: 'secret_text' },
       { dataset: 'open_hearts_relay', name: 'OH_METRICS', type: 'analytics_engine' },
       { name: 'OH_MAIL_FROM', text: 'noreply@openhearts.game', type: 'plain_text' },
       { bucket_name: 'open-hearts-pictures', name: 'OH_PICTURES', type: 'r2_bucket' },
@@ -450,7 +450,7 @@ const liveRelay = () => ({
       { class_name: 'TagRelay', name: 'TABLE', namespace_id: '744b', type: 'durable_object_namespace' },
     ],
   },
-  secrets: ['OH_JUROR_SECRET'],
+  secrets: ['OH_HOUSE_SECRET'],
   domains: [{ hostname: 'relay.openhearts.game', service: 'open-hearts-relay', enabled: true }],
   subdomain: { enabled: false },
   namespaces: ['TagRelay', 'Household', 'Bench', 'KnownPictures'].map((c) => ({ script: 'open-hearts-relay', class: c })),
@@ -473,14 +473,14 @@ test('relay: each kind of drift is said', () => {
   live.namespaces = live.namespaces.filter((n) => n.class !== 'Household');
   live.containers[0].max_instances = 3;
   const problems = relayProblems(wrangler, relay, live).join('\n');
-  for (const said of [/compatibility date/, /EMAIL .* not on the worker/, /CF_VERSION_METADATA .* not on the worker/, /OH_MAIL_FROM: text/, /EXTRA .* not in wrangler.toml/, /OH_JUROR_SECRET is not set/, /relay.openhearts.game is not attached/, /workers.dev address is on/, /namespace for Household/, /max_instances is 3/]) {
+  for (const said of [/compatibility date/, /EMAIL .* not on the worker/, /CF_VERSION_METADATA .* not on the worker/, /OH_MAIL_FROM: text/, /EXTRA .* not in wrangler.toml/, /OH_HOUSE_SECRET is not set: `.\/oh house key --apply`/, /relay.openhearts.game is not attached/, /workers.dev address is on/, /namespace for Household/, /max_instances is 3/]) {
     assert.match(problems, said);
   }
 });
 
 test("relay: Arachnid Shield's, PhotoDNA's and NCMEC's secrets are nothing amiss, set or not; any other undefined one is", () => {
   const live = liveRelay();
-  live.secrets = ['OH_JUROR_SECRET', 'OH_ARACHNID_USERNAME', 'OH_ARACHNID_PASSWORD', 'OH_PHOTODNA_KEY', 'OH_NCMEC_USERNAME', 'OH_NCMEC_PASSWORD'];
+  live.secrets = ['OH_HOUSE_SECRET', 'OH_ARACHNID_USERNAME', 'OH_ARACHNID_PASSWORD', 'OH_PHOTODNA_KEY', 'OH_NCMEC_USERNAME', 'OH_NCMEC_PASSWORD'];
   assert.deepEqual(relayProblems(wrangler, relay, live), []);
   live.secrets.push('OH_OTHER');
   assert.deepEqual(relayProblems(wrangler, relay, live), ['secret OH_OTHER is set but not defined (infra/cloudflare.mjs, relay.secrets)']);
@@ -538,7 +538,6 @@ test("the preview relay is a worker of its own, at its own address, with nothing
     'durable_object_namespace:HOUSEHOLD',
     'durable_object_namespace:TABLE',
     'kv_namespace:OH_STORE',
-    'plain_text:OH_BENCH_PRESENCE_RELAYS',
     'plain_text:OH_BENCH_RELAYS',
     'plain_text:OH_DEPLOYMENT',
     'version_metadata:CF_VERSION_METADATA',
@@ -546,8 +545,8 @@ test("the preview relay is a worker of its own, at its own address, with nothing
   const store = (t) => t.kv_namespaces.find((k) => k.binding === 'OH_STORE').id;
   assert.notEqual(store(preview), store(wrangler));
   assert.equal(preview.vars.OH_DEPLOYMENT, 'preview');
-  // Its backup jurors follow tables on it, not on production's.
-  for (const v of [preview.vars.OH_BENCH_RELAYS, preview.vars.OH_BENCH_PRESENCE_RELAYS]) assert.equal(v, `wss://${preview.routes[0].pattern}/{tag}`);
+  // Its house follows tables on it, not on production's.
+  assert.equal(preview.vars.OH_BENCH_RELAYS, `wss://${preview.routes[0].pattern}/{tag}`);
   // Named as wrangler names an environment's container: the top-level
   // name, the class, then the environment (wrangler deploy --dry-run).
   assert.deepEqual(preview.containers.map((c) => [c.name, c.class_name, c.max_instances]), [['open-hearts-relay-bench-preview', 'Bench', 1]]);
@@ -569,15 +568,14 @@ const livePreviewRelay = () => ({
       { class_name: 'Bench', name: 'BENCH', namespace_id: 'c1', type: 'durable_object_namespace' },
       { name: 'CF_VERSION_METADATA', type: 'version_metadata' },
       { class_name: 'Household', name: 'HOUSEHOLD', namespace_id: 'c2', type: 'durable_object_namespace' },
-      { name: 'OH_BENCH_PRESENCE_RELAYS', text: 'wss://relay-preview.openhearts.game/{tag}', type: 'plain_text' },
       { name: 'OH_BENCH_RELAYS', text: 'wss://relay-preview.openhearts.game/{tag}', type: 'plain_text' },
       { name: 'OH_DEPLOYMENT', text: 'preview', type: 'plain_text' },
-      { name: 'OH_JUROR_SECRET', type: 'secret_text' },
+      { name: 'OH_HOUSE_SECRET', type: 'secret_text' },
       { name: 'OH_STORE', namespace_id: 'ab416db4ab31420c83b8e2bc212a8a05', type: 'kv_namespace' },
       { class_name: 'TagRelay', name: 'TABLE', namespace_id: 'c3', type: 'durable_object_namespace' },
     ],
   },
-  secrets: ['OH_JUROR_SECRET'],
+  secrets: ['OH_HOUSE_SECRET'],
   domains: [{ hostname: 'relay-preview.openhearts.game', service: 'open-hearts-relay-preview', enabled: true }],
   subdomain: { enabled: false },
   namespaces: ['TagRelay', 'Household', 'Bench', 'KnownPictures'].map((c) => ({ script: 'open-hearts-relay-preview', class: c })),
@@ -588,7 +586,7 @@ test('the preview relay: as deployed it matches, and its secret is its own', () 
   assert.deepEqual(relayProblems(preview, relay.preview, livePreviewRelay()), []);
   const unset = livePreviewRelay();
   unset.secrets = [];
-  assert.deepEqual(relayProblems(preview, relay.preview, unset), ['secret OH_JUROR_SECRET is not set: `./oh preview secrets --apply`']);
+  assert.deepEqual(relayProblems(preview, relay.preview, unset), ['secret OH_HOUSE_SECRET is not set: `./oh preview secrets --apply`']);
   // The checkers' credentials are production's: a preview checks no picture.
   const credentials = livePreviewRelay();
   credentials.secrets.push('OH_ARACHNID_USERNAME');

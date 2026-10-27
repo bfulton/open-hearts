@@ -159,14 +159,10 @@ jobs:
           workspaces: |
             crypto/deal
             crypto/schnorr
-      - name: Deal and Schnorr (Rust — the cdylibs the relay and the juror load)
+      - name: Deal and Schnorr (Rust — the cdylibs the sides and the house load)
         run: cd crypto/deal && cargo build --release --locked && cd ../schnorr && cargo build --release --locked
-      - name: Service (the local relay, and a hand played over it with real signatures)
+      - name: Service (tables played over the object's relay and its referee, with real signatures)
         run: cd service && dart pub get && dart analyze --fatal-infos && dart test
-      - name: Service, against the object's relay (the same suite, the other implementation)
-        run: cd service && OH_RELAY=js dart test
-      - name: Service, against the object's relay as deployed (one tag an address, its own kinds)
-        run: cd service && OH_RELAY=object dart test
       - name: The object's relay (its own tests, in node's test runner)
         run: node --test service/do/*.test.mjs
 

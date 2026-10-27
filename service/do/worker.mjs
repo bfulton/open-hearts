@@ -19,7 +19,7 @@
 // And nobody is carried on the service's say-so alone. Every socket is
 // asked who it is, and carried only for a device the service has given
 // a current activation — the device in use of an account with a
-// subscription — or for a backup juror (relay.mjs, serviceGate). The
+// subscription — or for the house (relay.mjs, serviceGate). The
 // account's own object (Household) is asked whether an activation is
 // still the one in use as a socket shows it, and tells this object to
 // close a device's sockets the moment another device of its account
@@ -30,11 +30,15 @@
 // no storage to pay for and nothing to sweep. A table's or a lobby's
 // tag keeps only the lobby kind tagged for it, in its object's own
 // storage, for a day (tag_store.mjs, docs/explanation/relay.md); anything
-// else that is not ephemeral is refused rather than quietly dropped.
+// else that is not ephemeral is refused rather than quietly dropped. And
+// a table's tag keeps the table's log, which its referee writes down
+// entry by entry (referee.mjs): a table goes on where it was after its
+// object is evicted, and its log goes a day after its last entry.
 
 import wasm from '../../app/web/schnorr.wasm';
 
 import { limitsFrom, objectRelay, presenceTag, schnorrVerifier, serviceGate, socketLine, tagOf, tally } from './relay.mjs';
+import { wakeLimiter } from './referee.mjs';
 import { tagStore } from './tag_store.mjs';
 import { pictureScreen } from './withheld.mjs';
 import { reviewRun } from './review.mjs';
@@ -46,7 +50,7 @@ import { PICTURES_ROW } from '../functions/pictures.mjs';
 import { alertKnownProblem, alertPicturesProblem, alertsOf } from '../functions/alerts.mjs';
 import { Household as HouseholdObject } from '../functions/household.mjs';
 import { storeOf } from '../functions/rows.mjs';
-import { Bench as BenchObject, callIn } from './bench.mjs';
+import { Bench as BenchObject } from './bench.mjs';
 import { withConfig } from '../functions/deployment.mjs';
 // The service's settings that are not secret, as the Pages worker reads
 // them (service/functions/deployment.mjs): here, the service's public
@@ -67,8 +71,8 @@ export class Household extends HouseholdObject {
   }
 }
 
-// The backup jurors, a Cloudflare Container started when a table
-// calls for a juror and nobody is there (bench.mjs).
+// The house, a Cloudflare Container started when a sealed table wants
+// it and it is not there (bench.mjs).
 export class Bench extends BenchObject {
   constructor(state, env = {}) {
     super(state, withConfig(env, config));
@@ -85,10 +89,6 @@ export class KnownPictures extends KnownObject {
   }
 }
 
-/// How often one object passes a call on to the backup jurors: a table
-/// calls every ten seconds while it is short, and they need one.
-const WAKE_EVERY_MS = 20 * 1000;
-
 export class TagRelay {
   constructor(state, env = {}) {
     this.state = state;
@@ -98,7 +98,12 @@ export class TagRelay {
     // OH_METRICS): a line of counts a minute, and one when the last
     // socket goes, nothing about anyone.
     this.tally = tally(env.OH_METRICS ?? null);
-    this.wokeAt = 0;
+    // The house woken for this table, when it is wanted and away
+    // (referee.mjs, wakeLimiter): at most one wake every twenty seconds.
+    this.wakeHouse = wakeLimiter({
+      wake: () => this.wake(),
+      stillWanted: async () => (await this.ready()).wantsHouse,
+    });
     // The pictures the operator took down (withheld.mjs), read from the
     // store at most once a minute while pictures come this way.
     this.pictures = pictureScreen({ read: () => this.env.OH_STORE?.get(PICTURES_ROW.join('|'), 'json') ?? null });
@@ -108,20 +113,15 @@ export class TagRelay {
     this.owned = ownedScreen({ bucket: this.env.OH_PICTURES ?? null, log: (line) => console.log(line) });
   }
 
-  /// An event the relay took: a call for a juror passed to the backup
-  /// jurors where they are bound (wrangler.toml, BENCH), not awaited by
-  /// the relay: the caller has its OK already.
-  heard(event) {
-    const table = callIn(event);
-    if (!table || !this.env.BENCH) return;
-    const now = Date.now();
-    if (now - this.wokeAt < WAKE_EVERY_MS) return;
-    this.wokeAt = now;
+  /// This table's house woken where it is bound (wrangler.toml, BENCH)
+  /// and told of the table, not awaited — the referee has said what it
+  /// had to already, and a wake that does not get through is made again
+  /// on the table's next entry.
+  wake() {
+    if (!this.env.BENCH) return;
     const bench = this.env.BENCH.get(this.env.BENCH.idFromName('bench'));
     this.state.waitUntil(
-      // A wake that does not get through is said again by the table's
-      // next call, ten seconds on.
-      bench.fetch(`https://bench/wake?table=${encodeURIComponent(table)}`, { method: 'POST' }).catch((e) => console.log(`backup jurors not woken: ${e}`)),
+      bench.fetch(`https://bench/wake?table=${encodeURIComponent(this.tag)}`, { method: 'POST' }).catch((e) => console.log(`house not woken: ${e}`)),
     );
   }
 
@@ -147,39 +147,48 @@ export class TagRelay {
     // A table's or a lobby's tag keeps the lobby kind (docs/explanation/relay.md):
     // what an evicted object held comes back from its own storage.
     const kept = tagStore(this.state.storage, tag);
+    const [store, log] = await Promise.all([kept.load(), kept.loadLog()]);
+    const house = /^[0-9a-f]{64}$/.test(this.env.OH_HOUSE_KEY ?? '') ? this.env.OH_HOUSE_KEY : null;
     const relay = objectRelay(verify, {
       tag,
       count: (what, n) => this.tally.count(what, n),
       // The operator's limits are presence's; a table's are the relay's own.
       limits: presence ? limits : null,
-      heard: (event) => this.heard(event),
-      store: await kept.load(),
+      store,
       kept: (event, gone) => this.state.waitUntil(kept.keep(event, gone)),
       withhold: (event) => this.pictures.withheld(event),
       screen: this.owned,
       forget: (event) => this.state.waitUntil(kept.forget(event)),
-      gate: this.gate(verify, tag),
+      gate: this.gate(verify, tag, house),
+      house,
+      log,
+      keepEntry: (entry) => this.state.waitUntil(kept.keepEntry(entry)),
+      wanted: () => this.wakeHouse(),
     });
     for (const socket of this.state.getWebSockets()) {
       const carried = socket.deserializeAttachment();
-      relay.open(socket, carried?.v === 2 ? carried.subs : carried, carried?.v === 2 ? carried.auth : null);
+      const v2 = carried?.v === 2;
+      relay.open(socket, v2 ? carried.subs : carried, v2 ? carried.auth : null, v2 ? (carried.log ?? null) : null);
     }
+    // Whoever the log says is there and has no socket now was cut off
+    // while the object was gone.
+    relay.settle();
     return relay;
   }
 
   /// Who may use this object (relay.mjs, serviceGate): a device with a
   /// current activation from the service whose key the deployment names
   /// (OH_SERVICE_KEY), still its account's device in use as the
-  /// account's own object says — or a backup juror, by OH_JUROR_SECRET.
+  /// account's own object says — or the house, by its key (OH_HOUSE_KEY).
   /// Without the service's key nobody is: a relay that carried anybody
   /// would be live play without a subscription.
-  gate(verify, tag) {
+  gate(verify, tag, house) {
     const env = this.env;
     const service = /^[0-9a-f]{64}$/.test(env.OH_SERVICE_KEY ?? '') ? env.OH_SERVICE_KEY : '0'.repeat(64);
     return serviceGate({
       service,
       verify,
-      bench: env.OH_JUROR_SECRET ?? null,
+      house,
       seen: env.HOUSEHOLD
         ? async (who) => {
             try {
@@ -264,10 +273,10 @@ export class TagRelay {
     await relay.message(socket, message);
     // What this socket must remember if the object is evicted before
     // its next message: its subscriptions, bounded by the relay itself,
-    // which holds a client to a few, who it answered as, and when it
-    // opened.
+    // which holds a client to a few, who it answered as, the
+    // subscription it follows the table's log under, and when it opened.
     const at = socket.deserializeAttachment()?.at;
-    socket.serializeAttachment({ v: 2, subs: relay.subscriptionsOf(socket), auth: relay.authOf(socket), at });
+    socket.serializeAttachment({ v: 2, subs: relay.subscriptionsOf(socket), auth: relay.authOf(socket), log: relay.followedBy(socket), at });
   }
 
   async webSocketClose(socket, code, reason, wasClean) {

@@ -151,7 +151,7 @@ void main() {
       final t = SimTable(humans: 2, seed: 3);
       t.start();
       final view = WatchedTable.of(t.people.first.client, const ['Ada', 'Romeo', 'Bao', 'Juliet']);
-      t.stop();
+      t.close();
       final keys = [for (final h in t.spec.seats) h is HumanSeat ? h.key : null];
       expect(view.keys, keys);
       expect(view.keys!.whereType<String>(), hasLength(2));

@@ -432,7 +432,7 @@ export function relayProblems(toml, relay, live) {
     if (!wranglerBindings(toml).some((w) => w.name === b.name)) out.push(`binding ${b.name} (${b.type}) is on the worker but not in wrangler.toml`);
   }
   for (const secret of relay.secrets) {
-    if (!live.secrets.includes(secret)) out.push(`secret ${secret} is not set: \`./oh secret set ${secret} --apply\``);
+    if (!live.secrets.includes(secret)) out.push(`secret ${secret} is not set: \`${relay.madeBy?.[secret] ?? `./oh secret set ${secret} --apply`}\``);
   }
   // A preview's own, never production's (infra/cloudflare.mjs, ownSecrets).
   for (const secret of relay.ownSecrets ?? []) {

@@ -1,8 +1,9 @@
-/// Games kept by an older library still read, to the end, and a copy
-/// bent anywhere the deal's cryptography vouches for does not.
+/// Games kept before the referee — and by an older library — still read,
+/// to the end, and a copy bent anywhere the deal's cryptography vouches
+/// for does not (legacy/v2_record.dart).
 ///
 /// test/fixtures/ holds two sealed games as the library built on
-/// arkworks 0.3 wrote them (tool/kept_records.dart, run once): four
+/// arkworks 0.3 wrote them (once, with a tool since gone): four
 /// people to the end of the game, and three people and a bot where a
 /// person leaves mid-hand and the hand is finished from escrow. Records
 /// like them are kept for anyone to look at (game_record.dart), and the
@@ -18,7 +19,6 @@ import 'dart:typed_data';
 
 import 'package:deal/deal.dart';
 import 'package:table/table.dart';
-import 'package:table_sim/table_sim.dart';
 import 'package:test/test.dart';
 
 Map<String, Object?> fixture(String name) =>
@@ -29,9 +29,9 @@ void main() {
   setUpAll(() async => crypto = await DealCrypto.load());
 
   Verification check(Map<String, Object?> json, {bool signatures = true}) {
-    final r = GameRecord.parse(json, verifySignatures: signatures);
+    final r = GameRecordV2.parse(json, verifySignatures: signatures);
     expect(r, isNotNull, reason: 'the record reads');
-    return verifyRecord(r!.spec, r.record, juries: r.juries, crypto: crypto, releases: r.releases);
+    return verifyRecordV2(r!.spec, r.record, juries: r.juries, crypto: crypto, releases: r.releases);
   }
 
   /// [json] with the first event of [kind] (and [round], for the deal's)
@@ -44,10 +44,10 @@ void main() {
       final body = e['body'] as Map;
       if (e['kind'] != kind || (round != null && body['round'] != round) || !body.containsKey(field)) continue;
       body[field] = bend(body[field]);
-      e['id'] = TableEvent.idFor(
+      e['id'] = V2Event.idFor(
           table: e['table'] as String,
           author: e['author'] as String,
-          kind: EventKind.values.byName(kind),
+          kind: V2Kind.values.byName(kind),
           body: Map<String, Object?>.from(body));
       return copy;
     }
@@ -73,33 +73,6 @@ void main() {
       expect(v.complete, isTrue);
     });
   }
-
-  test('the escrow\'s game, played again today, is the same record to the byte', () {
-    // Every key, shuffle, token, seal, share and proof in it made again
-    // by this library from the same seeds, and the record they make the
-    // one the older library kept — in the form it kept it. Today's
-    // carries beside each removal the signed word of its backers
-    // (GameRecord.version); the older form named them by key alone.
-    final t = threeAndALeaver(crypto);
-    final today = GameRecord.of(t.people.first.client, names: threeNames).toJson();
-    t.stop();
-    final asKept = {
-      ...today,
-      'v': 1,
-      'record': [for (final d in today['record']! as List) Map<String, Object?>.of(d as Map<String, Object?>)..remove('backing')],
-    };
-    expect(jsonEncode(asKept), utf8.decode(gzip.decode(File('test/fixtures/sealed_three_leave.json.gz').readAsBytesSync())));
-
-    // And in today's form the leave travels with its backing — the
-    // leaver's own word and a witness's — and the game verifies by it.
-    final read = GameRecord.parse(jsonDecode(jsonEncode(today)))!;
-    final left = read.record.singleWhere((d) => d.removal);
-    expect(left.event.kind, EventKind.leave);
-    expect(left.backing!.map((e) => e.kind), containsAll([EventKind.leave, EventKind.witness]));
-    final v = verifyRecord(read.spec, read.record, juries: read.juries, crypto: crypto, releases: read.releases);
-    expect(v.ok, isTrue, reason: v.reason);
-    expect(v.complete, isTrue);
-  });
 
   test('the escrow\'s game carries its jury and its released pieces', () {
     final json = fixture('sealed_three_leave');

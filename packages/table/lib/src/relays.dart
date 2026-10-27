@@ -22,7 +22,16 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 import 'nostr.dart';
 import 'relay_policy.dart';
 import 'signing.dart';
-import 'transport.dart' show answerMs, unansweredMs;
+
+/// How long a device may hear nothing at all, with something it sent
+/// waiting on an answer, before it takes its socket for dead and makes
+/// it again. Our relay answers everything it is sent, so ten seconds of
+/// nothing is the line down.
+const unansweredMs = 10000;
+
+/// How long an answer may take on a slow line: something sent waits
+/// this long before its going unanswered counts at all.
+const answerMs = 3000;
 
 /// What a device shows a relay that asks who it is (NIP-42), as tags
 /// beside the relay's challenge in an event its key signs: the
@@ -105,9 +114,32 @@ class RelayConnection {
       required this.onMessage,
       this.log,
       this.auth,
+      this.onOpen,
       this.cutOffMs = unansweredMs,
       this.answerWaitMs = answerMs}) {
     _connect();
+  }
+
+  /// Told each time the socket drops.
+  void Function(RelayConnection connection)? onDropped;
+
+  /// Told each time a socket opens, after the subscriptions are sent:
+  /// for what else a new socket has to say first.
+  final void Function(RelayConnection connection)? onOpen;
+
+  /// Sends [message] as it is, if the socket is open: false where it is
+  /// not, and whoever is waiting on it says it again on the next.
+  bool sendRaw(List<Object?> message) {
+    final ch = _channel;
+    if (ch == null || !_open) return false;
+    try {
+      ch.sink.add(jsonEncode(message));
+      _unansweredSince ??= _nowMs;
+      return true;
+    } on StateError catch (err) {
+      log?.call('$url: not sent, the socket is closing: $err');
+      return false;
+    }
   }
 
   /// [unansweredMs] and [answerMs], shorter in a test.
@@ -224,6 +256,7 @@ class RelayConnection {
       }
       _liveness ??= Timer.periodic(Duration(milliseconds: cutOffMs ~/ 5), (_) => _checkLiveness());
       log?.call('connected to $url');
+      onOpen?.call(this);
     }).catchError((Object e) {
       log?.call('$url: connect failed: $e');
     });
@@ -235,6 +268,7 @@ class RelayConnection {
     _open = false;
     _unansweredSince = null;
     _drops++;
+    onDropped?.call(this);
     log?.call('$url: dropped; retrying in $_retryMs ms');
     Future<void>.delayed(Duration(milliseconds: _retryMs), _connect);
     _retryMs = (_retryMs * 2).clamp(500, 10000);

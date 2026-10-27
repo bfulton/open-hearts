@@ -66,8 +66,8 @@ void main() {
     ta.sayReaction(content);
     await Future<void>.delayed(const Duration(milliseconds: 300));
     // The table's own next word goes to the same relay, and arrives.
-    final heard = tb.incoming.first.then((m) => m.message).timeout(const Duration(seconds: 5));
-    ta.broadcast({'n': 1});
+    final heard = tb.watch.first.then((m) => m.content).timeout(const Duration(seconds: 5));
+    ta.sayWatch({'n': 1});
     expect(await heard, {'n': 1});
     expect(ta.refusal, isNull);
     expect(refusals, isEmpty, reason: 'nothing said under the felt');

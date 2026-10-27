@@ -196,6 +196,7 @@ class WaitingRoom {
     this.picture,
     this.target = gameOverScore,
     this.timing = TableTiming.standard,
+    this.house,
     this.licence,
   })  : poolBotsAfterMs = botsAfterMs,
         botsAfterMs = botsAfterMs,
@@ -228,6 +229,11 @@ class WaitingRoom {
   /// Whether this device deals sealed tables (docs/explanation/fair-deal.md): the tables it
   /// seats are sealed, and it sits only at sealed ones.
   final bool sealed;
+
+  /// The house this build plays with (docs/explanation/live-play.md): a
+  /// sealed table it hosts names it, and it sits at no sealed table that
+  /// names another.
+  final PublicKey? house;
   final int rating;
 
   /// Seconds this device takes over a card, as it measured itself
@@ -402,6 +408,7 @@ class WaitingRoom {
         'sealed': sealed,
         'target': target,
         'timing': timing.toJson(),
+        if (sealed) 'house': house,
         'seats': seats,
         'policy': botPolicyVersion,
       });
@@ -476,6 +483,9 @@ class WaitingRoom {
     // A device that cannot run the deal cannot sit at a sealed table,
     // and one that can does not sit at an unsealed one.
     if ((c['sealed'] == true) != sealed) return;
+    // A sealed table is the house's to hold the bots of and to say the
+    // end of: this build's, or none it sits at.
+    if (sealed && (house == null || c['house'] != house)) return;
     // A host on an older build says nothing about the target, which
     // means the game it seats runs to fifty.
     if ((c['target'] as int? ?? gameOverScore) != target) return;
@@ -508,10 +518,10 @@ class WaitingRoom {
             rated: c['rated'] == true,
             sealed: c['sealed'] == true,
             target: target,
-            // The host's clocks, not this device's; a host on an older
-            // build says none, which every build reads alike
-            // (TableTiming.unsaid).
-            timing: TableTiming.parse(c['timing']));
+            // The host's clocks, not this device's, said in full
+            // (TableTiming.exactly): a seating without them is no table.
+            timing: TableTiming.exactly(c['timing']) ?? (throw const FormatException('timing')),
+            house: sealed ? house : null);
       // Every seat an account's, by the service's word, and each
       // account once: a seating that is not is no table to sit at.
       final wrong = offered.licenceProblem(at: DateTime.fromMillisecondsSinceEpoch(_now));

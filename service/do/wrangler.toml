@@ -20,23 +20,23 @@ routes = [{ pattern = "relay.openhearts.game", custom_domain = true }]
 [alias]
 "open-hearts-photodna" = "./photodna_off.mjs"
 
-# The backup jurors' image is built from the repo on every
-# deploy (service/bench/build.sh): the juror compiled from the table
-# code as it is now, never a stage left over from an earlier deploy, so
-# the backup jurors always speak the app's protocol. Needs cargo and dart
-# (flutter's bin) on the PATH.
+# The house's image is built from the repo on every deploy
+# (service/bench/build.sh): the house compiled from the table code as it
+# is now, never a stage left over from an earlier deploy, so the house
+# always speaks the app's protocol. Needs cargo and dart (flutter's bin)
+# on the PATH.
 [build]
 command = "../bench/build.sh"
 cwd = "."
 
-# Which deploy this is. With it the Bench object (bench.mjs) restarts
-# backup jurors whose container is still running from an earlier
-# deploy: an object's container takes its image when it starts, and no
-# rollout replaces it.
+# Which deploy this is. With it the Bench object (bench.mjs) restarts a
+# house whose container is still running from an earlier deploy: an
+# object's container takes its image when it starts, and no rollout
+# replaces it.
 [version_metadata]
 binding = "CF_VERSION_METADATA"
 
-# Logs, the worker's and the jurors' container's own output, kept seven
+# Logs, the worker's and the house's container's own output, kept seven
 # days in Workers Logs. Without them a stalled table shows a running
 # container and nothing else.
 [observability]
@@ -74,15 +74,15 @@ new_sqlite_classes = ["Household"]
 name = "HOUSEHOLD"
 class_name = "Household"
 
-# The backup jurors, as a Cloudflare Container (bench.mjs; the
-# image is service/bench, built by its build.sh). The presence relay
-# above passes a table's call for a juror to it, and it runs only while
-# they are serving or waiting to be drawn. Built by [build] above on
-# every deploy; their identity is the secret OH_JUROR_SECRET (64 hex,
-# kept, so they have the same four keys after every start).
-# standard-1 is half a vCPU and 4 GiB: a deal took 9 s at a whole vCPU
-# and 21 s at a quarter (service/tool/bench_check.dart), and the jurors
-# themselves use about 22 MiB.
+# The house, as a Cloudflare Container (bench.mjs; the image is
+# service/bench, built by its build.sh). A sealed table's object wakes it
+# as the table starts and whenever the house is not on its log, and it
+# runs only while it is serving a table or was woken in the last ten
+# minutes. Built by [build] above on every deploy; its identity is the
+# secret OH_HOUSE_SECRET (64 hex), whose key is the house the relay takes
+# (OH_HOUSE_KEY, config/openhearts.json).
+# standard-1 is half a vCPU and 4 GiB (service/tool/house_check.dart
+# measures a deal in it).
 [[containers]]
 class_name = "Bench"
 image = "../bench/Dockerfile"
@@ -163,7 +163,7 @@ dataset = "open_hearts_relay"
 # ---- the preview relay ---------------------------------------------------
 # What previews of the app play on (docs/how-to/deploy.md): this code as
 # a worker of its own, open-hearts-relay-preview, at its own address,
-# with objects of its own (tags, households, its own backup jurors) on
+# with objects of its own (tags, households, its own house) on
 # the previews' store. It reaches nothing of production's: no
 # production store, bucket or object, no email (a preview emails
 # nobody), and no pictures bucket, so it carries no profile picture
@@ -217,10 +217,9 @@ binding = "OH_STORE"
 id = "ab416db4ab31420c83b8e2bc212a8a05"
 
 # Which deployment this is: a preview's relay holds devices to the
-# service key previews have (service/functions/deployment.mjs,
-# configFor), and its backup jurors follow tables here, not on
-# production's relay.
+# service key previews have, and takes the house previews have
+# (service/functions/deployment.mjs, configFor), which follows tables
+# here, not on production's relay.
 [env.preview.vars]
 OH_DEPLOYMENT = "preview"
 OH_BENCH_RELAYS = "wss://relay-preview.openhearts.game/{tag}"
-OH_BENCH_PRESENCE_RELAYS = "wss://relay-preview.openhearts.game/{tag}"

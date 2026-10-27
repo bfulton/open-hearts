@@ -164,9 +164,8 @@ export const TABLE_TIMING_BOUNDS = Object.freeze({
   fixedMs: [15000, 120000],
   botActsMs: [5000, 60000],
   botDealsMs: [15000, 120000],
-  quorumLostMs: [10000, 120000],
-  silenceMs: [30000, 600000],
-  jurorSilenceMs: [10000, 120000],
+  houseGraceMs: [10000, 120000],
+  silenceMs: [10000, 600000],
 });
 
 /// A table's timing as the operator wrote it, or null: all or nothing,

@@ -14,7 +14,7 @@ import { ARGUMENTS, COMMANDS } from './commands.mjs';
 import { root } from './env.mjs';
 import { releaseProblems } from './gate.mjs';
 import { commandOf, main, markdown, parse } from './oh.mjs';
-import { INVITED_DAYS, withPreviewKey } from './preview.mjs';
+import { INVITED_DAYS, withHouseKey, withPreviewKey } from './preview.mjs';
 import { rejected, reshaped } from './setup.mjs';
 import { KNOWN_ROW } from '../service/do/checkers.mjs';
 import { configOf } from '../service/functions/config.mjs';
@@ -213,10 +213,11 @@ test('a secret is set wherever its definition says it lives, from what is typed'
   const service = fake({ readSecret: async () => 'x' });
   assert.equal(await main(['secret', 'set', 'OH_SERVICE_SECRET', '--apply'], service), 0);
   assert.deepEqual(service.started.map((s) => s.args.slice(2)), [['pages', 'secret', 'put', 'OH_SERVICE_SECRET', '--project-name', 'open-hearts']]);
-  // As is the backup jurors': the preview relay's is its own.
-  const relay = fake({ readSecret: async () => 'x' });
-  assert.equal(await main(['secret', 'set', 'OH_JUROR_SECRET', '--apply'], relay), 0);
-  assert.deepEqual(relay.started.map((s) => s.args.slice(2)), [['secret', 'put', 'OH_JUROR_SECRET']]);
+  // The house's is never typed in: oh house key makes it, with the key
+  // that goes into the config beside it.
+  const house = fake({ readSecret: async () => 'x' });
+  assert.equal(await main(['secret', 'set', 'OH_HOUSE_SECRET', '--apply'], house), 2);
+  assert.equal(house.started.length, 0);
   // One set only once it is issued, as a checker's credentials are: the
   // relay's too, and only the relay's.
   for (const name of ['OH_ARACHNID_USERNAME', 'OH_ARACHNID_PASSWORD', 'OH_PHOTODNA_KEY', 'OH_NCMEC_USERNAME', 'OH_NCMEC_PASSWORD']) {
@@ -254,34 +255,71 @@ test("the previews' key goes beside production's, and nothing else in the file c
   assert.equal(outsidePreview(again), before);
 });
 
+/// A capture that answers `dart run bin/service_key.dart --json` with a
+/// new pair each time, as the tool does: the pairs it made, in order.
+function minting() {
+  const made = [];
+  const capture = async (command) => {
+    if (command !== 'dart') return { code: 0, out: '' };
+    const n = made.length + 1;
+    const pair = { key: n.toString(16).repeat(64).slice(0, 64), secret: (n + 8).toString(16).repeat(64).slice(0, 64) };
+    made.push(pair);
+    return { code: 0, out: `Building package executable...\n${JSON.stringify(pair)}\n` };
+  };
+  return { made, capture };
+}
+
 test("previews' own secrets are made new, set where they live, and shown to nobody", async () => {
   const { text, configFile } = configCopy();
-  const key = 'b'.repeat(64);
-  const secret = 'c'.repeat(64);
-  const capture = async (command) => (command === 'dart' ? { code: 0, out: `Building package executable...\n${JSON.stringify({ key, secret })}\n` } : { code: 0, out: '' });
-  const dry = fake({ capture, configFile });
+  const dry = fake({ capture: minting().capture, configFile });
   assert.equal(await main(['preview', 'secrets'], dry), 0);
   assert.equal(dry.started.length, 0);
   assert.equal(readFileSync(configFile, 'utf8'), text, 'nothing written without --apply');
 
+  const { made, capture } = minting();
   const ctx = fake({ capture, configFile });
   assert.equal(await main(['preview', 'secrets', '--apply'], ctx), 0);
-  const [service, jurors] = ctx.started;
-  assert.deepEqual(service.args.slice(2), ['pages', 'secret', 'put', 'OH_SERVICE_SECRET', '--project-name', 'open-hearts', '--env', 'preview']);
-  assert.equal(service.input, secret);
-  assert.deepEqual(jurors.args.slice(2), ['secret', 'put', 'OH_JUROR_SECRET', '--env', 'preview']);
-  assert.ok(jurors.cwd.endsWith('service/do'));
-  assert.match(jurors.input, /^[0-9a-f]{64}$/);
-  assert.notEqual(jurors.input, secret, 'a secret of its own, not the key pair\'s');
+  const [service, house] = made;
+  const [onPages, onRelay] = ctx.started;
+  assert.deepEqual(onPages.args.slice(2), ['pages', 'secret', 'put', 'OH_SERVICE_SECRET', '--project-name', 'open-hearts', '--env', 'preview']);
+  assert.equal(onPages.input, service.secret);
+  assert.deepEqual(onRelay.args.slice(2), ['secret', 'put', 'OH_HOUSE_SECRET', '--env', 'preview']);
+  assert.ok(onRelay.cwd.endsWith('service/do'));
+  assert.equal(onRelay.input, house.secret, 'a pair of its own, not the service\'s');
   assert.equal(ctx.started.length, 2);
-  // The public half is written, beside production's, and the rest kept.
+  // The public halves are written, beside production's, and the rest kept.
   const written = readFileSync(configFile, 'utf8');
-  assert.equal(JSON.parse(written).preview.serviceKey, key);
+  assert.deepEqual(JSON.parse(written).preview, { serviceKey: service.key, houseKey: house.key });
   assert.equal(outsidePreview(written), outsidePreview(text));
-  // Neither secret is said; the key is.
+  // Neither secret is said; the keys are.
   const said = [...ctx.said, ...ctx.warned].join('\n');
-  assert.ok(!said.includes(secret) && !said.includes(jurors.input));
-  assert.ok(said.includes(key));
+  assert.ok(!said.includes(service.secret) && !said.includes(house.secret));
+  assert.ok(said.includes(service.key) && said.includes(house.key));
+});
+
+test("the house's key is made new, its secret set on the relay and shown to nobody, and its key written beside the service's", async () => {
+  const { text, configFile } = configCopy();
+  const dry = fake({ capture: minting().capture, configFile });
+  assert.equal(await main(['house', 'key'], dry), 0);
+  assert.equal(dry.started.length, 0);
+  assert.equal(readFileSync(configFile, 'utf8'), text, 'nothing written without --apply');
+
+  const { made, capture } = minting();
+  const ctx = fake({ capture, configFile });
+  assert.equal(await main(['house', 'key', '--apply'], ctx), 0);
+  const [pair] = made;
+  assert.deepEqual(ctx.started.map((s) => [s.args.slice(2), s.input, s.cwd.endsWith('service/do')]), [[['secret', 'put', 'OH_HOUSE_SECRET'], pair.secret, true]]);
+  const written = readFileSync(configFile, 'utf8');
+  assert.equal(JSON.parse(written).houseKey, pair.key);
+  assert.deepEqual({ ...JSON.parse(written), houseKey: undefined }, { ...JSON.parse(text), houseKey: undefined }, 'nothing else changed');
+  assert.match(written, new RegExp(`"serviceKey": "${JSON.parse(text).serviceKey}",\n  "houseKey": "${pair.key}",\n`));
+  const said = [...ctx.said, ...ctx.warned].join('\n');
+  assert.ok(!said.includes(pair.secret));
+  assert.ok(said.includes(pair.key));
+  // Made again, it is replaced where it is.
+  const again = withHouseKey(written, 'e'.repeat(64));
+  assert.equal(JSON.parse(again).houseKey, 'e'.repeat(64));
+  assert.equal(again.split('"houseKey"').length, 2);
 });
 
 test("previews' secrets: without a key pair nothing is set, and what was said is not repeated", async () => {
@@ -327,7 +365,11 @@ test('the preview relay is deployed from what is checked out, without the PhotoD
   assert.equal(await main(['deploy', 'relay', '--preview', '--apply'], keyless), 1);
   assert.match(keyless.said.join('\n'), /no preview\.serviceKey/);
   assert.equal(keyless.started.length, 0);
-  const ctx = fake({ capture, config: { preview: { serviceKey: 'b'.repeat(64) } } });
+  const houseless = fake({ capture, config: { preview: { serviceKey: 'b'.repeat(64) } } });
+  assert.equal(await main(['deploy', 'relay', '--preview', '--apply'], houseless), 1);
+  assert.match(houseless.said.join('\n'), /no preview\.houseKey/);
+  assert.equal(houseless.started.length, 0);
+  const ctx = fake({ capture, config: { preview: { serviceKey: 'b'.repeat(64), houseKey: 'c'.repeat(64) } } });
   assert.equal(await main(['deploy', 'relay', '--preview', '--apply'], ctx), 0);
   assert.deepEqual(ctx.started.map((s) => s.args.slice(2)), [['deploy', '--env', 'preview']]);
   assert.ok(ctx.started[0].cwd.endsWith('service/do'));
