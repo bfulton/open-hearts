@@ -392,8 +392,7 @@ class AppLocalizationsPt extends AppLocalizations {
   }
 
   @override
-  String get seatsOrFriends =>
-      'Quatro lugares, para quem estiver esperando — ou um link que você manda para três amigos.';
+  String get pointLive => 'Jogue ao vivo com outras pessoas';
 
   @override
   String get subscribe => 'Assinar';
@@ -558,16 +557,14 @@ class AppLocalizationsPt extends AppLocalizations {
   }
 
   @override
-  String get pointRating =>
-      'Um rating só seu, calculado a partir dos resultados das suas partidas ao vivo.';
+  String get pointFriends => 'Crie uma partida só para amigos';
 
   @override
-  String get pointDeal =>
-      'Cada lugar embaralha, e nenhum outro jogador vê a sua mão. O nosso servidor joga os bots, então vê as deles.';
+  String get pointStats => 'Acompanhe seu rating e outras estatísticas';
 
   @override
   String get whatMoneyPaysFor =>
-      'Jogar sozinho é grátis, assim como os registros, o motor e cada linha disto, e não temos planos de mudar isso. O que o dinheiro paga é a parte que custa para mantermos: colocar vocês em contato, e o servidor que distribui as cartas e joga pelos bots em cada mesa ao vivo.';
+      'Jogar sozinho é grátis. A sua assinatura paga os servidores das partidas ao vivo.';
 
   @override
   String webRenewal(String price) {

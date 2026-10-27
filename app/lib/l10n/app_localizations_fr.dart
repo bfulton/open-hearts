@@ -392,8 +392,7 @@ class AppLocalizationsFr extends AppLocalizations {
   }
 
   @override
-  String get seatsOrFriends =>
-      'Quatre places, pour ceux qui attendent — ou un lien que vous envoyez à trois amis.';
+  String get pointLive => 'Jouez en direct avec d\'autres joueurs';
 
   @override
   String get subscribe => 'S\'abonner';
@@ -557,16 +556,14 @@ class AppLocalizationsFr extends AppLocalizations {
   }
 
   @override
-  String get pointRating =>
-      'Un classement à vous, calculé à partir des résultats de vos parties en direct.';
+  String get pointFriends => 'Créez une partie entre amis';
 
   @override
-  String get pointDeal =>
-      'Chaque place mélange, et aucun autre joueur ne voit votre main. Notre serveur joue les bots, il voit donc les leurs.';
+  String get pointStats => 'Suivez votre classement et d’autres statistiques';
 
   @override
   String get whatMoneyPaysFor =>
-      'Jouer seul est gratuit, tout comme les relevés, le moteur et chaque ligne de ce code, et nous n\'avons pas l\'intention de changer cela. L\'argent paie ce qui nous coûte à faire tourner : vous mettre en relation, et le serveur qui distribue les cartes et joue pour les bots à chaque table en direct.';
+      'Jouer seul est gratuit. Votre abonnement paie les serveurs des parties en direct.';
 
   @override
   String webRenewal(String price) {

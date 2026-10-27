@@ -566,11 +566,11 @@ abstract class AppLocalizations {
   /// **'{amount} a year'**
   String pricePerYear(String amount);
 
-  /// What live play is, where it is offered.
+  /// The subscription page's first point: what live play is.
   ///
   /// In en, this message translates to:
-  /// **'Four seats, filled with whoever is waiting — or a link you send to three friends.'**
-  String get seatsOrFriends;
+  /// **'Play live with other people'**
+  String get pointLive;
 
   /// Button: buy live play.
   ///
@@ -758,22 +758,22 @@ abstract class AppLocalizations {
   /// **'Open on this device, to {day}'**
   String openUntil(String day);
 
-  /// One of the points on the Live play page.
+  /// The subscription page's second point: a game of one's own that only the friends sent its link can join.
   ///
   /// In en, this message translates to:
-  /// **'A rating of your own, worked out from the results of your live games.'**
-  String get pointRating;
+  /// **'Create a friends-only game'**
+  String get pointFriends;
 
-  /// One of the points on the Live play page.
+  /// The subscription page's third point: a live player's rating, and their live games counted on their profile.
   ///
   /// In en, this message translates to:
-  /// **'Every seat shuffles, and no other player sees your hand. Our server plays the bots, so it sees theirs.'**
-  String get pointDeal;
+  /// **'Track your rating and other stats'**
+  String get pointStats;
 
   /// On the Live play page, under the points.
   ///
   /// In en, this message translates to:
-  /// **'Playing alone is free, and so are the records, the engine and every line of this; we have no plans to change that. What the money pays for is the part that costs us to run: putting you in touch with each other, and the server that deals the cards and plays the bots at every live table.'**
+  /// **'Playing alone is free. Your subscription pays for the servers that run live games.'**
   String get whatMoneyPaysFor;
 
   /// Under the Subscribe button on the web, where Stripe takes the payment and Link, Stripe's affiliate, sells the subscription: the price and that tax is added, that it is a year, that it renews by itself until cancelled, and where to cancel (Manage subscription, on this page once subscribed). California's automatic renewal law asks for all of it beside the button.

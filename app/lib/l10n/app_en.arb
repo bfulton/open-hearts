@@ -511,9 +511,9 @@
       }
     }
   },
-  "seatsOrFriends": "Four seats, filled with whoever is waiting — or a link you send to three friends.",
-  "@seatsOrFriends": {
-    "description": "What live play is, where it is offered."
+  "pointLive": "Play live with other people",
+  "@pointLive": {
+    "description": "The subscription page's first point: what live play is."
   },
   "subscribe": "Subscribe",
   "@subscribe": {
@@ -684,15 +684,15 @@
       }
     }
   },
-  "pointRating": "A rating of your own, worked out from the results of your live games.",
-  "@pointRating": {
-    "description": "One of the points on the Live play page."
+  "pointFriends": "Create a friends-only game",
+  "@pointFriends": {
+    "description": "The subscription page's second point: a game of one's own that only the friends sent its link can join."
   },
-  "pointDeal": "Every seat shuffles, and no other player sees your hand. Our server plays the bots, so it sees theirs.",
-  "@pointDeal": {
-    "description": "One of the points on the Live play page."
+  "pointStats": "Track your rating and other stats",
+  "@pointStats": {
+    "description": "The subscription page's third point: a live player's rating, and their live games counted on their profile."
   },
-  "whatMoneyPaysFor": "Playing alone is free, and so are the records, the engine and every line of this; we have no plans to change that. What the money pays for is the part that costs us to run: putting you in touch with each other, and the server that deals the cards and plays the bots at every live table.",
+  "whatMoneyPaysFor": "Playing alone is free. Your subscription pays for the servers that run live games.",
   "@whatMoneyPaysFor": {
     "description": "On the Live play page, under the points."
   },

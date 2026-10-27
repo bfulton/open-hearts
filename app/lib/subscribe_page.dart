@@ -509,9 +509,9 @@ class _SubscribePageState extends State<SubscribePage> {
                   if (suspended)
                     Text(l10n.accountSuspended, style: const TextStyle(fontSize: 13.5, height: 1.5, color: Palette.chrome))
                   else if (licence == null) ...[
-                    _Point(icon: Icons.groups_outlined, text: l10n.seatsOrFriends),
-                    _Point(icon: Icons.military_tech_outlined, text: l10n.pointRating),
-                    _Point(icon: Icons.lock_outline, text: l10n.pointDeal),
+                    _Point(icon: Icons.groups_outlined, text: l10n.pointLive),
+                    _Point(icon: Icons.group_add_outlined, text: l10n.pointFriends),
+                    _Point(icon: Icons.insights_outlined, text: l10n.pointStats),
                     const SizedBox(height: 18),
                     Text(
                       l10n.whatMoneyPaysFor,
