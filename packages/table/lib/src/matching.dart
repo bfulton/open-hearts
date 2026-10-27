@@ -509,7 +509,8 @@ class WaitingRoom {
             sealed: c['sealed'] == true,
             target: target,
             // The host's clocks, not this device's; a host on an older
-            // build says none, which is the standard table.
+            // build says none, which every build reads alike
+            // (TableTiming.unsaid).
             timing: TableTiming.parse(c['timing']));
       // Every seat an account's, by the service's word, and each
       // account once: a seating that is not is no table to sit at.

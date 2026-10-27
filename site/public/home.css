@@ -127,6 +127,12 @@ ul.points .d { color: var(--chrome-dim); font-size: 14.5px; }
 .way ul { margin: 0 0 14px; padding-left: 18px; color: var(--body); font-size: 15px; }
 .way li { margin-bottom: 6px; }
 
+/* The pages that teach the game. */
+main > nav.learn, main > nav.learn + section { margin-top: 50px; }
+ul.learn { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 10px; }
+ul.learn a { display: block; padding: 7px 15px; border: 1px solid var(--edge); border-radius: 999px; text-decoration: none; font-weight: 600; }
+ul.learn a:hover { border-color: var(--gold); }
+
 
 
 .shot { display: block; max-width: 100%; height: auto; border-radius: 12px; }

@@ -120,6 +120,37 @@ class AppLocalizationsPt extends AppLocalizations {
   String get leaveTheTable => 'Sair da mesa';
 
   @override
+  String get leaveTableTitle => 'Sair da mesa?';
+
+  @override
+  String get leaveTableBot =>
+      'Um bot fica com o seu lugar até o fim da partida.';
+
+  @override
+  String get leaveTableRated =>
+      'A partida é ranqueada e conta como se você tivesse terminado em último lugar.';
+
+  @override
+  String leaveTableWait(int minutes) {
+    String _temp0 = intl.Intl.pluralLogic(
+      minutes,
+      locale: localeName,
+      other:
+          'Jogar ao vivo só vai colocar você em outra mesa daqui a $minutes minutos.',
+      one: 'Jogar ao vivo só vai colocar você em outra mesa daqui a um minuto.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get stay => 'Ficar';
+
+  @override
+  String leftEarlyWait(String time) {
+    return 'Você não terminou a sua última partida ao vivo: Jogar ao vivo abre de novo em $time.';
+  }
+
+  @override
   String get about => 'Sobre';
 
   @override

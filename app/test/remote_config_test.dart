@@ -108,6 +108,11 @@ void main() {
     expect(quick.bank.graceMs, 3000);
     expect(quick.bank.bankMs, 30000);
     expect(quick.botActsMs, TableTiming.standard.botActsMs, reason: 'a field not named is the standard');
+    // This build's standard, not what a start that says nothing means
+    // to every build (TableTiming.unsaid): the silence is where the two
+    // differ.
+    expect(quick.silenceMs, TableTiming.standard.silenceMs);
+    expect(quick.silenceMs, isNot(TableTiming.unsaid.silenceMs));
     expect(RemoteConfig.parse({'table': {'graceMs': 3000, 'bankMs': 1}}).table, TableTiming.standard, reason: 'all or nothing');
     expect(RemoteConfig.parse({'table': 'fast'}).table, TableTiming.standard);
     expect(RemoteConfig.parse({'live': false, 'table': {'graceMs': 1}}).live, isFalse, reason: 'and the rest of the row stands');
@@ -162,6 +167,20 @@ void main() {
       expect(at(least - 1), of(AppWaits.standard, name), reason: '$name under');
       expect(at(most + 1), of(AppWaits.standard, name), reason: '$name over');
     }
+  });
+
+  test('Play live\'s wait after a game left early: the operator\'s in whole minutes within its bounds, none at zero, the build\'s five otherwise', () {
+    expect(RemoteConfig.none.leftEarly, const Duration(minutes: 5));
+    expect(RemoteConfig.parse(const {}).leftEarly, const Duration(minutes: 5));
+    expect(RemoteConfig.parse({'leftEarlyMin': 10}).leftEarly, const Duration(minutes: 10));
+    expect(RemoteConfig.parse({'leftEarlyMin': 0}).leftEarly, Duration.zero);
+    final (least, most) = RemoteConfig.leftEarlyBounds;
+    expect(RemoteConfig.parse({'leftEarlyMin': least}).leftEarly, Duration(minutes: least));
+    expect(RemoteConfig.parse({'leftEarlyMin': most}).leftEarly, Duration(minutes: most));
+    for (final wrong in [least - 1, most + 1, 2.5, '5', null, true]) {
+      expect(RemoteConfig.parse({'leftEarlyMin': wrong}).leftEarly, const Duration(minutes: 5), reason: '$wrong');
+    }
+    expect(RemoteConfig.parse({'live': false, 'leftEarlyMin': 99}).live, isFalse, reason: 'and the rest of the row stands');
   });
 
   testWidgets('a relay is called slow, and given up on, when the operator\'s waits say', (tester) async {

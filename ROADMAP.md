@@ -11,9 +11,6 @@ is a plan, not a promise. What has shipped is in the
 - **Search.** openhearts.game already has a title, a description, link
   previews, a page per language and a sitemap. Still to do: the site
   verified in Google Search Console so that it is indexed.
-- **Pages people search for:** how to play, the rules in full, shooting
-  the moon, and strategy. Today the rules are eight lines among the
-  support page's questions.
 - **The store listings:** the words and screenshots are made, in each
   of the app's languages. Still to do: a preview video. What the stores
   ask about how the app works is answered in
@@ -28,8 +25,6 @@ is a plan, not a promise. What has shipped is in the
 - **Bot speed** when playing alone: slow, normal or fast. Today the
   bots keep one pace, and the Auto switch plays out a hand that is
   already decided.
-- **A wait after quitting.** A player who leaves a live game early
-  can't start another one straight away.
 
 ### Your record
 

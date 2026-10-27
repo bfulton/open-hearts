@@ -27,7 +27,7 @@
 /// ```
 ///
 /// A boot is claimed by the clock, once the seat's grace and bank are spent, or for
-/// silence, two minutes unheard at the standard timing; both are votes in the same race,
+/// silence, half a minute unheard at the standard timing; both are votes in the same race,
 /// and a seat is only ever removed at its own turn or by its own signed
 /// leave (client.dart says why). A turn stuck for want of a
 /// silent seat's vote is split. A settled turn never reopens; a split

@@ -28,7 +28,8 @@ header {
   padding: 48px 0 40px;
   text-align: center;
 }
-/* A page's title on the left and the logo on the right, both the way home. */
+/* A page's title on the left and the logo on the right, the way home, as
+   is the title's "Open Hearts" where it has one. */
 header.bar { text-align: left; padding: 28px 0 28px; }
 header.bar .title { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 8px; }
 header.bar h1 { margin: 0; font-size: clamp(26px, 7vw, 40px); }
@@ -101,6 +102,27 @@ ul.plain { margin: 0 0 14px; padding-left: 20px; color: #CFDCD5; }
 ul.plain li { margin-bottom: 8px; }
 ul.plain b { color: var(--chrome); font-weight: 650; }
 
+/* The way to the game, at the end of what a page teaches. */
+.go { margin: 26px 0 0; }
+.go a {
+  display: inline-block;
+  padding: 13px 26px;
+  border-radius: 13px;
+  background: var(--gold);
+  color: var(--felt-dark);
+  font-weight: 800;
+  text-decoration: none;
+  box-shadow: 0 10px 28px rgba(0,0,0,.42);
+}
+.go a:hover { filter: brightness(1.07); }
+/* The pages that teach the game, the one you are on said, not offered. */
+main > nav.learn { margin-top: 46px; }
+ul.learn { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 10px; }
+ul.learn a { display: block; padding: 7px 15px; border: 1px solid var(--edge); border-radius: 999px; text-decoration: none; font-weight: 600; }
+ul.learn a:hover { border-color: var(--gold); }
+ul.learn a[aria-current="page"] { color: var(--chrome); border-color: var(--chrome-dim); }
+ul.learn a[aria-current="page"]:hover { border-color: var(--chrome-dim); }
+
 footer.wrap {
   margin-top: 60px;
   border-top: 1px solid var(--edge);
@@ -133,6 +155,7 @@ a:focus-visible { outline: 3px solid var(--gold); outline-offset: 3px; border-ra
   body, header { background: #fff !important; color: #000; }
   header { padding: 12px 0; border: 0; }
   h1, h2, h3, p, li, b, code, a, address, .tagline, .updated, ul.points span, footer { color: #000 !important; }
-  .skip, .logo { display: none; }
+  .skip, .logo, nav.learn { display: none; }
+  .go a { background: none; box-shadow: none; padding: 0; }
   main a[href^="http"]::after { content: " (" attr(href) ")"; font-size: 90%; }
 }

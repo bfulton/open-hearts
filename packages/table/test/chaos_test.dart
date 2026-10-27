@@ -14,4 +14,11 @@ void main() {
   for (var seed = 0; seed < 40; seed++) {
     test('chaos $seed', () => expect(walkChaos(seed), isNull), tags: seed < 8 ? null : 'slow');
   }
+  // Walks where a side cut off from the rest, its jury gone, ends the
+  // game for itself while the rest put it out and finish: a split
+  // longer than a person's half-minute silence and the twenty seconds
+  // after it.
+  for (final seed in [69, 183]) {
+    test('chaos $seed, a side ended and the rest finished', () => expect(walkChaos(seed), isNull), tags: 'slow');
+  }
 }

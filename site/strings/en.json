@@ -9,7 +9,12 @@
     "terms": "Terms",
     "languages": "Languages",
     "ogImageAlt": "Open Hearts: the four suits over green felt",
-    "translationNote": ""
+    "translationNote": "",
+    "learn": "More about Hearts",
+    "howToPlay": "How to play",
+    "rules": "Rules",
+    "moon": "Shooting the moon",
+    "strategy": "Strategy"
   },
   "home": {
     "title": "Open Hearts — open source card game, no ads",
@@ -60,7 +65,11 @@
       "text": "See the <a href=\"{{base}}/support\">support page</a>, email <a href=\"mailto:help@openhearts.game\">help@openhearts.game</a>, or use <i>Tell us what's broken</i> in the game's menu.",
       "menuAlt": "The game's menu, open, with the pointer on Tell us what's broken"
     },
-    "soon": "The phone apps are coming soon."
+    "soon": "The phone apps are coming soon.",
+    "learn": {
+      "title": "New to Hearts?",
+      "text": "It takes a few minutes to learn, and the game will teach you a hand as you play it: choose <i>Learn to play</i> in its menu."
+    }
   },
   "support": {
     "meta": {
@@ -81,7 +90,7 @@
     "faq": {
       "title": "Questions",
       "p1": "How do I play?",
-      "p2": "Go to <a href=\"{{play}}\">play.openhearts.game</a>, or (coming soon) search for “Open Hearts” in the {{appStore}} or {{googlePlay}}.",
+      "p2": "Go to <a href=\"{{play}}\">play.openhearts.game</a>, or (coming soon) search for “Open Hearts” in the {{appStore}} or {{googlePlay}}. New to Hearts? <a href=\"{{base}}/how-to-play\">How to play</a> explains the game in a few minutes, and <i>Learn to play</i>, in the game's menu, teaches you a hand.",
       "p5": "How do I subscribe?",
       "p6": "Tap the <i>Subscribe</i> button under <i>Play live</i>. On the <a href=\"{{app}}/subscription?lang={{code}}\">web</a>, payment is on Stripe's page, and Link, Stripe's affiliate, sells the subscription. In the phone apps, it is through the App Store or Google Play, which bill and renew it. Subscribing makes your account: your name, picture, rating and games go with it onto any device you add (up to 5), and a change to your profile on one of them shows on all of them.",
       "p7": "How do I cancel?",
@@ -101,7 +110,9 @@
       "p16": "The game follows your device's language. On the web, choose another under <i>Language</i> on the game's <i>About</i> page, or with the language menu at the foot of this site. On a phone, use the phone's own setting for each app: on an iPhone, Settings, then Open Hearts, then Language; on Android 13 and later, Settings, then System, then Languages, then App languages.",
       "p17": "How do I know the deal is fair?",
       "p19": "What happens to my data?",
-      "p20": "Alone, nothing leaves your device. Live play shows your name, picture, account number and results publicly. Nothing is sold or used for ads. More in the <a href=\"{{base}}/privacy\">privacy policy</a>."
+      "p20": "Alone, nothing leaves your device. Live play shows your name, picture, account number and results publicly. Nothing is sold or used for ads. More in the <a href=\"{{base}}/privacy\">privacy policy</a>.",
+      "p27": "What if I leave a live game early?",
+      "p28": "A bot takes your seat at once and plays it to the end, so the game goes on for everyone else. A rated game counts as one you finished last. And if <i>Play live</i> seated you there, with other people still at the table, it waits a few minutes before seating you again, and shows how long is left; playing alone and with friends stay open. A seat a bot takes because your time ran out, or your device stopped answering, counts the same as one you left."
     },
     "rules": {
       "title": "What are the rules for Hearts?",
@@ -113,7 +124,7 @@
       "r6": "Each heart is one point; the queen of spades is thirteen.",
       "r7": "Take all twenty-six to shoot the moon: everyone else gets them.",
       "r8": "Play to fifty or a hundred. Lowest score wins.",
-      "more": "For more detail on rules and game history, see <a href=\"{{support.rules.wikipedia}}\">Wikipedia</a>.",
+      "more": "The rules in full, with the variants this game leaves out, are on <a href=\"{{base}}/rules\">their own page</a>. For the game's history, see <a href=\"{{support.rules.wikipedia}}\">Wikipedia</a>.",
       "wikipedia": "https://en.wikipedia.org/wiki/Hearts_(card_game)"
     },
     "cancelAlt": "The game's menu with the pointer on Subscription, then the subscription page with the pointer on Manage subscription",
@@ -134,6 +145,257 @@
       "witness": "<b>Witnessed.</b> Each hand draws jurors: strangers picked at random from other players online, with no stake in the table. They play any seat a bot holds, and keep pieces of each player's keys, so a hand can finish when someone leaves while nobody alone can open another's cards. When too few other players are online to make a jury, our service's backup jurors make up the number. Like any juror, they cannot see your cards alone, only together with another player at your table, so for those hands you are trusting us not to collude.",
       "audit": "<b>Audited.</b> After each hand every device publishes its secret, so the whole game can be replayed and every shuffle, card and play checked. After a live game, <i>See the whole game</i> does that check for you; after a game alone, <i>Copy record</i> keeps it.",
       "more": "How it all works is in <a href=\"https://github.com/bfulton/open-hearts/blob/main/docs/explanation/fair-deal.md\">the write-up</a>."
+    }
+  },
+  "howToPlay": {
+    "meta": {
+      "title": "How to play Hearts — Open Hearts",
+      "description": "How to play Hearts, the card game, in a few minutes: passing three cards, following suit, taking tricks, why every heart counts against you, and how a game is won."
+    },
+    "header": {
+      "title": "How to play Hearts",
+      "tagline": "The whole game in a few minutes, from the deal to the last trick."
+    },
+    "game": "The game",
+    "aim": {
+      "title": "The aim",
+      "p1": "Hearts is a card game for four players, each playing for themselves. The cards you take score points against you: one for each heart, and thirteen for the queen of spades. When the game ends, the lowest score wins."
+    },
+    "deal": {
+      "title": "The deal",
+      "p1": "All 52 cards are dealt, thirteen to each player. In every suit the ace is high and the two is low, and no suit is trumps."
+    },
+    "pass": {
+      "title": "Passing three cards",
+      "p1": "Before each hand is played, everyone passes three cards: in the first hand to the player on their left, in the second to the player on their right, in the third to the player across, and in the fourth nobody passes. Then the order starts again. You choose your three before you see the ones coming to you."
+    },
+    "tricks": {
+      "title": "Tricks",
+      "p1": "Whoever holds the two of clubs leads it to the first trick. Then each player in turn, going left, plays one card. You have to follow suit: play a card of the suit that was led, if you have one. If you have none, you can play any card, and that is your chance to get rid of hearts and the queen of spades.",
+      "p2": "The highest card of the suit that was led takes the trick, with any points in it. A card of another suit never takes a trick, however high. Whoever takes a trick leads the next, until all thirteen have been played."
+    },
+    "breaking": {
+      "title": "Breaking hearts",
+      "p1": "Nobody may play a heart or the queen of spades to the first trick, unless they have nothing else. And nobody may lead a heart until one has been played, which is called breaking hearts, unless hearts are all they have left. The queen of spades doesn't break hearts, and can be led at any time."
+    },
+    "score": {
+      "title": "Scoring",
+      "p1": "When all thirteen tricks have been played, each player adds up the points in the tricks they took: one for each heart and thirteen for the queen of spades, 26 between the four of them. Those go onto their score."
+    },
+    "moon": {
+      "title": "Shooting the moon",
+      "p1": "Take all 26 points in one hand and you shoot the moon: you score nothing for the hand, and everyone else scores 26. Miss by one heart, though, and you keep the other 25. There's more on <a href=\"{{base}}/shooting-the-moon\">shooting the moon</a>."
+    },
+    "end": {
+      "title": "The end of the game",
+      "p1": "The game ends after the hand in which someone's score reaches 50 or more, or 100 in a longer game. The lowest score wins, and players tied for it share the win."
+    },
+    "here": "Playing here",
+    "learn": {
+      "title": "Learn by playing",
+      "p1": "The game will teach you a hand: choose <i>Learn to play</i> in its menu, and play one hand against three bots, with a note at each new thing as it comes up."
+    },
+    "solo": {
+      "title": "Alone",
+      "p1": "<i>Play solo</i> deals you a game against three bots: free, with no ads and no sign-up, and it works offline."
+    },
+    "live": {
+      "title": "With people",
+      "p1": "Live play takes a subscription. <i>Play live</i> seats you with three people near your rating, and <i>Play friends</i> opens a room for the people you send its link to. <i>Game options</i> chooses 50 or 100 points, and whether a live game is rated. What changes at a live table is in <a href=\"{{base}}/rules#live\">the rules</a>."
+    }
+  },
+  "rules": {
+    "meta": {
+      "title": "Hearts rules in full — Open Hearts",
+      "description": "The complete rules of Hearts as Open Hearts plays them: the deal, the pass, the first trick, breaking hearts, scoring, shooting the moon and the end of the game, with the variants it leaves out."
+    },
+    "header": {
+      "title": "The rules of Hearts",
+      "tagline": "Every rule, as the game is played here, and the variants it leaves out."
+    },
+    "game": "The rules",
+    "cards": {
+      "title": "Players and cards",
+      "p1": "Four players, each playing for themselves, with one standard deck of 52 cards and no jokers. In every suit the cards rank from the ace, highest, down through the king, queen, jack and ten to the two, lowest. No suit is trumps."
+    },
+    "deal": {
+      "title": "The deal",
+      "p1": "For each hand the deck is shuffled and dealt out, thirteen cards to each player. Playing alone, your device shuffles. At a live table every device shuffles in turn, so the deal is fair as long as one of them is honest: <a href=\"{{base}}/support#fair\">how that works</a>."
+    },
+    "pass": {
+      "title": "The pass",
+      "p1": "Before the first trick, each player chooses three cards and passes them on, face down. The direction goes round in fours: the first hand passes to the left, the second to the right, the third across, and the fourth not at all. The fifth passes to the left again. Everyone chooses before anyone sees what they receive."
+    },
+    "lead": {
+      "title": "The first lead",
+      "p1": "Whoever holds the two of clubs after the pass leads it to the first trick. Play goes to the left, each player adding one card to the trick."
+    },
+    "follow": {
+      "title": "Following suit",
+      "p1": "Each player must play a card of the suit that was led, if they hold one. A player who holds none may play any card, within the two rules below."
+    },
+    "firstTrick": {
+      "title": "No points on the first trick",
+      "p1": "No heart may be played to the first trick, and nor may the queen of spades. The one exception is a player with no clubs whose hand is nothing but hearts and the queen of spades: they play one of those."
+    },
+    "breaking": {
+      "title": "Breaking hearts",
+      "p1": "A heart may not be led until a heart has been played to an earlier trick; hearts are then broken. A player who holds nothing but hearts may lead one anyway. The queen of spades doesn't break hearts, and may be led at any time."
+    },
+    "taking": {
+      "title": "Taking a trick",
+      "p1": "The highest card of the suit that was led takes the trick. A card of another suit can't take it, however high. Whoever takes a trick keeps its cards and leads the next. A hand is thirteen tricks."
+    },
+    "scoring": {
+      "title": "Scoring",
+      "p1": "At the end of each hand, every heart a player took scores them one point, and the queen of spades scores thirteen. No other card scores. A hand's points always add up to 26, and each player's go onto their score."
+    },
+    "moon": {
+      "title": "Shooting the moon",
+      "p1": "A player who takes all 26 points in a hand scores nothing for it, and each of the other three scores 26. There's more on <a href=\"{{base}}/shooting-the-moon\">shooting the moon</a>."
+    },
+    "end": {
+      "title": "The end of the game",
+      "p1": "A game is played to 50 points, or to 100 if chosen in <i>Game options</i> before it starts. It ends after the hand in which anyone's score reaches that number or passes it, never in the middle of a hand. The lowest score wins, and players tied for the lowest share the win."
+    },
+    "live": "At a live table",
+    "seating": {
+      "title": "Who you play with",
+      "p1": "<i>Play live</i> seats people near each other's rating, and <i>Play friends</i> seats whoever is in the room. Seats nobody fills go to bots, and every bot is marked as one."
+    },
+    "clock": {
+      "title": "The clock",
+      "p1": "Every decision has a few seconds' grace, and each hand has a bank of time that thinking past the grace uses up. Once a player's grace is spent, their seat shows how much is left. When someone's bank runs out, the others can boot them, and a bot takes their seat."
+    },
+    "leaving": {
+      "title": "Leaving",
+      "p1": "A player who leaves, is booted, or stops answering is replaced at once by a bot, which plays their seat to the end of the game; the seat doesn't come back to them. In a rated game, a player who left counts as finishing last. <a href=\"{{base}}/support#leaving\">More on leaving a game early</a>."
+    },
+    "rated": {
+      "title": "Rated games",
+      "p1": "A rated game moves your rating by how your final score compares with each of the other three players': the lower score wins each pair, and equal scores halve it. Bots that sat down at the deal are rated the same way. An unrated game changes no ratings."
+    },
+    "variants": {
+      "title": "Variants not played here",
+      "p1": "Hearts is played many ways. These are the common variants this game leaves out.",
+      "jack": "<b>The jack of diamonds.</b> In Omnibus Hearts, whoever takes the jack of diamonds takes ten points off their score. Here it scores nothing.",
+      "queen": "<b>The queen breaks hearts.</b> Some tables count the queen of spades as breaking hearts. Here only a heart does.",
+      "first": "<b>Points on the first trick.</b> Some tables let hearts and the queen of spades be played to the first trick. Here they can't, unless a player has nothing else.",
+      "moon": "<b>A choice on the moon.</b> Some let a player who shoots the moon take 26 off their own score instead. Here the others always take the 26.",
+      "pass": "<b>Other passes.</b> Some tables pass four cards, or pass in another order. Here it is always three: left, right, across, then none.",
+      "lead": "<b>Other leads.</b> Some tables have the player on the dealer's left lead any card. Here the two of clubs always leads.",
+      "players": "<b>Three or five players.</b> Hearts can be played by three or five, with a card or two taken out of the deck. Here it is always four."
+    }
+  },
+  "moon": {
+    "meta": {
+      "title": "Shooting the moon in Hearts — Open Hearts",
+      "description": "Shooting the moon in Hearts: what it is, how it's scored, when it's worth trying, and how to stop a player who is going for it."
+    },
+    "header": {
+      "title": "Shooting the moon",
+      "tagline": "Take every point in a hand, and everyone else takes them instead."
+    },
+    "rule": "The rule",
+    "what": {
+      "title": "What it is",
+      "p1": "In Hearts you try to take as few points as you can. Shooting the moon turns that around: take all of them. A player who takes every heart and the queen of spades in one hand, all 26 points, scores nothing for it, and each of the other three scores 26."
+    },
+    "example": {
+      "title": "An example",
+      "p1": "In a game to 50, Ana, Ben, Cleo and Dev have 18, 22, 31 and 9 points. In the next hand Ben takes all thirteen hearts and the queen of spades. Ben scores nothing, and Ana, Cleo and Dev score 26 each.",
+      "p2": "That makes 44, 22, 57 and 35. Cleo has passed 50, so the game ends, and Ben, who was third, wins it."
+    },
+    "play": "Playing for it",
+    "gamble": {
+      "title": "Why it's a gamble",
+      "p1": "A shot at the moon has to take every point. If one heart goes to somebody else, the shot fails, and the player who tried keeps everything else they took: as much as 25 points in one hand."
+    },
+    "when": {
+      "title": "When to try it",
+      "p1": "Look for a hand that can win tricks and keep winning them: high hearts; the queen of spades, or the ace and king of spades to catch her with; and long suits headed by their top cards. Low cards are the danger, because each one can hand the lead to somebody who won't give it back.",
+      "p2": "It helps to start quietly. Take tricks the way anyone might, and show your hand only when it's too late to stop you."
+    },
+    "stop": {
+      "title": "How to stop it",
+      "p1": "If one player has taken every point so far, it may be a run at the moon. Stopping it takes only one heart: win a trick with a heart in it, or keep a heart high enough to win one late in the hand. A few points on your own score cost far less than 26.",
+      "p2": "So don't throw your highest heart away just because hearts are bad: late in the hand, it may be the only card that can stop the moon."
+    },
+    "more": "Here and elsewhere",
+    "here": {
+      "title": "At Open Hearts",
+      "p1": "When someone shoots the moon, the table shakes around them, and the score sheet says who did it. Your profile counts, for your games alone, the moons you've shot and the ones you've blocked: hands in which somebody else took the queen and ten hearts or more, and you took one of the rest."
+    },
+    "variants": {
+      "title": "Other ways to score it",
+      "p1": "Some tables let the shooter take 26 off their own score instead, which matters when adding 26 to everyone else would end the game with the shooter still behind. Some count taking all thirteen tricks, “shooting the sun”, as worth more. Here the moon is always scored the same way: nothing for the shooter, and 26 for everyone else."
+    }
+  },
+  "strategy": {
+    "meta": {
+      "title": "Hearts strategy: how to play well — Open Hearts",
+      "description": "Hearts strategy and tips: what to pass, how to handle the queen of spades, when to duck a trick, counting cards, stopping a moon, and playing the score."
+    },
+    "header": {
+      "title": "Hearts strategy",
+      "tagline": "What good players do, from the pass to the last trick."
+    },
+    "passing": "The pass",
+    "short": {
+      "title": "Make a suit short",
+      "p1": "The pass is your best chance to shape your hand. Pass all the cards you hold in a short suit and you are out of it: when it is led, you can throw away a heart or the queen of spades. Two or three clubs or diamonds are the easiest to get rid of."
+    },
+    "high": {
+      "title": "Pass high cards",
+      "p1": "Aces, kings and queens win tricks you don't want. Low cards, the twos to fives, let you play under everyone else, so keep them, and low hearts above all."
+    },
+    "queen": {
+      "title": "The queen of spades",
+      "p1": "With the queen and only one or two other spades, pass her, or she is likely to be forced out of you onto a trick you take. With four or more spades below her she is safer kept: you can follow spades with the small ones, and throw her on somebody else's trick once you are out of a suit.",
+      "p2": "Without the queen, the ace and king of spades are a danger: whoever holds her will throw her on them. Pass them if you have few other spades."
+    },
+    "remember": {
+      "title": "Remember what you passed",
+      "p1": "You know three cards in another player's hand. If you passed the queen of spades, you know who holds her."
+    },
+    "playing": "Playing the cards",
+    "first": {
+      "title": "The first trick is safe",
+      "p1": "No points can be played to the first trick, so it is the safest time to get rid of your highest club."
+    },
+    "duck": {
+      "title": "Duck with your highest safe card",
+      "p1": "When you don't want a trick, play the highest card that still loses to the one winning it. Your low cards are worth more later in the hand, when there are more points about."
+    },
+    "last": {
+      "title": "Last to play, win it high",
+      "p1": "Last to a trick with no points in it that you will win anyway? Win it with your highest card of the suit, not a low one, as long as you have something safe to lead next."
+    },
+    "void": {
+      "title": "Out of a suit, throw your worst",
+      "p1": "When you can't follow suit, throw the card that would hurt you most later: the queen of spades if you hold her, then your highest hearts, then high cards in the suits you still hold."
+    },
+    "spades": {
+      "title": "Lead spades to bring out the queen",
+      "p1": "Without the queen, and with no spade above the jack, leading spades is safe for you and a danger to whoever holds her: each spade trick uses up another of their spades, until she has to come out."
+    },
+    "count": {
+      "title": "Count the cards",
+      "p1": "Keep track of the hearts and spades that have been played, and of who has run out of which suit. A player out of a suit will throw points when it is led, and you will know before you lead it."
+    },
+    "moon": {
+      "title": "Watch for the moon",
+      "p1": "If one player is taking every point, take one yourself, even if it costs you a few: one heart is cheaper than 26. There's more on <a href=\"{{base}}/shooting-the-moon#stop\">stopping a moon</a>."
+    },
+    "late": "The score",
+    "score": {
+      "title": "Play the score",
+      "p1": "The game ends when someone reaches the target, so near the end the scores change what you want. If you are lowest, the sooner it ends the better: points to the player nearest the target can end it. If you are behind, keep it going, and send points to whoever is winning.",
+      "p2": "That is also when a moon matters most: 26 to each of the others can end the game in one hand, with the shooter on top or not."
+    },
+    "bots": {
+      "title": "Practise against the bots",
+      "p1": "The bots here are famous lovers, each with a way of their own: Romeo can't hold on to a queen, and Don Juan runs at the moon on hands nobody else would. <i>Play solo</i> is free, as often as you like."
     }
   },
   "privacy": {

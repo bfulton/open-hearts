@@ -106,6 +106,19 @@ GoRouter appRouter({
             path: livePath.substring(1),
             redirect: (_, state) => state.extra is LiveController ? null : '/',
             builder: (_, state) => LivePage(controller: state.extra! as LiveController),
+            // A browser's Back comes here as an address to go to, past
+            // the page's own Back (live_page.dart). While the game goes
+            // on it is asked the same: Stay keeps the table, and the
+            // router puts its address back; Leave is leaving, said as
+            // such, rather than a seat the others wait on until the
+            // table gives up on it.
+            onExit: (context, state) async {
+              final controller = state.extra;
+              if (controller is! LiveController || !controller.inGame || controller.left) return true;
+              if (!await askToLeave(context, controller)) return false;
+              if (controller.inGame && !controller.left) controller.leave();
+              return true;
+            },
           ),
         ],
       ),

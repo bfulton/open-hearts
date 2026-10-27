@@ -212,7 +212,10 @@ void main() {
     });
   });
 
-  test('a start that says no timing, or one out of bounds, is the standard table', () {
+  // What every build reads it as (TableTiming.unsaid), not this build's
+  // standard: a start by an older build says no timing for its own
+  // standard, which was that.
+  test('a start that says no timing, or one out of bounds, is the table every build reads it as', () {
     for (final said in <Object?>[null, {'graceMs': 500}, {'bankMs': '45000'}, 'quick']) {
       fakeAsync((async) {
         final bus = Bus();
@@ -241,7 +244,7 @@ void main() {
         });
         async.elapse(const Duration(seconds: 1));
         expect(room.spec, isNotNull, reason: '$said');
-        expect(room.spec!.timing, TableTiming.standard, reason: '$said');
+        expect(room.spec!.timing, TableTiming.unsaid, reason: '$said');
         room.dispose();
       });
     }

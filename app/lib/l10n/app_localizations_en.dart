@@ -120,6 +120,35 @@ class AppLocalizationsEn extends AppLocalizations {
   String get leaveTheTable => 'Leave the table';
 
   @override
+  String get leaveTableTitle => 'Leave the table?';
+
+  @override
+  String get leaveTableBot => 'A bot takes your seat for the rest of the game.';
+
+  @override
+  String get leaveTableRated =>
+      'The game is rated, and counts as one you finished last.';
+
+  @override
+  String leaveTableWait(int minutes) {
+    String _temp0 = intl.Intl.pluralLogic(
+      minutes,
+      locale: localeName,
+      other: 'Play live won\'t seat you again for $minutes minutes.',
+      one: 'Play live won\'t seat you again for a minute.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get stay => 'Stay';
+
+  @override
+  String leftEarlyWait(String time) {
+    return 'You didn\'t finish your last live game: Play live opens again in $time.';
+  }
+
+  @override
   String get about => 'About';
 
   @override

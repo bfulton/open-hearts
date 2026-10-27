@@ -76,6 +76,11 @@ export function configOf(raw) {
   if (table) c.table = table;
   const waits = waitsOf(raw.waits);
   if (waits) c.waits = waits;
+  // How long Play live waits before it seats a device again, after it
+  // left a game with other people still playing: whole minutes, zero
+  // for none. Served only when set; the app has its own (five).
+  const [least, most] = LEFT_EARLY_BOUNDS;
+  if (Number.isInteger(raw.leftEarlyMin) && raw.leftEarlyMin >= least && raw.leftEarlyMin <= most) c.leftEarlyMin = raw.leftEarlyMin;
   return c;
 }
 
@@ -91,6 +96,10 @@ function urlOf(text) {
     throw e;
   }
 }
+
+/// Least and most for `leftEarlyMin`, in minutes: the bounds the app
+/// parses it by (app/lib/net/remote_config.dart, RemoteConfig.leftEarlyBounds).
+export const LEFT_EARLY_BOUNDS = Object.freeze([0, 60]);
 
 /// How long a device waits on the network, each field least and most:
 /// the bounds the app parses them by (app/lib/net/remote_config.dart,

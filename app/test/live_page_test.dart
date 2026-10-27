@@ -17,9 +17,11 @@ import 'package:go_router/go_router.dart';
 import 'package:open_hearts/avatar.dart';
 import 'package:open_hearts/live/live_controller.dart';
 import 'package:open_hearts/live/live_page.dart';
+import 'package:open_hearts/net/remote_config.dart';
 import 'package:open_hearts/net/report_error.dart' show noticed;
 import 'package:open_hearts/pictures.dart';
 import 'package:open_hearts/report.dart';
+import 'package:open_hearts/router.dart';
 import 'package:open_hearts/theme.dart';
 import 'package:open_hearts/ui/player_icon.dart' show BotMark;
 import 'package:open_hearts/ui/table_view.dart' show ClockText, TableView;
@@ -46,6 +48,7 @@ class LiveHarness {
     int jurors = 0,
     bool workers = false,
     bool canPlayAgain = false,
+    bool strangers = false,
     int seed = 21,
     Transport Function(Transport line)? myLine,
   }) {
@@ -96,6 +99,7 @@ class LiveHarness {
           ratingOf: rated ? ledger.of : null,
           onResult: rated ? ledger.apply : null,
           canPlayAgain: canPlayAgain,
+          strangers: strangers,
           reactions: reactions.lane(signers[s].publicKey),
           reactionClock: reactions.nowMs,
         );
@@ -180,6 +184,7 @@ Future<LiveHarness> pumpLive(WidgetTester tester,
     Set<int> botSeats = const {},
     int jurors = 0,
     bool workers = false,
+    bool strangers = false,
     Transport Function(Transport line)? myLine,
     ReportSender? report}) async {
   tester.view
@@ -188,7 +193,16 @@ Future<LiveHarness> pumpLive(WidgetTester tester,
   addTearDown(tester.view.reset);
   final live =
       LiveHarness(
-          crypto: crypto, pictures: pictures, avatars: avatars, target: target, rated: rated, botSeats: botSeats, jurors: jurors, workers: workers, myLine: myLine);
+          crypto: crypto,
+          pictures: pictures,
+          avatars: avatars,
+          target: target,
+          rated: rated,
+          botSeats: botSeats,
+          jurors: jurors,
+          workers: workers,
+          strangers: strangers,
+          myLine: myLine);
   await tester.pumpWidget(MaterialApp(
       theme: buildTheme(), home: LivePage(controller: live.controller, report: report ?? (_) async => throw StateError('no report expected'))));
   await tester.pumpAndSettle();
@@ -750,5 +764,249 @@ void main() {
     expect(live.controller.clockMs(_me), isNotNull);
     expect(find.bySemanticsLabel(RegExp(r'^You: .*, \d+ s on the clock$')), findsOneWidget);
     expect(tester.takeException(), isNull);
+  });
+
+  group('leaving a game still going', () {
+    /// The table as the front door opens it, on the app's own routes
+    /// (router.dart): its way back, and a browser's, are the real ones.
+    /// Resolves to the table's page closing, with what it said.
+    Future<({GoRouter router, Future<bool?> closed})> openThroughApp(WidgetTester tester, LiveHarness live) async {
+      tester.view
+        ..physicalSize = const Size(390, 844)
+        ..devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+      late BuildContext door;
+      final router = appRouter(
+        boot: Uri.parse('https://play.openhearts.game/'),
+        initialLocation: '/',
+        home: (_, _) => Builder(builder: (c) {
+          door = c;
+          return const SizedBox();
+        }),
+      );
+      await tester.pumpWidget(MaterialApp.router(theme: buildTheme(), routerConfig: router));
+      final closed = door.push<bool>('/live', extra: live.controller);
+      await tester.pumpAndSettle();
+      expect(find.byType(LivePage), findsOneWidget);
+      return (router: router, closed: closed);
+    }
+
+    /// Past the pass, into the play: a game going on.
+    Future<void> intoTheGame(WidgetTester tester, LiveHarness live) async {
+      await act(tester, live);
+      await live.advance(tester, 2000);
+      expect(live.controller.game.phase, engine.Phase.playing);
+    }
+
+    Future<void> leaveFromTheMenu(WidgetTester tester) async {
+      await tester.tap(find.bySemanticsLabel('Menu'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Leave the table'));
+      await tester.pumpAndSettle();
+    }
+
+    String asked(WidgetTester tester) =>
+        tester.widget<Text>(find.descendant(of: find.byType(AlertDialog), matching: find.byType(Text)).at(1)).data!;
+
+    testWidgets('is asked first, saying what it costs: the seat, a rated game, and Play live\'s wait; Stay stays', (tester) async {
+      final live = await pumpLive(tester, rated: true, strangers: true);
+      await intoTheGame(tester, live);
+      await leaveFromTheMenu(tester);
+      expect(find.text('Leave the table?'), findsOneWidget);
+      expect(
+          asked(tester),
+          'A bot takes your seat for the rest of the game. '
+          'The game is rated, and counts as one you finished last. '
+          "Play live won't seat you again for 5 minutes.");
+      await tester.tap(find.text('Stay'));
+      await tester.pumpAndSettle();
+      expect(find.text('Leave the table?'), findsNothing);
+      expect(live.controller.left, isFalse);
+      expect(live.controller.amSeated, isTrue);
+      expect(live.controller.leftEarly, isFalse);
+      // And the game goes on, with this player in it.
+      for (var guard = 0; guard < 40 && !live.controller.awaitingPlay; guard++) {
+        await live.advance(tester, 500);
+      }
+      await act(tester, live);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('Leave leaves: early, at a table Play live seated, with other people still playing', (tester) async {
+      final live = LiveHarness(rated: true, strangers: true);
+      final open = await openThroughApp(tester, live);
+      await intoTheGame(tester, live);
+      await leaveFromTheMenu(tester);
+      await tester.tap(find.text('Leave'));
+      await tester.pumpAndSettle();
+      expect(live.controller.left, isTrue);
+      expect(live.controller.leftEarly, isTrue);
+      expect(find.byType(LivePage), findsNothing, reason: 'back at the door');
+      expect(await open.closed, isNull);
+      // The leave said, the socket closed a beat later.
+      await tester.pump(LiveController.leaveBeat);
+    });
+
+    testWidgets('at a friends\' table it says only what becomes of the seat, and is not a game left early', (tester) async {
+      final live = LiveHarness();
+      await openThroughApp(tester, live);
+      await intoTheGame(tester, live);
+      await leaveFromTheMenu(tester);
+      expect(asked(tester), 'A bot takes your seat for the rest of the game.');
+      await tester.tap(find.text('Leave'));
+      await tester.pumpAndSettle();
+      expect(live.controller.left, isTrue);
+      expect(live.controller.leftEarly, isFalse);
+      await tester.pump(LiveController.leaveBeat);
+    });
+
+    testWidgets('with nobody else at the table there is no wait to say, and none after', (tester) async {
+      final live = LiveHarness(strangers: true, botSeats: {0, 1, 3});
+      await openThroughApp(tester, live);
+      await intoTheGame(tester, live);
+      expect(live.controller.othersSeated, isFalse);
+      await leaveFromTheMenu(tester);
+      expect(asked(tester), 'A bot takes your seat for the rest of the game.');
+      await tester.tap(find.text('Leave'));
+      await tester.pumpAndSettle();
+      expect(live.controller.leftEarly, isFalse);
+      await tester.pump(LiveController.leaveBeat);
+    });
+
+    testWidgets('the wait said is the operator\'s, and none is said where there is none', (tester) async {
+      addTearDown(() => RemoteSettings.current = RemoteSettings());
+      RemoteSettings.current.adopt(RemoteConfig.parse({'leftEarlyMin': 1}));
+      final live = await pumpLive(tester, strangers: true);
+      await intoTheGame(tester, live);
+      await leaveFromTheMenu(tester);
+      expect(asked(tester), "A bot takes your seat for the rest of the game. Play live won't seat you again for a minute.");
+      await tester.tap(find.text('Stay'));
+      await tester.pumpAndSettle();
+      RemoteSettings.current.adopt(RemoteConfig.parse({'leftEarlyMin': 0}));
+      await leaveFromTheMenu(tester);
+      expect(asked(tester), 'A bot takes your seat for the rest of the game.');
+      await tester.tap(find.text('Stay'));
+      await tester.pumpAndSettle();
+    });
+
+    testWidgets('going back is leaving too, and asked the same; Stay stays at the table', (tester) async {
+      final live = LiveHarness(strangers: true);
+      await openThroughApp(tester, live);
+      await intoTheGame(tester, live);
+      // A phone's own Back.
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.text('Leave the table?'), findsOneWidget);
+      await tester.tap(find.text('Stay'));
+      await tester.pumpAndSettle();
+      expect(find.byType(LivePage), findsOneWidget);
+      expect(live.controller.left, isFalse);
+      // And again, leaving.
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Leave'));
+      await tester.pumpAndSettle();
+      expect(find.byType(LivePage), findsNothing);
+      expect(live.controller.leftEarly, isTrue);
+      await tester.pump(LiveController.leaveBeat);
+    });
+
+    testWidgets('a browser\'s Back is asked the same: Stay keeps the table and its address; Leave leaves, and the door is told the table closed', (tester) async {
+      final live = LiveHarness(strangers: true);
+      final open = await openThroughApp(tester, live);
+      var closed = 0;
+      live.controller.onClosed = () => closed++;
+      await intoTheGame(tester, live);
+      // A browser's Back reaches the router as an address to go to, past
+      // the page's own Back, as this does.
+      open.router.go('/');
+      await tester.pumpAndSettle();
+      expect(find.text('Leave the table?'), findsOneWidget);
+      expect(asked(tester), "A bot takes your seat for the rest of the game. Play live won't seat you again for 5 minutes.");
+      await tester.tap(find.text('Stay'));
+      await tester.pumpAndSettle();
+      expect(find.byType(LivePage), findsOneWidget);
+      expect(live.controller.left, isFalse);
+      expect(open.router.routeInformationProvider.value.uri.path, '/live', reason: 'the address back at the table');
+      expect(closed, 0);
+      // And again, leaving.
+      open.router.go('/');
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Leave'));
+      await tester.pumpAndSettle();
+      expect(find.byType(LivePage), findsNothing);
+      expect(live.controller.left, isTrue, reason: 'said, not left for the table to give up on');
+      expect(live.controller.leftEarly, isTrue);
+      expect(closed, 1);
+      await tester.pump(LiveController.leaveBeat);
+    });
+
+    testWidgets('a way out taken while the question shows asks nothing more: the question answers it', (tester) async {
+      final live = LiveHarness(strangers: true);
+      final open = await openThroughApp(tester, live);
+      await intoTheGame(tester, live);
+      await leaveFromTheMenu(tester);
+      // A browser's Back with the menu's question still open.
+      open.router.go('/');
+      await tester.pumpAndSettle();
+      expect(find.text('Leave the table?'), findsOneWidget, reason: 'one question, not two');
+      expect(find.byType(LivePage), findsOneWidget);
+      expect(open.router.routeInformationProvider.value.uri.path, '/live');
+      await tester.tap(find.text('Stay'));
+      await tester.pumpAndSettle();
+      expect(find.text('Leave the table?'), findsNothing);
+      expect(find.byType(LivePage), findsOneWidget);
+      expect(live.controller.left, isFalse);
+    });
+
+    testWidgets('a game the table has ended is nobody\'s game left early, while the screen still plays its last trick out', (tester) async {
+      final live = await pumpLive(tester, target: 1, strangers: true);
+      await intoTheGame(tester, live);
+      // The table and the screen on one clock, a little at a time, until
+      // the table's game is over and the screen's is not yet.
+      for (var guard = 0; guard < 4000 && live.controller.client.game.phase != engine.Phase.gameOver; guard++) {
+        await act(tester, live);
+        await live.tick(tester, 50, step: 50);
+      }
+      expect(live.controller.client.game.phase, engine.Phase.gameOver);
+      expect(live.controller.done, isFalse, reason: 'its last trick still to be shown');
+      expect(live.controller.inGame, isTrue, reason: 'so leaving now is still asked');
+      expect(live.controller.othersPlaying, isFalse, reason: 'nobody\'s game goes on');
+      live.controller.leave();
+      expect(live.controller.leftEarly, isFalse);
+      // The page gone, and the leave's beat on the socket with it.
+      await tester.pumpWidget(const SizedBox());
+      await tester.pump(LiveController.leaveBeat);
+    });
+
+    testWidgets('a game over asks nothing, and is no game left early', (tester) async {
+      final live = LiveHarness(target: 1, strangers: true);
+      await openThroughApp(tester, live);
+      for (var guard = 0; guard < 400 && !live.controller.gameOverDue; guard++) {
+        await act(tester, live);
+        await live.advance(tester, 500);
+      }
+      expect(live.controller.inGame, isFalse);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.text('Leave the table?'), findsNothing);
+      expect(find.byType(LivePage), findsNothing);
+      expect(live.controller.leftEarly, isFalse);
+    });
+
+    testWidgets('a seat the table gives to a bot is a game left early at a Play live table with people at it, and only there', (tester) async {
+      for (final strangers in [true, false]) {
+        final live = await pumpLive(tester, strangers: strangers);
+        await intoTheGame(tester, live);
+        // Say nothing on turn: the others boot this seat.
+        for (var guard = 0; guard < 200 && live.controller.amSeated; guard++) {
+          await live.advance(tester, 1000);
+        }
+        expect(live.controller.amSeated, isFalse);
+        expect(live.controller.left, isFalse, reason: 'not by its own word');
+        expect(live.controller.leftEarly, strangers, reason: strangers ? 'Play live seated it' : 'a friends\' table');
+        await tester.pumpWidget(const SizedBox());
+      }
+    });
   });
 }

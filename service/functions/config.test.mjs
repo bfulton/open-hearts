@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { readFileSync } from 'node:fs';
 import worker from './worker.mjs';
-import { CONFIG_DEFAULTS, TABLE_TIMING_BOUNDS, WAITS_BOUNDS, configOf } from './config.mjs';
+import { CONFIG_DEFAULTS, LEFT_EARLY_BOUNDS, TABLE_TIMING_BOUNDS, WAITS_BOUNDS, configOf } from './config.mjs';
 
 /// Cloudflare KV as the worker reads it: a JSON value by key.
 const kvWith = (rows) => ({
@@ -161,4 +161,22 @@ test('the waits\' bounds are the app\'s own', () => {
   const dart = readFileSync(new URL('../../app/lib/net/remote_config.dart', import.meta.url), 'utf8');
   const app = Object.fromEntries([...dart.matchAll(/'(\w+)': \((\d+), (\d+)\)/g)].map((m) => [m[1], [Number(m[2]), Number(m[3])]]));
   assert.deepEqual(app, { ...WAITS_BOUNDS });
+});
+
+test('the wait after leaving a game early is served in whole minutes within its bounds, zero included, and only when set', () => {
+  assert.equal(configOf({}).leftEarlyMin, undefined, 'none set: the app keeps its own');
+  assert.equal(configOf({ leftEarlyMin: 10 }).leftEarlyMin, 10);
+  assert.equal(configOf({ leftEarlyMin: 0 }).leftEarlyMin, 0, 'no wait at all');
+  assert.equal(configOf({ leftEarlyMin: 60 }).leftEarlyMin, 60);
+  for (const wrong of [-1, 61, 2.5, '5', null, true]) {
+    assert.equal(configOf({ leftEarlyMin: wrong }).leftEarlyMin, undefined, JSON.stringify(wrong));
+  }
+  // And the rest of the row is served regardless.
+  assert.equal(configOf({ live: false, leftEarlyMin: 99 }).live, false);
+});
+
+test('the bounds of the wait after leaving a game early are the app\'s own', () => {
+  const dart = readFileSync(new URL('../../app/lib/net/remote_config.dart', import.meta.url), 'utf8');
+  const [, least, most] = dart.match(/static const leftEarlyBounds = \((\d+), (\d+)\);/);
+  assert.deepEqual([Number(least), Number(most)], [...LEFT_EARLY_BOUNDS]);
 });

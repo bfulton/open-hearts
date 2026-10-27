@@ -9,7 +9,12 @@
     "terms": "Términos",
     "languages": "Idiomas",
     "ogImageAlt": "Open Hearts: los cuatro palos sobre tapete verde",
-    "translationNote": "<p class=\"note\">Esta página es una traducción; donde difiera de la versión en inglés, prevalece la versión en inglés.</p>"
+    "translationNote": "<p class=\"note\">Esta página es una traducción; donde difiera de la versión en inglés, prevalece la versión en inglés.</p>",
+    "learn": "Más sobre Corazones",
+    "howToPlay": "Cómo se juega",
+    "rules": "Reglas",
+    "moon": "Disparar a la luna",
+    "strategy": "Estrategia"
   },
   "home": {
     "title": "Open Hearts — juego de cartas de código abierto, sin anuncios",
@@ -60,7 +65,11 @@
       "text": "Consulta la <a href=\"{{base}}/support\">página de ayuda</a>, escribe a <a href=\"mailto:help@openhearts.game\">help@openhearts.game</a> o usa <i>Dinos qué falla</i> en el menú del juego.",
       "menuAlt": "El menú del juego, abierto, con el puntero sobre Dinos qué falla"
     },
-    "soon": "Las apps para teléfono llegan pronto."
+    "soon": "Las apps para teléfono llegan pronto.",
+    "learn": {
+      "title": "¿Primera vez con Corazones?",
+      "text": "Se aprende en unos minutos, y el propio juego te enseña una mano mientras la juegas: elige <i>Aprender a jugar</i> en su menú."
+    }
   },
   "support": {
     "meta": {
@@ -81,7 +90,7 @@
     "faq": {
       "title": "Preguntas",
       "p1": "¿Cómo se juega?",
-      "p2": "Ve a <a href=\"{{play}}\">play.openhearts.game</a> o (próximamente) busca «Open Hearts» en la {{appStore}} o en {{googlePlay}}.",
+      "p2": "Ve a <a href=\"{{play}}\">play.openhearts.game</a> o (próximamente) busca «Open Hearts» en la {{appStore}} o en {{googlePlay}}. ¿Primera vez con Corazones? <a href=\"{{base}}/how-to-play\">Cómo se juega</a> te explica el juego en unos minutos, y <i>Aprender a jugar</i>, en el menú del juego, te enseña una mano.",
       "p5": "¿Cómo me suscribo?",
       "p6": "Toca el botón <i>Suscribirse</i> en <i>Jugar en vivo</i>. En la <a href=\"{{app}}/subscription?lang={{code}}\">web</a>, el pago se hace en la página de Stripe y la suscripción la vende Link, filial de Stripe. En las apps para móvil, a través de la App Store o Google Play, que la cobran y la renuevan. Suscribirte crea tu cuenta: tu nombre, tu imagen, tu clasificación y tus partidas van con ella a cualquier dispositivo que añadas (hasta 5), y un cambio en tu perfil en uno de ellos se ve en todos.",
       "p7": "¿Cómo cancelo?",
@@ -101,7 +110,9 @@
       "p16": "El juego sigue el idioma de tu dispositivo. En la web, elige otro en <i>Idioma</i>, en la página <i>Acerca de</i> del juego, o con el menú de idiomas al pie de este sitio. En un teléfono, usa el ajuste del propio teléfono para cada app: en un iPhone, Ajustes, luego Open Hearts, luego Idioma; en Android 13 o posterior, Ajustes, luego Sistema, luego Idiomas, luego Idiomas de las aplicaciones.",
       "p17": "¿Cómo sé que el reparto es justo?",
       "p19": "¿Qué pasa con mis datos?",
-      "p20": "Jugando solo, nada sale de tu dispositivo. En vivo, tu nombre, imagen, número de cuenta y resultados son públicos. Nada se vende ni se usa para anuncios. Más en la <a href=\"{{base}}/privacy\">política de privacidad</a>."
+      "p20": "Jugando solo, nada sale de tu dispositivo. En vivo, tu nombre, imagen, número de cuenta y resultados son públicos. Nada se vende ni se usa para anuncios. Más en la <a href=\"{{base}}/privacy\">política de privacidad</a>.",
+      "p27": "¿Qué pasa si dejo una partida en vivo antes de tiempo?",
+      "p28": "Un bot ocupa tu asiento al momento y lo juega hasta el final, así que la partida sigue para los demás. Una partida con clasificación cuenta como si hubieras terminado en último lugar. Y si fue <i>Jugar en vivo</i> quien te sentó allí, con otras personas aún en la mesa, espera unos minutos antes de volver a sentarte, y muestra cuánto falta; jugar solo y con amigos sigue abierto. Un asiento que ocupa un bot porque se te acabó el tiempo, o porque tu dispositivo dejó de responder, cuenta igual que uno que dejaste."
     },
     "rules": {
       "title": "¿Cuáles son las reglas de Corazones?",
@@ -113,7 +124,7 @@
       "r6": "Cada corazón vale un punto; la reina de picas, trece.",
       "r7": "Llévate los veintiséis para disparar a la luna: se los llevan todos los demás.",
       "r8": "Se juega a cincuenta o a cien. Gana la puntuación más baja.",
-      "more": "Para más detalles sobre las reglas y la historia del juego, consulta la <a href=\"{{support.rules.wikipedia}}\">Wikipedia</a>.",
+      "more": "Las reglas completas, con las variantes que este juego deja fuera, están en <a href=\"{{base}}/rules\">su propia página</a>. Para la historia del juego, consulta la <a href=\"{{support.rules.wikipedia}}\">Wikipedia</a>.",
       "wikipedia": "https://es.wikipedia.org/wiki/Corazones_(juego)"
     },
     "cancelAlt": "El menú del juego con el puntero sobre Suscripción, y luego la página de la suscripción con el puntero sobre Gestionar suscripción",
@@ -134,6 +145,257 @@
       "witness": "<b>Con testigos.</b> Cada mano sortea jurados: desconocidos elegidos al azar entre otros jugadores en línea, sin nada en juego en la mesa. Juegan los asientos de los bots y guardan partes de las claves de cada jugador, para que la mano pueda terminar si alguien se va sin que nadie pueda abrir solo las cartas de otro. Cuando hay muy pocos jugadores en línea para formar un jurado, los jurados de reserva de nuestro servicio completan el número. Como cualquier jurado, no pueden ver tus cartas solos, solo junto con otro jugador de tu mesa, así que en esas manos confías en que no nos confabulemos.",
       "audit": "<b>Auditado.</b> Tras cada mano, cada dispositivo publica su secreto, así que la partida entera se puede repetir y comprobar cada barajada, carta y jugada. Tras una partida en vivo, <i>Ver la partida entera</i> hace esa comprobación por ti; tras una partida a solas, <i>Copiar registro</i> la guarda.",
       "more": "Todo el funcionamiento está en <a href=\"https://github.com/bfulton/open-hearts/blob/main/docs/explanation/fair-deal.md\">la explicación</a>."
+    }
+  },
+  "howToPlay": {
+    "meta": {
+      "title": "Cómo jugar a Corazones — Open Hearts",
+      "description": "Cómo jugar a Corazones, el juego de cartas, en unos minutos: pasar tres cartas, seguir el palo, ganar bazas, por qué cada corazón cuenta en tu contra y cómo se gana una partida."
+    },
+    "header": {
+      "title": "Cómo jugar a Corazones",
+      "tagline": "Todo el juego en unos minutos, del reparto a la última baza."
+    },
+    "game": "El juego",
+    "aim": {
+      "title": "El objetivo",
+      "p1": "Corazones es un juego de cartas para cuatro jugadores, cada uno por su cuenta. Las cartas que te llevas suman puntos en tu contra: uno por cada corazón y trece por la reina de picas. Cuando termina la partida, gana la puntuación más baja."
+    },
+    "deal": {
+      "title": "El reparto",
+      "p1": "Se reparten las 52 cartas, trece a cada jugador. En cada palo el as es la carta más alta y el dos la más baja, y no hay triunfo."
+    },
+    "pass": {
+      "title": "Pasar tres cartas",
+      "p1": "Antes de jugar cada mano, todos pasan tres cartas: en la primera mano al jugador de su izquierda, en la segunda al de su derecha, en la tercera al de enfrente, y en la cuarta nadie pasa. Luego el orden vuelve a empezar. Eliges tus tres antes de ver las que te llegan."
+    },
+    "tricks": {
+      "title": "Las bazas",
+      "p1": "Quien tiene el dos de tréboles abre con él la primera baza. Luego cada jugador, por turno y hacia la izquierda, juega una carta. Tienes que seguir el palo: juega una carta del palo que se abrió, si tienes. Si no tienes, puedes jugar cualquier carta, y esa es tu ocasión de deshacerte de corazones y de la reina de picas.",
+      "p2": "La carta más alta del palo que se abrió gana la baza, con los puntos que haya en ella. Una carta de otro palo nunca gana una baza, por alta que sea. Quien gana una baza abre la siguiente, hasta que se juegan las trece."
+    },
+    "breaking": {
+      "title": "Romper los corazones",
+      "p1": "Nadie puede jugar un corazón ni la reina de picas en la primera baza, salvo que no tenga otra cosa. Y nadie puede abrir con un corazón hasta que se haya jugado uno, lo que se llama romper los corazones, salvo que solo le queden corazones. La reina de picas no rompe los corazones, y se puede abrir con ella en cualquier momento."
+    },
+    "score": {
+      "title": "La puntuación",
+      "p1": "Cuando se han jugado las trece bazas, cada jugador suma los puntos de las bazas que se llevó: uno por cada corazón y trece por la reina de picas, 26 entre los cuatro. Esos puntos se añaden a su puntuación."
+    },
+    "moon": {
+      "title": "Disparar a la luna",
+      "p1": "Llévate los 26 puntos en una mano y disparas a la luna: no sumas nada en esa mano, y todos los demás suman 26. Pero si te falta un solo corazón, te quedas con los otros 25. Hay más sobre <a href=\"{{base}}/shooting-the-moon\">disparar a la luna</a>."
+    },
+    "end": {
+      "title": "El final de la partida",
+      "p1": "La partida termina después de la mano en la que alguien llega a 50 puntos o más, o a 100 en una partida larga. Gana la puntuación más baja, y quienes empatan en ella comparten la victoria."
+    },
+    "here": "Jugar aquí",
+    "learn": {
+      "title": "Aprender jugando",
+      "p1": "El juego te enseña una mano: elige <i>Aprender a jugar</i> en su menú y juega una mano contra tres bots, con una nota en cada cosa nueva cuando aparece."
+    },
+    "solo": {
+      "title": "Solo",
+      "p1": "<i>Jugar solo</i> te reparte una partida contra tres bots: gratis, sin anuncios ni registro, y funciona sin conexión."
+    },
+    "live": {
+      "title": "Con otras personas",
+      "p1": "El juego en vivo requiere una suscripción. <i>Jugar en vivo</i> te sienta con tres personas de clasificación parecida a la tuya, y <i>Jugar con amigos</i> abre una sala para las personas a las que envíes su enlace. En <i>Opciones de partida</i> eliges 50 o 100 puntos, y si una partida en vivo es con clasificación. Lo que cambia en una mesa en vivo está en <a href=\"{{base}}/rules#live\">las reglas</a>."
+    }
+  },
+  "rules": {
+    "meta": {
+      "title": "Las reglas completas de Corazones — Open Hearts",
+      "description": "Las reglas completas de Corazones tal como se juega en Open Hearts: el reparto, el pase, la primera baza, romper los corazones, la puntuación, disparar a la luna y el final de la partida, con las variantes que deja fuera."
+    },
+    "header": {
+      "title": "Las reglas de Corazones",
+      "tagline": "Todas las reglas, tal como se juega aquí, y las variantes que se quedan fuera."
+    },
+    "game": "Las reglas",
+    "cards": {
+      "title": "Jugadores y cartas",
+      "p1": "Cuatro jugadores, cada uno por su cuenta, con una baraja francesa de 52 cartas, sin comodines. En cada palo, las cartas van del as, la más alta, pasando por el rey, la reina, la jota y el diez, hasta el dos, la más baja. No hay triunfo."
+    },
+    "deal": {
+      "title": "El reparto",
+      "p1": "En cada mano se baraja y se reparte toda la baraja, trece cartas a cada jugador. Si juegas solo, baraja tu dispositivo. En una mesa en vivo cada dispositivo baraja por turno, así que el reparto es justo con que uno de ellos sea honesto: <a href=\"{{base}}/support#fair\">cómo funciona</a>."
+    },
+    "pass": {
+      "title": "El pase",
+      "p1": "Antes de la primera baza, cada jugador elige tres cartas y las pasa boca abajo. La dirección va en ciclos de cuatro: en la primera mano se pasa a la izquierda, en la segunda a la derecha, en la tercera al frente, y en la cuarta no se pasa. En la quinta se vuelve a pasar a la izquierda. Todos eligen antes de que nadie vea lo que recibe."
+    },
+    "lead": {
+      "title": "La primera salida",
+      "p1": "Quien tiene el dos de tréboles después del pase abre con él la primera baza. El juego sigue hacia la izquierda, y cada jugador pone una carta en la baza."
+    },
+    "follow": {
+      "title": "Seguir el palo",
+      "p1": "Cada jugador debe jugar una carta del palo que se abrió, si tiene alguna. Quien no tiene puede jugar cualquier carta, dentro de las dos reglas siguientes."
+    },
+    "firstTrick": {
+      "title": "Sin puntos en la primera baza",
+      "p1": "En la primera baza no se puede jugar ningún corazón, ni tampoco la reina de picas. La única excepción es un jugador sin tréboles cuya mano no tiene más que corazones y la reina de picas: juega una de esas cartas."
+    },
+    "breaking": {
+      "title": "Romper los corazones",
+      "p1": "No se puede abrir con un corazón hasta que se haya jugado un corazón en una baza anterior; entonces los corazones están rotos. Quien no tiene más que corazones puede abrir con uno de todos modos. La reina de picas no rompe los corazones, y se puede abrir con ella en cualquier momento."
+    },
+    "taking": {
+      "title": "Ganar una baza",
+      "p1": "La carta más alta del palo que se abrió gana la baza. Una carta de otro palo no puede ganarla, por alta que sea. Quien gana una baza se queda con sus cartas y abre la siguiente. Una mano son trece bazas."
+    },
+    "scoring": {
+      "title": "La puntuación",
+      "p1": "Al final de cada mano, cada corazón que se llevó un jugador le suma un punto, y la reina de picas trece. Ninguna otra carta puntúa. Los puntos de una mano siempre suman 26, y los de cada jugador se añaden a su puntuación."
+    },
+    "moon": {
+      "title": "Disparar a la luna",
+      "p1": "Quien se lleva los 26 puntos de una mano no suma nada en ella, y cada uno de los otros tres suma 26. Hay más sobre <a href=\"{{base}}/shooting-the-moon\">disparar a la luna</a>."
+    },
+    "end": {
+      "title": "El final de la partida",
+      "p1": "Una partida se juega a 50 puntos, o a 100 si se elige en <i>Opciones de partida</i> antes de empezar. Termina después de la mano en la que alguien llega a esa cifra o la supera, nunca a mitad de una mano. Gana la puntuación más baja, y quienes empatan en ella comparten la victoria."
+    },
+    "live": "En una mesa en vivo",
+    "seating": {
+      "title": "Con quién juegas",
+      "p1": "<i>Jugar en vivo</i> sienta juntas a personas de clasificación parecida, y <i>Jugar con amigos</i> sienta a quien esté en la sala. Los asientos que nadie ocupa son para bots, y cada bot lleva una marca que lo dice."
+    },
+    "clock": {
+      "title": "El reloj",
+      "p1": "Cada decisión tiene unos segundos de gracia, y cada mano una reserva de tiempo que se gasta al pensar más allá de esa gracia. Cuando a un jugador se le acaba la gracia, su asiento muestra cuánto le queda. Cuando la reserva de alguien se agota, los demás pueden expulsarlo, y un bot ocupa su asiento."
+    },
+    "leaving": {
+      "title": "Irse",
+      "p1": "A quien se va, es expulsado o deja de responder lo sustituye al momento un bot, que juega su asiento hasta el final de la partida; el asiento no vuelve a esa persona. En una partida con clasificación, quien se fue cuenta como si hubiera terminado en último lugar. <a href=\"{{base}}/support#leaving\">Más sobre dejar una partida antes de tiempo</a>."
+    },
+    "rated": {
+      "title": "Partidas con clasificación",
+      "p1": "Una partida con clasificación mueve tu clasificación según cómo queda tu puntuación final frente a la de cada uno de los otros tres: la puntuación más baja gana cada par, y las iguales lo reparten a medias. Los bots que se sentaron desde el reparto se clasifican igual. Una partida sin clasificación no cambia ninguna."
+    },
+    "variants": {
+      "title": "Variantes que no se juegan aquí",
+      "p1": "Corazones se juega de muchas maneras. Estas son las variantes comunes que este juego deja fuera.",
+      "jack": "<b>La jota de diamantes.</b> En Omnibus Hearts, quien se lleva la jota de diamantes resta diez puntos de su puntuación. Aquí no puntúa.",
+      "queen": "<b>La reina rompe los corazones.</b> En algunas mesas, la reina de picas también rompe los corazones. Aquí solo lo hace un corazón.",
+      "first": "<b>Puntos en la primera baza.</b> Algunas mesas permiten jugar corazones y la reina de picas en la primera baza. Aquí no se puede, salvo que un jugador no tenga otra cosa.",
+      "moon": "<b>Elegir con la luna.</b> En algunas, quien dispara a la luna puede restarse 26 puntos en lugar de dárselos a los demás. Aquí los demás siempre se llevan los 26.",
+      "pass": "<b>Otros pases.</b> Algunas mesas pasan cuatro cartas, o pasan en otro orden. Aquí siempre son tres: a la izquierda, a la derecha, al frente y luego ninguno.",
+      "lead": "<b>Otras salidas.</b> En algunas mesas sale el jugador a la izquierda del que reparte, con cualquier carta. Aquí siempre abre el dos de tréboles.",
+      "players": "<b>Tres o cinco jugadores.</b> Corazones se puede jugar entre tres o entre cinco, quitando una o dos cartas de la baraja. Aquí siempre son cuatro."
+    }
+  },
+  "moon": {
+    "meta": {
+      "title": "Disparar a la luna en Corazones — Open Hearts",
+      "description": "Disparar a la luna en Corazones: qué es, cómo se puntúa, cuándo vale la pena intentarlo y cómo detener a quien va a por ella."
+    },
+    "header": {
+      "title": "Disparar a la luna",
+      "tagline": "Llévate todos los puntos de una mano, y se los llevan todos los demás."
+    },
+    "rule": "La regla",
+    "what": {
+      "title": "Qué es",
+      "p1": "En Corazones intentas llevarte los menos puntos posibles. Disparar a la luna le da la vuelta: llévatelos todos. Quien se lleva todos los corazones y la reina de picas en una mano, los 26 puntos, no suma nada en ella, y cada uno de los otros tres suma 26."
+    },
+    "example": {
+      "title": "Un ejemplo",
+      "p1": "En una partida a 50, Ana, Ben, Cleo y Dev tienen 18, 22, 31 y 9 puntos. En la mano siguiente, Ben se lleva los trece corazones y la reina de picas. Ben no suma nada, y Ana, Cleo y Dev suman 26 cada uno.",
+      "p2": "Eso deja 44, 22, 57 y 35. Cleo ha pasado de 50, así que la partida termina, y Ben, que iba tercero, la gana."
+    },
+    "play": "Ir a por ella",
+    "gamble": {
+      "title": "Por qué es una apuesta",
+      "p1": "Un disparo a la luna tiene que llevarse todos los puntos. Si un solo corazón va a parar a otro jugador, el disparo falla, y quien lo intentó se queda con todo lo demás que se llevó: hasta 25 puntos en una sola mano."
+    },
+    "when": {
+      "title": "Cuándo intentarlo",
+      "p1": "Busca una mano que pueda ganar bazas y seguir ganándolas: corazones altos; la reina de picas, o el as y el rey de picas para atraparla; y palos largos encabezados por sus cartas más altas. Las cartas bajas son el peligro, porque cada una puede dejar la salida a alguien que no te la devolverá.",
+      "p2": "Ayuda empezar con discreción. Gana bazas como lo haría cualquiera, y enseña tu juego solo cuando ya sea tarde para detenerte."
+    },
+    "stop": {
+      "title": "Cómo detenerla",
+      "p1": "Si un jugador se ha llevado todos los puntos hasta ahora, puede que vaya a por la luna. Para detenerlo basta un corazón: gana una baza con un corazón dentro, o guarda un corazón lo bastante alto para ganar una al final de la mano. Unos pocos puntos en tu cuenta cuestan mucho menos que 26.",
+      "p2": "Así que no te deshagas de tu corazón más alto solo porque los corazones son malos: al final de la mano puede ser la única carta capaz de detener la luna."
+    },
+    "more": "Aquí y en otras partes",
+    "here": {
+      "title": "En Open Hearts",
+      "p1": "Cuando alguien dispara a la luna, la mesa tiembla a su alrededor, y la hoja de puntuación dice quién fue. Tu perfil cuenta, en tus partidas a solas, las lunas que has disparado y las que has bloqueado: manos en las que otro jugador se llevó la reina y diez corazones o más, y tú te llevaste uno de los demás."
+    },
+    "variants": {
+      "title": "Otras formas de puntuarla",
+      "p1": "Algunas mesas dejan que quien dispara se reste 26 puntos en lugar de dárselos a los demás, lo que importa cuando sumar 26 a los demás terminaría la partida con quien disparó todavía por detrás. Otras dan más valor a llevarse las trece bazas, «disparar al sol». Aquí la luna se puntúa siempre igual: nada para quien dispara, y 26 para todos los demás."
+    }
+  },
+  "strategy": {
+    "meta": {
+      "title": "Estrategia de Corazones: cómo jugar bien — Open Hearts",
+      "description": "Estrategia y consejos para Corazones: qué pasar, cómo manejar la reina de picas, cuándo dejar pasar una baza, contar cartas, detener una luna y jugar según el marcador."
+    },
+    "header": {
+      "title": "Estrategia de Corazones",
+      "tagline": "Lo que hacen los buenos jugadores, del pase a la última baza."
+    },
+    "passing": "El pase",
+    "short": {
+      "title": "Quédate corto en un palo",
+      "p1": "El pase es tu mejor ocasión para dar forma a tu mano. Pasa todas las cartas que tengas de un palo corto y te quedarás sin él: cuando se abra, podrás descartarte de un corazón o de la reina de picas. Dos o tres tréboles o diamantes son lo más fácil de quitarse de encima."
+    },
+    "high": {
+      "title": "Pasa cartas altas",
+      "p1": "Los ases, los reyes y las reinas ganan bazas que no quieres. Las cartas bajas, del dos al cinco, te dejan jugar por debajo de los demás, así que guárdalas, y sobre todo los corazones bajos."
+    },
+    "queen": {
+      "title": "La reina de picas",
+      "p1": "Con la reina y solo una o dos picas más, pásala, o lo más probable es que te la saquen en una baza que te lleves tú. Con cuatro picas o más por debajo de ella, es más segura quedártela: puedes seguir las picas con las pequeñas, y echársela a otro en su baza cuando te quedes sin un palo.",
+      "p2": "Sin la reina, el as y el rey de picas son un peligro: quien la tenga te la echará encima. Pásalos si tienes pocas picas más."
+    },
+    "remember": {
+      "title": "Recuerda lo que pasaste",
+      "p1": "Conoces tres cartas de la mano de otro jugador. Si pasaste la reina de picas, sabes quién la tiene."
+    },
+    "playing": "Jugar las cartas",
+    "first": {
+      "title": "La primera baza es segura",
+      "p1": "En la primera baza no se pueden jugar puntos, así que es el momento más seguro para deshacerte de tu trébol más alto."
+    },
+    "duck": {
+      "title": "Esquiva con tu carta segura más alta",
+      "p1": "Cuando no quieras una baza, juega la carta más alta que aún pierda frente a la que la va ganando. Tus cartas bajas valen más al final de la mano, cuando hay más puntos en juego."
+    },
+    "last": {
+      "title": "Último en jugar, gana alto",
+      "p1": "¿Juegas el último en una baza sin puntos que vas a ganar de todos modos? Gánala con tu carta más alta del palo, no con una baja, siempre que tengas algo seguro con lo que abrir después."
+    },
+    "void": {
+      "title": "Sin el palo, descarta tu peor carta",
+      "p1": "Cuando no puedas seguir el palo, descarta la carta que más daño te haría después: la reina de picas si la tienes, luego tus corazones más altos, y luego cartas altas de los palos que aún tienes."
+    },
+    "spades": {
+      "title": "Abre con picas para sacar a la reina",
+      "p1": "Sin la reina, y sin ninguna pica por encima de la jota, abrir con picas es seguro para ti y un peligro para quien la tenga: cada baza de picas le gasta otra pica, hasta que la reina tiene que salir."
+    },
+    "count": {
+      "title": "Cuenta las cartas",
+      "p1": "Lleva la cuenta de los corazones y las picas que se han jugado, y de quién se ha quedado sin qué palo. Un jugador sin un palo se descartará de puntos cuando se abra, y lo sabrás antes de abrirlo tú."
+    },
+    "moon": {
+      "title": "Vigila la luna",
+      "p1": "Si un jugador se está llevando todos los puntos, llévate tú uno, aunque te cueste unos pocos: un corazón sale más barato que 26. Hay más sobre <a href=\"{{base}}/shooting-the-moon#stop\">cómo detener una luna</a>."
+    },
+    "late": "El marcador",
+    "score": {
+      "title": "Juega según el marcador",
+      "p1": "La partida termina cuando alguien llega al objetivo, así que hacia el final el marcador cambia lo que te conviene. Si tienes la puntuación más baja, cuanto antes termine, mejor: darle puntos al jugador más cerca del objetivo puede terminarla. Si vas por detrás, mantenla viva, y manda puntos a quien va ganando.",
+      "p2": "Es también cuando más importa una luna: 26 para cada uno de los demás pueden terminar la partida en una sola mano, con quien disparó en cabeza o no."
+    },
+    "bots": {
+      "title": "Practica contra los bots",
+      "p1": "Los bots de aquí son amantes famosos, cada uno con su manera de jugar: Romeo no sabe guardarse una reina, y Don Juan va a por la luna con manos con las que nadie más lo haría. <i>Jugar solo</i> es gratis, tantas veces como quieras."
     }
   },
   "privacy": {

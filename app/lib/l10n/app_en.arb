@@ -144,6 +144,41 @@
   "@leaveTheTable": {
     "description": "Menu item that leaves the game."
   },
+  "leaveTableTitle": "Leave the table?",
+  "@leaveTableTitle": {
+    "description": "Title of the question asked before leaving a live game that is still going, from the menu or by going back."
+  },
+  "leaveTableBot": "A bot takes your seat for the rest of the game.",
+  "@leaveTableBot": {
+    "description": "In the question before leaving a live game: what happens to the seat."
+  },
+  "leaveTableRated": "The game is rated, and counts as one you finished last.",
+  "@leaveTableRated": {
+    "description": "In the question before leaving a live game, when the game is rated: the player who leaves finishes last."
+  },
+  "leaveTableWait": "{minutes, plural, =1{Play live won't seat you again for a minute.} other{Play live won't seat you again for {minutes} minutes.}}",
+  "@leaveTableWait": {
+    "description": "In the question before leaving a live game Play live seated, with other people still playing: how long, in whole minutes, before Play live seats the player again.",
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "stay": "Stay",
+  "@stay": {
+    "description": "Button in the question before leaving a live game: stay at the table."
+  },
+  "leftEarlyWait": "You didn't finish your last live game: Play live opens again in {time}.",
+  "@leftEarlyWait": {
+    "description": "Under the Play live button, while Play live waits after a live game the player did not finish: how long is left, as minutes:seconds.",
+    "placeholders": {
+      "time": {
+        "type": "String",
+        "example": "4:32"
+      }
+    }
+  },
   "about": "About",
   "@about": {
     "description": "Menu item and page title: about the app."
@@ -577,7 +612,7 @@
   },
   "leave": "Leave",
   "@leave": {
-    "description": "Button: leave the table before it starts."
+    "description": "Button: leave the table, before it starts, or during a game once asked whether to."
   },
   "ratedSpoken": "rated {rating}{provisional, select, true{, provisionally} other{}}",
   "@ratedSpoken": {

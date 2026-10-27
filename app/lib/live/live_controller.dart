@@ -53,6 +53,7 @@ class LiveController extends ChangeNotifier implements TableModel {
     this.pictures,
     this.paced = true,
     this.canPlayAgain = false,
+    this.strangers = false,
     TableJournal? journal,
     ReactionLane? reactions,
     ValueListenable<bool>? reactionMute,
@@ -126,6 +127,11 @@ class LiveController extends ChangeNotifier implements TableModel {
   /// another the same way: the pool it was drawn from, or the room it
   /// was started in. A table come back to after a reload does not.
   final bool canPlayAgain;
+
+  /// Whether Play live seated this table, with strangers, rather than a
+  /// friends' room: leaving its game early is waited out before Play
+  /// live seats this device again (left_early.dart).
+  final bool strangers;
 
   void _pictured() {
     if (_disposed) return;
@@ -847,10 +853,57 @@ class LiveController extends ChangeNotifier implements TableModel {
   static const leaveBeat = Duration(milliseconds: 600);
   bool _left = false;
 
+  /// Whether this device left the table, by its own word.
+  bool get left => _left;
+
+  /// Seated in a game still going: leaving now gives the seat to a bot
+  /// for good.
+  bool get inGame => amSeated && !done && client.failure == null;
+
+  /// Called once, as the table's page goes, however it went: by a way
+  /// out of its own, or by a browser's Back (router.dart), which
+  /// completes nothing the front door could wait on (lobby.dart).
+  VoidCallback? onClosed;
+
   void leave() {
+    _walkingOut = othersPlaying;
     _left = true;
     client.leave();
     notifyListeners();
+  }
+
+  /// Whether somebody besides this device still sits at the table: a
+  /// seat of a person, not of a bot.
+  bool get othersSeated {
+    for (var s = 0; s < seatCount; s++) {
+      if (s != client.mySeat && client.holders[s] is HumanSeat) return true;
+    }
+    return false;
+  }
+
+  /// Whether leaving now would leave other people's game: one still on,
+  /// not stopped for want of anything, with somebody else still seated.
+  /// Leaving a game that is over, that cannot go on or has stopped, or
+  /// that nobody else is in, costs nobody anything. Over by the table's
+  /// account, not the screen's, which plays the last trick out after.
+  bool get othersPlaying => !_over && client.failure == null && pause == null && othersSeated;
+
+  bool get _over => client.game.phase == Phase.gameOver;
+
+  /// [othersPlaying], as it was when this device left.
+  bool _walkingOut = false;
+
+  /// Whether this device left this game early, at a table Play live
+  /// seated it at (left_early.dart): it left while others were playing,
+  /// or the table gave its seat to a bot — its clock ran out, or it went
+  /// quiet — with somebody else still seated and the game not over.
+  /// Not when the game failed for everyone, nor when this device could
+  /// no longer run the deal: neither is the player's doing.
+  bool get leftEarly {
+    if (!strangers) return false;
+    if (_left) return _walkingOut;
+    final c = client;
+    return c.mySeat != null && !c.amSeated && !_over && c.failure == null && c.cannotDeal == null && othersSeated;
   }
 
   /// Humans at the table and heard from lately, this device included.
@@ -969,6 +1022,8 @@ class LiveController extends ChangeNotifier implements TableModel {
   @override
   void dispose() {
     _disposed = true;
+    onClosed?.call();
+    onClosed = null;
     _waitTimer?.cancel();
     _sheetTimer?.cancel();
     _sub?.cancel();
