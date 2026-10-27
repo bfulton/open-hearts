@@ -81,6 +81,14 @@ test('an event\'s id is worked out here as the table works it out', async () => 
   assert.ok(ids.length > 50);
 });
 
+test('an event\'s id does not hang on the order of any object\'s keys, at any depth, as the table works it out', async () => {
+  // The id the Dart table gives this event; JavaScript lists the
+  // keys of `known` as 0, 2, 3, 10 whatever order they were written in.
+  const body = { hand: 1, turn: 57, seat: 1, round: 4, secret: 's', known: { 3: 'c', 0: 'a', 2: 'b', 10: 'd' }, deeper: [{ b: 1, a: 2 }] };
+  const event = { author: '14261433f12e255e017d79fd36bb2845f6417d399f19fd1f3aa455577c1aabf4', kind: 'deal', body };
+  assert.equal(await eventIdOf('ab'.repeat(16), event), '35461adc14d3ef3efdac798ed5d2e426ab81ddca685cb25dbb922de94bcaed97');
+});
+
 test('a game played at a refereed table, its record as the app sends it, is kept from each of its people', async () => {
   // A real game, played to its end over the referee's log, its house's
   // result in it, and licences from the rig's service (BIP-340's second

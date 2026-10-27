@@ -37,7 +37,8 @@ export const rememberedIds = 40000;
 /// What the object (worker.mjs) holds one socket to. The node host under
 /// the suites carries whole tables, whose deal is the big one, and asks
 /// for no limits; the object carries presence, whose largest event is a
-/// summons of a few kilobytes, for everyone on the tag at once — and
+/// beat with the device's activation in it, under a kilobyte, for
+/// everyone on the tag at once — and
 /// takes a socket from anybody. Cloudflare hands an object messages of
 /// up to 32 MiB, and an event that matches presence is sent on to
 /// every device listening, on the one thread they all share.
@@ -356,10 +357,10 @@ const supersededWhy = 'superseded: another device of this account is in use';
 /// Whether [why] is a refusal the relay will not change its mind about
 /// for this device: superseded, its account suspended
 /// (service/functions/suspension.mjs) or deleted
-/// (service/functions/deletion.mjs), or not admitted at all. The app
+/// (service/functions/deletion.mjs). The app
 /// goes by the same first word (packages/table, relays.dart,
 /// turnedAway).
-const finalWhy = (why) => typeof why === 'string' && why.length <= 120 && /^(superseded|suspended|deleted|restricted): /.test(why);
+const finalWhy = (why) => typeof why === 'string' && why.length <= 120 && /^(superseded|suspended|deleted): /.test(why);
 
 /// The relay itself. [verify] checks a signature, [refuse] is a policy
 /// that may turn an event away with a reason — an object that carries
@@ -580,7 +581,7 @@ export function createRelay({ verify, store = memoryStore(), refuse = null, log 
     // A table's event is the referee's, and nobody else's: it goes into
     // the log, which everybody reads, and nowhere else.
     if (event.kind === logKind && table) {
-      const { ok, why } = table.take(event);
+      const { ok, why } = await table.take(event);
       count?.(ok ? (why ? 'duplicate' : 'events') : why.startsWith('invalid') ? 'invalid' : 'refused');
       if (!ok) log?.(`not logged ${event.id.slice(0, 6)}: ${why}`);
       return send(from, ['OK', event.id, ok, why]);
@@ -771,9 +772,12 @@ export function createRelay({ verify, store = memoryStore(), refuse = null, log 
     /// earlier ones. The promise is for a host that wants to know when
     /// the message has been answered.
     message(socket, raw) {
+      // A message that throws is a bug here, and said wherever this
+      // relay says anything, or on the console where it says nothing:
+      // its socket hears nothing back, so nothing else would say it.
       const turn = (turns.get(socket) ?? Promise.resolve())
         .then(() => handle(socket, raw))
-        .catch((e) => log?.(`relay: ${e}`));
+        .catch((e) => (log ?? console.error)(`relay: ${e?.stack ?? e}`));
       turns.set(socket, turn);
       return turn;
     },
@@ -851,7 +855,7 @@ export function createRelay({ verify, store = memoryStore(), refuse = null, log 
 /// taken from.
 export function objectRelay(
   verify,
-  { tag = presenceTag, now = Date.now, count = null, limits = null, store = null, kept = null, also = null, gate = null, withhold = null, screen = null, forget = null, house = null, log = null, keepEntry = null, wanted = null } = {},
+  { tag = presenceTag, now = Date.now, count = null, limits = null, store = null, kept = null, also = null, gate = null, withhold = null, screen = null, forget = null, house = null, log = null, keepEntry = null, wanted = null, say = null } = {},
 ) {
   const presence = tag === presenceTag;
   const own = refusalFor(tag, { house });
@@ -859,6 +863,7 @@ export function objectRelay(
   return createRelay({
     verify,
     gate,
+    log: say,
     referee: tableTag.test(tag) ? ({ send, admitted }) => tableReferee({ table: tag, verify, house, now, entries: log ?? [], keep: keepEntry, wanted, send, admitted }) : null,
     // Presence keeps nothing; a table's tag keeps its lobby.
     store: presence ? null : (store ?? memoryStore(storedKeep(tag))),

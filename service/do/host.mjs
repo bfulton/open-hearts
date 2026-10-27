@@ -86,6 +86,7 @@ export async function serve({ port = 0, host = '127.0.0.1', keep = 10000, log = 
             house,
             wanted,
             count: (what) => (what === 'rateLimited' || what === 'refused' || what === 'tooBig' ? log?.(`${tag}: ${what}`) : null),
+            say: log && ((line) => log(`${tag || 'online'}: ${line}`)),
           })
         : createRelay({ verify, store: memoryStore(keep), refuse, gate: gating(), log: log && ((line) => log(tag ? `${tag}: ${line}` : line)) });
       relays.set(tag, relay);

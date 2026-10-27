@@ -17,8 +17,8 @@ import { stripe as stripeDefinition } from '../infra/stripe.mjs';
 import { checkoutFields } from '../service/functions/stripe.mjs';
 
 /// The programs a relay deploy builds with: its custom build
-/// (service/bench/build.sh) compiles the juror and the native libraries,
-/// and Wrangler builds the backup jurors' image with Docker.
+/// (service/bench/build.sh) compiles the house and the native libraries,
+/// and Wrangler builds the house's image with Docker.
 const RELAY_NEEDS = [
   ['docker', ['info'], 'Docker, running (start dockerd)'],
   ['dart', ['--version'], 'Dart (the Flutter SDK’s bin on PATH)'],

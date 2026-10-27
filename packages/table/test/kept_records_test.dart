@@ -172,10 +172,14 @@ void main() {
     /// [e] with its id worked out again for what it now says, as the
     /// table works one out (events.dart): only its signature, which
     /// nobody but its author can make again, still gives it away.
+    // Every map's keys in order at every depth, as events.dart hashes them.
+    Object? inOrder(Object? json) => json is List
+        ? [for (final e in json) inOrder(e)]
+        : json is Map
+            ? {for (final k in [for (final k in json.keys) k as String]..sort()) k: inOrder(json[k])}
+            : json;
     void reId(Map<String, Object?> e) {
-      final body = Map<String, Object?>.from(e['body'] as Map);
-      final sorted = Map.fromEntries(body.entries.toList()..sort((a, b) => a.key.compareTo(b.key)));
-      e['id'] = digestOf(Uint8List.fromList(utf8.encode(jsonEncode([e['table'], e['author'], e['kind'], sorted]))));
+      e['id'] = digestOf(Uint8List.fromList(utf8.encode(jsonEncode([e['table'], e['author'], e['kind'], inOrder(e['body'])]))));
     }
 
     test('its ids made again here are its own: what the bends below rely on', () {

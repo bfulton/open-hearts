@@ -30,8 +30,8 @@ export const synthetics = {
     // What a purchase needs: the store read, and Stripe answering the
     // service's key for the price (service/functions/health.mjs, healthOf).
     { name: 'Service health', uri: 'https://play.openhearts.game/api/health', expect: '"ok":true' },
-    // The relay's worker, which also wakes the jurors of last
-    // resort (service/do/worker.mjs).
+    // The relay's worker, which also wakes the house
+    // (service/do/worker.mjs).
     { name: 'Relay', uri: 'https://relay.openhearts.game/', expect: 'open hearts relay' },
   ],
 };

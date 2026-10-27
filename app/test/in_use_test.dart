@@ -128,7 +128,7 @@ void main() {
     // Taken back, and turned away by a relay.
     stand.says('activate', {'activation': activationFor(me.publicKey, epoch: 3)});
     expect(await InUse.current.open(me), Use.here);
-    InUse.current.turnedAway('restricted: not a backup juror');
+    InUse.current.turnedAway('rate-limited: slow down');
     expect(InUse.current.standing, Use.here, reason: 'only a superseding is a stepping back');
     InUse.current.turnedAway('superseded: another device of this account is in use');
     expect(InUse.current.standing, Use.elsewhere);

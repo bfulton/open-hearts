@@ -7,6 +7,7 @@
 library;
 
 import 'dart:async';
+import 'dart:io' show sleep;
 import 'dart:math';
 import 'dart:typed_data';
 
@@ -32,7 +33,7 @@ import 'package:table/table.dart';
 import 'package:table_sim/table_sim.dart';
 
 import 'drawn.dart';
-import 'table_page_test.dart' show fanCards, sliverOf, tapCard;
+import 'table_page_test.dart' show fanCards, tapCard;
 
 const _me = 2;
 
@@ -54,6 +55,7 @@ class LiveHarness {
     Map<int, SeatConduct> conducts = const {},
     bool lineHeld = false,
     RefereeLine Function(SimLine line)? myLine,
+    TableTiming timing = TableTiming.standard,
   }) : _crypto = crypto {
     // Each device's deal work in a worker of its own, taking a
     // browser's time over each job, as the app's does.
@@ -61,7 +63,6 @@ class LiveHarness {
     final signers = [for (var s = 0; s < engine.seatCount; s++) FakeSigner('seat$s')];
     keys = [for (final s in signers) s.publicKey];
     spec = TableSpec(
-        id: 'widget',
         seed: seed,
         seats: [
           for (var s = 0; s < engine.seatCount; s++)
@@ -70,6 +71,7 @@ class LiveHarness {
         sealed: crypto != null,
         rated: rated,
         target: target,
+        timing: timing,
         house: houseSigner.publicKey);
     // The house at every table, as at the relay: it plays a sealed
     // table's bots, and says how any game came out, which is what a
@@ -104,7 +106,8 @@ class LiveHarness {
               canPlayAgain: canPlayAgain,
               strangers: strangers,
               reactions: reactions.lane(signers[_me].publicKey),
-              reactionClock: reactions.nowMs,
+              // The screen's clock, the test's: what its timers keep.
+              screenClock: reactions.nowMs,
             );
         controller = _seated(line, Random(seed * 10 + s));
       } else {
@@ -117,6 +120,8 @@ class LiveHarness {
             crypto: crypto,
             dealWorker: worker(),
             conduct: conducts[s] ?? const SeatConduct(),
+            // Each device keeps its hands' secrets, as the app does.
+            journal: TableJournal(),
             random: Random(seed * 10 + s));
         final person = ScriptedHuman(client, line, clock, persona: engine.Persona.westley, thinkMs: 300);
         people[s] = person;
@@ -146,6 +151,8 @@ class LiveHarness {
         clock: clock,
         crypto: _crypto,
         random: Random(seed * 10 + 9),
+        // Its bots think over their cards as they do in service.
+        pace: 1,
         onResult: (_, signed) => results.add(signed),
       );
 
@@ -235,6 +242,7 @@ Future<LiveHarness> pumpLive(WidgetTester tester,
     Map<int, SeatConduct> conducts = const {},
     bool lineHeld = false,
     RefereeLine Function(SimLine line)? myLine,
+    TableTiming timing = TableTiming.standard,
     ReportSender? report}) async {
   tester.view
     ..physicalSize = const Size(390, 844)
@@ -252,7 +260,8 @@ Future<LiveHarness> pumpLive(WidgetTester tester,
       seed: seed,
       conducts: conducts,
       lineHeld: lineHeld,
-      myLine: myLine);
+      myLine: myLine,
+      timing: timing);
   await tester.pumpWidget(MaterialApp(
       theme: buildTheme(), home: LivePage(controller: live.controller, report: report ?? (_) async => throw StateError('no report expected'))));
   await tester.pumpAndSettle();
@@ -342,111 +351,73 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('the table has the bots\' cards the moment they are owed, and the screen shows them one at a time, each after its think',
+  testWidgets('the house thinks over each bot\'s card in the log, the screen shows each as it lands, and the player\'s turn reaches them at once',
       (tester) async {
-    final live = await pumpLive(tester, botSeats: const {0, 1, 3});
+    // A sealed table, as every live one is: the house holds the bots.
+    final crypto = await rememberedCrypto();
+    final live = await pumpLive(tester, crypto: crypto, botSeats: const {0, 1, 3});
     final c = live.controller;
-    int atTable() => c.client.rules.moves.where((m) => m.hand == c.client.game.handNumber && !m.isPass).length;
-    await act(tester, live);
-    for (var guard = 0; guard < 100 && !c.awaitingPlay; guard++) {
-      await live.advance(tester, 500);
-    }
-    expect(c.awaitingPlay, isTrue, reason: 'the player\'s turn, the screen caught up');
-    // The player's card, and the log carrying it back: at the table the
-    // bots after it play at once, as the rules work them out.
-    final shownBefore = c.playedThisHand.length;
-    final playable = fanCards(tester).where((card) => !card.dimmed).toList();
-    await tester.tapAt(sliverOf(tester, playable.first.card));
-    await tester.pump();
-    live.clock.advance(200);
-    await tester.pump();
-    expect(atTable(), greaterThanOrEqualTo(shownBefore + 2), reason: 'the table is cards ahead');
-    expect(c.playedThisHand.length, shownBefore + 1, reason: 'the screen has the player\'s own card, and no more yet');
-    // And the rest come one at a time, never closer than a bot's
-    // quickest think.
+    const step = 50;
+    // The bots' cards as the log has them, by when they landed, and as
+    // the screen shows them, by when; the moments the table opened the
+    // player's turn and the screen offered it.
+    final logged = <int>[];
+    final shown = <int>[];
+    final waits = <int>[];
     var at = 0;
-    final landed = <int>[];
-    var shown = c.playedThisHand.length;
-    for (var guard = 0; guard < 400 && c.playedThisHand.length < atTable(); guard++) {
-      await tester.pump(const Duration(milliseconds: 50));
-      at += 50;
-      final now = c.playedThisHand.length;
-      if (now == shown) continue;
-      expect(now, shown + 1, reason: 'one card at a time, at ${at}ms');
-      landed.add(at);
-      shown = now;
+    int? opened;
+    var inLog = c.client.rules.moves.length;
+    var onScreen = c.playedThisHand.length;
+    for (var guard = 0; guard < 4000 && c.client.game.tricksPlayed < 5; guard++) {
+      final playing = c.client.game.phase == engine.Phase.playing;
+      if (c.awaitingPass) await act(tester, live);
+      if (c.awaitingPlay) {
+        waits.add(at - (opened ?? at));
+        opened = null;
+        await act(tester, live);
+      }
+      await live.tick(tester, step, step: step);
+      at += step;
+      final moves = c.client.rules.moves;
+      if (moves.length != inLog) {
+        for (final m in moves.skip(inLog)) {
+          if (m.card != null && m.seat != c.mySeat) logged.add(at);
+        }
+        inLog = moves.length;
+      }
+      if (playing && c.playedThisHand.length > onScreen && c.game.trick.isNotEmpty && c.game.trick.last.seat != c.mySeat) shown.add(at);
+      onScreen = c.playedThisHand.length;
+      if (c.client.awaitingMyPlay && opened == null) opened = at;
     }
-    expect(c.playedThisHand.length, atTable(), reason: 'the screen caught the table up');
-    expect(landed, isNotEmpty);
-    for (var i = 1; i < landed.length; i++) {
-      expect(landed[i] - landed[i - 1], greaterThanOrEqualTo(engine.BotPace.quick.minMs), reason: 'card $i after its think: $landed');
+    expect(logged.length, greaterThanOrEqualTo(9), reason: 'the bots played: $logged');
+    // In the log, each bot card a bot's thought after the move before it.
+    final cards = c.client.rules.log.where((e) => e.event?.kind == EventKind.play).toList();
+    for (var i = 1; i < cards.length; i++) {
+      if (cards[i].event!.author != live.houseSigner.publicKey) continue;
+      expect(cards[i].t - cards[i - 1].t, greaterThanOrEqualTo(engine.BotPace.quick.minMs),
+          reason: 'the house thought over card $i before saying it');
     }
-    expect(landed.first, greaterThanOrEqualTo(engine.BotPace.quick.minMs), reason: 'the first bot thought too: $landed');
+    // On the screen, each within a beat of the log having it.
+    for (final s in shown) {
+      final landedAt = logged.lastWhere((l) => l <= s, orElse: () => s);
+      expect(s - landedAt, lessThanOrEqualTo(LiveController.cardBeat.inMilliseconds + Pacing.trickHold.inMilliseconds + step),
+          reason: 'shown ${s - landedAt}ms after it landed');
+    }
+    // And the player asked within a trick's hold and a beat of their
+    // turn opening: their clock is theirs, not the screen's.
+    expect(waits, isNotEmpty);
+    for (final w in waits) {
+      expect(w, lessThanOrEqualTo(Pacing.trickHold.inMilliseconds + LiveController.cardBeat.inMilliseconds + 2 * step),
+          reason: 'offered ${w}ms after the turn opened: $waits');
+    }
     expect(tester.takeException(), isNull);
   });
 
   testWidgets('the others\' cards come a beat apart however quickly they land, and a full trick stays a moment before it is swept',
-      (tester) async {
-    final live = await pumpLive(tester);
-    final c = live.controller;
-    const step = 10;
-    // Each card of the others' after one the screen showed, how long
-    // after it; how long each full trick stayed on the felt; and the
-    // moments a full trick showed with the table waiting on the player.
-    final gaps = <int>[];
-    final holds = <int>[];
-    var heldOnMe = 0;
-    for (var turn = 0; turn < 13 && (gaps.length < 3 || holds.isEmpty || heldOnMe == 0); turn++) {
-      for (var guard = 0; guard < 100 && !c.awaitingPass && !c.awaitingPlay; guard++) {
-        await live.advance(tester, 500);
-      }
-      final playing = c.awaitingPlay;
-      final hand = c.game.handNumber;
-      await act(tester, live);
-      await tester.pump();
-      // The table far ahead of the screen: the others play as quickly
-      // as they do, and the screen shows it at its own pace.
-      live.clock.advance(5000);
-      var at = 0;
-      int? lastCard = playing ? 0 : null;
-      int? fullAt = c.game.pendingTrick != null ? 0 : null;
-      var shown = c.playedThisHand.length;
-      for (var guard = 0; guard < 2000 && !c.awaitingPlay && c.game.handNumber == hand; guard++) {
-        await tester.pump(const Duration(milliseconds: step));
-        at += step;
-        final now = c.playedThisHand.length;
-        if (now != shown) {
-          expect(now, shown + 1, reason: 'one card at a time, at ${at}ms');
-          if (lastCard != null) gaps.add(at - lastCard);
-          lastCard = at;
-          shown = now;
-        }
-        final full = c.game.pendingTrick != null;
-        if (full && fullAt == null) fullAt = at;
-        if (!full && fullAt != null) {
-          holds.add(at - fullAt);
-          fullAt = null;
-        }
-        // A trick the player won, held on the felt: the table waits on
-        // their lead, and the screen does not ask for it until the
-        // trick is swept.
-        if (full && c.client.awaitingMyPlay) {
-          heldOnMe++;
-          expect(c.awaitingPlay, isFalse, reason: 'asked to lead with the last trick on the felt, at ${at}ms');
-        }
-      }
-    }
-    expect(gaps.length, greaterThanOrEqualTo(3), reason: 'the others played: $gaps');
-    expect(holds, isNotEmpty, reason: 'a trick was swept');
-    expect(heldOnMe, greaterThan(0), reason: 'the player won a trick and led the next');
-    for (final g in gaps) {
-      expect(g, greaterThanOrEqualTo(LiveController.cardBeat.inMilliseconds - step), reason: 'a beat after the card before: $gaps');
-    }
-    for (final h in holds) {
-      expect(h, greaterThanOrEqualTo(Pacing.trickHold.inMilliseconds - step), reason: 'held before it is swept: $holds');
-    }
-    expect(tester.takeException(), isNull);
-  });
+      (tester) => _beatsApart(tester));
+
+  testWidgets('and a beat apart however long the screen takes over each: real time it spends drawing is not taken off the next',
+      (tester) => _beatsApart(tester, drawing: const Duration(milliseconds: 25)));
 
   testWidgets('back from a reload, the screen is at the table as it is now, at once', (tester) async {
     final live = await pumpLive(tester);
@@ -720,7 +691,7 @@ void main() {
     expect(lines, hasLength(1), reason: 'told of once it had been down two minutes');
     final (message, attributes) = lines.single;
     expect(message, startsWith('live: line down 1'));
-    expect(attributes['table'], 'widget');
+    expect(attributes['table'], live.spec.id.substring(0, 8), reason: 'the table, by the first eight of its id');
     expect(attributes['seen'], allOf(startsWith('playing at #'), endsWith('line down')));
     expect(attributes['line'], isNotNull);
     expect(attributes['build'], isNotNull);
@@ -1201,4 +1172,73 @@ void main() {
       }
     });
   });
+}
+
+/// The others' cards shown a beat apart and full tricks held before
+/// they are swept, with the table far ahead of the screen; the screen
+/// spending [drawing] of real time each time its view changes.
+Future<void> _beatsApart(WidgetTester tester, {Duration drawing = Duration.zero}) async {
+  final live = await pumpLive(tester);
+  final c = live.controller;
+  // Each time the view changes, the screen spends [drawing] of real
+  // time over it, as a busy machine's does. The beat is the screen's
+  // own, and none of it goes in that.
+  if (drawing > Duration.zero) c.addListener(() => sleep(drawing));
+  const step = 10;
+  // Each card of the others' after one the screen showed, how long
+  // after it; how long each full trick stayed on the felt; and the
+  // moments a full trick showed with the table waiting on the player.
+  final gaps = <int>[];
+  final holds = <int>[];
+  var heldOnMe = 0;
+  for (var turn = 0; turn < 13 && (gaps.length < 3 || holds.isEmpty || heldOnMe == 0); turn++) {
+    for (var guard = 0; guard < 100 && !c.awaitingPass && !c.awaitingPlay; guard++) {
+      await live.advance(tester, 500);
+    }
+    final playing = c.awaitingPlay;
+    final hand = c.game.handNumber;
+    await act(tester, live);
+    await tester.pump();
+    // The table far ahead of the screen: the others play as quickly
+    // as they do, and the screen shows it at its own pace.
+    live.clock.advance(5000);
+    var at = 0;
+    int? lastCard = playing ? 0 : null;
+    int? fullAt = c.game.pendingTrick != null ? 0 : null;
+    var shown = c.playedThisHand.length;
+    for (var guard = 0; guard < 2000 && !c.awaitingPlay && c.game.handNumber == hand; guard++) {
+      await tester.pump(const Duration(milliseconds: step));
+      at += step;
+      final now = c.playedThisHand.length;
+      if (now != shown) {
+        expect(now, shown + 1, reason: 'one card at a time, at ${at}ms');
+        if (lastCard != null) gaps.add(at - lastCard);
+        lastCard = at;
+        shown = now;
+      }
+      final full = c.game.pendingTrick != null;
+      if (full && fullAt == null) fullAt = at;
+      if (!full && fullAt != null) {
+        holds.add(at - fullAt);
+        fullAt = null;
+      }
+      // A trick the player won, held on the felt: the table waits on
+      // their lead, and the screen does not ask for it until the
+      // trick is swept.
+      if (full && c.client.awaitingMyPlay) {
+        heldOnMe++;
+        expect(c.awaitingPlay, isFalse, reason: 'asked to lead with the last trick on the felt, at ${at}ms');
+      }
+    }
+  }
+  expect(gaps.length, greaterThanOrEqualTo(3), reason: 'the others played: $gaps');
+  expect(holds, isNotEmpty, reason: 'a trick was swept');
+  expect(heldOnMe, greaterThan(0), reason: 'the player won a trick and led the next');
+  for (final g in gaps) {
+    expect(g, greaterThanOrEqualTo(LiveController.cardBeat.inMilliseconds - step), reason: 'a beat after the card before: $gaps');
+  }
+  for (final h in holds) {
+    expect(h, greaterThanOrEqualTo(Pacing.trickHold.inMilliseconds - step), reason: 'held before it is swept: $holds');
+  }
+  expect(tester.takeException(), isNull);
 }

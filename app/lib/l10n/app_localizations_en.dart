@@ -554,11 +554,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get pointRating =>
-      'A rating of your own, from results the four of you sign.';
+      'A rating of your own, worked out from the results of your live games.';
 
   @override
   String get pointDeal =>
-      'The deal is dealt between the four of you. No server sees a hand, ours included.';
+      'Every seat shuffles, and no other player sees your hand. Our server plays the bots, so it sees theirs.';
 
   @override
   String get whatMoneyPaysFor =>

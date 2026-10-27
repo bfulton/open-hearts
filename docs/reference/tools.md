@@ -22,17 +22,10 @@ Run each from `packages/table` as `dart run tool/<name>.dart`. The flags work as
 
 | File | What it does | Main flags |
 |---|---|---|
-| `packages/table/tool/chaos.dart` | Walks random faults through simulated tables over many seeds, optionally with the verifiable deal run for real. Prints every broken invariant with the faults that led there, and exits non-zero if there was one. | `--seeds <n>`; `--sealed <n>` also walks the first `n` seeds sealed; `--sealed-only <a,b,…>` walks just those sealed seeds; `--structure` reads every side against the state machines; `--jurors <n>` with `--sweep` draws from more strangers than a jury; `--workers` makes the deal's slow calls in a worker with a browser's timing; `--twins` takes accounts up on second devices. |
-| `packages/table/tool/explore.dart` | Runs a short sealed game once per event, peer and change (a copy lost, or late), to find ordering faults that random walks miss. | `--scenario <name>` (one of `scenarios` in the file); `--changes lose,late`; `--hold <ms,…>` how late a late copy is; `--fault-at <ms,…>` when the scenario's own fault comes; `--shard <i>/<n>`; `--limit <n>`; `--first` stops at the first failure; `--whole` plays the hand out and checks the whole record; `--structure`; `--census` counts the events by kind and stops; `--at <n>` or `--match <text>` replays one run with every client's trace. |
-| `packages/table/tool/walk.dart` | Walks one chaos seed with every client's trace printed. | `--seed <n>`; `--seeded` uses the seeded deal rather than the sealed one. |
+| `packages/table/tool/chaos.dart` | Walks random faults through simulated tables over many seeds, on the simulator's referee, optionally with the verifiable deal run for real. Prints every broken invariant with the faults that led there, and exits non-zero if there was one. | `--seeds <n>`; `--sealed <n>` also walks the first `n` seeds sealed; `--sealed-only <a,b,…>` walks just those sealed seeds; `--workers` makes the deal's slow calls in a worker with a browser's timing; `--traces` prints every side's trace; `--tally` counts how games ended, how seats were given up and the faults thrown. |
+| `packages/table/tool/explore.dart` | Runs a short sealed game once for each event it sends, with that one event dropped, late or sent twice, to find ordering faults that random walks miss. | `--scenario <name>`: `deal`, `four`, `leave`, `pass`, `reload` or `house` (each says what it plays when the name is wrong); `--changes drop,late,twice`; `--hold <ms>` how late a late event is; `--shard <i>/<n>`; `--limit <n>`; `--first` stops at the first failure; `--census` lists the events the scenario sends and stops; `--at <n>` runs the one change to event `n`, with every side's trace. |
 | `packages/table/tool/ladder.dart` | Calibrates the bots' strength ladder: every persona at every level, rated from pairwise results. Prints each level's mean and the `priors` line for `packages/engine/lib/src/persona.dart`. | `--tables <n>` |
-| `packages/table/tool/time_to_deal.dart` | Measures how long a sealed hand takes to deal, and what the jury's own waits cost in it, on the simulator's virtual clock. | `--seeds <n>`; `--jury <n>` |
-| `packages/table/tool/jury_size.dart` | Works out how big a jury has to be, across a range of juror failure rates. | `--target <p>`, the most hands that may fail to go on; `--juror-p50 <seconds>`, a juror's median time online. |
-| `packages/table/tool/wire_in_sim.dart` | Counts a hand's bytes on the wire on the simulator, where the count is exact: two people and two bot seats the jury holds. | `--jury <n,…>` jury sizes; `--seeds <n>` hands to average; `--away` takes a seat offline and back; `--slow` gives the network a relay's latency; `--quiet` takes a bot seat's juror offline. |
-| `packages/table/tool/wire_breakdown.dart` | Shows where a hand's bytes go, by event, round and field, and what they would be compressed. | None |
-| `packages/table/tool/juror_wire.dart` | Shows what a juror holding bot seats says in a hand, in bytes, as JSON for a relay and as a frame for a channel. | None |
-| `packages/table/tool/game_fixture.dart` | Writes a finished sealed game's record to standard output, for the browser suite's look at a kept game. | None; redirect the output, such as `> game.json`. |
-| `packages/table/tool/kept_records.dart` | Writes the kept-game fixtures in `packages/table/test/fixtures/` with the deal library of their day, for the test that later libraries still read them. The fixtures are not to be written again. | An optional path to a `libdeal` library. |
+| `packages/table/tool/game_fixture.dart` | Writes a finished sealed game's record to standard output, as it is kept: four people at a refereed table, the rig's house, real keys and licences. For the browser suite's look at a kept game, and the kept-game fixture `packages/table/test/fixtures/refereed_four.json.gz`. | None; redirect the output, such as `> game.json`. |
 
 ## Service tools
 
@@ -40,23 +33,22 @@ Run the Dart tools from `service` as `dart run bin/<name>.dart` or `dart run too
 
 | File | What it does | Main flags |
 |---|---|---|
-| `service/bin/service.dart` | Runs the local relay, and optionally a juror in the same process. With `OH_RELAY=js`, runs the relay the Cloudflare object runs. | `--port <n>` (`0` for any free port); `--quiet`; `--juror` |
-| `service/bin/juror.dart` | Runs the backup jurors: quiet on the relay until a table calls for jurors, then online to serve it. Reads `OH_JUROR_SECRET` and `OH_SERVICE_KEY`. Ends on SIGTERM. | `--relay <url,…>` where the jurors follow tables; `--presence <url,…>` where they announce themselves and hear calls; `--jurors <n>`; `--port <n>` answers `GET /ping`, `GET /status` and `POST /wake?table=…` |
+| `service/bin/house.dart` | Runs the house: woken for a table (`POST /wake?table=…`), it follows the table's log from the start, deals and plays its bot seats, holds half of each person's escrow and says it when that person goes, and says how the game came out, in the log and on the results tag. Reads `OH_HOUSE_SECRET`, and `OH_HOUSE_KEY` and `OH_SERVICE_KEY` where set; a secret that is not `OH_HOUSE_KEY`'s does not start. Ends on SIGTERM. | `--relay <url,…>`, with `{tag}` where the table's tag goes; `--port <n>` answers `GET /ping`, `GET /status` and `POST /wake?table=…`; `--pace <0..1>` the share of each bot's thinking time it takes before it says the bot's card (1, the default; the browser suites pass their app's pace) |
 | `service/bin/service_key.dart` | Mints the service's signing pair, and prints both halves once. Run by `./oh key mint`. | None |
 | `service/tool/forget.mjs` | Not run by itself: forgets an account (`forget`), for `./oh account delete`. Marks it forgotten in `OH_RECORDS` (`forgottenKey`), takes its name off its kept games (`anonymizeGames`) and deletes every row the service keeps for it (`forgetAccount`). | Not applicable |
 | `service/tool/suspend.mjs` | Not run by itself: how an account stands (`standing`), what an act would do (`wouldDo`), and an order carried out in the account's turn (`carry`), for `./oh account`. | Not applicable |
 | `service/tool/find.mjs` | Not run by itself: finds accounts by name or email (`findAccounts`), or by a device's key (`accountOf`), for `./oh account`. | Not applicable |
 | `service/tool/kv.mjs` | Not run by itself: `OH_STORE` through Cloudflare's API, behind the same calls as the worker's store, for `./oh`. | Not applicable |
 | `service/tool/r2.mjs` | Not run by itself: `OH_RECORDS` through Cloudflare's API, for `./oh account`. | Not applicable |
-| `service/tool/bench_check.dart` | Times the backup jurors, wherever they were started, against a real table: a relay here, two people here, two bot seats. | `--port <n>`; `--hands <n>`; `--relay <url>` uses a relay that is already running. |
-| `service/tool/wire_over_socket.dart` | Counts the bytes a sealed hand puts on a real socket, with the relay's compression on and off. | An optional first argument: how long each decision takes, in milliseconds. |
-| `service/do/host.mjs` | Hosts the relay that the Cloudflare object runs on a plain Node socket, one relay per path. | `--port <n>`; `--object` holds each tag to the object's own rules; `--gate <service key>` asks every socket who it is; `--keep <n>`; `--stats <path>`; `--control`; `--quiet` |
+| `service/tool/house_check.dart` | Times the house, wherever it was started (in its image, limited to the Cloudflare instance it runs on, say), against a real table: a relay here, two people here, two bot seats. The relay wakes the house on its port as the deployed object does. Reads `OH_HOUSE_SECRET`. | `--port <n>` the relay's; `--hands <n>`; `--house <url>` where the house answers (`http://127.0.0.1:8080`, the image's port, by default). |
+| `service/tool/wire_over_socket.dart` | Counts the bytes a sealed hand puts on a real socket to the relay, each way, and what the log is made of, entry by entry: two people and two bots, the house in the same process. | An optional first argument: how long each decision takes, in milliseconds. |
+| `service/do/host.mjs` | Hosts the relay that the Cloudflare object runs on a plain Node socket, one relay per path, each table's tag refereeing its log. | `--port <n>`; `--object` holds each tag to the object's own rules; `--gate <service key>` asks every socket who it is; `--house <key>` is the house it carries on its key alone and referees sealed tables for, saying `{"wanted": <table>}` on stdout when a table wants it; `--keep <n>`; `--stats <path>`; `--control`; `--quiet` |
 
 ## Build and deploy scripts
 
 | File | What it does | Main flags |
 |---|---|---|
-| `deploy.sh` | Builds the site, the app and the handlers, and uploads them to the Pages project as one deployment. Run by `./oh deploy site` and `./oh deploy prune`. Refuses production without `serviceKey` in `config/openhearts.json`, or when `ops/gate.mjs` finds anything in the way. A preview's app is built with the previews' key (`preview.serviceKey`) and the preview relay. Needs `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`. | `[label]`: the Pages branch, which defaults to `main` on `main` and `dev` elsewhere; `--prune [keep]` deletes older previews; `--prune -n` lists them only. |
+| `deploy.sh` | Builds the site, the app and the handlers, and uploads them to the Pages project as one deployment. Run by `./oh deploy site` and `./oh deploy prune`. Refuses production without `serviceKey` and `houseKey` in `config/openhearts.json`, or when `ops/gate.mjs` finds anything in the way. A preview's app is built with the previews' keys (`preview.serviceKey`, `preview.houseKey`) and the preview relay. Needs `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`. | `[label]`: the Pages branch, which defaults to `main` on `main` and `dev` elsewhere; `--prune [keep]` deletes older previews; `--prune -n` lists them only. |
 | `build_phone.sh` | Builds the native libraries, then a store release compiled with what `config/openhearts.json` names. Run by `./oh phone`. | `ios` or `android`; further arguments go to `flutter build`. |
 | `crypto/deal/build.sh` | Builds the deal library for the Dart VM, and the wasm, copied to `app/web/deal.wasm`. | None |
 | `crypto/schnorr/build.sh` | Builds the Schnorr library for the Dart VM. | None |
@@ -66,7 +58,7 @@ Run the Dart tools from `service` as `dart run bin/<name>.dart` or `dart run too
 | `crypto/build_ios.sh` | Builds the deal and Schnorr libraries as XCFrameworks, into `app/ios/Frameworks`. Needs a Mac with Xcode and the Rust targets. | None |
 | `site/build.mjs` | Builds the site into a directory, once in each language, with the sitemap that lists it. `deploy.sh` runs it. | `<out>` |
 | `app/worker/build.sh` | Compiles the review worker beside a built app. `deploy.sh` and `e2e/build.sh` run it. | `<build directory>` |
-| `service/bench/build.sh` | Builds the backup jurors' container image. The relay's `wrangler deploy` runs it. | None |
+| `service/bench/build.sh` | Builds the house's container image. The relay's `wrangler deploy` runs it. | None |
 
 ## Accounts and monitoring
 
@@ -82,7 +74,7 @@ For the environment variables both read, see [Environment variables](configurati
 | File | What it does | Main flags |
 |---|---|---|
 | `app/tool/affected_tests.mjs` | Prints the app's test files whose imports reach a changed file, or `all`. `./check.sh quick` runs it. | The changed paths, from the repository's root. |
-| `app/tool/defines.mjs` | Writes the phone build's `--dart-define-from-file` from `config/openhearts.json` (`appDefines`). Refuses a file with no `serviceKey` or `appOrigin`. `build_phone.sh` runs it. | `<out.json>` |
+| `app/tool/defines.mjs` | Writes the phone build's `--dart-define-from-file` from `config/openhearts.json` (`appDefines`). Refuses a file with no `serviceKey`, `houseKey` or `appOrigin`. `build_phone.sh` runs it. | `<out.json>` |
 | `app/tool/icons.mjs` | Draws every icon and launch image the app and the site ship from `app/tool/icon.svg`. Run it from `app`. | None |
 
 ## Docs tools

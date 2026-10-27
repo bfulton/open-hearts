@@ -19,7 +19,13 @@ import 'relays.dart';
 import 'signing.dart';
 
 class RelayLine implements RefereeLine {
-  RelayLine({required List<Uri> relays, required this.signer, required this.table, this.log}) : url = tableUrl(relays, table);
+  RelayLine({required List<Uri> relays, required this.signer, required this.table, this.log, this.cutOffMs = unansweredMs})
+      : url = tableUrl(relays, table);
+
+  /// How long a silence with something unanswered takes the line for
+  /// cut off ([RelayConnection.cutOff]): [unansweredMs], shorter in a
+  /// test.
+  final int cutOffMs;
 
   /// The table's object: the first of the relays the build names, with
   /// the table's id where it asks for a tag.
@@ -54,6 +60,12 @@ class RelayLine implements RefereeLine {
       log: log,
       auth: relayAuthFor(signer),
       onOpen: _opened,
+      // Quiet a while: the log again from where this side is, which the
+      // referee answers with whatever came since and its end. The answer
+      // is what tells a line still carrying from one stalled.
+      onIdle: (c) => c.sendRaw(['LOG', _sub, _next]),
+      cutOffMs: cutOffMs,
+      answerWaitMs: answerMs.clamp(0, cutOffMs ~/ 3),
     )..onDropped = (_) => _setUp(false);
   }
 

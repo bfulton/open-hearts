@@ -10,8 +10,8 @@ The non-secret configuration, committed and the same for every deployment.
 
 - The Pages worker reads it beneath its own settings: `service/functions/entry.mjs` passes the file to `withConfig` in `service/functions/deployment.mjs`, which maps each field to an `OH_` name (`configEnv`). A variable of the same name that is set on the project or by a test wins, except `OH_PRICE`: the price is the file's alone. The entry also hands the worker `site/ledger.json` as `OH_LEDGER` (see [Change the terms](../how-to/change-the-terms.md)).
 - The relay worker reads it the same way (`service/do/worker.mjs`).
-- Where the environment says it is a preview (`OH_DEPLOYMENT` is `preview`), the file is read as a preview has it (`configFor`): `serviceKey` is `preview.serviceKey`, or none while there is none, never production's.
-- `deploy.sh` compiles `serviceKey` (a preview's: `preview.serviceKey`), `google.webClientId` and `apple.servicesId` into the web build.
+- Where the environment says it is a preview (`OH_DEPLOYMENT` is `preview`), the file is read as a preview has it (`configFor`): `serviceKey` is `preview.serviceKey` and `houseKey` is `preview.houseKey`, or none while there is none, never production's.
+- `deploy.sh` compiles `serviceKey` and `houseKey` (a preview's: `preview.serviceKey` and `preview.houseKey`), `google.webClientId` and `apple.servicesId` into the web build.
 - `app/tool/defines.mjs` writes the phone build's `--dart-define-from-file` from it (`appDefines`).
 - A field that is `null` is left out, so the feature that needs it stays off.
 
@@ -19,6 +19,8 @@ The non-secret configuration, committed and the same for every deployment.
 |---|---|---|---|
 | `appOrigin` | `OH_APP_ORIGIN`, which the relay orders a termination at (`service/do/known.mjs`) | `OH_APP_ORIGIN` | The app's origin. A phone build calls the service there and builds shared links on it (`app/lib/net/address_io.dart`). `app/tool/defines.mjs` refuses a file without it. |
 | `serviceKey` | `OH_SERVICE_KEY` | `OH_SERVICE_KEY` | The service's public key, 64 hex characters. Licences and activations are checked against it. A production deploy and a phone build refuse to run without it. |
+| `houseKey` | `OH_HOUSE_KEY` | `OH_HOUSE_KEY` | The house's public key, 64 hex characters: the house every live table the app seats names, which deals and plays its bot seats and says how the game came out (`app/lib/net/licence.dart`). The relay carries the house on this key alone, referees sealed tables for it and takes results from it. `./oh house key --apply` writes it, and sets its secret on the relay worker as `OH_HOUSE_SECRET`. A production deploy and a phone build refuse to run without it. |
+| `preview.houseKey` | `OH_HOUSE_KEY`, on a preview | `OH_HOUSE_KEY`, in a preview's build | The previews' house, never production's. `./oh preview secrets` writes it, with the preview relay's `OH_HOUSE_SECRET`. |
 | `preview.serviceKey` | `OH_SERVICE_KEY`, on a preview | `OH_SERVICE_KEY`, in a preview's build | The public key previews sign with, which is never production's: licences and activations on previews are checked against it. `./oh preview secrets` writes it ([Play live on a preview](../how-to/deploy.md#play-live-on-a-preview)). A preview without it licenses nobody, and the preview relay refuses to deploy. |
 | `turnKeyId` | `OH_TURN_KEY_ID` | none | The Cloudflare Realtime TURN key that the worker mints credentials with. `infra/cloudflare.mjs` (`turnKeys`) defines the same key. |
 | `stripePrice` | `OH_STRIPE_PRICE` | none | The Stripe price, as a price ID or lookup key, that a checkout sells. A checkout sells it only when it is a year at `price`. |
@@ -77,13 +79,13 @@ The relay worker (`open-hearts-relay`) is defined by `service/do/wrangler.toml`.
 | `OH_ARACHNID_USERNAME`, `OH_ARACHNID_PASSWORD` | Optional secrets | The relay worker's secrets (`relay.optionalSecrets`) | Arachnid Shield's credentials, which the Canadian Centre for Child Protection issues with an account. Without them, while Shield is the checker in use, no picture is checked against known images. |
 | `OH_PHOTODNA_KEY` | Optional secret | The relay worker's secrets (`relay.optionalSecrets`) | PhotoDNA's key, which Microsoft issues with access to its PhotoDNA Cloud Service. Used only while PhotoDNA is the checker in use ([known images](#known-images)). |
 | `OH_NCMEC_USERNAME`, `OH_NCMEC_PASSWORD` | Optional secrets | The relay worker's secrets (`relay.optionalSecrets`) | The CyberTipline reporting service's credentials, which NCMEC issues to a registered provider. Without them, a match is acted on all the same and the operator is emailed to report it by hand. |
-| `OH_JUROR_SECRET` | Secret | The relay worker's secrets | 64 hex characters. The backup jurors derive their keys from it, and the relay checks each backup juror's mark against it (`benchMark` in `service/do/relay.mjs`). Without it, the relay admits no backup juror. |
+| `OH_HOUSE_SECRET` | Secret | The relay worker's secrets | 64 hex characters: the house's signing key, and the root of every deal secret it makes for a bot seat. The relay starts the house's container with it (`service/do/bench.mjs`). `./oh house key --apply` makes it. Without it, no house plays, and no sealed table can be dealt. |
 | `OH_MAIL_FROM` | Variable | `[vars]` in `service/do/wrangler.toml` | The sender of backup-code emails and the operator's alerts. |
 | `OH_SERVICE_KEY` | From the config file | `config/openhearts.json` (`serviceKey`, and `preview.serviceKey` on the preview relay) | The key every activation must be signed by. `wrangler.toml` does not set it. Without a valid key, the relay carries no device. |
-| `OH_BENCH_RELAYS` | Optional variable | The preview relay's `[env.preview.vars]` | Overrides the relays the backup jurors' container follows tables on. The default is `OH_RELAYS` in `service/bench/Dockerfile`. |
-| `OH_BENCH_PRESENCE_RELAYS` | Optional variable | The preview relay's `[env.preview.vars]` | Overrides the relays the backup jurors' container announces presence on. The default is `OH_PRESENCE_RELAYS` in `service/bench/Dockerfile`. |
+| `OH_HOUSE_KEY` | From the config file | `config/openhearts.json` (`houseKey`, and `preview.houseKey` on the preview relay) | The house the relay carries on its key alone, referees sealed tables for and takes results from (`service/do/referee.mjs`), and starts its container with, which does not start on a secret that is not this key's. Without a valid key, the relay referees no sealed table, which is every table the app seats. |
+| `OH_BENCH_RELAYS` | Optional variable | The preview relay's `[env.preview.vars]` | Overrides the relays the house's container follows tables on. The default is `OH_RELAYS` in `service/bench/Dockerfile`. |
 
-The preview relay (`open-hearts-relay-preview`, `[env.preview]` in the same file, `relay.preview` in `infra/cloudflare.mjs`) has one secret, its own `OH_JUROR_SECRET`, made by `./oh preview secrets`, and none of the checkers' or NCMEC's: it checks no picture. Its `OH_DEPLOYMENT` is `preview`, as the Pages project's preview environment's is ([variables](#pages-project-variables)).
+The preview relay (`open-hearts-relay-preview`, `[env.preview]` in the same file, `relay.preview` in `infra/cloudflare.mjs`) has one secret, its own `OH_HOUSE_SECRET`, made by `./oh preview secrets`, and none of the checkers' or NCMEC's: it checks no picture. Its `OH_DEPLOYMENT` is `preview`, as the Pages project's preview environment's is ([variables](#pages-project-variables)).
 
 ## Bindings
 
@@ -108,7 +110,7 @@ From `service/do/wrangler.toml`.
 |---|---|---|
 | `TABLE` | Durable Object, class `TagRelay` | One object per tag. See [Relay tags, kinds and limits](relay.md). |
 | `HOUSEHOLD` | Durable Object, class `Household` | Each account's object, which checks and keeps each picture the account sets with `OH_PICTURES`, `AI` and `KNOWN`. The Pages project binds the same class. |
-| `BENCH` | Durable Object and Cloudflare Container, class `Bench` | The backup jurors (`service/do/bench.mjs`). |
+| `BENCH` | Durable Object and Cloudflare Container, class `Bench` | The house (`service/do/bench.mjs`, `service/bin/house.dart`): started when a sealed table wants it and it is not there, and stopped once it has gone quiet. |
 | `OH_STORE` | Workers KV | The same namespace as production's `OH_STORE`. The `Household` object reads and writes it. Each relay object reads [relay settings](#relay-settings) and the pictures withheld from it; an account's object adds a picture the automatic check hides. |
 | `OH_PICTURES` | R2 bucket `open-hearts-pictures` | Each account's own copy of each picture it sets, `account/<account>/<sha256>.jpg`, with all that is known of it in its metadata, kept for the operator until a year after it stops being the account's; served at `pictures.openhearts.game` for the daily email (`service/do/profile_pictures.mjs`, `service/do/review.mjs`). The account's picture now is the one it set last, unless that one says it has ended, and the relay carries only that one. |
 | `KNOWN` | Durable Object, class `KnownPictures`, made in the `us` jurisdiction | Asks the checker of known images in use about each new picture as an account sets it, and acts on a match (`service/do/known.mjs`). One object, named `known`. |
@@ -157,15 +159,15 @@ No script checks the token's permissions first. A missing permission shows as Cl
 
 | Variable | Read by | What it is |
 |---|---|---|
-| `OH_RELAY` | `service/lib/src/relay.dart`, so the `service/` tests and `service/bin/service.dart` | Unset: the Dart relay. `js`: the relay the Cloudflare object runs, hosted by `service/do/host.mjs`. `object`: the same, under the object's own rules (one tag an address, only that tag's kinds). |
 | `OH_DEAL_MEMO` | `packages/deal/lib/memo.dart` | `off` keeps no deal answers on disk. |
 | `CHECK_PLAN` | `check.sh` | Any non-empty value: print what would run, and run nothing. |
 | `CHROME_EXECUTABLE` | `check.sh` (`app` suite) | The Chrome that runs `app/test/web`. |
 | `PLAYWRIGHT_BROWSERS_PATH` | `check.sh` (`app` suite) | Where to look for Playwright's Chromium when no other Chrome is found. |
-| `OH_JUROR_SECRET` | `service/bin/juror.dart`, `service/do/host.mjs` | The backup jurors' secret. Without it, `juror.dart` makes fresh keys and has no mark. |
-| `OH_SERVICE_KEY` | `service/bin/juror.dart` | The jurors hold every seat to its licence under this key. |
+| `OH_HOUSE_SECRET` | `service/bin/house.dart` | The house's secret. Without it, the house does not start. The browser suites' rig gives it BIP-340's third published pair (`rigHouse` in `e2e/drive.mjs`). |
+| `OH_HOUSE_KEY` | `service/bin/house.dart` | The house the relay takes. A house whose secret is not this key's does not start. |
+| `OH_SERVICE_KEY` | `service/bin/house.dart` | The house holds every seat to its licence under this key. |
 | `OH_OPEN_HOUSE` | The Pages worker (`openHouse`) | Local mode: every device that asks is licensed, and `local:` sign-ins are accepted. Honoured only for a request to `localhost`, `127.0.0.1` or a `*.localhost` host (`isLocal`). The browser suites' rig sets it. |
-| `OH_TURN_LOCAL` | The Pages worker (`turn`) | In local mode, the TURN URL that `turn` hands out, with fixed credentials. The rig points it at its coturn. |
+| `OH_TURN_LOCAL` | The Pages worker (`turn`) | In local mode, the TURN URL that `turn` hands out, with fixed credentials. Nothing sets it now: no part of the game uses TURN, which stays for voice and video chat. |
 
 ### Build defines
 
@@ -174,6 +176,7 @@ Compile-time values the app reads with `String.fromEnvironment`. They are not en
 | Define | Read in | Set by |
 |---|---|---|
 | `OH_SERVICE_KEY` | `app/lib/net/licence.dart` | `deploy.sh`, `app/tool/defines.mjs`, `e2e/build.sh` |
+| `OH_HOUSE_KEY` | `app/lib/net/licence.dart` (`houseKey`) | `deploy.sh`, `app/tool/defines.mjs`, `e2e/build.sh` |
 | `OH_APP_ORIGIN` | `app/lib/net/address_io.dart` | `app/tool/defines.mjs` |
 | `OH_GOOGLE_CLIENT_ID`, `OH_APPLE_SERVICE_ID` | `app/lib/net/provider_tokens.dart` | `deploy.sh`, `app/tool/defines.mjs` |
 | `OH_APPLE_PRODUCT`, `OH_PLAY_PRODUCT`, `OH_PLAY_PACKAGE` | `app/lib/net/store_buying.dart` | `app/tool/defines.mjs` (not `OH_PLAY_PACKAGE`) |
@@ -186,7 +189,7 @@ The row `config|app` in `OH_STORE`, which the `config` handler serves to every d
 | Field | Check | Default | Effect |
 |---|---|---|---|
 | `v` | Served, not read | `1` | The row's format version. |
-| `live` | Boolean | `true` | `false` closes live play: the buttons, table links and juror duty. Games in progress play on. |
+| `live` | Boolean | `true` | `false` closes live play: the buttons and table links. Games in progress play on. |
 | `offer` | Boolean | `true` | `false` hides the paid tier from devices that have not bought it. |
 | `relays` | 1 to `MOST_RELAYS` `wss:` URLs on `openhearts.game` or a subdomain, with no user info. All must pass, or none is taken. | The build's (`ourRelay` in `app/lib/net/relays.dart`) | Replaces the build's relays, read at app start. A build served from a local host, or built with `OH_RELAYS`, ignores it. |
 | `banner` | `id` matching `^[\w.-]{1,64}$`; `level` `warn` (anything else is `info`); `text` by two-letter language code, English required, each up to `LONGEST_SAY` characters | None | A line on the front door. |
@@ -211,7 +214,7 @@ Each field of `waits` is taken on its own when it is a whole number within its b
 | `licenceMs` | `licence` | The device's licence. |
 | `householdMs` | `household` | A household code, claim, drop or device list. |
 | `buyMs` | `buy` | Opening a checkout. |
-| `turnMs` | `turn` | TURN credentials. |
+| `turnMs` | `turn` | TURN credentials, for a call between seats. Nothing of a game goes over WebRTC. |
 | `configMs` | `config` | This config. |
 | `configEveryMin` | `configEvery` | How often an open app asks for this config again. |
 | `relaySlowMs` | `relaySlow` | When the screen says a relay is slow. |
@@ -219,7 +222,6 @@ Each field of `waits` is taken on its own when it is a whole number within its b
 | `standingMs` | `standing` | The standings from the first relay. |
 | `standingAllMs` | `standingAll` | The standings from the other relays. |
 | `roomStartMs` | `roomStart` | How long after the last arrival a friends' room starts, once two are in. |
-| `meshAnswerMs` | `meshAnswer` | A direct connection to a peer. After this, the table uses the relay. |
 | `recordMs` | `record` | Keeping or fetching a game's record. |
 | `recordAgainMs` | `recordAgain` | How often a just-finished game's record is asked for again. |
 | `recordForMs` | `recordFor` | How long it is asked for, when the game was watched to its end. |
@@ -278,7 +280,7 @@ What either checker said of a picture stands whichever is in use: a picture is a
 
 ## Table clocks
 
-The clocks a table plays by. The device that starts a table takes them from the `table` field of its [remote config](#remote-config), and they ride in the signed start event (`TableSpec.timing` in `packages/table/lib/src/spec.dart`), so every seat plays by the same clocks. A start event with no timing, or with any field of the wrong type or out of bounds, gives the clocks every build reads that as: the first builds' standard, `TableTiming.unsaid`, a two-minute silence and the rest as today's standard (`TableTiming.parse`). A start at today's standard, or at any clocks but those, says every field. A `table` field in remote config that leaves a clock out gives today's standard for it.
+The clocks a table plays by. The device that starts a table takes them from the `table` field of its [remote config](#remote-config), and they ride in the signed start event (`TableSpec.timing` in `packages/table/lib/src/spec.dart`), every field said in full, so every side applies the same clocks to the referee's times. A start whose timing leaves a field out, names one this build does not know, or has one of the wrong type or out of bounds, is no table this build sits at (`TableTiming.exactly`). A `table` field in remote config that leaves a clock out gives today's standard for it; one with a field of the wrong type or out of bounds is not served at all (`tableTimingOf` in `service/functions/config.mjs`). A game kept before the referee is read with whatever timing it says.
 
 Bounds: `TableTiming.bounds` in `packages/table/lib/src/timing.dart`, and the same values in `TABLE_TIMING_BOUNDS` in `service/functions/config.mjs`. All values are milliseconds.
 
@@ -288,12 +290,11 @@ Bounds: `TableTiming.bounds` in `packages/table/lib/src/timing.dart`, and the sa
 | `passGraceMs` | `TimeBank` | A person's grace for the pass. |
 | `bankMs` | `TimeBank` | A person's thinking time per hand, beyond the graces. |
 | `fixedMs` | `TimeBank` | A person's deal steps and audit, which their device answers by itself. |
-| `botActsMs` | `TableTiming` in `packages/table/lib/src/timing.dart` | A held bot seat's card or pass. Keep it above ten seconds: a device whose own line stalls takes up to that long to know it (`unansweredMs` in `packages/table/lib/src/transport.dart`), and until it does, a juror's move it never heard looks like a juror sitting on its turn. |
-| `botDealsMs` | `TableTiming` | A held bot seat's deal steps and audit. |
-| `quorumLostMs` | `TableTiming` | How long a table stopped for a lost quorum waits before the game ends. |
-| `silenceMs` | `TableTiming` | How long a person may be silent before a peer may boot them at their turn, without waiting on their clock. |
-| `jurorSilenceMs` | `TableTiming` | How long a juror may be silent before the table stops counting it. Above ten seconds, for the same reason as `botActsMs`. |
+| `botActsMs` | `TableTiming` in `packages/table/lib/src/timing.dart` | The house's time for a bot seat's card or pass. A bot's move is worked out, not thought about, so there is no grace in it and no bank behind it. |
+| `botDealsMs` | `TableTiming` | The house's time for a bot seat's step of the deal or its audit, which wait on the deal's slow calls. |
+| `houseGraceMs` | `TableTiming` | How long past either of those the house is waited for before the game ends as failed: time for a restarted house to come back and read the log where it left it. Nobody else can play a bot seat's cards. |
+| `silenceMs` | `TableTiming` | How long a person's connection may stay closed, as the referee's log has it, before the table gives their seat to a bot at their turn, without waiting on their clock. Long enough for a reload. |
 
-Three more clocks are fixed in code and are not in remote config: `reloadGraceMs` in `TableClient` (`packages/table/lib/src/client.dart`), how long a seat whose connection closed has to come back before it counts as silent; and `unansweredMs` and `answerMs` (`packages/table/lib/src/transport.dart`), how long a device may hear nothing, with something it sent waiting longer than an answer takes, before it takes itself for cut off ([a device cut off from the table](../explanation/live-play.md#a-device-cut-off-from-the-table)).
+Three more clocks are fixed in code and are not in remote config: `unansweredMs` and `answerMs` (`packages/table/lib/src/relays.dart`), how long a device may hear nothing, with something it sent waiting longer than an answer takes, before it takes itself for cut off; and `downSaidAfterMs` (`LiveController` in `app/lib/live/live_controller.dart`), how long a line that has been up may be down before the screen says so ([a device cut off from the table](../explanation/live-play.md#a-device-cut-off-from-the-table)).
 
 For how the clocks are used, see [live play](../explanation/live-play.md) and [the table's states](../explanation/table-states.md).

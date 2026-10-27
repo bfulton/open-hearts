@@ -2,7 +2,7 @@
 
 Use this guide to find a seed or a single message that breaks a simulated table, and to replay it with every trace kept.
 
-The chaos walk (`packages/table/tool/chaos.dart`) throws random faults at simulated tables, one seed each, and checks every side against the table's invariants. The explorer (`packages/table/tool/explore.dart`) replays a short sealed game once per message, peer and change, to find faults of ordering that random walks miss. Both are deterministic, so a seed or a run that broke once breaks again. For every flag, see [Command-line tools](../reference/tools.md).
+The chaos walk (`packages/table/tool/chaos.dart`) throws random faults at simulated tables, one seed each, and checks every side against the table's invariants. The explorer (`packages/table/tool/explore.dart`) plays a short sealed game once per event and change, to find faults of ordering that random walks miss. Both are deterministic, so a seed or a run that broke once breaks again. For every flag, see [Command-line tools](../reference/tools.md).
 
 ## Before you begin
 
@@ -25,13 +25,11 @@ The chaos walk (`packages/table/tool/chaos.dart`) throws random faults at simula
 
    The walk prints `seed N: …` for each seed that broke an invariant, with the faults that led there, and exits with 1 if any did. It ends with a line that counts the seeds and the broken ones.
 
-1. To walk the same way as a scenario you are chasing, add its flags. For example, more strangers than a jury, each letting go of the table once it has served:
+1. To walk the sealed seeds with the deal's slow calls in a worker that takes a browser's time over them, as the app does, add `--workers`. To count what the walks did (how games ended, how seats were given up, the faults thrown), add `--tally`:
 
    ```bash
-   dart run tool/chaos.dart --seeds 100 --sealed 14 --jurors 9 --sweep
+   dart run tool/chaos.dart --seeds 0 --sealed 14 --workers --tally
    ```
-
-   `--structure` also reads every side against the state machines as it walks, and reports waits that are stuck and sides that are apart. `--twins` takes accounts up on a second device as it walks.
 
 1. After a fix, walk only the sealed seeds that broke, without the unsealed ones:
 
@@ -41,36 +39,37 @@ The chaos walk (`packages/table/tool/chaos.dart`) throws random faults at simula
 
 ## Replay one seed with every trace
 
-1. Walk the seed that broke, with every client's log printed. For a seed from `--sealed` or `--sealed-only`:
+1. Walk the seed that broke with `--traces`, which prints every side's trace: each person's, the house's follower and each seat it plays. For a sealed seed:
 
    ```bash
-   dart run tool/walk.dart --seed 7
+   dart run tool/chaos.dart --seeds 0 --sealed-only 7 --traces
    ```
 
-   For a seed from `--seeds`, which is dealt from the seed, add `--seeded`:
+   For an unsealed seed, `--seeds` walks every seed below the number given, so walk up to the one that broke: `--seeds 8 --traces` ends with seed 7.
 
-   ```bash
-   dart run tool/walk.dart --seed 7 --seeded
-   ```
-
-   `walk.dart` walks with the default jurors only. It takes no `--jurors`, `--sweep` or `--twins`.
-
-1. Read the end of the output. It names the faults, what each survivor and juror holds, and whether each survivor's record verifies.
+1. Read the end of the output. It names the faults that led there and the invariant that broke: two sides that saw the table differently after an entry, a game not over as the faults allow, a seat lost by no fault of its own, something taken twice, or the house's word on the end missing or wrong.
 
 ## Find a fault of ordering with the explorer
 
-1. Run a scenario: `deal`, `two`, `leave`, `summons` or `topup`. Add `--first` to stop at the first run that breaks:
+1. List the scenarios: a name that is not one prints them all, each with what it plays.
+
+   ```bash
+   dart run tool/explore.dart --scenario help
+   ```
+
+1. Run a scenario. Add `--first` to stop at the first run that breaks:
 
    ```bash
    dart run tool/explore.dart --scenario leave --first
    ```
 
-   Each broken run is printed with its number, the event and peer it changed, and whether the first copy was lost or every copy was held late.
+   Each broken run is printed with the event it changed, and how: `drop` (lost on the way and said again on the next socket), `late` (the sender off the network for a few seconds) or `twice` (sent twice).
 
-1. Replay one run with every trace, by what it changed. `--match` takes text from the broken run's line, and `--changes` names the one change, `lose` or `late`. Give the same `--fault-at` and `--hold` as the run that found it, if you gave any:
+1. Replay one run with every trace. `--census` lists the events the scenario sends, numbered; `--at` runs the change to one of them, and `--changes` names the change:
 
    ```bash
-   dart run tool/explore.dart --scenario leave --match 'witness aeaa→6eab first said at 308ms' --changes lose
+   dart run tool/explore.dart --scenario leave --census
+   dart run tool/explore.dart --scenario leave --at 41 --changes late
    ```
 
 ## Check it worked

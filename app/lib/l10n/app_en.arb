@@ -684,11 +684,11 @@
       }
     }
   },
-  "pointRating": "A rating of your own, from results the four of you sign.",
+  "pointRating": "A rating of your own, worked out from the results of your live games.",
   "@pointRating": {
     "description": "One of the points on the Live play page."
   },
-  "pointDeal": "The deal is dealt between the four of you. No server sees a hand, ours included.",
+  "pointDeal": "Every seat shuffles, and no other player sees your hand. Our server plays the bots, so it sees theirs.",
   "@pointDeal": {
     "description": "One of the points on the Live play page."
   },
@@ -721,7 +721,9 @@
   "@storeNotAnswered": {
     "description": "Under the Subscribe button, on a phone whose store has not said yet what the subscription costs, as when the app opened offline. store is apple or google: the App Store or Google Play.",
     "placeholders": {
-      "store": {"type": "String"}
+      "store": {
+        "type": "String"
+      }
     }
   },
   "subscriptionIsYours": "A subscription is your account, not a device's, and it plays on one device at a time. Bring another in by showing it this code — its camera is all it needs — and drop one whenever you like.",
@@ -1473,14 +1475,18 @@
       "price": {
         "type": "String"
       },
-      "store": {"type": "String"}
+      "store": {
+        "type": "String"
+      }
     }
   },
   "manageInStore": "Cancel or change it in {store, select, apple{the App Store} other{Google Play}}.",
   "@manageInStore": {
     "description": "Above the Manage subscription button for a subscription bought in the App Store or Google Play. 'store' is apple or google.",
     "placeholders": {
-      "store": {"type": "String"}
+      "store": {
+        "type": "String"
+      }
     }
   },
   "subscription": "Subscription",

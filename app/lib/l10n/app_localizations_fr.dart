@@ -558,11 +558,11 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get pointRating =>
-      'Un classement à vous, issu de résultats que vous signez à quatre.';
+      'Un classement à vous, calculé à partir des résultats de vos parties en direct.';
 
   @override
   String get pointDeal =>
-      'Les cartes sont distribuées entre vous quatre. Aucun serveur ne voit une main, pas même le nôtre.';
+      'Chaque place mélange, et aucun autre joueur ne voit votre main. Notre serveur joue les bots, il voit donc les leurs.';
 
   @override
   String get whatMoneyPaysFor =>

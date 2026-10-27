@@ -14,7 +14,7 @@ Previews sign with a pair of their own, which this guide doesn't touch: to repla
 | Web app | `serviceKey`, compiled in by `deploy.sh` | Accept a licence or an activation only if this key signed it (`Entitlement` in `app/lib/entitlement.dart`, `InUse` in `app/lib/net/in_use.dart`), and check every seat's licence at a table (`licenceService` in `packages/table/lib/src/licence.dart`). |
 | Phone apps | `serviceKey`, compiled in by `build_phone.sh` (`app/tool/defines.mjs`) | The same as the web app. |
 | Relay worker (`service/do/worker.mjs`) | `serviceKey` from the config, read when it is deployed | Carry a device only with an activation this key signed (`gate`). |
-| Backup jurors (`service/bin/juror.dart`) | The relay worker's key, given to their container when it starts (`wake` in `service/do/bench.mjs`) | Hold every seat to its licence. |
+| The house (`service/bin/house.dart`) | The relay worker's key, given to its container when it starts (`wake` in `service/do/bench.mjs`) | Serve only a table whose every seat shows a licence this key signed. |
 
 ## What a rotation breaks
 
@@ -89,7 +89,7 @@ Every part above checks against exactly one key, so there is no overlap between 
 
    This order is the reverse of the usual one in [Deploy the site, app and service](deploy.md). Deploying the relay first would turn away every device at once, since they all hold activations signed by the old key, until the site was deployed.
 
-   A deploy does not restart the backup jurors' container, which takes `OH_SERVICE_KEY` when it starts. At the next call for a juror, the `Bench` object restarts a running container that was started under an earlier deploy, or with anything other than what it would start one with now: the service key, `OH_JUROR_SECRET`, or the relay overrides (`wake` in `service/do/bench.mjs`). The backup jurors check seats against the new key from then on.
+   A deploy does not restart the house's container, which takes `OH_SERVICE_KEY` when it starts. At the next wake, the `Bench` object restarts a running container that was started under an earlier deploy, or with anything other than what it would start one with now: the service key, the house's key and secret, or the relay overrides (`wake` in `service/do/bench.mjs`). The house checks seats against the new key from then on.
 
 1. Release the phone builds in both stores.
 

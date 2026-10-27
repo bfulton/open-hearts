@@ -119,11 +119,11 @@ void main() {
     expect(AppWaits.standard.relaySlow, const Duration(seconds: 8));
     expect(AppWaits.standard.relayGiveUp, const Duration(seconds: 40));
     expect(AppWaits.standard.configEvery, const Duration(minutes: 15));
-    final w = AppWaits.parse({'licenceMs': 9000, 'householdMs': 1, 'configEveryMin': 60, 'meshAnswerMs': '30000'});
+    final w = AppWaits.parse({'licenceMs': 9000, 'householdMs': 1, 'configEveryMin': 60, 'roomStartMs': '30000'});
     expect(w.licence, const Duration(seconds: 9));
     expect(w.household, AppWaits.standard.household, reason: 'under its least');
     expect(w.configEvery, const Duration(hours: 1));
-    expect(w.meshAnswer, AppWaits.standard.meshAnswer, reason: 'not a number');
+    expect(w.roomStart, AppWaits.standard.roomStart, reason: 'not a number');
     const record = {'recordAgainMs', 'recordForMs', 'recordSoonMs'};
     for (final MapEntry(key: name, value: (least, most)) in AppWaits.bounds.entries) {
       // The record's three go together, so are checked together (below).

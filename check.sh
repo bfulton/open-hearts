@@ -122,13 +122,13 @@ suite_app() {
 suite_e2e_build() { ./e2e/build.sh; }
 suite_e2e_flows() { node e2e/flows.mjs; }
 suite_e2e_run() { node e2e/run.mjs; }
-suite_e2e_escrow() { node e2e/escrow.mjs; }
+suite_e2e_house() { node e2e/house.mjs; }
 suite_e2e_offline() { node e2e/offline.mjs; }
 suite_e2e_site() { node e2e/site.mjs; }
 suite_e2e_move() { node e2e/move.mjs; }
 
 all_suites="engine deal table table_slow service relay_js functions site infra ops workers crypto scripts docs app_analyze app
-  e2e_build e2e_flows e2e_run e2e_escrow e2e_offline e2e_site e2e_move"
+  e2e_build e2e_flows e2e_run e2e_house e2e_offline e2e_site e2e_move"
 
 # ---- running them ----------------------------------------------------------
 
@@ -309,7 +309,7 @@ quick() {
 # run at the lowest priority (above), all at once. The ones that keep
 # time run in waves no bigger than a laptop can carry: the browser
 # suites' build; the move's timings, which hold the app's start to a
-# second and a half; the service's sockets all three ways and the escrow;
+# second and a half; the service's sockets all three ways and the house;
 # the four-browser run and the network taken away; the flows. All of
 # them at once is no sooner on a few cores, only less sure: their tables
 # keep deadlines that a starved process misses. The Rust crates' own
@@ -319,7 +319,7 @@ full() {
   local crypto="" s
   [ -d crypto/deal/target/release/.fingerprint ] && command -v cargo > /dev/null && crypto=crypto
   local plan=("table table_slow" "app_analyze app" "engine,deal" "relay_js,functions,site,infra,ops,workers,scripts,docs $crypto"
-    "e2e_build e2e_move,e2e_site service,e2e_escrow e2e_run,e2e_offline e2e_flows")
+    "e2e_build e2e_move,e2e_site service,e2e_house e2e_run,e2e_offline e2e_flows")
   # Every suite there is, in a lane: one left out would never run here.
   for s in $all_suites; do
     [ "$s" = crypto ] && [ -z "$crypto" ] && continue

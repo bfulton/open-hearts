@@ -699,7 +699,7 @@ void main() {
     await tester.tap(find.text('Subscribe'));
     await tester.pumpAndSettle();
     expect(find.textContaining('Playing alone is free'), findsOneWidget);
-    expect(find.textContaining('No server sees a hand'), findsOneWidget);
+    expect(find.textContaining('no other player sees your hand'), findsOneWidget);
     expect(find.text(r'$5.99 a year'), findsOneWidget);
   });
 }

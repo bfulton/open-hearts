@@ -381,7 +381,7 @@ class WaitingRoom {
     if (p.tables.isEmpty) return;
     log?.call('$pool round $round: hosting, ${all.length} present, ${p.tables.length} table(s)');
     for (final humans in p.tables) {
-      final id = newTableId(_random);
+      final salt = newSalt(_random);
       final seed = _random.nextInt(1 << 31);
       final mean = humans.map((w) => w.rating).reduce((a, b) => a + b) ~/ humans.length;
       final wanted = seatCount - humans.length;
@@ -399,10 +399,26 @@ class WaitingRoom {
           seats.add({'bot': bots[s - humans.length].id});
         }
       }
+      // The table's id is its spec's (spec.dart, TableSpec.id), as every
+      // device seated works it out again.
+      final table = TableSpec(
+        seed: seed,
+        seats: [
+          for (var s = 0; s < seatCount; s++)
+            s < humans.length ? HumanSeat(humans[s].key, licence: humans[s].licence) : BotSeat(bots[s - humans.length]),
+        ],
+        rated: pool == 'rated',
+        sealed: sealed,
+        target: target,
+        timing: timing,
+        house: sealed ? house : null,
+        salt: salt,
+      );
       relay.announce({
         'kind': 'match',
         'round': round,
-        'table': id,
+        'table': table.id,
+        'salt': salt,
         'seed': seed,
         'rated': pool == 'rated',
         'sealed': sealed,
@@ -508,11 +524,8 @@ class WaitingRoom {
         }
         s++;
       }
-      // A table is named by its id, and its id is its address: one that
-      // could be guessed, or shared with another table, is not taken.
-      if (!mine || seats.length != seatCount || c['table'] is! String || !validTableId(c['table'] as String)) return;
+      if (!mine || seats.length != seatCount) return;
       final offered = TableSpec(
-            id: c['table'] as String,
             seed: c['seed'] as int,
             seats: seats,
             rated: c['rated'] == true,
@@ -521,7 +534,15 @@ class WaitingRoom {
             // The host's clocks, not this device's, said in full
             // (TableTiming.exactly): a seating without them is no table.
             timing: TableTiming.exactly(c['timing']) ?? (throw const FormatException('timing')),
-            house: sealed ? house : null);
+            house: sealed ? house : null,
+            salt: c['salt'] as String? ?? (throw const FormatException('salt')));
+      // A table is named by its id, which is its spec's: a seating whose
+      // table is not the one it says is no table, and one with no salt
+      // has an id anybody who saw the seats could work out.
+      if (c['table'] != offered.id || !validTableId(offered.salt!)) {
+        log?.call('$pool: a seating refused: its table is not its spec\'s');
+        return;
+      }
       // Every seat an account's, by the service's word, and each
       // account once: a seating that is not is no table to sit at.
       final wrong = offered.licenceProblem(at: DateTime.fromMillisecondsSinceEpoch(_now));

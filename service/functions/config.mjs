@@ -116,7 +116,6 @@ export const WAITS_BOUNDS = Object.freeze({
   standingMs: [3000, 30000],
   standingAllMs: [1000, 20000],
   roomStartMs: [3000, 60000],
-  meshAnswerMs: [5000, 60000],
   recordMs: [5000, 120000],
   recordAgainMs: [1000, 30000],
   recordForMs: [10000, 600000],

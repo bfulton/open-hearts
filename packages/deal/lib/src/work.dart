@@ -187,7 +187,7 @@ class PreparedDeal implements DealCrypto {
   final DealCrypto inner;
 
   /// How many answers are kept, the oldest going first. A hand asks
-  /// for a dozen or so; a juror serving a few tables, a few dozen.
+  /// for a dozen or so; the house, serving several tables, a few dozen.
   final int capacity;
 
   final Map<String, Object> _answers = {};

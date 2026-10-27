@@ -28,9 +28,11 @@ class SimTable {
     bool workers = false,
     this.latencyMs = 30,
     int? houseLatencyMs,
+    double housePace = 0,
+    this.keepJournals = true,
     bool rated = false,
     Map<int, SeatConduct> conducts = const {},
-    String? id,
+    String? salt,
     List<Signer>? keys,
     Signer? houseKey,
     Licence? Function(PublicKey key)? licenceOf,
@@ -49,7 +51,6 @@ class SimTable {
           : BotSeat(Persona.roster[(s + seed) % Persona.roster.length]));
     }
     spec = TableSpec(
-      id: id ?? 'table-$seed',
       seed: seed,
       seats: seats,
       sealed: sealed,
@@ -57,6 +58,7 @@ class SimTable {
       timing: timing,
       rated: rated,
       house: sealed ? houseSigner.publicKey : null,
+      salt: salt,
     );
     DealWorker? workerFor() => workers && crypto != null ? SimDealWorker(crypto!, clock) : null;
     _newHouse = () => House(
@@ -68,6 +70,9 @@ class SimTable {
           // The house runs the deal natively, on a server: its slow calls
           // are not a browser's.
           random: Random(seed * 1000 + 999 + _houses++),
+          // The bots' thought, which in service is the house's to take
+          // (house.dart, pace): none here unless a test asks.
+          pace: housePace,
           onResult: (result, signed) => results.add(signed),
           onSide: (side) => _watch(side, 'house${_houses > 1 ? '.$_houses' : ''} ${side.role == Role.houseFollower ? 'follower' : 'seat ${side.seat}'}'),
           trace: traces ? (t, l) => _log(l) : null,
@@ -87,6 +92,11 @@ class SimTable {
           persona: Persona.roster[(i * 3 + seed) % Persona.roster.length]));
     }
   }
+
+  /// Whether each person's device keeps its hands' secrets
+  /// (journal.dart), as the app's does: a device that keeps nothing has
+  /// only the secret its run drew.
+  final bool keepJournals;
 
   /// The results the house published, signed, as it published them.
   final List<NostrEvent> results = [];
@@ -139,7 +149,7 @@ class SimTable {
         spec: spec,
         crypto: crypto,
         dealWorker: _workerFor(),
-        journal: journals[i],
+        journal: keepJournals ? journals[i] : null,
         conduct: _conducts[i],
         random: random,
         trace: traces ? (l) => _log('p$i: $l') : null,

@@ -30,16 +30,18 @@ final p0 = FakeSigner('rules p0');
 final p1 = FakeSigner('rules p1');
 final stranger = FakeSigner('rules stranger');
 
-TableSpec specOf({String id = 'rules-table', TableTiming timing = TableTiming.standard}) => TableSpec(
-      id: id,
-      seed: 9,
+TableSpec specOf({int seed = 9, TableTiming timing = TableTiming.standard}) => TableSpec(
+      seed: seed,
       seats: [HumanSeat(p0.publicKey), HumanSeat(p1.publicKey), BotSeat(Persona.roster[0]), BotSeat(Persona.roster[1])],
       sealed: false,
       timing: timing,
     );
 
-TableEvent ev(Signer s, EventKind kind, Map<String, Object?> body, {String table = 'rules-table'}) =>
-    TableEvent.sign(s, table: table, kind: kind, body: body);
+/// The table the last one [started] is.
+String _table = specOf().id;
+
+TableEvent ev(Signer s, EventKind kind, Map<String, Object?> body, {String? table}) =>
+    TableEvent.sign(s, table: table ?? _table, kind: kind, body: body);
 
 TableEvent start(Signer s, TableSpec spec) => ev(s, EventKind.start, {'spec': spec.toJson()}, table: spec.id);
 
@@ -52,8 +54,10 @@ TableEvent passOf(Signer s, TableRules r, int seat, {List<Card>? cards, int? tur
 
 /// A table started, both people's passes open.
 (TableRules, Writer) started({TableTiming timing = TableTiming.standard}) {
-  final r = TableRules(tableId: 'rules-table');
-  final w = Writer(r)..event(start(p0, specOf(timing: timing)));
+  final spec = specOf(timing: timing);
+  _table = spec.id;
+  final r = TableRules(tableId: spec.id);
+  final w = Writer(r)..event(start(p0, spec));
   return (r, w);
 }
 
@@ -69,12 +73,23 @@ void main() {
     });
 
     for (final (what, entry) in [
-      ('another table', start(p0, specOf(id: 'elsewhere'))),
+      ('another table', start(p0, specOf(seed: 10))),
       ('a key nobody seated', start(stranger, specOf())),
-      ('no start at all', ev(p0, EventKind.leave, {'seat': 0})),
+      ('no start at all', ev(p0, EventKind.leave, {'seat': 0}, table: specOf().id)),
+      // Under this table's id, a spec its id does not name: another
+      // seed, a seat given to a bot, a field more.
+      ('a spec its id does not name', ev(p0, EventKind.start, {'spec': {...specOf().toJson(), 'seed': 10}}, table: specOf().id)),
+      ('a seat its id does not name', ev(p0, EventKind.start, {
+        'spec': {
+          ...specOf().toJson(),
+          'seats': [...(specOf().toJson()['seats'] as List).take(3), {'bot': Persona.roster[2].id}],
+        },
+      }, table: specOf().id)),
+      ('a field its id does not name', ev(p0, EventKind.start, {'spec': {...specOf().toJson(), 'rated': true}}, table: specOf().id)),
+      ('a field more than its id names', ev(p0, EventKind.start, {'spec': {...specOf().toJson(), 'extra': 1}}, table: specOf().id)),
     ]) {
       test('fails for $what', () {
-        final r = TableRules(tableId: 'rules-table');
+        final r = TableRules(tableId: specOf().id);
         Writer(r).event(entry);
         expect(r.state, TableState.failed);
         expect(r.over, isTrue);
@@ -82,8 +97,8 @@ void main() {
     }
 
     test('fails a sealed table without a house', () {
-      final spec = TableSpec(id: 'rules-table', seed: 9, seats: specOf().seats, sealed: true);
-      final r = TableRules(tableId: 'rules-table');
+      final spec = TableSpec(seed: 9, seats: specOf().seats, sealed: true);
+      final r = TableRules(tableId: spec.id);
       Writer(r).event(start(p0, spec));
       expect(r.state, TableState.failed);
     });

@@ -10,7 +10,7 @@ For why the relay works this way, see [the relay](../explanation/relay.md).
 |---|---|---|
 | Deployed (web and phone) | `wss://relay.openhearts.game/{tag}`: the tag replaces `{tag}` (`tagMark` in `packages/table/lib/src/presence_relay.dart`) | `ourRelay` in `app/lib/net/relays.dart` |
 | Deployed, with `relays` in the remote config | Up to `MOST_RELAYS` relays on `openhearts.game` or a subdomain | [Remote config](configuration.md#remote-config) |
-| Served from a local host | `ws://127.0.0.1:7447`, or the port in the page's `?relay=PORT` | `localRelay` and `localRelayAt` in `app/lib/net/relays.dart` |
+| Served from a local host | `ws://127.0.0.1:7448/{tag}`, or the port in the page's `?relay=PORT` | `localRelay` and `localRelayAt` in `app/lib/net/relays.dart` |
 | Built with the `OH_RELAYS` define | That comma list | `devRelay` in `app/lib/net/relays.dart` |
 
 The tag in the path names a Durable Object, so everyone on one tag reaches the same object (`TABLE.idFromName(tag)` in `service/do/worker.mjs`). A tag is one path segment of letters, digits and `._:@+-` (`tagShape` and `tagOf` in `service/do/relay.mjs`).
@@ -40,11 +40,11 @@ The kind numbers are `TableKinds` in `packages/table/lib/src/nostr.dart`. Kinds 
 | Kind | Name | Tags | Carries | Ephemeral |
 |---|---|---|---|---|
 | 4244 | `TableKinds.lobby` | `t`: the pool, room code or results tag | JSON with a `kind`: `match` (a pool's seating of a table), `start` (a room's table started), `picture` (a player's picture), `result` (a finished game's result, `GameResult`) | No |
-| 22242 | `TableKinds.auth` | `relay`, `challenge`, and `activation` (the device's activation, as JSON) or `bench` (a backup juror's mark) | A device's answer to the relay's challenge (NIP-42), sent in an `AUTH` message. The relay reads it and does not forward it. | Yes |
-| 24242 | `TableKinds.table` | `t`: the table ID | A table event (`packages/table/lib/src/events.dart`) as JSON | Yes |
+| 22242 | `TableKinds.auth` | `relay`, `challenge`, and `activation` (the device's activation, as JSON) | A device's answer to the relay's challenge (NIP-42), sent in an `AUTH` message. The house's answer carries no activation: its key is the one the relay admits by key alone. The relay reads it and does not forward it. | Yes |
+| 4250 | `TableKinds.log` | `t`: the table ID | A table event (`packages/table/lib/src/events.dart`) as JSON, for the table's log. The table's referee takes it, numbers it and stamps it with its time (`service/do/referee.mjs`), and sends it on only as an entry of the log. | No: kept in the table's log, and nowhere else |
 | 24243 | `TableKinds.signal` | `p`: the recipient; `t`: the table ID | A WebRTC offer, answer or ICE candidate, sealed to the recipient with NIP-44 v2 (`packages/table/lib/src/nip44.dart`) | Yes |
 | 24245 | `TableKinds.waiting` | `t`: the pool or room code | A beat: `wait` from a player waiting in a pool, `here` from a member of a friends' room | Yes |
-| 24246 | `TableKinds.presence` | `t`: `online`; `p`: the juror, on a summons | JSON with a `kind`: `here` (status and activation), `gone`, `summons` (to a juror), `call` (a table's call for a backup juror) | Yes |
+| 24246 | `TableKinds.presence` | `t`: `online` | JSON with a `kind`: `here` (status and activation) or `gone` | Yes |
 | 24247 | `TableKinds.watch` | `t`: the table ID | A watcher saying it is watching (`{"watching": true, "licence": …}`), or a seated player's view of the table (`WatchedTable` in `packages/table/lib/src/watch.dart`) | Yes |
 | 24248 | `TableKinds.react` | `t`: the table ID, and nothing else | A reaction. See [Reactions](#reactions). | Yes |
 
@@ -54,10 +54,10 @@ The relay speaks a subset of NIP-01, plus NIP-42's `AUTH` (`createRelay` in `ser
 
 | From | Message |
 |---|---|
-| Client | `EVENT`, `REQ`, `CLOSE`, `AUTH` |
-| Relay | `AUTH` (a challenge, as each socket opens), `OK`, `EVENT`, `EOSE`, `CLOSED`, `NOTICE` |
+| Client | `EVENT`, `REQ`, `CLOSE`, `AUTH`; and on a table's tag `LOG` (the log, from an entry on, under a subscription id; asked again by a line that has heard nothing for five seconds, so that its answer shows the line still carries) and `TICK` (an entry with the referee's time in it, when a deadline is due) |
+| Relay | `AUTH` (a challenge, as each socket opens), `OK`, `EVENT`, `EOSE`, `CLOSED`, `NOTICE`; and on a table's tag `LOG` (one entry of the log) and `LOGEND` (the end of the log as it stands, after which each entry comes as it is added) |
 
-A deployed relay object holds every socket's `EVENT`, `REQ` and `CLOSE` until the socket answers the challenge (`serviceGate`). It carries a socket only for a device with a current activation, which is the device in use of an account with a subscription, or for a backup juror.
+A deployed relay object holds every socket's `EVENT`, `REQ` and `CLOSE` until the socket answers the challenge (`serviceGate`). It carries a socket only for a device with a current activation, which is the device in use of an account with a subscription, or for the house. While a socket's answer has run out, the relay holds what it says and sends it no entry of a table's log, and asks it again.
 
 The reason in a refusal starts with one of these words:
 
@@ -69,7 +69,6 @@ The reason in a refusal starts with one of these words:
 | `duplicate:` | The relay already has this event. The `OK` is `true`. |
 | `withheld:` | A picture the operator took down ([withheld pictures](../explanation/relay.md#withheld-pictures)). The `OK` is `true`, and the event is neither stored nor passed on. |
 | `auth-required:` | The socket has not answered the challenge, or its answer is stale or carries no current activation. |
-| `restricted:` | Not a backup juror. The relay closes the socket. |
 | `superseded:` | Another device of this account is in use. The relay closes the socket. |
 | `suspended:` | This account is suspended from live play. The relay closes the socket. |
 | `deleted:` | This account was deleted, from one of its devices. The relay closes the socket. |

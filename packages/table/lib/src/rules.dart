@@ -402,6 +402,10 @@ class TableRules {
     if (e.down != null) _down[e.down!] = e.t;
     final ev = e.event;
     if (ev != null) _takeEvent(ev);
+    // Logged by the referee, which checks a signature on an id and no
+    // more, and read by no side: it changes nothing, and says so.
+    final unread = e.unread;
+    if (unread != null) trace?.call('entry #${e.n} does not read as an event (${unread['kind']} by ${'${unread['author']}'.padRight(6).substring(0, 6)}), and changes nothing');
     _settledSince = true;
   }
 
@@ -514,7 +518,7 @@ class TableRules {
             _fail();
             return;
           }
-          _remove(s, Exit.booted);
+          _remove(s, Exit.booted, why: '$o, out at $_now');
           lost = true;
           break;
         }
@@ -573,13 +577,14 @@ class TableRules {
   /// Whether a person is left at the table.
   bool get anyoneHere => _holders.any((h) => h is HumanSeat);
 
-  void _remove(int seat, Exit how) {
+  /// [why], for the trace: the turn that ran out, for a seat booted.
+  void _remove(int seat, Exit how, {String? why}) {
     final h = _holders[seat];
     if (h is! HumanSeat) return;
     _holders[seat] = BotSeat(_spec!.replacementFor(seat));
     _removals[seat] = Removal(how, n: log.length - 1, t: _now, hand: game.handNumber);
     _owed.remove(seat);
-    trace?.call('seat $seat ${how.name} at #${log.length - 1}');
+    trace?.call('seat $seat ${how.name} at #${log.length - 1}${why == null ? '' : ': $why'}');
     final d = _deal;
     if (d != null) {
       // This side's own seat gone: its session built again from the log,
@@ -605,7 +610,10 @@ class TableRules {
   /// side's seat is gone, or as its own seat's.
   void _rebuild({required bool mine}) {
     final hand = game.handNumber;
-    final again = _session(hand, mine: mine);
+    // The seat's secret as this side holds it, where nothing kept says
+    // otherwise: a session that drew another would open none of the
+    // seat's own cards.
+    final again = _session(hand, mine: mine, held: mine ? _deal?.mySecret : null);
     for (final op in _ops) {
       op(again);
     }
@@ -653,12 +661,13 @@ class TableRules {
   }
 
   /// A session for [hand]'s deal: holding this side's seat's secret
-  /// where [mine] and this side holds one there.
-  DealSession _session(int hand, {required bool mine}) {
+  /// where [mine] and this side holds one there — the one kept for the
+  /// hand ([secretFor]), else [held], else one drawn now.
+  DealSession _session(int hand, {required bool mine, Uint8List? held}) {
     final spec = _spec!;
     final me = mine ? _mySeatAt(hand) : null;
     final house = spec.house!;
-    final secret = me == null ? null : secretFor?.call(hand);
+    final secret = me == null ? null : secretFor?.call(hand) ?? held;
     final d = DealSession(
       _prepared ?? crypto!,
       tableId: spec.id,

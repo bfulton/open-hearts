@@ -58,6 +58,28 @@ void main() {
       t.close();
     }, timeout: const Timeout(Duration(minutes: 5)));
 
+    test('a house that thinks says each bot card a bot\'s moment after the move before, and the game plays out', () {
+      // The bots' rhythm is the house's, in the log's own times
+      // (house.dart, pace), so that a person's clock after a bot's card
+      // starts when a screen showing the cards as they land shows it.
+      final t = SimTable(humans: 1, seed: 5, crypto: crypto, housePace: 1);
+      t.start();
+      expect(t.run(), isTrue, reason: 'the game plays out');
+      agree(t);
+      final plays = [
+        for (final e in t.referee.log)
+          if (e.event?.kind == EventKind.play) e,
+      ];
+      var thought = 0;
+      for (var i = 1; i < plays.length; i++) {
+        if (plays[i].event!.author != t.houseSigner.publicKey) continue;
+        thought++;
+        expect(plays[i].t - plays[i - 1].t, greaterThanOrEqualTo(BotPace.quick.minMs), reason: 'card $i, after its bot\'s moment');
+      }
+      expect(thought, greaterThan(seatCount * 13), reason: 'the house played: $thought cards');
+      t.close();
+    }, timeout: const Timeout(Duration(minutes: 5)));
+
     test('four people play a whole sealed game', () {
       final t = SimTable(humans: 4, seed: 7, crypto: crypto);
       t.start();

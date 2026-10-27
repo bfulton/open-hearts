@@ -190,11 +190,17 @@ void main() {
     });
 
     // A seating as a host says it (matching.dart, _hostRound): these
-    // keys, and bots in the other seats.
-    Map<String, Object?> seating(String id, List<PublicKey> keys) => {
+    // keys, bots in the other seats, salted with [salt], and the table
+    // its spec names.
+    Map<String, Object?> seating(String salt, List<PublicKey> keys) => {
           'kind': 'match',
           'round': DateTime.now().millisecondsSinceEpoch ~/ 2000,
-          'table': id,
+          'table': TableSpec(
+            seed: 1,
+            seats: [for (final k in keys) HumanSeat(k), for (var s = keys.length; s < seatCount; s++) BotSeat(Persona.roster[s])],
+            salt: salt,
+          ).id,
+          'salt': salt,
           'seed': 1,
           'rated': false,
           'sealed': false,
@@ -230,12 +236,20 @@ void main() {
     Future<List<(RelayTransport, WaitingRoom, Future<TableSpec>)>> waiters(List<SchnorrSigner> signers) async =>
         [for (final s in signers) await join('W', signer: s, botsAfterMs: 60000)];
 
+    /// Two salts for seatings of [keys], the one whose table's id is
+    /// lower first, and those ids.
+    (List<String>, List<String>) twoOf(List<PublicKey> keys) {
+      String tableOf(String salt) => seating(salt, keys)['table'] as String;
+      final salts = [newSalt(), newSalt()]..sort((a, b) => tableOf(a).compareTo(tableOf(b)));
+      return (salts, [for (final s in salts) tableOf(s)]);
+    }
+
     test('a device takes the lowest table id among the seatings it has in time, whichever came first', () async {
       final signers = [for (var i = 0; i < 3; i++) SchnorrSigner.generate()];
       final keys = [for (final s in signers) s.publicKey];
-      final ids = [newTableId(), newTableId()]..sort();
+      final (salts, ids) = twoOf(keys);
       final h = await host();
-      await publish(h, [seating(ids[1], keys), seating(ids[0], keys)]);
+      await publish(h, [seating(salts[1], keys), seating(salts[0], keys)]);
       final rooms = await waiters(signers);
       final specs = await Future.wait(rooms.map((r) => r.$3.timeout(const Duration(seconds: 15))));
       expect(specs.map((s) => s.id), everyElement(ids[0]), reason: 'the lower id, though it came second');
@@ -251,16 +265,16 @@ void main() {
       // reaches some of them in time and the rest too late.
       final signers = [for (var i = 0; i < 3; i++) SchnorrSigner.generate()];
       final keys = [for (final s in signers) s.publicKey];
-      final ids = [newTableId(), newTableId()]..sort();
+      final (salts, ids) = twoOf(keys);
       final h = await host();
-      await publish(h, [seating(ids[1], keys)]);
+      await publish(h, [seating(salts[1], keys)]);
       final rooms = await waiters(signers);
       final specs = await Future.wait(rooms.map((r) => r.$3.timeout(const Duration(seconds: 15))));
       expect(specs.map((s) => s.id), everyElement(ids[1]));
       final heard = [
         for (final r in rooms) r.$1.lobby.firstWhere((e) => (jsonDecode(e.content) as Map)['table'] == ids[0]),
       ];
-      await publish(h, [seating(ids[0], keys)]);
+      await publish(h, [seating(salts[0], keys)]);
       await Future.wait(heard).timeout(const Duration(seconds: 15));
       // A device that took it would within a tenth of a round of hearing
       // it (matching.dart); three tenths on, none has. One that drops it
@@ -364,14 +378,25 @@ void main() {
       final sockets = <String, WebSocketChannel>{};
       final host = SchnorrSigner.generate();
       final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-      void store(String tag, int at, String what) =>
-          sockets.putIfAbsent(tag, () => WebSocketChannel.connect(relaysForTag([relay.url], tag).single)).sink.add(jsonEncode([
-            'EVENT',
-            NostrEvent.sign(host, kind: TableKinds.lobby, content: jsonEncode({'what': what}), tags: [
-              ['t', tag],
-            ], createdAt: at)
-                .toJson(),
-          ]));
+      // Each kept once the relay says so: what a device entering finds is
+      // whatever the relay had taken by then.
+      final unkept = <String>{};
+      final allKept = Completer<void>();
+      void store(String tag, int at, String what) {
+        final socket = sockets.putIfAbsent(tag, () {
+          final s = WebSocketChannel.connect(relaysForTag([relay.url], tag).single);
+          s.stream.listen((m) {
+            final said = jsonDecode(m as String) as List;
+            if (said[0] == 'OK' && said[2] == true && unkept.remove(said[1]) && unkept.isEmpty) allKept.complete();
+          });
+          return s;
+        });
+        final e = NostrEvent.sign(host, kind: TableKinds.lobby, content: jsonEncode({'what': what}), tags: [
+          ['t', tag],
+        ], createdAt: at);
+        unkept.add(e.id);
+        socket.sink.add(jsonEncode(['EVENT', e.toJson()]));
+      }
       final pool = poolTag('unrated');
       for (var i = 0; i < 40; i++) {
         store(pool, now - 3600 + i * 90, 'an old seating');
@@ -380,7 +405,7 @@ void main() {
       // And a room announced an hour ago, whose joiner still has to
       // find it.
       store('ROOM42', now - 3600, 'a room');
-      await Future<void>.delayed(const Duration(milliseconds: 300));
+      await allKept.future.timeout(const Duration(seconds: 15), onTimeout: () => fail('${unkept.length} of 42 not kept'));
 
       final entering = RelayTransport(relays: [relay.url], signer: SchnorrSigner.generate(), table: pool);
       await entering.ready;

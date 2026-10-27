@@ -559,11 +559,11 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get pointRating =>
-      'Um rating só seu, a partir de resultados que os quatro assinam.';
+      'Um rating só seu, calculado a partir dos resultados das suas partidas ao vivo.';
 
   @override
   String get pointDeal =>
-      'As cartas são distribuídas entre vocês quatro. Nenhum servidor vê uma mão, nem o nosso.';
+      'Cada lugar embaralha, e nenhum outro jogador vê a sua mão. O nosso servidor joga os bots, então vê as deles.';
 
   @override
   String get whatMoneyPaysFor =>

@@ -1,10 +1,10 @@
 # Run the browser suites
 
-Use this guide to run the suites in `e2e/` that drive the built web app in a headless Chromium, with a local relay, the backup jurors, the service's handlers and a TURN server on your machine.
+Use this guide to run the suites in `e2e/` that drive the built web app in a headless Chromium, with a local relay, the house and the service's handlers on your machine.
 
 ## Before you begin
 
-- Install Node, Flutter and Rust. CI pins the versions in `.github/workflows/ci.yml`. The suites run the relay and the backup jurors with Dart, so Dart must be on your `PATH` (Flutter's own is fine).
+- Install Node, Flutter and Rust. CI pins the versions in `.github/workflows/ci.yml`. The suites run the relay with Node and the house with Dart, so Dart must be on your `PATH` (Flutter's own is fine).
 - Install Playwright globally, with Chromium. The suites load it from the global `node_modules` (`e2e/browser.mjs`). To install the version CI pins:
 
   ```bash
@@ -13,19 +13,13 @@ Use this guide to run the suites in `e2e/` that drive the built web app in a hea
 
   On a Linux machine without Chromium's system libraries, add `--with-deps` to the second command.
 
-- Install coturn, so that `turnserver` is on your `PATH`. Every suite that serves the app starts one on `127.0.0.1` (`startTurn` in `e2e/drive.mjs`), and stops with an error if it is missing. Only `e2e/site.mjs` runs without it.
-
-  ```bash
-  sudo apt-get install coturn
-  ```
-
 - Fetch the app's and the service's packages:
 
   ```bash
   (cd app && flutter pub get) && (cd service && dart pub get)
   ```
 
-- Build the deal and Schnorr libraries, which the relay and the jurors load:
+- Build the deal and Schnorr libraries, which the house loads:
 
   ```bash
   (cd crypto/deal && cargo build --release --locked) && (cd crypto/schnorr && cargo build --release --locked)
@@ -41,7 +35,7 @@ Use this guide to run the suites in `e2e/` that drive the built web app in a hea
    ./e2e/build.sh
    ```
 
-   This builds the app into `app/build/e2e`, compiled to take licences from the rig's own service key, and compiles the relay and the backup juror ahead of time. When nothing it is made from has changed, it says the build is up to date and stops. To build again anyway, add `--force`.
+   This builds the app into `app/build/e2e`, compiled to take licences from the rig's own service key, and compiles the house ahead of time. When nothing it is made from has changed, it says the build is up to date and stops. To build again anyway, add `--force`.
 
 1. Run the suite you want. Each exits with 0 when every check passed:
 
@@ -49,7 +43,7 @@ Use this guide to run the suites in `e2e/` that drive the built web app in a hea
    |---|---|
    | `node e2e/flows.mjs` | Every flow one device can drive. |
    | `node e2e/run.mjs` | Four browsers at one table. |
-   | `node e2e/escrow.mjs` | One browser and three bot seats; a juror is taken off the air. |
+   | `node e2e/house.mjs` | The house taken off the air mid-hand and back; a person's seat opened from the escrow. |
    | `node e2e/offline.mjs` | The network taken away a piece at a time. |
    | `node e2e/move.mjs` | The site's and the app's hosts: old addresses, the device carried over, previews. |
    | `node e2e/site.mjs` | The marketing site in each language. It needs no app build. |
@@ -84,9 +78,9 @@ Suites can run at the same time: each starts its relay on a free port of its own
    node e2e/run.mjs; echo "exit $?"
    ```
 
-1. When a suite fails, read its logs in `app/build/logs/`: the relay's (`relay-<suite>.log`, or `relay-<suite>-<worker>.log` for a suite run on several workers) and the TURN server's (`turn-<suite>.log`). `offline.mjs` also leaves a screenshot of where each flow ended in `app/build/offline/`.
+1. When a suite fails, read its logs in `app/build/logs/`: the relay's and the house's (`relay-<suite>.log`, or `relay-<suite>-<worker>.log` for a suite run on several workers). `offline.mjs` also leaves a screenshot of where each flow ended in `app/build/offline/`.
 
 ## Learn more
 
 - [How Open Hearts is tested](../explanation/testing.md#what-keeps-it-fast): why the suites run side by side, at a tenth of the tables' pace, on the least table clocks.
-- [Multiplayer without a game server](../explanation/multiplayer.md#through-turn-never-direct): why the suites' data channels go through TURN.
+- [Multiplayer through a referee](../explanation/multiplayer.md): what the suites' relay and house stand in for.

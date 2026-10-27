@@ -5,20 +5,24 @@ it is. Every handler, host, statement and stored row is in the
 [service reference](../reference/service-api.md), and every setting in
 the [configuration reference](../reference/configuration.md).
 
-The service is deliberately small. The game is peer to peer
-([multiplayer](multiplayer.md)), the deal is verifiable
-([the fair deal](fair-deal.md)), and matchmaking, results and ratings are
-the players' own business on the relay ([live play](live-play.md)). What
-runs on our side:
+The service is deliberately small. A table's referee orders what is
+said at it and decides nothing else ([multiplayer](multiplayer.md)), the
+deal is verifiable ([the fair deal](fair-deal.md)), and matchmaking is
+the players' own business on the relay, as is folding ratings from the
+results the house signs ([live play](live-play.md)). What runs on our
+side:
 
 - **The Pages worker** (`service/functions/`): accounts, licences, the
   shop, TURN credentials, remote config and game records.
 - **The relay worker** (`service/do/`): a Durable Object per tag
   ([the relay](relay.md)), which carries only an account's device in
-  use; the `Household` object, one per account; and the backup jurors
-  (`service/bin/juror.dart` in a container).
+  use, and on a table's tag is the table's referee; the `Household`
+  object, one per account; and the house (`service/bin/house.dart` in a
+  container), which sits at every sealed table
+  ([the house](live-play.md#the-house)).
 
-None of it is in a game's latency path.
+A table's referee is in a game's latency path: every card goes through
+it. Nothing else here is.
 
 ## Where the app is
 
@@ -385,18 +389,18 @@ superseded device off it:
 The device itself hears it sooner where it can: the relay's
 `superseded:` notice, a 409 at its renewal, or the other device's
 presence, which carries the later activation. It then leaves the
-relays, any table it sits at, juror duty, the pool and anything it was
-watching, and shows "Open Hearts is now open on another device" with
-*Use it here*. Its signed leave goes by whatever channel is still open,
-and the table's ordinary handling takes the seat however it goes: a bot
-in the seat, scored as a leave in a rated game.
+relays, any table it sits at, the pool and anything it was watching,
+and shows "Open Hearts is now open on another device" with *Use it
+here*. Its signed leave goes by whatever channel is still open, and the
+table's ordinary handling takes the seat however it goes: a bot in the
+seat, scored as a leave in a rated game.
 
 The service is the authority because it is the one party every device
 of an account already trusts and already asks. An activation is the
 account's turn's word, so two devices can never both hold the current
-one. A backup juror answers the challenge with an HMAC of its key under
-`OH_JUROR_SECRET`, which the relay holds too; backup jurors belong to no
-account.
+one. The house belongs to no account: it answers the challenge signed
+by its own key, the one key the relay admits that way (`OH_HOUSE_KEY`,
+`serviceGate` in `service/do/relay.mjs`).
 
 ### The account's profile
 
@@ -599,8 +603,8 @@ activations (`seenAt`).
 **The app** hears it in one of three ways: the relay's reason, a 403
 with `suspended` when it next asks to be the device in use, or a 403
 with `suspended` at its licence check. Each does the same: live play
-shuts as on a superseded device (the table, the pool or room, any watch,
-and juror duty), the licence comes off the device, and where the app
+shuts as on a superseded device (the table, the pool or room, and any
+watch), the licence comes off the device, and where the app
 would sell live play it says that the account is suspended and where to
 ask why (`InUse`, `Entitlement.suspend`). Playing alone is untouched.
 
@@ -790,32 +794,33 @@ the same report goes once a day, and an account sends at most
 report that could not be sent is answered 503 and not counted, and the
 app says it did not go.
 
-## The relay and the backup jurors
+## The relay and the house
 
 The relay's core ([the relay](relay.md)), `service/do/relay.mjs`, is
-plain functions with no Cloudflare or Node imports. It checks
-signatures with the app's own `app/web/schnorr.wasm`, passed in
-precompiled because a Worker may not compile wasm at runtime. The
-Durable Object (`TagRelay`, `service/do/worker.mjs`) hosts it in
-production. A plain Node socket server (`service/do/host.mjs`) hosts it
-for the tests, so the whole `service/` suite runs against the deployed
-relay's code, under the object's own rules or not (`OH_RELAY`).
+plain functions with no Cloudflare or Node imports, and so is a table's
+referee in it (`service/do/referee.mjs`). It checks signatures with the
+app's own `app/web/schnorr.wasm`, passed in precompiled because a Worker
+may not compile wasm at runtime. The Durable Object (`TagRelay`,
+`service/do/worker.mjs`) hosts it in production. A plain Node socket
+server (`service/do/host.mjs`) hosts it for the tests, under the
+object's own rules, so the whole `service/` suite and the browser suites
+run against the deployed relay's code (`service/lib` starts it for the
+Dart tests). The host also accepts the simulator's fake signatures; the
+deployed object accepts only BIP-340. WebRTC signalling on the relay,
+kept for calls (`ROADMAP.md`), is sealed to its one recipient with
+NIP-44 v2, since an ICE candidate carries an address.
 
-`service/lib` has a Dart relay with the same behaviour, the default in
-the Dart tests and in `dart run bin/service.dart`. The local relays also
-accept the simulator's fake signatures; the deployed object accepts only
-BIP-340. WebRTC signalling on the relay is sealed to its one recipient
-with NIP-44 v2, since an ICE candidate carries an address.
-
-**The backup jurors** ([live play](live-play.md#backup-jurors)). On a
-quiet night a table with bot seats calls for jurors on the presence
-tag. The presence object passes the call to the `Bench` object
-(`service/do/bench.mjs`), at most once in a while (`WAKE_EVERY_MS` in
-`service/do/worker.mjs`). The `Bench` object starts a Cloudflare
-Container running `service/bin/juror.dart`: the jurors in one process,
-with keys derived from `OH_JUROR_SECRET` so that they are the same
-across restarts. The jurors go quiet a while after their last call with
-nothing to serve (`idleMs` in `juror_duty.dart`), and the object stops
+**The house** ([live play](live-play.md#the-house)). A sealed table's
+object wakes the house as the table starts, and again whenever the
+house is not on the table's log, at most once every twenty seconds
+(`wakeLimiter` in `service/do/referee.mjs`). The wake goes to the
+`Bench` object (`service/do/bench.mjs`), which starts a Cloudflare
+Container running `service/bin/house.dart` if it is not running, waits
+for it to answer, and tells it of the table. The house reads the table's
+log from its first entry, so a house started again goes on where the log
+is. Its signing key and every secret it makes come from one secret,
+`OH_HOUSE_SECRET`, so they are the same across restarts. Once it has
+served no table and been woken by none for ten minutes, the object stops
 the container. The image is built from the repository on every relay
 deploy (`service/bench/build.sh`).
 
@@ -846,7 +851,7 @@ The Pages project's preview environment binds the previews' store and
 bucket, and the households of the preview relay: the same relay worker's
 code deployed as `open-hearts-relay-preview` (`[env.preview]` in
 `service/do/wrangler.toml`), at its own address, with tags, households
-and backup jurors of its own on that store. Both environments say they
+and a house of its own on that store. Both environments say they
 are a preview (`OH_DEPLOYMENT`), and each worker then takes the
 config as a preview has it (`configFor`): with the service key previews
 have, `preview.serviceKey`, and none while there is none, never

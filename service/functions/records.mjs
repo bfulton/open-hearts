@@ -57,11 +57,22 @@ export async function markForgotten(binding, account, { now = Date.now() } = {})
 const accountShape = /^[0-9a-f]{32}$/;
 
 /// The id an event of [table] has: the hash of what it says, as the
-/// table writes it (packages/table, events.dart, `_canonical`) — the
-/// body's own keys in order, nothing else reordered.
+/// table writes it (packages/table, events.dart, `_canonical`): every
+/// object's keys in order, at every depth.
 export async function eventIdOf(table, event) {
-  const body = Object.fromEntries(Object.entries(event.body).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)));
-  return sha256Hex(JSON.stringify([table, event.author, event.kind, body]));
+  return sha256Hex(inOrder([table, event.author, event.kind, event.body]));
+}
+
+/// [json] written out with every object's keys in order at every depth,
+/// as Dart writes an event for its id (packages/table, events.dart,
+/// _canonical). Written here a key at a time, not by JSON.stringify of
+/// an object built in that order: an object puts a key like "2" ahead of
+/// every other, whatever order it is given its keys in.
+function inOrder(json) {
+  if (Array.isArray(json)) return `[${json.map(inOrder).join(',')}]`;
+  if (json === null || typeof json !== 'object') return JSON.stringify(json);
+  const keys = Object.keys(json).sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+  return `{${keys.map((k) => `${JSON.stringify(k)}:${inOrder(json[k])}`).join(',')}}`;
 }
 
 /// SHA-256 of [text], hex.

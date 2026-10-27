@@ -20,6 +20,17 @@
 // id is not its bytes' is logged as it came and changes nothing, at
 // every side alike (log.dart, LogEntry.unread).
 //
+// But for the start, which every side has to read as the same table
+// for anything after it to mean anything: a log that began with one
+// they could not would be no table at all, for any of them. So the
+// start is taken only as Dart wrote it (startRefusal): its text as it
+// comes out written again, its id the hash of what it says, and its
+// spec the one the table's id names (packages/table, spec.dart,
+// TableSpec.id). The table is the one everybody was seated at, and one
+// person cannot start it as another.
+
+import { eventIdOf } from '../functions/records.mjs';
+//
 // The simulator's referee (packages/table_sim, sim_referee.dart) is
 // this, on the simulator's clock: a table played there is a table played
 // here.
@@ -92,6 +103,47 @@ export function writersOf(spec, table, house) {
   if (named !== null && (typeof named !== 'string' || named !== house)) return null;
   if (spec.sealed === true && named === null) return null;
   return { people, house: named, writers: new Set(named ? [...people, named] : people) };
+}
+
+/// SHA-256 of [text], in hex.
+async function sha256Hex(text) {
+  const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text)));
+  return [...digest].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+/// The id of the table [spec] names: the first 32 hex digits of the
+/// SHA-256 of all it says but its id, as it is written (packages/table,
+/// spec.dart, TableSpec.idOf).
+export async function specIdOf(spec) {
+  const { id, ...written } = spec;
+  return (await sha256Hex(JSON.stringify(written))).slice(0, 32);
+}
+
+/// Why [content], a [logKind] event's text, is no start for the log of
+/// [table] to begin with; null for one that is, or for content that is
+/// no start at all. A start is taken as Dart wrote it and every side
+/// reads it: its text as it comes out written again, so that the bytes
+/// hashed here are the bytes hashed there; its id the hash of what it
+/// says (events.dart, as functions/records.mjs, eventIdOf, works it
+/// out); saying a spec and nothing else, its id first; and that spec
+/// the one [table] names.
+export async function startRefusal(content, table) {
+  let said;
+  try {
+    said = JSON.parse(content);
+  } catch {
+    return null;
+  }
+  if (!said || typeof said !== 'object' || said.kind !== 'start') return null;
+  if (JSON.stringify(said) !== content) return 'invalid: a start is taken as it was written';
+  const { body } = said;
+  const spec = body && typeof body === 'object' && !Array.isArray(body) ? body.spec : null;
+  if (Object.keys(body ?? {}).length !== 1 || !spec || typeof spec !== 'object' || Array.isArray(spec) || Object.keys(spec)[0] !== 'id') {
+    return 'invalid: a start says its spec and nothing else';
+  }
+  if ((await eventIdOf(said.table, said)) !== said.id) return 'invalid: a start\'s id is the hash of what it says';
+  if (spec.id !== table || (await specIdOf(spec)) !== table) return 'blocked: not the table this id names';
+  return null;
 }
 
 /// The table event a [logKind] event carries, the fields a table event
@@ -200,8 +252,10 @@ export function tableReferee({ table, verify, house = null, now = Date.now, entr
     },
 
     /// A [logKind] event, its own id and signature already checked:
-    /// {ok, why}, as the relay answers it.
-    take(event) {
+    /// {ok, why}, as the relay answers it. Waits only on a start, while
+    /// the log has not begun: every other event is in the log, or not,
+    /// before this returns, in the order they were handed in.
+    async take(event) {
       const e = eventIn(event.content);
       if (!e) return { ok: false, why: 'invalid: not a table event' };
       if (e.table !== table) return { ok: false, why: `blocked: this log is table ${table}'s` };
@@ -213,6 +267,11 @@ export function tableReferee({ table, verify, house = null, now = Date.now, entr
         const writers = writersOf(e.body?.spec, table, house);
         if (!writers) return { ok: false, why: 'blocked: not a table this relay referees' };
         if (!writers.people.has(e.author)) return { ok: false, why: 'blocked: a table is started by one of its people' };
+        const refused = await startRefusal(event.content, table);
+        if (refused) return { ok: false, why: refused };
+        // Another start may have begun the log meanwhile: the same
+        // table, since only one spec is this table's.
+        if (entries.length) return { ok: true, why: 'duplicate: the table has started' };
         append({ e });
         return { ok: true, why: '' };
       }

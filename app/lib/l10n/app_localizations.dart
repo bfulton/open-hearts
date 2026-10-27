@@ -761,13 +761,13 @@ abstract class AppLocalizations {
   /// One of the points on the Live play page.
   ///
   /// In en, this message translates to:
-  /// **'A rating of your own, from results the four of you sign.'**
+  /// **'A rating of your own, worked out from the results of your live games.'**
   String get pointRating;
 
   /// One of the points on the Live play page.
   ///
   /// In en, this message translates to:
-  /// **'The deal is dealt between the four of you. No server sees a hand, ours included.'**
+  /// **'Every seat shuffles, and no other player sees your hand. Our server plays the bots, so it sees theirs.'**
   String get pointDeal;
 
   /// On the Live play page, under the points.

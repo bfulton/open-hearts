@@ -9,8 +9,9 @@
 /// the page: a build made with `--dart-define=OH_RELAYS=…` uses those —
 /// a preview, the preview relay (deploy.sh), and the local rig, its
 /// bridges — and a build served from localhost (`flutter run`, the
-/// browser suite) uses the local relay (service/), at the port its
-/// address names if it names one. The remote config may name another
+/// browser suite) uses the local relay (service/do/host.mjs, ours on a
+/// plain socket, an object per tag as here), at the port its address
+/// names if it names one. The remote config may name another
 /// relay of ours (net/remote_config.dart), never anyone else's.
 library;
 
@@ -32,8 +33,10 @@ const deployedRelays = [ourRelay];
 /// every table's rotation. All of a deployed list; none of a local one.
 int pinnedRelays(List<Uri> relays) => relays.takeWhile(RemoteConfig.ours).length;
 
-/// The local relay, where a build served from this machine looks.
-const localRelay = 'ws://127.0.0.1:7447';
+/// The local relay, where a build served from this machine looks: ours
+/// on a node socket (service/do/host.mjs), on its own port, an object
+/// per tag as ours is.
+const localRelay = 'ws://127.0.0.1:7448/{tag}';
 
 /// The local relay at the port the address names (`?relay=7448`), and
 /// at [localRelay]'s otherwise: each browser suite on a machine starts

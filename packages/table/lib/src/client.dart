@@ -58,6 +58,7 @@ class TableClient {
     this.dealWorker,
     this.journal,
     this.houseSecret,
+    this.botThinkMs,
     this.conduct = const SeatConduct(),
     Random? random,
     this.trace,
@@ -100,6 +101,13 @@ class TableClient {
 
   /// The house's own secret, the bot seats' deal secrets are made from.
   final Uint8List? houseSecret;
+
+  /// For the house's seat: how long its bot thinks over a card, drawn
+  /// for its persona each time (house.dart, pace), or null for not at
+  /// all. The card is said after it, so the log has the bot's rhythm in
+  /// its own times: a screen shows each card as it lands, and the next
+  /// person's clock starts when they can see that it is their turn.
+  final int Function(Persona persona)? botThinkMs;
 
   /// What this seat says where it could say something else: the
   /// honest conduct everywhere but the simulator.
@@ -226,6 +234,7 @@ class TableClient {
     if (_closed) return;
     _closed = true;
     _tickTimer?.call();
+    _thinkTimer?.call();
     line.close();
     // Closed a moment later: this may be called from a listener, while
     // the stream is still telling the others.
@@ -319,13 +328,33 @@ class TableClient {
     if (role != Role.houseSeat) return; // a person's pass and play are theirs to choose
     final g = rules.game;
     if (!g.knowsHand(s)) return;
-    final bot = Bot(persona: (rules.holders[s] as BotSeat).persona);
+    final persona = (rules.holders[s] as BotSeat).persona;
+    final bot = Bot(persona: persona);
     if (t.isPass) {
       _sayPass(s, bot.choosePass(g.handOf(s)));
     } else if (t.isPlay) {
+      final think = botThinkMs?.call(persona) ?? 0;
+      if (think > 0 && _thought != t) {
+        if (_thinking == t) return;
+        _thinking = t;
+        _thinkTimer = clock.schedule(think, () {
+          _thinkTimer = null;
+          _thinking = null;
+          _thought = t;
+          _act();
+        });
+        return;
+      }
       _sayPlay(s, TableRules.botCard(g, s, rules.played, holders: rules.holders));
     }
   }
+
+  /// The house's seat thinking over the card of [_thinking], until
+  /// [_thinkTimer] fires; and the turn it last thought over, whose card
+  /// it says when next asked.
+  TurnId? _thinking;
+  TurnId? _thought;
+  Cancel? _thinkTimer;
 
   /// A person's pass, chosen.
   void pass(List<Card> cards) {
@@ -351,7 +380,7 @@ class TableClient {
       final positions = [for (final c in cards) d.positionOf(seat, c.index)];
       if (positions.any((p) => p == null)) return;
       final to = (seat + rules.game.passDirection.seatOffset) % seatCount;
-      final m = d.passMessage(to, [for (final p in positions) p!], from: seat);
+      final m = d.passMessage(to, [for (final p in positions) p!]);
       if (m == null) return;
       final sealed = m['sealed'];
       if (sealed is List<String>) m['sealed'] = conduct.sealedPass(sealed, _random);

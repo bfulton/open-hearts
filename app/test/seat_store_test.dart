@@ -18,7 +18,7 @@ import 'package:table_sim/table_sim.dart';
 void main() {
   final me = FakeSigner('me');
   final spec = TableSpec(
-    id: newTableId(),
+    salt: newSalt(),
     seed: 3,
     sealed: true,
     target: 50,

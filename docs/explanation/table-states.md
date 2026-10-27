@@ -1,355 +1,228 @@
 # The table's states
 
 This page explains the states a live table, its turns, seats and hands
-move through, how each change between them is decided, and why so many
-of them are on the record. The protocol itself is
-[live play](live-play.md).
+move through, and how each change between them is decided. The
+protocol itself is [live play](live-play.md).
 
-The machines are code: `turnTransitions`, `seatTransitions` and
-`seatExits`, `heldSeatTransitions`, `handTransitions` and
-`tableTransitions` in `packages/table/lib/src/model.dart` list every
-state, every way out of it, and how each is decided. The simulator reads
-every side against them (`packages/table_sim/lib/src/structure.dart`),
-and the chaos walk fails any run that steps outside them.
+The states are code: `TableState`, `Owed`, `Exit` and `Removal` in
+`packages/table/lib/src/rules.dart`, with the hand's phases from the
+engine (`Phase`). The simulator reads every side's table after every
+entry and fails a run where two sides disagree
+([how it is checked](#how-it-is-checked)).
 
 ## How a transition is decided
 
-Every transition is one of three kinds (`Decided`):
+Every transition is a function of the log: the referee's entries so
+far, in their order, with the referee's times on them. Every side
+applies the same rules to the same entries (`rules.dart`), so every
+side is in the same state after every entry, and a side that reads the
+log later (a device back from a reload, the house started again, the
+verifier) comes to the same states too.
 
-- **On the record.** A signed event, settled the way a turn is: backed
-  by a majority of the people at the table, or ruled on by the jury.
-  Every side ends up holding the same event, and a side that falls
-  behind is carried forward to it.
-- **From the record.** A function of events already on the record, which
-  every side works out alike. A bot seat nobody holds plays this way:
-  its move is computed, not said.
-- **Here.** Each side decides it for itself, from its own clock or from
-  whom it happens to hear. Nothing in the record says so, so two sides
-  can decide it differently, and a side that joins later can only guess.
+A clock does not propose anything. A deadline is past when an entry's
+time is past it, and a side that sees one due asks the referee for an
+entry with nothing but the time in it, a tick. The only thing a side
+decides for itself is what it says, and what it says changes nothing
+until the log carries it.
 
-The first two cannot leave two sides in different states for good; the
-third can. So every transition but one is on the record or follows
-from it, and clocks only *propose* transitions.
+Before the referee there were three ways a transition could be decided:
+on the record, by a majority's signatures or a jury's verdict; from the
+record, worked out alike by every side; and *here*, by each side for
+itself, from its own clock or from whom it heard. The last was where
+sides came apart, and a table that came apart could not be put back
+together. There is no *here* any more.
 
 ## The machines
 
+### The table
+
+The table is **waiting** until the log has its start, then **playing**.
+It ends:
+
+- **finished**, when somebody reaches the target and the last hand is
+  audited;
+- **ended**, when no person is left at it;
+- **failed**, when a turn of the house's runs out, or when the log's
+  first entry is not a start this side can read as its table. Nobody is
+  rated on a failed game. The referee takes no such start
+  ([what the referee takes](live-play.md#what-the-referee-takes)), so
+  only a log kept wrongly fails that way.
+
+Once it is over, the house says how it came out: an entry naming the
+log by its length and hash as it stood at the end, the state and the
+totals. The rules take it only when it names that log.
+
+While a departed person's hand is opened, every clock stops
+(`TableRules.paused`). That is a reading of the hand, not a state of the
+table: it lifts when the hand is open, or when it is given up.
+
 ### A turn
 
-A turn is **open** until somebody says the seat's move, and **acting**
-once its actor has: its person; for a held bot seat, its juror; and once
-the record gives a held seat to the escrow, the first custodian still
-heard, the seat's own juror last. A person at the table can **contest**
-the turn instead: a boot when the seat's clock runs out, a claim of
-absence after the silence clock (`silenceMs`), or, at a held seat, a
-claim for the escrow when its juror is out. A majority of the people
-settles a turn **by the action** or **by the removal**. Where neither can
-reach a majority the turn is **split**, and the jury rules it.
+A turn is **open** (`Owed`): owed by its actor, the person at the seat
+or the house for a bot seat it holds, since an entry's time, with an
+allowance from the table's clocks. It closes one of three ways:
 
-At a held seat, the escrow carried reopens the turn for the escrow:
-keeping a move already said for the seat, or waiting for one. A turn
-nobody needs to say is **settled silently**, worked out by every side
-alike: a bot seat nobody holds, or the audit of a held seat the record
-gave to the escrow, closed from its pieces. A turn nobody left can move
-is **ended** by the people ([the lost-quorum ending](#the-lost-quorum-ending)).
+- **taken**, by the first event for it from its actor that checks: a
+  deal step with its proofs, a pass of three of the seat's cards, a
+  legal card the seat holds;
+- **lost**, when an entry's time is past its deadline: a person's seat
+  is given to a bot (booted), and the house's loss fails the table;
+- **gone**, when the seat is given up for any other reason before the
+  turn is taken: its person's leave, their connection closed for the
+  table's silence at the turn (absent), or the deal showing they lied.
+
+The turns of a hand are each seat's steps of the deal (its keys, its
+shuffle, its tokens, the lead card declared), the pass, the plays in
+order, and the audit. A step of a seat nobody holds a key for is
+nobody's turn: every side works it out.
 
 ### A seat
 
-A person's seat is theirs until they **leave** (their own signed word),
-are **booted** (a boot carried at their turn) or are found **absent** (a
-claim of silence carried by the people or by a verdict). A bot seat is a
-bot from the start. A seat never comes back, and all three exits are on
-the record.
+A person's seat is theirs until they **leave** (their own signed leave),
+are **booted** (their clock out at their turn), are found **absent**
+(their connection closed, as the referee's log has it, for the table's
+silence at their turn) or are found to have **lied** (the deal shows
+they declared the lead card nowhere). Each of these is a `Removal`,
+with the entry and the hand it happened in. The seat is then a bot's,
+the one the table's id names for it (`TableSpec.replacementFor`), and
+never comes back to a person.
+
+In the hand the person went in, their hand is opened from the escrow
+(below) and every side plays it from the log. From the next hand the
+house holds the seat. A bot seat at a sealed table is the house's from
+the deal, every hand it is a bot's when the hand begins. A seat whose
+person goes before they said their keys takes a secret anybody can
+compute ([seats nobody holds](fair-deal.md#seats-nobody-holds)).
 
 A seat is an account's, and an account plays on one device at a time
 ([one device at a time](service.md#one-device-at-a-time)). Another
 device taking the account up while it sits here is no new transition:
-the device at the seat leaves, by its own signed leave where any path is
-still open to it, and otherwise falls silent, cut off by the relay,
-which is one of the three exits above. The account's new device is never
-one of the table's jurors, and a juror whose account is taken up
-elsewhere is a juror gone.
-
-### A held bot seat, for one hand
-
-A bot seat the jury holds is **held** by its juror until a person claims
-it for the escrow, and **escrowed** from then on, played by a juror
-holding a piece of it. The claim is made at the seat's own turn when the
-juror has not been heard from for the juror silence clock
-(`jurorSilenceMs`), or has had the turn in front of it longer than a
-held seat's deadlines allow (`botActsMs` for a play or a pass,
-`botDealsMs` for a deal step or its audit), counted once the juror is
-heard at the hand and not while this side is behind. The claim is
-carried as a boot is.
+the relay turns the old device's sockets away, the referee notes its
+connection closed, and the seat is found absent at its turn, unless the
+old device said its leave first.
 
 ### A hand
 
-A hand of a sealed table with bot seats **awaits a jury** until the first
-person's keys name a draw that can hold the bot seats. It is **dealt**,
-then **passed** (or played at once, on a hand with no pass), **played**
-and **audited**, and is then **over**. Two other endings follow from the
-record: a hand whose lead card nobody declared is **opened** from the
-seats' audits and **given up**, and a hand whose held seat was escrowed
-while it still owed a deal step is **abandoned**. A seeded table's hand
-starts at the pass or the play and ends with no audit, and a sealed table
-with no bot seats needs no jury.
+A hand is **dealt** (every seat's keys, shuffle and tokens, and the lead
+card declared), then **passed**, or played at once on a hand with no
+pass, then **played**, then **audited** (every keyed seat says its
+secret), and is then over: the next is dealt, or the game is.
 
-### The table
+Two ways a hand is **given up**, unscored, with the next dealt in its
+place ([the abandoned hand](#the-abandoned-hand)):
 
-The table is **playing**, or **paused** while it says what it is waiting
-for: the jury, its peers, or the deal. It ends **finished** or **failed**.
-A pause is a reading of the hand's and turns' states, not a state of its
-own, and lifts when a decision lands. A failure is on the record where a
-majority of the people can say so, and decided here where they cannot
-([decided here](#decided-here)).
+- nobody declared the lead card, so the hand is opened from the seats'
+  audits, which shows who lied, and they are removed;
+- a departed person's hand was not opened within the fixed clock.
 
-## What each waiting state waits for
-
-A side that is waiting names what for, and who can end it
-(`TableClient.waits`, `WaitKind` in `model.dart`):
+## What each wait waits for
 
 | Wait | Who can end it |
 |---|---|
-| a seat's move | its person, or the people by a boot or a claim of silence; a held seat's juror, or the people by a claim for the escrow; once escrowed, a custodian with its key |
-| backing for an action or a claim this side holds | the people who have not given theirs; once a silent voter has split the turn, the hand's jurors |
-| the jury's ruling on a split turn | the hand's jurors |
-| a departed or escrowed seat's secret | enough of those holding a piece: for a held seat, its own juror or two custodians; for a departed person's, one juror of the draw the deal was sealed to beside a person's piece |
-| a jury that can hold the bot seats | somebody outside the table, not yet drawn |
+| a turn | its actor; or its deadline; and for a person whose connection is closed, the table's silence at the turn |
+| a departed hand to open | the house's piece and one other person's; or the fixed clock (`fixedMs`), which gives the hand up |
+| the house's word, once the game is over | the house |
 
-A bot seat nobody holds is never waited on: every side works its move
-out, waiting only for the seat's secret if its cards are not open yet.
+Every wait has a deadline on the referee's clock but the last, and the
+game is over by then either way: a kept game without the house's word
+is not vouched for, and no rating is folded from it.
 
-A side's own deal worker ([the fair deal](fair-deal.md)) is not a wait of
-the table's: a step being checked there is kept until the answer comes
-back. If the worker fails for good, the side can no longer deal
-(`TableClient.cannotDeal`) and leaves; the table sees a seat that left.
+A side's own deal worker ([the fair deal](fair-deal.md)) is not a wait
+of the table's: an entry being checked there is taken when the answer
+comes back, and the table goes on meanwhile. If the worker fails for
+good, the side can no longer deal (`TableClient.cannotDeal`), and a
+person's device leaves; the table sees a seat that left.
 
-## Stuck and apart
+## Never stuck, never apart
 
-A wait is **covered** when someone who can end it is up and holds what
-ends it or is on the way to it: the move or the removal has been made or
-is owed; the backing has been given and is repeated until the turn
-settles; a juror is up to rule a turn the voters cannot carry; the turn
-is decided on the record, which a side behind is carried to; or enough
-of the seat's pieces to open it are held by sides that are up.
+Two sides that have taken the same entries are in the same state,
+because the state is a function of the entries. So sides cannot be
+apart, as long as they are reading the same log, and there is only one.
 
-A side is **stuck** when a wait of its is:
+A wait cannot be on nobody: every open turn has a deadline, a person's
+closed connection has the silence, a departed hand has the fixed clock,
+and the house's own deadline ends the game rather than holding it for
+ever. The one thing that holds a table up is the referee being out of
+reach. Then every side waits alike, the log is kept meanwhile, and
+every side goes on alike when it is back.
 
-- **on nobody**: nobody up can end it. The side may be paused, saying
-  why, and still wait for good;
-- **left behind**: everyone up who could end it has moved past it in a
-  way no rule brings back: past its hand without deciding it, closed
-  with nothing said, never giving up the seat whose pieces the side
-  wants, or finished the game without it;
-- **in a cycle**: the sides that could end it wait on each other.
-
-This is a fact about states, not about how long anything has taken.
-
-Sides are **apart** when they disagree on something each decides for
-itself: a held seat escrowed at one and not another; a hand abandoned at
-one and not another; a deal sealed to different draws; the game failed
-at one and not another; a turn closed silently at one and decided on the
-record at another; a person removed at different turns. Being apart is
-not stuck in itself, but it is how sides become stuck, which is why each
-of these is on the record.
-
-## On the record
+## On the log
 
 ### The leave
 
-A leave is carried where it is said. The leaver's signature is its own
-vote, the others back it as it reaches them (there is nothing to judge,
-it being the leaver's own word), and a majority of the people at its
-turn carries it; at a table of two, the other person's backing is that
-majority. Each person backs one way out of a seat (a leave, or a boot
-or claim of silence at the seat's turn), and not the other while the one
-it backed can still carry. Two majorities of one table meet in somebody,
-so a leave and a boot cannot both carry, and every record, the jurors'
-too, names the same exit. The leaver has gone, so whoever holds the
-leave carries it forward with its backing; a juror carries it on the
-backing it is handed.
-
-It is not settled in the seat's own next turn: at a table of two that
-turn could never come, since every turn before it needs both people.
-
-It is made at the leaver's own position, or at the next one where its
-device has already moved or backed a move there, so that the move and
-the vote count the same at every side. Whatever the seat still owes
-where it stood, its device still says: the pass at once, chosen as the
-bot taking the seat over would choose it, and a step of the deal when
-the step comes due. Nothing else settles it. No removal reaches back to
-that turn, and at a table of two a boot of it needs the leaver's own
-vote (`packages/table/test/leave_owing_a_turn_test.dart`).
-Where one voice per exit leaves no majority either way (two backing
-the leave, two booting the seat), the turn is split and the jury rules
-it. A person known to have backed a seat's leave is not a vote still to
-come for its boot. The verifier turns down a leave without its majority
-(`packages/table/test/leave_on_record_test.dart`).
+A leave is the leaver's signed word, and it removes them at the entry
+it is in. There is nothing to back and no race with a boot: whichever
+of the leave and the deadline comes first in the log is what happened.
+Whatever the seat owed when its person left is the bot's from that
+entry: worked out by every side for the rest of the hand once the hand
+is open, and the house's from the next.
 
 ### The escrow
 
-A person at the table whose clocks say a held seat's juror is out claims
-the seat for the escrow at that turn, with an `escrow` event. The claim
-is a vote in the turn's race. A majority of the people carries it; where
-they split between the juror's move and the claim, the jury rules by
-the juror's presence to it. From there the seat is the escrow's for the
-rest of the hand:
-
-- it is played by the first of the hand's custodians still heard, the
-  seat's own juror last, and that custodian says again whatever the
-  seat's turn already holds, since the move's author may be gone;
-- a move by the seat's juror that lands after the escrow is as good as
-  the escrow's own (the same card by another voice), and the reopened
-  turn keeps it and its backing; only a side whose voice went to the
-  escrow votes again;
-- claims, their witnesses and a ruling for the escrow are taken even at
-  a turn already settled by the move, and the escrow is recorded beside
-  it;
-- the escrowed seat's audit is nobody's move: not said, not taken, and
-  closed from the seat's pieces.
-
-The verifier holds a record to the same: an escrow claimed by a person
-at the table, carried or ruled for, once a hand, for a seat the hand's
-draw gave a juror; only that juror moving the seat before, any juror of
-the hand after (`escrow_on_record_test.dart`).
+When a person is removed mid-hand before their hand is in the open,
+the hand is opened from the escrow: the house holds one half of their
+secret, and every other person at the table the other
+([escrow](fair-deal.md#escrow)). Each says its piece as a release, an
+entry like any other, and the rules take a piece only for a seat
+waiting to open. Every clock stops meanwhile. Once the house's piece
+and one person's are in, the hand is open and every side plays it. A
+hand still not open after the fixed clock is given up.
 
 ### The abandoned hand
 
-Both follow from the escrow. A held seat escrowed while it still owes a
-deal step gives the hand up, and the verifier asks for that escrow at
-one of the seat's deal steps. A side behind is carried to the escrow
-like any removal; from any turn of a hand given up in its deal, the
-hand's removals are sent, since nothing settles at the turn such a hand
-stops at (`undealt_hand_test.dart`). A jury carried for a hand the table
-has left rebuilds nothing.
+A hand is given up, unscored and unaudited, and the next dealt in its
+place, when nobody declared the lead card or a departed hand could not
+be opened. A hand given up for a lie shows a seat that was dealt the
+lead card and declared it nowhere, which only that seat could have
+caused, so nobody can throw away a hand they merely dislike. One given
+up for want of an opening needs a piece of the escrow nobody said. The
+person who would not say theirs cannot turn a game into one nobody is
+rated for this way: the game goes on.
 
-### The draw a deal is sealed to
+### The house's word
 
-A hand's bot seats are held by the draw its deal is sealed to, and the
-record says which. Every seat's keys name the draw they were sealed to
-(the draw's event id, or none), and the draw named by the keys of the
-first person to key the hand is the hand's, at every side and at the
-verifier: lowest seat first, passing over a person removed at their keys
-or gone before them. A person's keys name a carried draw that can hold
-every bot seat. A hand nobody at the table can key is sealed to none.
-Until the first person's keys have settled at a side:
+The house's result names the log as it stood when the game ended, by
+its length and hash (`LogHash`), with the state and the totals. A kept
+game is checked against it: a log with any entry changed, dropped,
+added or put in another order is not the one the house signed for
+([game records](live-play.md#game-records)).
 
-- a held seat's juror makes no keys, and its time for them has not
-  started;
-- no side takes a held seat's keys, and afterwards takes them only
-  naming the same draw, from the juror that draw names for the seat;
-- no bot seat's keys are settled silently;
-- nobody claims a held seat for the escrow at its keys; a claim that
-  comes is kept until the record has said, since a claim names the seat,
-  not the juror.
+## The clocks
 
-A seat's holder is then whoever's keys settled its first deal round.
-Keys that arrive before the draw they name has carried are kept and
-taken up when it carries; so is a verdict carrying a held seat's keys
-that arrives before the record has said which draw the hand is sealed
-to (`late_juror_verdict_test.dart`). A summons carries the hand's draws
-with their witnesses, so a juror brought in reads the table's draw from
-the moment it is summoned (`sealed_to_draw_test.dart`).
+Every clock that decides anything is the table's, carried in its start
+(`TableTiming`; [table clocks](../reference/configuration.md#table-clocks)):
 
-### The escrow's custodians
+- **A person's**: a grace for each decision and a bank for the hand
+  (`graceMs`, `passGraceMs`, `bankMs`), and a fixed clock for their
+  deal steps and audit (`fixedMs`), which also times an opening.
+- **The house's**: a deadline for a bot's card or pass (`botActsMs`)
+  and for its deal step or audit (`botDealsMs`), and the grace it is
+  waited for after either before the game fails (`houseGraceMs`).
+- **A closed connection's**: the silence after which a person is given
+  up at their turn (`silenceMs`).
 
-A held seat's pieces are indexed by each custodian's place in a list:
-the jury the seat's keys named, then whoever the hand's later draws
-bring in. Two draws of one hand can carry in either order at different
-sides, so the order is on the record too. A person's own play names the
-draws that have brought somebody into a held seat's escrow since the
-last play that did; every side grows each held seat's list from those
-plays in record order, and the verifier reads the same plays ahead of
-the replay. A draw named and not yet carried at a side holds up the
-ones after it there. Every index reads the seat's own list: the place a
-part is made for, the custodian a piece is sealed to, and which
-custodian plays an escrowed seat (`top_up_test.dart`).
-
-People's plays carry this because they settle one after another with an
-event every time; passes and deal steps settle in different orders at
-different sides. The cost is a wait: a newcomer gets its share only
-after the next person's play, and a draw carried after the hand's last
-one grows nothing in that hand. A piece from a newcomer a side has no
-place for yet is refused, and taken again as the list grows.
-
-### The lost-quorum ending
-
-A side stopped for the lost-quorum clock (`quorumLostMs`) at a turn nobody left
-can move (a seat nobody left can open, or a turn put to a jury none of
-whose jurors is left) claims the game's end at that turn. The claim is
-a vote in the turn's race, the third way a turn can go beside the move
-and the removal; a person has one voice at a turn. A person stopped at
-the same turn backs it at once; a majority of the people carries it, and
-every side ends the game there (`TurnState.ended`). Where a table is
-stopped at several turns of one position, every side names the lowest
-seat's. The end is the last thing at its position. The verifier reads a
-record ending with it as a game ended, not complete and nobody rated,
-and turns down one that goes on past it, lacks its majority, or has it
-claimed by somebody not at the table or at another turn
-(`ended_on_record_test.dart`).
-
-A voice already given at the turn waits for the end the rest carry and
-takes it with them. A side that has seen a departed seat's hand open, and
-so would work its move out, holds at the turn while the end can still
-carry, and lets go once the rest are known to stand past it. A side that
-has ended the game for itself says nothing more, and is not a vote still
-to come.
-
-A seat's piece holders are the custodians its keys named, including at a
-table of four people, whose hands are sealed to no draw but are still
-escrowed to the jury (`quorum_lost_test.dart`).
-
-## Decided here
-
-One transition is still decided by each side for itself: **the game's
-end for a lost quorum where no majority can be had.** That is a turn
-split between a card and a boot with the jury gone and every voice
-spent, or the last person at a table of two hearing too little of the
-table. Nothing can go on the record without a majority or a jury, so
-the side ends the game for itself. Its record stops at the turn, a
-prefix of the table's. The rule standing in for a record is the silence
-clock: a side that hears too little of the table ends only once everyone
-it cannot hear has been silent as long as a person is given before the
-table removes them (`silenceMs`).
-
-## The clocks that stay
-
-A transition on the record needs no rule for guessing what the others
-decided, but it still needs clocks. The clocks are of three kinds:
-
-- **Pacing:** when to say something again: heartbeats, repeats of an
-  unsettled action, carrying a peer forward, catch-up budgets, top-up
-  and release repeats, how often a jury is proposed. None decides a
-  state.
-- **Noticing absence:** silence from a person (`silenceMs`) and from a
-  juror (`jurorSilenceMs`), "heard lately" for who is here, how long a
-  juror's position may stand still before it counts as stopped rather
-  than catching up, and how long a juror goes without hearing an appeal
-  before taking it as no longer standing (`appealStandsMs`), which is the
-  juror's own way of noticing it has lost the table. Nothing but time tells gone from
-  slow.
-- **Deadlines on someone present:** a person's grace and bank, and a
-  held seat's deadlines for a play and for a deal step. These are rules
-  of the game, like a chess clock.
-
-The deadlines, the silences that count as absence and the lost-quorum
-wait are the table's, not each side's: the starter's remote config
-chooses them and the signed start event carries them (`TableTiming`),
-so every side and every juror times the same table by the same clocks
-([table clocks](../reference/configuration.md#table-clocks)). Pacing is
-each device's own. Each clock *proposes* a transition; the
-table settles it on the record.
+Pacing is each side's own and decides nothing: when it asks the referee
+for the time, how it says again on a new socket what the log has not
+carried, how long its screen holds a card.
 
 ## How it is checked
 
-The structure checker (`packages/table_sim/lib/src/structure.dart`)
-reads every side against these machines during a run and at its end, reporting waits stuck and sides apart. What counts
-is what is still read at the end among sides still online; mid-run, an
-event in flight is ordinary.
+The simulator (`packages/table_sim`) runs whole tables over a referee on
+a virtual clock, every person and the house as sides of their own. It
+keeps every side's view of the table after every entry
+(`TableRules.settledView`) and reports any entry after which two sides
+saw different tables (`SimTable.lockstepProblems`).
 
-The chaos walk and the explorer drive the machines through random and
-systematic faults, and fail a run on any broken invariant
-([testing](testing.md#the-table)).
-
-With every transition above on the record, nothing stuck and nothing
-apart is read at the end among sides still playing, except where one
-side ended the game for itself ([decided here](#decided-here)).
+The chaos walk (`chaos_walk.dart`) throws faults at a table at random:
+people going every way at every moment, devices reloaded, sockets
+dropped, phones off the network for a while, a slow line, the house
+started again, a seat that lies. The explorer (`explore.dart`) plays a
+short sealed game once per event and change: the event dropped on the
+way, late, or sent twice. Each run is held to the same
+(`tableProblems`): every side still reading the log saw the same table
+after every entry and came to the same end; the log read alone comes
+there too; the game is over as the faults allow; nobody lost a seat but
+by a fault of their own; nothing was taken twice; and at a sealed table
+the house's word on the end is in the log and true
+([testing](testing.md#the-table),
+[run the chaos walk](../how-to/run-the-chaos-walk.md)).

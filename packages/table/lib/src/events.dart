@@ -153,9 +153,22 @@ class TableEvent {
   Map<String, Object?> toJson() =>
       {'id': id, 'table': table, 'author': author, 'kind': kind.name, 'body': body, 'sig': sig};
 
-  static Uint8List _canonical(String table, PublicKey author, EventKind kind, Map<String, Object?> body) {
-    final sortedBody = Map.fromEntries(body.entries.toList()..sort((a, b) => a.key.compareTo(b.key)));
-    return Uint8List.fromList(utf8.encode(jsonEncode([table, author, kind.name, sortedBody])));
+  /// The bytes an event's id is the hash of: its table, author, kind and
+  /// body as JSON, with every map's keys in order at every depth. Nothing
+  /// that carries an event keeps a map's keys in the order they were
+  /// written: the relay's referee is JavaScript, whose objects put a key
+  /// like "2" ahead of "3" whatever order they came in, and it writes
+  /// every event it takes out again from the object it parsed. So that
+  /// order cannot move the id (functions/records.mjs, eventIdOf, makes the
+  /// same bytes).
+  static Uint8List _canonical(String table, PublicKey author, EventKind kind, Map<String, Object?> body) =>
+      Uint8List.fromList(utf8.encode(jsonEncode([table, author, kind.name, _inOrder(body)])));
+
+  static Object? _inOrder(Object? json) {
+    if (json is List) return [for (final e in json) _inOrder(e)];
+    if (json is! Map) return json;
+    final keys = [for (final k in json.keys) k as String]..sort();
+    return {for (final k in keys) k: _inOrder(json[k])};
   }
 
   // ---- typed views of the body ----------------------------------------

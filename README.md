@@ -13,28 +13,28 @@ private to the person holding it.
 | | |
 |---|---|
 | [`packages/engine/`](packages/engine/) | The rules of Hearts and the bots, in pure Dart with no Flutter, no I/O and no clock. The app, the table protocol and the service all use it |
-| [`packages/table/`](packages/table/) | The live table protocol: signed events, seats coming and going, the jury, ratings. Runs over an abstract transport and clock |
-| [`packages/table_sim/`](packages/table_sim/) | The table over a simulated network, for tests and tools: a virtual clock, fake signatures, seats that lie, the chaos walk. Nothing that ships includes it |
+| [`packages/table/`](packages/table/) | The live table: signed events, the referee's log and the rules every side applies to it, the house, seats coming and going, ratings. Runs over an abstract line to the referee and clock |
+| [`packages/table_sim/`](packages/table_sim/) | The table over a simulated referee, for tests and tools: a virtual clock, fake signatures, seats that lie, the chaos walk. Nothing that ships includes it |
 | [`packages/deal/`](packages/deal/) | The verifiable deal as Dart sessions over the Rust primitives |
 | [`crypto/`](crypto/) | Rust: the deal (`crypto/deal`, built for the Dart VM and as wasm) and BIP-340 signatures for the VM (`crypto/schnorr`) and the browser (`crypto/schnorr_wasm`) |
 | [`app/`](app/) | The Flutter app, one codebase for web, Android and iOS |
-| [`service/`](service/) | The Cloudflare worker's handlers (licences, the shop, TURN), the relay, the backup jurors, and a local relay for tests |
+| [`service/`](service/) | The Cloudflare worker's handlers (licences, the shop, TURN), the relay and each table's referee, the house, and the relay on a node socket for tests |
 | [`e2e/`](e2e/) | Browser suites that drive the built app through its accessibility tree |
 | [`site/`](site/) | The marketing site: page templates, their words in each language, and the build that joins them |
 | [`config/`](config/openhearts.json) | What is not secret about this deployment: the service's public key, store and sign-in identifiers, the Stripe price |
 | [`infra/`](infra/), [`observability/`](observability/) | Cloudflare, Stripe and New Relic configuration, checked and applied by script |
 
-Solo play runs entirely on the device. Live play is four devices
-talking directly to each other over WebRTC, with our relay for
-introductions, as a fallback path, and for storing rooms and results
-([multiplayer](docs/explanation/multiplayer.md),
-[the relay](docs/explanation/relay.md)). Bots at a live table are played
-by *jurors*: other players online, picked at random, with our backup
-jurors making up the number when too few are online. No player sees a
-bot's cards, and the juror playing a bot's seat sees only that hand,
-never enough to work out a person's. The deal is Barnett–Smart mental
-poker with a Bayer–Groth shuffle argument: every seat shuffles with a
-proof, and the whole hand is audited and can be replayed once it ends.
+Solo play runs entirely on the device. At a live table each device
+holds one connection to the table's referee, an object on our relay
+that puts everything said at the table in one order and keeps time;
+every device runs the same rules over that log, so they all come to
+the same table ([multiplayer](docs/explanation/multiplayer.md),
+[the relay](docs/explanation/relay.md)). Bots at a live table are
+played by *the house*, our own side at every table, which also holds
+half of each player's escrow and says how the game came out. No player
+sees a bot's cards. The deal is Barnett–Smart mental poker with a
+Bayer–Groth shuffle argument: every seat shuffles with a proof, and the
+whole hand is audited and can be replayed once it ends.
 What that guarantees, and where it rests on trusting us, is in
 [the fair deal](docs/explanation/fair-deal.md#what-is-guaranteed-and-what-is-not).
 

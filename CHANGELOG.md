@@ -269,18 +269,36 @@ squashed from a pull request, the pull request's number.
 
 ### Changed
 
+- A live table is refereed. Each table's object on our relay keeps its
+  log: every event its people and the house send, in one order and
+  stamped with one clock, and when each seat's connection to it closed
+  and opened again. Every device applies the same rules to the same
+  log, so all of them come to the same table, and nothing is voted on.
+  The house, the operator's server, plays every bot's seat, holds half
+  of each person's escrow, and says how each game came out; ratings are
+  worked out from the results it signs, which name the log as it
+  ended, and the relay takes results from the house alone. A live game
+  goes through the relay only, no longer device to device, and a
+  device no longer serves as a juror at anybody else's table. A kept
+  game is the referee's log, checked by the same rules; games kept
+  before read and check as they did. The house serves only a table
+  whose every person holds a licence for their key, and a kept game
+  without them is refused. An event is known by the hash of its text
+  with every object's keys in order at every depth, which the relay and
+  the devices work out alike. A device that has heard nothing on its
+  line for five seconds asks for the log again, so that a stalled
+  connection is found out while it waits on others. Every word players
+  and subscribers read about live tables says so, in all five
+  languages, the privacy policy and the terms among them.
+  (2026-10-27, #40)
 - Leaving a live game while it is on asks first, from the menu or by
   Back, a phone's or a browser's, and says what leaving costs: the
   seat, a rated game counted as last, and Play live's wait where there
   would be one. (2026-10-26, #40)
-- A live table gives a bot the seat of a device that has gone quiet, at
-  its turn, once nothing has been heard from it for half a minute, not
-  two minutes. A connection seen to close is still given twenty
-  seconds, and a device that is there and slow is still timed by its
-  clock. A table started by an earlier build keeps that build's two
-  minutes, and every build reads it so. Heartbeats go by every relay
-  every ten seconds, not every thirty, so a device the others can only
-  hear that way is heard well inside the half minute. (2026-10-26, #40)
+- A live table gives a bot the seat of a person whose connection to it
+  has been closed for half a minute, at their turn, not two minutes. A
+  person who is there and slow is still timed by their clock.
+  (2026-10-26, #40)
 - The front door's top corner has your rating, the number alone, just
   left of your picture, from your first rated game; the sentence under
   the game options that said it is gone. A screen reader hears it as
@@ -401,6 +419,11 @@ squashed from a pull request, the pull request's number.
 
 ### Removed
 
+- Juries, the backup jurors and the duty of every open app to serve
+  other tables, the mesh of connections between the devices at a table,
+  and the votes and signatures a table settled its seats by: the
+  referee's log and the house do all of it. WebRTC and TURN stay, for
+  voice and video chat, off the game's path. (2026-10-27, #40)
 - The 17 games kept before seats carried licences (4 to 6 October
   2026), whose names nothing but a device's key tied to an account, and
   with them `service/tool/forget.mjs` matching a seat by the account's

@@ -431,8 +431,8 @@ class _RecordVerifier {
   /// carries. A table of two with one gone quiet carries no draw, so
   /// the old jury rules the seat out; then the one person left is the
   /// table's majority and carries the hand's own draw, which the juror
-  /// who ruled need not be in (docs/explanation/live-play.md, "Appeals and
-  /// verdicts"; `test/verdict_before_the_draw_test.dart`).
+  /// who ruled need not be in: the jury's appeals and verdicts, as live
+  /// play had them before the referee.
   ///
   /// At the turn the hand's own carried, the old jury still rules: the
   /// removal it rules there is what lets the one person left carry the

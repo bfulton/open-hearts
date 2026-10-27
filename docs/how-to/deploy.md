@@ -2,7 +2,7 @@
 
 Use this guide to publish the site, the web app and the service's handlers to Cloudflare Pages, and the relay worker to Cloudflare Workers.
 
-`./oh deploy site` publishes the site, the app and the handlers in one upload to the Pages project `open-hearts`, through `deploy.sh`. `./oh deploy relay` deploys the relay worker (`open-hearts-relay`, which also runs the `Household` object and the backup jurors) from `service/do/wrangler.toml`. Each says first what it would do and what stands in the way, and does it only with `--apply` ([the oh command](../reference/oh.md)).
+`./oh deploy site` publishes the site, the app and the handlers in one upload to the Pages project `open-hearts`, through `deploy.sh`. `./oh deploy relay` deploys the relay worker (`open-hearts-relay`, which also runs the `Household` object and the house) from `service/do/wrangler.toml`. Each says first what it would do and what stands in the way, and does it only with `--apply` ([the oh command](../reference/oh.md)).
 
 ## Before you begin
 
@@ -10,7 +10,7 @@ Use this guide to publish the site, the web app and the service's handlers to Cl
 - A production deploy of the site also holds the terms and the privacy policy to `site/ledger.json`. It emails nobody: after publishing a change that matters to subscribers, [tell them](change-the-terms.md#tell-subscribers) yourself. See [Change the terms](change-the-terms.md#publish-it).
 - Make sure the commit passes CI, or run `./check.sh full`.
 - Install Node, git, Python 3 (for pruning) and Flutter. CI pins the Flutter version in `.github/workflows/ci.yml`. The web build needs no Rust: the wasm is committed.
-- To deploy the relay, you also need a linux/amd64 machine with Dart, Cargo (CI pins the Rust version in `.github/workflows/ci.yml`) and Docker running. Wrangler builds the backup jurors' image from `service/bench/Dockerfile` with binaries built on your machine (`service/bench/build.sh`). Run `dart pub get` in `service/` once. `./oh deploy relay` says which of these is missing.
+- To deploy the relay, you also need a linux/amd64 machine with Dart, Cargo (CI pins the Rust version in `.github/workflows/ci.yml`) and Docker running. Wrangler builds the house's image from `service/bench/Dockerfile` with binaries built on your machine (`service/bench/build.sh`). Run `dart pub get` in `service/` once. `./oh deploy relay` says which of these is missing.
 - Export `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`. For what else the scripts read, see [environment variables](../reference/configuration.md#deploying-and-operating).
 - For production, `serviceKey` must be set in `config/openhearts.json`: `deploy.sh` refuses a production deploy without it. To set it up, see [Mint or rotate the service key](rotate-the-service-key.md).
 - For production, `houseKey` must be set in `config/openhearts.json` too, and its secret on the relay worker: `./oh deploy relay` refuses without it. Make both with `./oh house key --apply`, then commit `config/openhearts.json`. Do it with no table playing: a table started under another house's key is one no house serves.
@@ -23,7 +23,7 @@ Use this guide to publish the site, the web app and the service's handlers to Cl
    - `service/functions/household.mjs` and the modules it imports, since the `Household` object comes from there
    - `config/openhearts.json`, which the relay worker reads when it is deployed
    - `app/web/schnorr.wasm`
-   - the backup jurors' code: `service/bin/juror.dart` and the `packages/` it imports
+   - the house's code: `service/bin/house.dart` and the `packages/` it imports
 
 1. See what would be deployed, and what stands in the way:
 
@@ -41,7 +41,7 @@ Use this guide to publish the site, the web app and the service's handlers to Cl
 
    The relay goes first because the `Household` object runs in the relay worker. A new site whose handlers ask the object something it does not know yet gets a 400 (`not a household operation`) until the relay is deployed. To deploy only one, use `./oh deploy relay --apply` or `./oh deploy site --apply`.
 
-   For the relay, Wrangler runs `service/bench/build.sh` first, which builds the deal and Schnorr libraries and compiles the backup juror, and then builds and uploads the jurors' image.
+   For the relay, Wrangler runs `service/bench/build.sh` first, which builds the deal and Schnorr libraries and compiles the house, and then builds and uploads the house's image.
 
 ## Deploy a preview
 
@@ -57,7 +57,7 @@ Without `--label`, the label is `dev` on a working branch. A preview is publishe
 
 A preview plays live too, on the preview relay, with the people you invite. Previews are a deployment of their own:
 
-- their own store, and their own relay worker, `open-hearts-relay-preview` at `relay-preview.openhearts.game`, with its own households and backup jurors
+- their own store, and their own relay worker, `open-hearts-relay-preview` at `relay-preview.openhearts.game`, with its own households and its own house
 - secrets of their own, none of them production's, since a preview runs whatever branch was deployed to it. Nothing a preview signs is good in production, and a preview takes nothing production signed.
 - no email: a preview sends none
 - no profile pictures at its tables. Pictures are checked against known images before anyone is shown one, and only production checks them. Your own picture still shows on your own device.
@@ -72,7 +72,7 @@ There is one preview relay for every preview. It runs the branch it was last dep
    ./oh preview secrets --apply
    ```
 
-   It sets the previews' service secret on the Pages project's preview environment and the preview relay's backup-juror secret, and shows neither. It writes the previews' public key to `config/openhearts.json` as `preview.serviceKey`: commit it.
+   It sets the previews' service secret on the Pages project's preview environment and the preview relay's house secret, and shows neither. It writes their public keys to `config/openhearts.json` as `preview.serviceKey` and `preview.houseKey`: commit them.
 
 1. Deploy the preview relay, from the branch you're on:
 

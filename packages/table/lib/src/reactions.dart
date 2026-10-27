@@ -9,8 +9,8 @@
 /// own (`TableKinds.react`), signed by the seat's device like
 /// everything the seat says, and a relay forwards it and keeps nothing
 /// (service/do/relay.mjs). It is not in the record, the results or the
-/// game record, and nothing the protocol decides — a turn, a clock, a
-/// jury — ever looks at one. Lost is lost: nobody says one again.
+/// game record, and nothing the protocol decides — a turn, a clock, the
+/// house — ever looks at one. Lost is lost: nobody says one again.
 ///
 /// The rules are [ReactionRules], the same at both ends: a player
 /// says one at most every [ReactionRules.gap], and a screen shows only

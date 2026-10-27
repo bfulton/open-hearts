@@ -29,6 +29,33 @@ void main() {
     expect(parsed(EventKind.result, {'n': 9, 'hash': 'x', 'totals': [1, 2, 3, 4]}), isNull, reason: 'no state');
   });
 
+  test('an event reads with its own id whatever order its maps\' keys come back in, at any depth', () {
+    // A lone player's audit names the departed seats' secrets by seat,
+    // in the order they went (DealSession.myAudit); the referee hands it
+    // back written from a JavaScript object, which puts "0" ahead of "2"
+    // ahead of "3" whatever order they came in.
+    final made = TableEvent.sign(me, table: 't', kind: EventKind.deal, body: {
+      'hand': 1,
+      'turn': TurnId.audit(1, 1).index,
+      'seat': 1,
+      'round': 4,
+      'secret': 's',
+      'known': {'3': 'c', '0': 'a', '2': 'b'},
+      'deeper': [
+        {'10': 'x', '9': 'y', 'b': 'z', 'a': 'w'},
+      ],
+    });
+    final back = asJavaScriptHoldsIt(made.toJson()) as Map<String, Object?>;
+    expect(((back['body'] as Map)['known'] as Map).keys, ['0', '2', '3'], reason: 'the order changed on the way');
+    final read = TableEvent.parse(back);
+    expect(read, isNotNull);
+    expect(read!.id, made.id);
+    // And reads as itself in a log, not as an entry that changes nothing.
+    final entry = LogEntry.parse({'n': 9, 't': 1000, 'e': back})!;
+    expect(entry.event?.id, made.id);
+    expect(entry.unread, isNull);
+  });
+
   test('a log entry carrying one is kept as it came, by its id', () {
     final raw = signed(EventKind.play, {'hand': 0, 'turn': 4, 'seat': 0});
     final e = LogEntry.parse({'n': 3, 't': 1000, 'e': raw}, verifySignature: false)!;

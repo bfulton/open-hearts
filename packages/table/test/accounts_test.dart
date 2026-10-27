@@ -1,14 +1,17 @@
 /// Accounts at the table (docs/explanation/live-play.md, docs/explanation/service.md): a
 /// seat is the account its licence names, checked by every peer against
-/// the service's key; results and ratings are the accounts'; a jury draws
-/// nobody of an account seated at the table; and a device superseded by
-/// another of its account is heard as such.
+/// the service's key, by every device before it sits, by the house
+/// before it serves and by whoever checks the game after; results and
+/// ratings are the accounts'; and a device superseded by another of its
+/// account is heard as such.
 library;
 
 import 'dart:convert';
 
+import 'package:deal/deal.dart';
 import 'package:engine/engine.dart';
 import 'package:table/table.dart';
+import 'package:table_sim/table_sim.dart';
 import 'package:test/test.dart';
 
 /// BIP-340's own published pair: the service of these tests, as of the
@@ -57,7 +60,7 @@ void main() {
   });
 
   test('a seat is the account its licence names, and every seat must show one that holds', () {
-    final good = TableSpec(id: 'a' * 32, seed: 1, seats: [
+    final good = TableSpec(seed: 1, seats: [
       HumanSeat(phone.publicKey, licence: licenceFor(phone.publicKey, _ada)),
       HumanSeat(other.publicKey, licence: licenceFor(other.publicKey, _bao)),
       const BotSeat(Persona.romeo),
@@ -72,7 +75,7 @@ void main() {
     expect(back.licenceProblem(), isNull);
 
     TableSpec seated(List<SeatHolder> people) =>
-        TableSpec(id: 'b' * 32, seed: 1, seats: [...people, for (var i = people.length; i < 4; i++) const BotSeat(Persona.westley)]);
+        TableSpec(seed: 1, seats: [...people, for (var i = people.length; i < 4; i++) const BotSeat(Persona.westley)]);
     for (final (why, spec) in [
       ('no licence', seated([HumanSeat(phone.publicKey)])),
       ('another key\'s', seated([HumanSeat(phone.publicKey, licence: licenceFor(laptop.publicKey, _ada))])),
@@ -94,8 +97,52 @@ void main() {
     expect(seated([HumanSeat(phone.publicKey, licence: swapped)]).licenceProblem(), isNotNull);
   });
 
+  group('a sealed table of one hand', () {
+    late DealCrypto crypto;
+    setUpAll(() async => crypto = await rememberedCrypto());
+
+    // Two people, each with a licence for their own key unless [without]
+    // names their place, and two bots the house holds.
+    SimTable table({int? without}) {
+      const seed = 41;
+      final second = FakeSigner('p1-$seed').publicKey;
+      return SimTable(
+        humans: 2,
+        seed: seed,
+        target: 1,
+        crypto: crypto,
+        licenceOf: (key) => without == 1 && key == second ? null : licenceFor(key, key.substring(0, 32)),
+      );
+    }
+
+    test('whose seats all show their licences is served by the house, played out, and believed', () {
+      final t = table()..start();
+      expect(t.run(), isTrue);
+      expect(t.following.map((c) => c.state), everyElement(TableState.finished));
+      expect(t.results, hasLength(1), reason: 'the house said how it came out');
+      final verdict = verifyRecord(GameRecord(spec: t.spec, log: t.referee.log), crypto: crypto, house: t.houseSigner.publicKey);
+      expect(verdict.ok, isTrue, reason: verdict.reason);
+      t.close();
+    });
+
+    test('with a seat that shows none is not served by the house, fails at the house\'s first turn, and is not believed', () {
+      final t = table(without: 1)..start();
+      // The house is not there to say how it came out: the run waits for
+      // that word, and the table is over long before the limit.
+      t.run(limitMs: 10 * 60 * 1000);
+      expect(t.following.map((c) => c.state), everyElement(TableState.failed));
+      expect(t.house!.serving, isEmpty, reason: 'the house let the table go');
+      expect(t.results, isEmpty, reason: 'nobody is rated on it');
+      expect(t.referee.log.where((e) => e.event?.author == t.houseSigner.publicKey), isEmpty, reason: 'the house said nothing at it');
+      final verdict = verifyRecord(GameRecord(spec: t.spec, log: t.referee.log), crypto: crypto, house: t.houseSigner.publicKey, allowUnfinished: true);
+      expect(verdict.ok, isFalse);
+      expect(verdict.reason, 'seat 1 has no licence for its key');
+      t.close();
+    });
+  });
+
   test('a rating is the account\'s, whichever device sat; a result is vouched for by the device that sat, and one from before accounts is not folded', () {
-    final spec = TableSpec(id: 'c' * 32, seed: 1, rated: true, seats: [
+    final spec = TableSpec(seed: 1, rated: true, seats: [
       HumanSeat(phone.publicKey, licence: licenceFor(phone.publicKey, _ada)),
       HumanSeat(other.publicKey, licence: licenceFor(other.publicKey, _bao)),
       const BotSeat(Persona.romeo),

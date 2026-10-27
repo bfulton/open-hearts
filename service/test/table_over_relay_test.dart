@@ -59,7 +59,7 @@ Future<List<Object?>> say(Relay relay, String tag, NostrEvent event) async {
 
 /// A person's spec: [people] in seats 0 and 2, bots in the others.
 TableSpec specFor(List<Signer> people, {bool sealed = false, PublicKey? house, int seed = 11}) => TableSpec(
-      id: newTableId(),
+      salt: newSalt(),
       seed: seed,
       target: 1,
       sealed: sealed,
@@ -254,6 +254,37 @@ void main() {
     }, timeout: const Timeout(Duration(minutes: 3)));
   });
 
+  test('an event whose body holds a map keyed by seat reads back from the referee as it was signed, whatever order its keys were in', () async {
+    // The referee is JavaScript: it writes each event it takes out again
+    // from the object it parsed, and an object puts keys like "0" ahead
+    // of "3" whatever order they came in. A lone player's audit names
+    // the departed seats' secrets by seat, in the order they went
+    // (DealSession.myAudit); read back with another order, its id was
+    // not its own, and nobody took it.
+    final relay = Relay();
+    await relay.serve();
+    addTearDown(relay.close);
+    final people = [SchnorrSigner.generate(), SchnorrSigner.generate()];
+    final spec = specFor(people);
+    final start = TableEvent.sign(people[0], table: spec.id, kind: EventKind.start, body: {'spec': spec.toJson()});
+    final audit = TableEvent.sign(people[0], table: spec.id, kind: EventKind.deal, body: {
+      'hand': 0,
+      'turn': TurnId.audit(0, 0).index,
+      'seat': 0,
+      'round': 4,
+      'secret': 's',
+      'known': {'3': 'c', '0': 'a', '2': 'b'},
+    });
+    for (final e in [start, audit]) {
+      final ok = await say(relay, spec.id, NostrEvent.sign(people[0], kind: TableKinds.log, content: jsonEncode(e.toJson()), tags: [
+        ['t', spec.id]
+      ]));
+      expect(ok[2], isTrue, reason: '${ok[3]}');
+    }
+    final log = await readLog(relay, spec.id);
+    expect([for (final e in log) e.event?.id], [start.id, audit.id], reason: 'both read back, each with its own id');
+  });
+
   test('signalling goes to its addressee only, and sealed', () async {
     final relay = Relay();
     await relay.serve();
@@ -261,7 +292,8 @@ void main() {
     final a = SchnorrSigner.generate();
     final b = SchnorrSigner.generate();
     final c = SchnorrSigner.generate();
-    final table = newTableId();
+    // A table's tag, as a table's id has it: 32 hex digits.
+    final table = newSalt();
     final ta = RelayTransport(relays: [relay.url], signer: a, table: table);
     final tb = RelayTransport(relays: [relay.url], signer: b, table: table);
     final tc = RelayTransport(relays: [relay.url], signer: c, table: table);

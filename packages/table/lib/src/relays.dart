@@ -35,9 +35,9 @@ const answerMs = 3000;
 
 /// What a device shows a relay that asks who it is (NIP-42), as tags
 /// beside the relay's challenge in an event its key signs: the
-/// activation the service gave it (licence.dart), or for the backup
-/// jurors the mark the relay knows them by. Set once at
-/// startup by whatever holds them; null, or null for a key, and a
+/// activation the service gave it (licence.dart), or for the house
+/// nothing beside the challenge: the relay knows it by its key. Set
+/// once at startup by whatever holds them; null, or null for a key, and a
 /// challenge goes unanswered — a relay that asks will not carry that
 /// device, which is right for one the service has not vouched for.
 List<List<String>>? Function(PublicKey key)? relayCredentials;
@@ -45,8 +45,7 @@ List<List<String>>? Function(PublicKey key)? relayCredentials;
 /// Told when a relay turns this device away for good, with the
 /// relay's reason: `superseded:` — another device of the account is the
 /// one in use now — `suspended:` — the account is suspended from live
-/// play — `deleted:` — the account was deleted — or `restricted:` —
-/// not admitted at all. The relay has closed
+/// play — or `deleted:` — the account was deleted. The relay has closed
 /// or will close the socket, and retrying will not change its mind
 /// (docs/explanation/service.md, "One device at a time").
 void Function(String reason)? relayTurnedAway;
@@ -64,13 +63,12 @@ NostrEvent? Function(Uri relay, String challenge) relayAuthFor(Signer signer) =>
     };
 
 /// Whether a relay's reason is one it will not change its mind about
-/// for this device: a superseded device, a suspended or deleted
-/// account's, or one not admitted.
+/// for this device: a superseded device, or a suspended or deleted
+/// account's.
 bool turnedAway(String reason) =>
     reason.startsWith('superseded:') ||
     reason.startsWith('suspended:') ||
-    reason.startsWith('deleted:') ||
-    reason.startsWith('restricted:');
+    reason.startsWith('deleted:');
 
 /// The list itself: parsed from text, turned by a key.
 abstract final class Relays {
@@ -115,6 +113,7 @@ class RelayConnection {
       this.log,
       this.auth,
       this.onOpen,
+      this.onIdle,
       this.cutOffMs = unansweredMs,
       this.answerWaitMs = answerMs}) {
     _connect();
@@ -126,6 +125,13 @@ class RelayConnection {
   /// Told each time a socket opens, after the subscriptions are sent:
   /// for what else a new socket has to say first.
   final void Function(RelayConnection connection)? onOpen;
+
+  /// Told when the relay has said nothing for half of [cutOffMs] and
+  /// nothing sent is waiting on its answer: for something to ask that
+  /// the relay answers. A line whose way in has stalled is found out
+  /// only by what goes unanswered ([cutOff]), and a side waiting on
+  /// others has nothing else to say.
+  final void Function(RelayConnection connection)? onIdle;
 
   /// Sends [message] as it is, if the socket is open: false where it is
   /// not, and whoever is waiting on it says it again on the next.
@@ -232,7 +238,11 @@ class RelayConnection {
 
   void _checkLiveness() {
     final ch = _channel;
-    if (ch == null || _closed || !_open || !cutOff) return;
+    if (ch == null || _closed || !_open) return;
+    if (!cutOff) {
+      if (_unansweredSince == null && _nowMs - _heardMs >= cutOffMs ~/ 2) onIdle?.call(this);
+      return;
+    }
     log?.call('$url: nothing heard for ${(_nowMs - _heardMs) ~/ 1000} s, with what was sent unanswered; reconnecting');
     _silences++;
     remake();

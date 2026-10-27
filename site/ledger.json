@@ -50,6 +50,23 @@
         "de": "Am 23. Oktober 2026 veröffentlicht: die Bedingungen vom 19. Oktober 2026, unverändert.",
         "fr": "Publiées le 23 octobre 2026 : les conditions du 19 octobre 2026, inchangées."
       }
+    },
+    {
+      "date": "2026-10-27",
+      "fingerprint": "768065532c81b6aeab385247bfedd9c302e78b780e84d44e6ba2610c48c09bc0",
+      "change": "material",
+      "price": {
+        "amount": 599,
+        "currency": "usd"
+      },
+      "storesNotified": null,
+      "summary": {
+        "en": "Your device is no longer drawn as a juror at other subscribers' tables: our server now plays the bots' seats. Ratings are worked out from the results it signs for each game.",
+        "es": "Tu dispositivo ya no se sortea como jurado en las mesas de otros suscriptores: ahora nuestro servidor juega los asientos de los bots. Las clasificaciones se calculan a partir de los resultados que firma para cada partida.",
+        "pt": "O seu aparelho não é mais sorteado como jurado nas mesas de outros assinantes: agora o nosso servidor joga os lugares dos bots. Os ratings são calculados a partir dos resultados que ele assina para cada partida.",
+        "de": "Dein Gerät wird nicht mehr als Juror an die Tische anderer Abonnenten gelost: Die Plätze der Bots spielt jetzt unser Server. Wertungen werden aus den Ergebnissen berechnet, die er für jedes Spiel unterschreibt.",
+        "fr": "Votre appareil n'est plus tiré au sort comme juré aux tables d'autres abonnés : notre serveur joue désormais les places des bots. Les classements sont calculés à partir des résultats qu'il signe pour chaque partie."
+      }
     }
   ],
   "privacy": [
@@ -117,6 +134,19 @@
         "pt": "Uma imagem sua agora é reduzida para 192 por 192 pixels no seu aparelho, não para 64 por 64, para ficar nítida nas telas de hoje. Só essa cópia pequena é guardada, como antes; a foto de onde você a tirou continua sem ser guardada nem enviada.",
         "de": "Ein eigenes Bild wird auf deinem Gerät jetzt auf 192 mal 192 Pixel verkleinert statt auf 64 mal 64, damit es auf heutigen Bildschirmen scharf ist. Nur diese kleine Kopie wird gespeichert, wie bisher; das Foto, aus dem du es gewählt hast, wird weder gespeichert noch gesendet.",
         "fr": "Une image à vous est désormais réduite à 192 sur 192 pixels sur votre appareil, et non plus 64 sur 64, pour être nette sur les écrans d'aujourd'hui. Seule cette petite copie est conservée, comme avant ; la photo d'origine n'est toujours ni stockée ni envoyée."
+      }
+    },
+    {
+      "date": "2026-10-27",
+      "fingerprint": "0516ef2eb9b8ff6bddc7fbe6febcc2d9ae495c62e62de4abc49e533e1d5f2a7e",
+      "change": "material",
+      "storesNotified": null,
+      "summary": {
+        "en": "Our server now plays the bots live, so with one player and three bots it could work out the player's hand; a game's moves stay a day on our relay. Your device also keeps whether you opened Learn to play, and when you last left a live game early or the app asked for a rating.",
+        "es": "Nuestro servidor juega ahora los bots en vivo: con un jugador y tres bots podría deducir su mano; las jugadas quedan un día en el relé. Tu dispositivo guarda además si abriste Aprender a jugar y cuándo dejaste antes una partida en vivo o la app pidió una valoración.",
+        "pt": "O nosso servidor agora joga os bots ao vivo: com um jogador e três bots, poderia deduzir a mão dele; as jogadas ficam um dia no relay. Seu aparelho também guarda se você abriu Aprender a jogar e quando saiu antes de uma partida ao vivo ou o app pediu uma avaliação.",
+        "de": "Unser Server spielt live die Bots: Mit einem Spieler und drei Bots könnte er dessen Hand erschließen; Züge bleiben einen Tag im Relay. Dein Gerät speichert auch, ob du Spielen lernen geöffnet hast, wann du zuletzt ein Live-Spiel früh verließt und wann die App um Bewertung bat.",
+        "fr": "Notre serveur joue désormais les bots en direct : avec un joueur et trois bots, il pourrait déduire sa main ; les coups restent un jour sur le relais. Votre appareil garde aussi si vous avez ouvert Apprendre à jouer, votre dernier départ anticipé et la dernière demande de note."
       }
     }
   ]

@@ -118,6 +118,55 @@ void main() {
       });
 
       if (sealed) {
+        test('a device that keeps nothing, its seat given up in the pass, still follows the table to its end', () {
+          // Its seat gone, its own session of the hand is built again from
+          // the log (rules.dart, _rebuild): with the secret it held, which
+          // nothing kept says otherwise of. One that drew another could
+          // open none of its seat's cards, and could not work out the
+          // pass the table makes for the seat.
+          final t = SimTable(humans: 2, seed: 47, crypto: crypto, keepJournals: false);
+          t.people[0]
+            ..going = Going.idle
+            ..goAt = Moment.duringPass;
+          t.start();
+          expect(t.run(), isTrue, reason: 'the game plays out:\n${t.clients.map((c) => c.rules.describe()).join('\n')}');
+          expect(t.people[0].gone, isTrue, reason: 'the moment came');
+          expect(t.following.map((c) => c.mySeat), contains(0), reason: 'the idle device still follows');
+          agree(t, TableState.finished);
+          expect(t.following.first.rules.removals[0]!.exit, Exit.booted);
+          t.close();
+        });
+
+        test('three of four going in one hand, out of seat order, leave the last to play the game out', () {
+          // The secrets of the hands the house opens are said keyed by
+          // seat, in the order the seats went: here 2, 0 and 3, which
+          // the referee's JavaScript lists as 0, 2, 3. Each side must
+          // still read the event as the one its author signed.
+          final t = SimTable(humans: 4, seed: 3, crypto: crypto);
+          t.people[2]
+            ..going = Going.crash
+            ..goAt = Moment('the next deal', (c) => c.game.phase == Phase.dealing, fromHand: 1);
+          t.people[0]
+            ..going = Going.idle
+            ..goAt = Moment('the pass', (c) => c.awaitingMyPass, fromHand: 1);
+          t.people[3]
+            ..going = Going.crash
+            ..goAt = Moment('off turn', (c) => c.game.phase == Phase.playing && !c.awaitingMyPlay && c.game.tricksPlayed >= 1, fromHand: 1);
+          t.start();
+          String why() => t.following.map((c) => c.rules.describe()).join('\n');
+          expect(t.run(), isTrue, reason: why());
+          agree(t, TableState.finished);
+          final rules = t.following.firstWhere((c) => c.mySeat == 1).rules;
+          final went = rules.removals.entries.toList()..sort((a, b) => a.value.n.compareTo(b.value.n));
+          expect([for (final e in went) e.key], [2, 0, 3], reason: why());
+          expect({for (final e in went) e.value.hand}, {1}, reason: 'all in the second hand');
+          expect([for (final e in rules.log) if (e.unread != null) e.n], isEmpty, reason: 'every entry reads as the event it was');
+          for (final seat in [0, 2, 3]) {
+            heldAfter(t, seat);
+          }
+          t.close();
+        });
+
         group('the clocks stop while a departed hand is opened', () {
           // The house a long way off: its piece of the escrow takes some
           // twenty seconds to come, and every clock waits on it.

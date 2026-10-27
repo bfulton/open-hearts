@@ -79,7 +79,7 @@ Future<void> main(List<String> args) async {
   );
 
   final signers = [SchnorrSigner.generate(), SchnorrSigner.generate()];
-  final spec = TableSpec(id: newTableId(), seed: 5, sealed: true, target: 1, house: houseKey.publicKey, seats: [
+  final spec = TableSpec(salt: newSalt(), seed: 5, sealed: true, target: 1, house: houseKey.publicKey, seats: [
     HumanSeat(signers[0].publicKey),
     HumanSeat(signers[1].publicKey),
     BotSeat(Persona.roster[3]),

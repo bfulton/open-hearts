@@ -145,6 +145,10 @@ RecordVerdict verifyRecord(GameRecord record, {DealCrypto? crypto, PublicKey? ho
   if (started == null || jsonEncode(started.toJson()) != jsonEncode(spec.toJson())) {
     return no('the log does not start this table');
   }
+  // Every person's seat held to its licence, as a seating is before
+  // anyone sits: with no clock to hold its date to after the game.
+  final unlicensed = spec.licenceProblem();
+  if (unlicensed != null) return no(unlicensed);
   if (spec.sealed) {
     if (crypto == null) return no('a sealed game, and no deal here to check it with');
     if (house != null && spec.house != house) return no('the table names another house');

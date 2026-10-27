@@ -4,20 +4,21 @@
 /// view needs — the pass selection, the score sheet of the hand just
 /// finished, what a live table says besides — and, above all, pace.
 ///
-/// The table jumps: the house plays a bot seat's card the moment it is
-/// owed, and the next bot's after it, and a full trick is swept in the
-/// same instant. A person watching that sees their own card, two bots'
+/// The table jumps: two people's cards can land together, a full trick
+/// is swept the moment its last card is in, a departed person's cards,
+/// played by every side, come all at once. A person watching that sees
 /// cards and the sweep land in one frame, if they see them at all. So
 /// the rules hand the view the table after each change a person could
 /// see (packages/table, rules.dart, `Frame`), and the view shows them
-/// one at a time at a human pace — each bot thinks for its persona's
-/// beat, a finished trick sits for a moment, another person's card
-/// lands a beat after the last — exactly as the solo table paces
-/// itself. Nothing is worked out here, so it can only ever show what
-/// the table did, a moment later; what came while this device was
-/// catching up, after a reload or a dropped line, is shown at once.
-/// Meanwhile the player's own card goes on the table the instant it is
-/// tapped, ahead of the log that will carry it.
+/// one at a time — a card a beat after the last, a finished trick held
+/// for a moment. A bot's moment of thought is the house's, in the log
+/// (packages/table, house.dart, `pace`), not the screen's: the player's
+/// clock runs from when the log opens their turn, and the screen offers
+/// it a beat or a trick's hold after. Nothing is worked out here, so it
+/// can only ever show what the table did, a moment later; what came
+/// while this device was catching up, after a reload or a dropped line,
+/// is shown at once. Meanwhile the player's own card goes on the table
+/// the instant it is tapped, ahead of the log that will carry it.
 library;
 
 import 'dart:async';
@@ -58,12 +59,14 @@ class LiveController extends ChangeNotifier implements TableModel {
     Random? random,
     ReactionLane? reactions,
     ValueListenable<bool>? reactionMute,
-    int Function()? reactionClock,
+    int Function()? screenClock,
     void Function(String line)? trace,
   })  : _lane = reactions,
         _lineHealth = lineHealth ?? (() => line is RelayLine ? line.health : ''),
         _mute = reactionMute ?? ReactionMute.current,
-        _reactionRules = ReactionRules(now: reactionClock),
+        _screenClock = screenClock ?? _wallMs,
+        _trace = trace,
+        _reactionRules = ReactionRules(now: screenClock),
         client = TableClient(
             tableId: spec.id,
             spec: spec,
@@ -175,18 +178,45 @@ class LiveController extends ChangeNotifier implements TableModel {
 
   bool _pumping = false;
   bool _disposed = false;
-  final _rhythm = Random();
 
   /// When the view last showed something, and last showed a card.
   int _shownAt = 0;
   int _lastCardAt = 0;
 
-  /// How long after the card before another person's card is shown:
+  /// How long after the card before any other seat's card is shown:
   /// the moment a card takes to land, so that two played at once are
   /// seen one after the other.
   static const cardBeat = Duration(milliseconds: 320);
 
-  int get _nowMs => DateTime.now().millisecondsSinceEpoch;
+  /// The screen's own clock, in milliseconds since the epoch: what the
+  /// view's pace and the reactions' gaps go by, as its pauses are timers
+  /// on it. Real time, but in a test whose timers keep a time of their
+  /// own.
+  final int Function() _screenClock;
+  static int _wallMs() => DateTime.now().millisecondsSinceEpoch;
+
+  int get _nowMs => _screenClock();
+
+  final void Function(String line)? _trace;
+
+  /// This player's turn as this device met it, for the trace: which,
+  /// when the referee opened it, and by the wall clock when the table
+  /// here first owed it and when the screen first offered it. The
+  /// referee's time and this device's are one machine's in the browser
+  /// suites; elsewhere their difference is the clocks' too.
+  ({TurnId turn, int since, int here, int? shown})? _met;
+  bool _metSaid = false;
+
+  /// Says how long [_met] took to reach this device, its screen, and
+  /// [what] it came to, once.
+  void _traceMet(String what) {
+    final m = _met;
+    if (m == null || _metSaid) return;
+    _metSaid = true;
+    final now = _wallMs();
+    _trace?.call('my ${m.turn}, opened at ${m.since}: here +${m.here - m.since}, '
+        'shown ${m.shown == null ? 'never' : '+${m.shown! - m.since}'}, $what +${now - m.since} ms');
+  }
 
   /// The game is over as shown, and its last trick has been seen off
   /// the table: the game's sheet may show.
@@ -197,8 +227,7 @@ class LiveController extends ChangeNotifier implements TableModel {
   /// ended while this device was catching up and has none.
   int _sheetsShownThrough = -1;
 
-  /// How long to wait before showing [f]: a bot's beat to think before
-  /// its card, from the last thing shown; another person's card a beat
+  /// How long to wait before showing [f]: any other seat's card a beat
   /// after the last card; a full trick held a moment before it is swept;
   /// the bare felt of a hand given up. The player's own card, at once,
   /// and the rest as they come.
@@ -211,10 +240,7 @@ class LiveController extends ChangeNotifier implements TableModel {
 
     return switch (f.change) {
       FrameChange.played when f.seat == mySeat => Duration.zero,
-      FrameChange.played => switch (f.holders[f.seat!]) {
-          BotSeat(:final persona) => after(Pacing.think(persona, _rhythm), _shownAt),
-          HumanSeat() => after(cardBeat, _lastCardAt),
-        },
+      FrameChange.played => after(cardBeat, _lastCardAt),
       FrameChange.collected => after(Pacing.trickHold, _shownAt),
       FrameChange.givenUp => after(Pacing.sweepBeat, _shownAt),
       _ => Duration.zero,
@@ -321,6 +347,12 @@ class LiveController extends ChangeNotifier implements TableModel {
   // ---- the table changed ------------------------------------------------
 
   void _onChange() {
+    final mine = client.myTurn;
+    if (mine != null && mine.turn != _met?.turn) {
+      _met = (turn: mine.turn, since: mine.since, here: _wallMs(), shown: null);
+      _metSaid = false;
+    }
+    if (!client.amSeated) _traceMet('seat gone');
     _watchLine();
     _beatClocks();
     final result = client.rules.result;
@@ -501,6 +533,8 @@ class LiveController extends ChangeNotifier implements TableModel {
   void notifyListeners() {
     _auto.watch(this);
     _offeredAt = awaitingPlay ? (_offeredAt ?? _nowMs) : null;
+    final m = _met;
+    if (m != null && m.shown == null && (awaitingPlay || awaitingPass)) _met = (turn: m.turn, since: m.since, here: m.here, shown: _wallMs());
     super.notifyListeners();
   }
 
@@ -627,6 +661,7 @@ class LiveController extends ChangeNotifier implements TableModel {
     // it back, and its frame is what clears the mark.
     _pendingPass = cards.toSet();
     _selected.clear();
+    _traceMet('passed');
     client.pass(cards);
     notifyListeners();
   }
@@ -643,6 +678,7 @@ class LiveController extends ChangeNotifier implements TableModel {
     // pass.
     _pendingPlay = card;
     _lastCardAt = _nowMs;
+    _traceMet('played');
     client.play(card);
     notifyListeners();
     return null;

@@ -1,5 +1,5 @@
 /// A finished sealed game's record, as it is kept (record.dart): four
-/// people, played out on the simulator with real keys, a real table id
+/// people, played out on the simulator with real keys, a salted table id
 /// and a house of known key. For the browser suite's look at a kept
 /// game (e2e/flows.mjs).
 ///
@@ -39,7 +39,7 @@ Future<void> main() async {
       humans: 4,
       seed: 3,
       crypto: crypto,
-      id: newTableId(),
+      salt: newSalt(),
       keys: [for (var i = 0; i < 4; i++) SchnorrSigner.generate()],
       houseKey: SchnorrSigner.fromSecret(rigHouseSecret),
       licenceOf: licenceOf);

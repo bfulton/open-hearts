@@ -360,18 +360,16 @@ flow('the network gone at a live table, and back', async ({ context, open, relay
   }
   await context.setOffline(true);
   // The device hears nothing back from the relay, which answers
-  // everything, so it is its own line that is down and not the jurors,
-  // who play on: it says so, and waits for the line rather than ending
-  // the game (docs/explanation/live-play.md, a device cut off from the
-  // table).
+  // everything, so it is its own line that is down: it says so, and
+  // waits for the line (docs/explanation/live-play.md, a device cut off
+  // from the table).
   const began = Date.now();
   await waitFor(page, down, { timeout: 30000, what: 'the device to say its own connection is down' });
   log(`      said its connection is down: ${((Date.now() - began) / 1000).toFixed(0)} s`);
-  // Well past when it would have ended the game before, for a jury it
-  // could not hear: the operator's word here is ten seconds' silence
-  // and ten more (setUp).
-  const until = Date.now() + 40000;
-  while (Date.now() < until) {
+  // Off for a while yet, and back inside the half minute a closed line
+  // is given at a person's turn (packages/table, timing.dart silenceMs):
+  // the table plays on without it, and has its seat waiting.
+  while (Date.now() - began < 15000) {
     if (await has(page, /^Connection failure$/)) throw new Error('the game ended for the device\'s own connection');
     await sleep(1000);
   }
@@ -379,16 +377,17 @@ flow('the network gone at a live table, and back', async ({ context, open, relay
   const back = Date.now();
   await waitGone(page, down, { timeout: 60000, what: 'the line back' });
   log(`      the line back: ${((Date.now() - back) / 1000).toFixed(0)} s`);
-  // And the game goes on where it was: the hand is played out and the
-  // next one dealt, with nothing ended.
+  // And the game goes on where it was, in its own seat: the hand is
+  // played out and the next one dealt, with nothing ended.
   await playUntil([page], async (p) => {
     if (await has(p, /^Connection failure$/)) throw new Error('the game ended once the line was back');
+    if (await has(p, /^A bot took your seat$/)) throw new Error('the seat went to a bot for a line back inside its half minute');
     return has(p, /^Hand 2 /);
   }, { timeout: 180000 });
   log(`      played on to the next hand: ${((Date.now() - back) / 1000).toFixed(0)} s`);
-  // The backup jurors who held the bots' seats are online still, and
-  // nobody to play with: the door counts people (presence_relay.dart,
-  // `people`), and here that is this device alone.
+  // The house that held the bots' seats is nobody to play with: the
+  // door counts people (presence_relay.dart, `people`), and here that
+  // is this device alone.
   await click(page, /^Menu$/);
   await waitFor(page, /^Leave the table$/, { what: 'the menu' });
   await click(page, /^Leave the table$/);
@@ -396,7 +395,7 @@ flow('the network gone at a live table, and back', async ({ context, open, relay
   await waitFor(page, /^Leave the table\?$/, { what: 'the question' });
   await click(page, /^Leave$/);
   await waitFor(page, /^Play live, /, { timeout: 20000, what: 'the door, counting' });
-  await within(page, /^Play live, nobody else online$/, 10, 'the count, the backup jurors left out');
+  await within(page, /^Play live, nobody else online$/, 10, 'the count, the house left out');
   return page;
 });
 
@@ -411,12 +410,10 @@ async function main() {
     setUp: async ({ tag, say }) => {
       const relayPort = await freePort();
       // A tenth of a table's beats (app/lib/net/address.dart), and the
-      // operator's word that a table stopped for jurors it cannot hear
-      // ends sooner (docs/explanation/service.md; the least each may be,
-      // packages/table, timing.dart). The device's own waits — on the
+      // standard's clocks at the table. The device's own waits — on the
       // relays, the service, the shop — are the build's, which is what
       // this suite times.
-      const app = await serveApp({ relayPort, tag, pace: 0.1, config: { table: { jurorSilenceMs: 10000, quorumLostMs: 10000 } } });
+      const app = await serveApp({ relayPort, pace: 0.1 });
       const browser = await chromium.launch();
       return { app, browser, relay: flowRelay({ port: relayPort, tag, say }) };
     },

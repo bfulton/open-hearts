@@ -442,12 +442,28 @@ class Room extends ChangeNotifier {
         seats.add({'bot': draw[s].id});
       }
     }
+    // The table's own id, not the code: a code is reused, and two
+    // tables that start under one code — two halves of a room that
+    // could not hear each other — must not hear each other's plays. It
+    // is the spec's (packages/table, spec.dart, TableSpec.id), as every
+    // member works it out again, salted so that nobody who saw the
+    // seats can work it out.
+    final salt = newSalt();
+    final table = TableSpec(
+      seed: seed,
+      seats: [
+        for (var s = 0; s < seatCount; s++) s < here.length ? HumanSeat(here[s].key, licence: here[s].licence) : BotSeat(draw[s]),
+      ],
+      sealed: true,
+      target: target,
+      timing: timing,
+      house: house,
+      salt: salt,
+    );
     channel.announce({
       'kind': 'start',
-      // The table's own id, not the code: a code is reused, and two
-      // tables that start under one code — two halves of a room that
-      // could not hear each other — must not hear each other's plays.
-      'table': newTableId(),
+      'table': table.id,
+      'salt': salt,
       'seed': seed,
       'seats': seats,
       'policy': botPolicyVersion,
@@ -540,15 +556,12 @@ class Room extends ChangeNotifier {
       if (mine) refusal = RoomRefusal.otherBuild;
       return;
     }
-    // Named by the leader (above): a start without an id is another
-    // build's.
-    final id = c['table'];
-    if (id is! String || !validTableId(id)) {
+    final salt = c['salt'];
+    if (salt is! String || !validTableId(salt)) {
       if (mine) refusal = RoomRefusal.otherBuild;
       return;
     }
     final made = TableSpec(
-      id: id,
       seed: seed,
       seats: seats,
       sealed: c['sealed'] == true,
@@ -557,7 +570,14 @@ class Room extends ChangeNotifier {
       target: c['target'] as int? ?? gameOverScore,
       timing: timing,
       house: house,
+      salt: salt,
     );
+    // Named by the leader (above) for its spec: a start whose table is
+    // not the spec it says was made by another build.
+    if (c['table'] != made.id) {
+      if (mine) refusal = RoomRefusal.otherBuild;
+      return;
+    }
     // Every seat an account's by the service's word, each account once:
     // a start that is not is not a table to sit at.
     if (made.licenceProblem(at: DateTime.fromMillisecondsSinceEpoch(_nowMs())) != null) {

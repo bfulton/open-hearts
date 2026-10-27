@@ -10,8 +10,12 @@
 /// and adds a tick when asked, no oftener than `tickGapMs`. A line
 /// delivers every entry after its own latency, in order, and when it
 /// drops and comes back it asks again from the first it has not had
-/// ([SimLine]).
+/// ([SimLine]). Every event goes into the log as that referee hands it
+/// back, through JSON and a JavaScript object ([asJavaScriptHoldsIt]),
+/// and reads there as it would read on the wire.
 library;
+
+import 'dart:convert';
 
 import 'package:table/table.dart';
 
@@ -58,6 +62,13 @@ class SimReferee {
       };
 
   void _append({TableEvent? event, Map<String, Object?>? unread, PublicKey? up, PublicKey? down}) {
+    // The event as the relay's referee hands it on: what reads of it
+    // there, and if nothing does, its bytes as they came, unread.
+    if (event != null) {
+      final wire = asJavaScriptHoldsIt(jsonDecode(jsonEncode(event.toJson()))) as Map<String, Object?>;
+      event = TableEvent.parse(wire, verifySignature: false);
+      if (event == null) unread = wire;
+    }
     final e = LogEntry(n: log.length, t: clock.nowMs, event: event, unread: unread, up: up, down: down);
     log.add(e);
     _lastEntryAt = e.t;
@@ -112,6 +123,21 @@ class SimReferee {
     if (left == 0 && spec != null && _writers.contains(l.key) && _downLogged.add(l.key)) _append(down: l.key);
   }
 }
+
+/// [json] as a JavaScript object holds it, at every depth: the keys that
+/// read as an array index ("0", "2", "10") ahead of the rest and in
+/// numeric order, whatever order they came in, and the rest as they
+/// came. The relay's referee is JavaScript, and an event it takes goes
+/// back out written from the object it parsed (service/do/referee.mjs).
+Object? asJavaScriptHoldsIt(Object? json) {
+  if (json is List) return [for (final e in json) asJavaScriptHoldsIt(e)];
+  if (json is! Map) return json;
+  final keys = [for (final k in json.keys) k as String];
+  final index = [for (final k in keys) if (_isIndex(k)) k]..sort((a, b) => int.parse(a).compareTo(int.parse(b)));
+  return {for (final k in [...index, for (final k in keys) if (!_isIndex(k)) k]) k: asJavaScriptHoldsIt(json[k])};
+}
+
+bool _isIndex(String key) => RegExp(r'^(0|[1-9][0-9]{0,8})$').hasMatch(key);
 
 /// One side's line to a [SimReferee].
 class SimLine implements RefereeLine {

@@ -63,7 +63,7 @@ Future<void> main(List<String> args) async {
   print('relay on ${relay.url}, the house ${house.substring(0, 8)} at $houseAt');
 
   final signers = [SchnorrSigner.generate(), SchnorrSigner.generate()];
-  final spec = TableSpec(id: newTableId(), seed: 5, sealed: true, target: gameOverScore, house: house, seats: [
+  final spec = TableSpec(salt: newSalt(), seed: 5, sealed: true, target: gameOverScore, house: house, seats: [
     HumanSeat(signers[0].publicKey),
     HumanSeat(signers[1].publicKey),
     BotSeat(Persona.roster[3]),

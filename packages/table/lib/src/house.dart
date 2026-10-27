@@ -15,7 +15,7 @@ import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:deal/deal.dart';
-import 'package:engine/engine.dart' show seatCount;
+import 'package:engine/engine.dart' show Persona, seatCount;
 
 import 'client.dart';
 import 'clock.dart';
@@ -37,6 +37,7 @@ class House {
     this.onResult,
     this.random,
     this.onSide,
+    this.pace = 0,
     this.trace,
   });
 
@@ -71,6 +72,22 @@ class House {
   /// Told of each side the house makes at a table, as it is made: a
   /// follower, and one for each bot seat it plays.
   final void Function(TableClient side)? onSide;
+
+  /// How long a bot seat thinks over a card, as a share of its persona's
+  /// pace (packages/engine, persona.dart, BotPace): 1 in service, less
+  /// in the browser suites, which run every beat of a table faster
+  /// (service/bin/house.dart, `--pace`), and 0 — no thought at all —
+  /// in the simulator. The bot's moment is the table's own, in the log
+  /// (client.dart, botThinkMs), and not a screen's to add: a person's
+  /// clock runs from when their turn opens in the log.
+  final double pace;
+
+  late final Random _rhythm = random ?? Random.secure();
+
+  int _thinkMs(Persona persona) {
+    final p = persona.pace;
+    return ((p.minMs + _rhythm.nextInt(p.maxMs - p.minMs + 1)) * pace).round();
+  }
 
   final void Function(String table, String line)? trace;
 
@@ -109,6 +126,14 @@ class House {
       trace?.call(s.table, 'house: the table names another house; not served');
       return _drop(s);
     }
+    // A seat whose licence is not the service's word for its key, held
+    // to it as the table began, as every device holds a seating to it
+    // before it sits: a table nobody would sit at is not served either.
+    final unlicensed = f.rules.spec!.licenceProblem(at: DateTime.fromMillisecondsSinceEpoch(f.rules.log.first.t));
+    if (unlicensed != null) {
+      trace?.call(s.table, 'house: $unlicensed; not served');
+      return _drop(s);
+    }
     // A side for every seat a bot holds or will hold: the house plays it
     // in every hand it holds it from, and follows the table before that.
     for (var seat = 0; seat < seatCount; seat++) {
@@ -123,6 +148,7 @@ class House {
         crypto: crypto,
         dealWorker: dealWorker,
         houseSecret: secret,
+        botThinkMs: pace > 0 ? _thinkMs : null,
         random: random,
         trace: (l) => trace?.call(s.table, 'house seat $seat: $l'),
       );

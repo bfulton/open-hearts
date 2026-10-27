@@ -195,7 +195,7 @@ class RelayTransport implements ReactionLane {
   /// checked. False for what fails, so the id is not remembered and the
   /// real event under it still gets in.
   bool _onEvent(Map<String, Object?> raw) {
-    // A reaction nobody here shows — a juror's client, say — is not
+    // A reaction nobody here shows — the house's client, say — is not
     // worth its signature.
     if (raw['kind'] == TableKinds.react && !_reactions.hasListener) return true;
     final e = NostrEvent.parse(raw);

@@ -292,7 +292,7 @@ Putting the relay worker and the site into production, and checking production a
 oh deploy relay [--apply] [--preview]
 ```
 
-Deploys the relay worker, and the backup jurors' container with it, from main; with --preview, the preview relay, from what is checked out. Needs Docker running, Dart and Cargo. Production is refused unless HEAD is origin/main with nothing uncommitted. The preview relay is what every preview plays on: it reaches nothing of production's, and is refused until config/openhearts.json has the previews' service key (oh preview secrets).
+Deploys the relay worker, and the house's container with it, from main; with --preview, the preview relay, from what is checked out. Needs Docker running, Dart and Cargo. Production is refused unless HEAD is origin/main with nothing uncommitted. The preview relay is what every preview plays on: it reaches nothing of production's, and is refused until config/openhearts.json has the previews' service key (oh preview secrets).
 
 - **Needs:** `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`
 - **How-to:** [deploy.md](../how-to/deploy.md)
@@ -384,7 +384,7 @@ What happened at a live table, from what each side of it said.
 oh table <table> [--days <days>]
 ```
 
-Prints, in one timeline, what the backup jurors, the relay and the device each said of one table: the jurors' traces, the relay's sockets coming and going, what was done with the backup jurors, and the device's own report of a game lost or a line down. --days says how far back to look (3 unless it says, at most 30; Workers Logs keeps what it keeps). Without New Relic's credentials the device's side is left out, and said so.
+Prints, in one timeline, what the house, the relay and the device each said of one table: the house's traces, the relay's sockets coming and going, what was done with the house, and the device's own report of a game lost or a line down. --days says how far back to look (3 unless it says, at most 30; Workers Logs keeps what it keeps). Without New Relic's credentials the device's side is left out, and said so.
 
 - **Needs:** `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, (Workers Observability Read), NEW_RELIC_API_KEY and NEW_RELIC_ACCOUNT_ID (for the device's side)
 - **How-to:** [look-into-a-lost-game.md](../how-to/look-into-a-lost-game.md)

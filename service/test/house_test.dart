@@ -106,7 +106,7 @@ void main() {
     expect((await house.ask('POST', '/wake', {'table': 'not a table'})).$1, 400);
 
     final people = [SchnorrSigner.generate(), SchnorrSigner.generate()];
-    final spec = TableSpec(id: newTableId(), seed: 21, target: 1, sealed: true, house: _house, seats: [
+    final spec = TableSpec(salt: newSalt(), seed: 21, target: 1, sealed: true, house: _house, seats: [
       HumanSeat(people[0].publicKey),
       const BotSeat(Persona.romeo),
       const BotSeat(Persona.juliet),

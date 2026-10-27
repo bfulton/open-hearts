@@ -4,6 +4,11 @@
 ///     OH_HOUSE_SECRET=<64 hex> dart run bin/house.dart --relay ws://127.0.0.1:7448/{tag}
 ///     OH_HOUSE_SECRET=<64 hex> dart run bin/house.dart --relay wss://relay.openhearts.game/{tag} --port 8080
 ///
+/// `--pace` is how long a bot thinks over a card, as a share of its
+/// persona's pace (packages/table, house.dart): 1, the standard, but
+/// for the browser suites, which run a table's beats at a tenth
+/// (e2e/drive.mjs).
+///
 /// Woken for a table (`POST /wake?table=…`), it follows the table's log
 /// from the first entry (packages/table, house.dart): it deals and plays
 /// every bot seat, holds half of each person's escrow and says it when
@@ -49,9 +54,11 @@ const awakeMs = 10 * 60 * 1000;
 Future<void> main(List<String> args) async {
   final relays = <Uri>[];
   int? port;
+  var pace = 1.0;
   for (var i = 0; i < args.length; i++) {
     if (args[i] == '--relay' && i + 1 < args.length) relays.addAll(Relays.parse(args[++i]));
     if (args[i] == '--port' && i + 1 < args.length) port = int.tryParse(args[++i]);
+    if (args[i] == '--pace' && i + 1 < args.length) pace = (double.tryParse(args[++i]) ?? 1.0).clamp(0.0, 1.0);
   }
   if (relays.isEmpty) relays.addAll(Relays.parse(Platform.environment['OH_RELAYS'] ?? ''));
   if (relays.isEmpty) relays.add(Uri.parse('ws://127.0.0.1:7448/$tagMark'));
@@ -93,6 +100,7 @@ Future<void> main(List<String> args) async {
     clock: WallClock(),
     crypto: crypto,
     dealWorker: worker,
+    pace: pace,
     onResult: (result, signed) {
       print('${result.table.substring(0, 8)} over: ${result.state}');
       results.publish(signed);

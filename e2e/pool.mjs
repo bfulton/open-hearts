@@ -4,7 +4,7 @@
 // A flow's devices are that flow's, and the rig under them is the
 // worker's alone — its own relay on a port of its own, its own server,
 // handlers and store, its own browser — so a flow beside another never
-// meets it: not in the pool, not on presence, not as a juror. Within a
+// meets it: not in the pool, not on presence, not at a table. Within a
 // worker the flows run one after another, as the whole suite used to.
 //
 //   --jobs N     workers (default 3; 1 is one after another, in order)
@@ -29,7 +29,7 @@ export function jobsAsked(fallback = 3) {
 
 /// Runs [flows] — `{ name, run }` — on [jobs] workers. [setUp](worker,
 /// say) makes a worker's rig, where `say` is how a line from the rig
-/// itself (a juror) reaches whichever flow the worker is running;
+/// itself (the house) reaches whichever flow the worker is running;
 /// [runFlow](flow, rig) runs one flow on it and cleans up after it; and
 /// [tearDown](rig) puts the rig away. Answers the number that failed.
 export async function runFlows({ flows, jobs = jobsAsked(), only = argOf('only'), setUp, runFlow, tearDown }) {
@@ -94,13 +94,13 @@ export async function runFlows({ flows, jobs = jobsAsked(), only = argOf('only')
 /// however often a flow asks — and `done()` stops it, and is waited on
 /// as a flow ends. A flow whose app talks to a relay asks for one; a
 /// flow that does not ask has none, so none passes on a relay another
-/// flow left behind, and none meets another's devices or jurors on it.
-/// Started outside the flow's own lines, as the rig's; its jurors speak
-/// through [say].
+/// flow left behind, and none meets another's devices on it. Started
+/// outside the flow's own lines, as the rig's; its house speaks through
+/// [say], and its bots think at the flows' pace (serveApp, `pace: 0.1`).
 export function flowRelay({ port, tag, say }) {
   let started = null;
   return {
-    relay: () => (started ??= logTo.exit(() => startRelay({ port, tag, say }))),
+    relay: () => (started ??= logTo.exit(() => startRelay({ port, tag, say, pace: 0.1 }))),
     done: async () => {
       const was = started;
       started = null;

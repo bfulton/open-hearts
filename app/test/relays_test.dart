@@ -46,17 +46,27 @@ void main() {
     final online = Online.on(deployed, FakeSigner('door'));
     addTearDown(online.close);
     expect(online.presence.relays.single.pathSegments.single, 'online');
+    // And the same on the local relay, which is ours on a plain socket
+    // (service/do/host.mjs): a tag that went to the root would reach
+    // presence, which takes nothing but presence.
+    final local = appRelays(base: Uri.parse('http://localhost:8080/?relay=40123'), web: true);
+    for (final tag in ['mf66d4537', 'queue:anyone', 'results', 'KP4T9MXR']) {
+      final t = RelayTransport(relays: local, signer: FakeSigner('t'), table: tag, pinned: pinnedRelays(local));
+      addTearDown(t.close);
+      expect((t.relays.single.host, t.relays.single.port), ('127.0.0.1', 40123));
+      expect(t.relays.single.pathSegments.single, tag, reason: 'the tag written in, not the mark');
+    }
   });
 
   test('served from localhost, the local relay', () {
-    expect(appRelays(base: Uri.parse('http://localhost:8080/'), web: true).map((r) => r.toString()), [localRelay]);
-    expect(appRelays(base: Uri.parse('http://127.0.0.1:41234/?e2e=1'), web: true).map((r) => r.toString()), [localRelay]);
+    expect(appRelays(base: Uri.parse('http://localhost:8080/'), web: true), [Uri.parse(localRelay)]);
+    expect(appRelays(base: Uri.parse('http://127.0.0.1:41234/?e2e=1'), web: true), [Uri.parse(localRelay)]);
   });
 
   test('served from localhost, the local relay at the port the address names', () {
     // Each browser suite's relay is on a port of its own (e2e/drive.mjs).
     expect(appRelays(base: Uri.parse('http://play.openhearts.localhost:41234/room/AB12?e2e=1&relay=40123'), web: true),
-        [Uri.parse('ws://127.0.0.1:40123')]);
+        [Uri.parse('ws://127.0.0.1:40123/{tag}')]);
     // A port and nothing else: anything more is no port, and the usual one.
     for (final nonsense in ['0', '70000', 'evil.example', 'ws://evil.example:1', '']) {
       expect(appRelays(base: Uri.parse('http://localhost:8080/?relay=${Uri.encodeComponent(nonsense)}'), web: true),

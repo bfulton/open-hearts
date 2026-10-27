@@ -1,5 +1,5 @@
 name: service
-description: The local NIP-01 relay the table clients meet on, the backup jurors, and the service's tools.
+description: The house, the relay the Dart suites meet the table on, and the service's tools.
 version: 0.1.0
 publish_to: none
 
@@ -10,7 +10,7 @@ dependencies:
   # For minting the service's signing pair (bin/service_key.dart): the
   # only place here that needs a public key derived from a secret.
   bip340: ^0.3.1
-  # The backup jurors' mark at the relay (bin/juror.dart): an HMAC.
+  # The house's deal secret, from its own (bin/house.dart).
   crypto: ^3.0.6
   web_socket_channel: ^3.0.3
   table:

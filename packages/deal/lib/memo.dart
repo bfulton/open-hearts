@@ -2,8 +2,8 @@
 ///
 /// Every operation is a function of its bytes — the randomness comes
 /// in as a seed — so the same call gives the same answer. A table
-/// checks the same proofs over and over: every person and every juror
-/// checks each shuffle, each token and each seal, and a verifier checks
+/// checks the same proofs over and over: every person and the house
+/// check each shuffle, each token and each seal, and a verifier checks
 /// them all again at the end; and a tool that runs one game hundreds of
 /// times with one thing different (packages/table, tool/explore.dart)
 /// makes most of the same calls every time. This answers those from
@@ -27,7 +27,7 @@ import 'deal.dart';
 /// next run.
 ///
 /// A sealed table is the same proofs checked over and over — every
-/// person and every juror checks each shuffle, each token and each
+/// person and the house check each shuffle, each token and each
 /// seal, and the verifier checks them all again at the end — and the
 /// tests of one file play the same seeds into one departure after
 /// another. Each is asked of the library once. Nothing a test checks is

@@ -1024,7 +1024,7 @@ async function main() {
       const relayPort = await freePort();
       // A tenth of a table's beats (app/lib/net/address.dart): the same
       // hands, without the minute a bot's thinking takes over each.
-      const app = await serveApp({ relayPort, tag, pace: 0.1 });
+      const app = await serveApp({ relayPort, pace: 0.1 });
       const browser = await chromium.launch();
       return { app, browser, relay: flowRelay({ port: relayPort, tag, say }) };
     },

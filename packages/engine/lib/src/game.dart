@@ -65,9 +65,9 @@ class HeartsGame {
   }
 
   /// A copy of the hand as it stands, to play cards on without playing
-  /// them here: what a juror holding a bot seat works the seat's card
-  /// out on before the card ahead of it has settled (packages/table,
-  /// client.dart). Nothing is shared but the seed, and the copy does
+  /// them here: what a table's frames carry (packages/table,
+  /// rules.dart, onFrame): the hand as each change left it, for a view
+  /// to show at a pace of its own. Nothing is shared but the seed, and the copy does
   /// not deal — the next hand is this game's to deal ([nextHand] and
   /// [abandonHand] throw on it).
   HeartsGame lookahead() => HeartsGame._ahead(this);

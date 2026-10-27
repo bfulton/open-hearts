@@ -75,10 +75,10 @@ void main() {
 
     test('the spec carries it in full, and one without it is no spec', () {
       final seats = [const HumanSeat('a'), const HumanSeat('b'), BotSeat(Persona.roster[0]), BotSeat(Persona.roster[1])];
-      final plain = TableSpec(id: 't', seed: 1, seats: seats);
+      final plain = TableSpec(seed: 1, seats: seats);
       expect(plain.toJson()['timing'], TableTiming.standard.toJson());
       expect(overTheWire(plain)!.timing, TableTiming.standard);
-      final quick = TableSpec(id: 't', seed: 1, seats: seats, timing: TableTiming.parse({'graceMs': 3000}));
+      final quick = TableSpec(seed: 1, seats: seats, timing: TableTiming.parse({'graceMs': 3000}));
       expect(overTheWire(quick)!.timing, quick.timing);
       final json = plain.toJson();
       expect(TableSpec.parse({...json}..remove('timing')), isNull);

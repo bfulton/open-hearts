@@ -192,8 +192,7 @@ abstract final class TableKinds {
   static const signal = 24243;
 
   /// Presence (presence_relay.dart): who is online, tagged `t` with the
-  /// one topic; a summons to a juror, tagged `p` with the juror; a
-  /// table's call for a backup juror.
+  /// one topic.
   static const presence = 24246;
 
   /// The lobby: hosting a table, joining it, starting it, tagged `t`
