@@ -290,7 +290,7 @@ squashed from a pull request, the pull request's number.
   connection is found out while it waits on others. Every word players
   and subscribers read about live tables says so, in all five
   languages, the privacy policy and the terms among them.
-  (2026-10-27, #40)
+  (2026-10-28, #42)
 - Leaving a live game while it is on asks first, from the menu or by
   Back, a phone's or a browser's, and says what leaving costs: the
   seat, a rated game counted as last, and Play live's wait where there
@@ -423,7 +423,7 @@ squashed from a pull request, the pull request's number.
   other tables, the mesh of connections between the devices at a table,
   and the votes and signatures a table settled its seats by: the
   referee's log and the house do all of it. WebRTC and TURN stay, for
-  voice and video chat, off the game's path. (2026-10-27, #40)
+  voice and video chat, off the game's path. (2026-10-28, #42)
 - The 17 games kept before seats carried licences (4 to 6 October
   2026), whose names nothing but a device's key tied to an account, and
   with them `service/tool/forget.mjs` matching a seat by the account's
