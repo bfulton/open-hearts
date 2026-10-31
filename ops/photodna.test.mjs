@@ -184,10 +184,9 @@ test('the relay is deployed with the pinned module in the stand-in\'s place, fet
   assert.equal(ctx.started.length, 0);
 
   assert.equal(await main(['deploy', 'relay', '--apply'], ctx), 0);
-  const [{ args, cwd }] = ctx.started;
-  assert.deepEqual(args.slice(-3), ['deploy', '--alias', MODULE_ALIAS]);
-  assert.match(cwd, /service\/do$/);
-  assert.deepEqual(seen, [true, true, false], 'the pinned files there as it builds, and nothing else');
+  assert.deepEqual(ctx.started.map((s) => s.args.slice(2)), [['deploy', '--dry-run', '--alias', MODULE_ALIAS], ['deploy', '--alias', MODULE_ALIAS]], 'built first, then deployed, the module in both');
+  assert.ok(ctx.started.every((s) => /service\/do$/.test(s.cwd)));
+  assert.deepEqual(seen, [true, true, false, true, true, false], 'the pinned files there as it builds, both times, and nothing else');
   assert.ok(!existsSync(moduleDir), 'gone after');
 
   // A deploy that fails leaves nothing either.
@@ -205,7 +204,7 @@ test('the relay is deployed with the pinned module in the stand-in\'s place, fet
   const off = context({ moduleDir });
   assert.equal(await main(['deploy', 'relay', '--apply'], off), 0);
   assert.match(off.said.join('\n'), /without a PhotoDNA module/);
-  assert.ok(!off.started[0].args.includes('--alias'));
+  assert.ok(off.started.every((s) => !s.args.includes('--alias')));
 });
 
 test('nothing private in the repository: the module\'s folder, its pinned files, the private marks, and WebAssembly not the app\'s', () => {

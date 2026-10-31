@@ -259,7 +259,7 @@ export const COMMANDS = [
     group: 'release',
     flags: ['apply', 'preview'],
     summary: 'Deploys the relay worker, and the house\'s container with it, from main; with --preview, the preview relay, from what is checked out.',
-    more: 'Needs Docker running, Dart and Cargo. Production is refused unless HEAD is origin/main with nothing uncommitted. The preview relay is what every preview plays on: it reaches nothing of production\'s, and is refused until config/openhearts.json has the previews\' service key (oh preview secrets).',
+    more: 'Needs Docker running, Dart and Cargo. Production is refused unless HEAD is origin/main with nothing uncommitted. It is built first (wrangler deploy --dry-run: the house and its image, nothing uploaded), and if the deploy then fails after its upload, the version that served before is put back. The preview relay is what every preview plays on: it reaches nothing of production\'s, and is refused until config/openhearts.json has the previews\' service key (oh preview secrets).',
     needs: CF,
     howto: 'docs/how-to/deploy.md',
     example: 'oh deploy relay --apply',

@@ -435,6 +435,16 @@ squashed from a pull request, the pull request's number.
 
 ### Fixed
 
+- A relay deploy no longer leaves the new relay live beside the old
+  house. Wrangler uploads the worker before it builds the house's image,
+  so when the image's base could not be fetched (the AWS public
+  registry's data limit), the new relay ran beside the old container
+  and the old site until it was rolled back by hand. `./oh deploy
+  relay` now builds everything first with `wrangler deploy --dry-run`,
+  which uploads nothing, and if a deploy fails after its upload all the
+  same, puts back the version that served before. The house's image is
+  built on Docker Hub's official Ubuntu, through Google's mirror of
+  Docker Hub. (2026-10-31, #43)
 - A browser's own Back at a live table now asks, as the menu does, and
   leaving by it is signed and told to the table at once. Before, the
   page closed without a word, the others waited at the seat's turn
