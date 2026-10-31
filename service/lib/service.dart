@@ -4,4 +4,5 @@
 library;
 
 export 'src/player.dart';
+export 'src/ratings.dart';
 export 'src/relay.dart';

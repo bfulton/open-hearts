@@ -20,6 +20,8 @@ import { basename, dirname, extname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { format } from 'node:util';
 import { build as buildSite } from '../site/build.mjs';
+import { configOf } from '../service/functions/config.mjs';
+import { wakePath } from '../service/do/bench.mjs';
 
 export const root = resolve(fileURLToPath(new URL('..', import.meta.url)));
 // The e2e tools take arguments, not environment: --app-dir <path>
@@ -154,17 +156,19 @@ async function stopped(p) {
 /// house, as the deployment has them: the relay the Cloudflare object
 /// runs, on a node socket (service/do/host.mjs), asking every socket
 /// who it is by the rig's service and refereeing tables for the rig's
-/// house; and the house, started and woken for each table that wants
-/// it, as the object wakes its container (service/do/bench.mjs). Their
-/// log is named for [tag] (the suite, and the worker for a suite run
-/// side by side), and the house's word on its tables is said through
-/// [say]. Its bots think at [pace], the share of every beat the suite's
-/// app takes ([serveApp]; service/bin/house.dart, `--pace`).
+/// house; and the house, started and woken for each table and each pool
+/// that wants it, as the object wakes its container
+/// (service/do/bench.mjs), and told with every wake the clocks of
+/// [config], the operator's remote config the suite's app is served
+/// ([serveApp]). Their log is named for [tag] (the suite, and the worker
+/// for a suite run side by side), and the house's word on its tables is
+/// said through [say]. Its bots think at [pace], the share of every beat
+/// the suite's app takes ([serveApp]; service/bin/house.dart, `--pace`).
 ///
 /// `house.stop()` takes the house off the air, as a container that has
 /// gone; the next table that wants it starts it again, and it goes on
 /// from the log.
-export async function startRelay({ port = null, tag = suite, say = log, pace = 1 } = {}) {
+export async function startRelay({ port = null, tag = suite, say = log, pace = 1, config = null } = {}) {
   // The whole log of both, always, at a known path for a debugging run.
   // A relay started again under the same tag — a worker's, flow after
   // flow — adds to the log this run began rather than starting it over.
@@ -173,7 +177,7 @@ export async function startRelay({ port = null, tag = suite, say = log, pace = 1
   const relayLog = createWriteStream(logFile, { flags: relayLogs.has(logFile) ? 'a' : 'w' });
   relayLogs.add(logFile);
   port ??= await freePort();
-  const house = houseOn(await freePort(), relayLog, say, pace);
+  const house = houseOn(await freePort(), relayLog, say, pace, config);
   const proc = spawn(process.execPath, [join(root, 'service', 'do', 'host.mjs'), '--port', `${port}`, '--object', '--gate', localService.key, '--house', rigHouse.key],
       { cwd: root });
   const url = await new Promise((resolveUrl, reject) => {
@@ -193,7 +197,8 @@ export async function startRelay({ port = null, tag = suite, say = log, pace = 1
       } catch {
         return;
       }
-      // A table that wants its house, and the house not on its log.
+      // A table that wants its house, and the house not on its log; or a
+      // pool somebody waits in, and the house not there.
       if (typeof said.wanted === 'string') house.wake(said.wanted).catch((e) => say(`house: not woken for ${said.wanted.slice(0, 8)}: ${e.message}`));
     });
     proc.stderr.on('data', (d) => process.stderr.write(d));
@@ -213,10 +218,11 @@ export async function startRelay({ port = null, tag = suite, say = log, pace = 1
 const relayLogs = new Set();
 
 /// The house on [port], for the relay its `relay` names: started when a
-/// table first wants it, and again once it has gone, then woken for the
-/// table. `said` is every line it has written, for a run that has to
-/// check what the house did rather than what a browser could see.
-function houseOn(port, relayLog, say, pace) {
+/// table or a pool first wants it, and again once it has gone, then
+/// woken for it, with the clocks of [config] as the bench says the
+/// operator's. `said` is every line it has written, for a run that has
+/// to check what the house did rather than what a browser could see.
+function houseOn(port, relayLog, say, pace, config) {
   let proc = null;
   let up = null;
   const said = [];
@@ -243,13 +249,16 @@ function houseOn(port, relayLog, say, pace) {
   const house = {
     relay: null,
     said,
-    async wake(table) {
+    async wake(tag) {
       // One start at a time: two tables that want the house at once
       // wait on the same one, as the container is started once
       // (service/do/bench.mjs). Started again once it has gone.
       if (!up || (proc && exited(proc))) up = start();
       await up;
-      const res = await fetch(`http://127.0.0.1:${port}/wake?table=${table}`, { method: 'POST' });
+      const res = await fetch(`http://127.0.0.1:${port}${wakePath(tag)}`, {
+        method: 'POST',
+        body: JSON.stringify({ timing: configOf(config).table ?? null }),
+      });
       if (!res.ok) throw new Error(`the house answered ${res.status}`);
     },
     async stop() {

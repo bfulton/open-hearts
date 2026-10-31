@@ -7,6 +7,7 @@
 /// own in no time at all.
 library;
 
+export 'src/bots.dart';
 export 'src/client.dart';
 export 'src/clock.dart';
 export 'src/conduct.dart';

@@ -1,26 +1,23 @@
-/// Seating strangers, with no one in charge.
+/// Seating strangers: the house seats every pool.
 ///
-/// Players who want a game say so on the relay every few seconds, in
-/// the pool they chose — rated or unrated — with their rating and how
-/// long they have waited. Everyone waiting sees everyone else. Time is
-/// cut into rounds of five seconds, and in each round the lowest key
-/// present acts as host: it runs [plan] over everyone it has heard
-/// from and publishes the seating, one signed event per table naming
-/// the seats, the same start event a friends' room uses. Everyone else
-/// waits for a seating with their key in it. If the host says nothing
-/// for a round, the next key steps in. A host can only waste five
-/// seconds; it cannot forge a play, since every play is signed by its
-/// seat and checked by every other.
+/// Players who want a game say so on the relay every couple of seconds
+/// ([WaitingRoom]), in the pool they chose — rated or unrated, and the
+/// score the game runs to — with their rating, their pace and how long
+/// they have waited. The house hears everyone in a pool ([PoolHost]):
+/// the pool's object on the relay wakes it while anybody is waiting
+/// there (service/do/pool.mjs). Time is cut into rounds of five
+/// seconds, and in each the house runs [plan] over everyone it hears
+/// and publishes the seating, one event per table naming the seats,
+/// signed by its key. A device takes a seating from its build's house
+/// and nobody else, and the relay carries a pool's seating from nobody
+/// else either.
 ///
-/// Two hosts with different views may both seat a round: the next in
-/// line steps in when the host's seating has not reached it in time. A
-/// player takes the lowest table id among the seatings naming it that
-/// arrive within a tenth of a round of the first, and no later one, so
-/// players seated together are parted when a seating reaches some of
-/// them in time and others not. Each still sits at one table, and the
-/// other table's empty seat is booted at its first turn and a bot takes
-/// it, as for a friend who joined and closed the app. Only something in
-/// charge could rule that out, and nothing here is.
+/// So one hand seats a pool, and it seats each player once: whoever a
+/// seating names is out of the pool as it is said, and nobody is seated
+/// at two tables, or parted from the people seated with them. Every
+/// table a pool seats is sealed and has the house at it anyway
+/// (docs/explanation/live-play.md), so a pool asks nothing of the house
+/// that its tables did not.
 library;
 
 import 'dart:async';
@@ -68,7 +65,11 @@ class Waiter {
   /// has not played enough to know, and sits with anybody.
   final int pace;
 
-  /// When they started waiting, ms since the epoch, by their own clock.
+  /// When they started waiting, ms since the epoch: by their own clock
+  /// as their own device has it ([WaitingRoom.since]), and by the
+  /// house's, from when it first heard them, as the house seats them
+  /// ([PoolHost]) — a device's clock is its own, and may be out by
+  /// minutes.
   final int since;
 
   /// How long they will wait for people before bots fill the seats, as
@@ -174,34 +175,57 @@ Plan plan(
 String poolTag(String pool, {int target = gameOverScore}) =>
     '${RelayTransport.poolPrefix}$pool${target == gameOverScore ? '' : ':$target'}';
 
-/// A player in a pool: says they are waiting, watches the others, hosts
-/// when it is their turn to, and stops when seated.
+/// The pool and the score a pool's tag names ([poolTag]): one of the
+/// [pools], and a score no higher than the long game's, or null for a
+/// tag that is not a pool's. The app offers the game and the long game
+/// (app/lib/game_options.dart); a driven build asks for as little as a
+/// point (app/lib/net/address.dart, targetIn).
+({String pool, int target})? poolOf(String tag) {
+  if (!tag.startsWith(RelayTransport.poolPrefix)) return null;
+  final parts = tag.substring(RelayTransport.poolPrefix.length).split(':');
+  if (parts.length > 2 || !pools.contains(parts.first)) return null;
+  final target = parts.length == 1 ? gameOverScore : int.tryParse(parts[1]);
+  if (target == null || target < 1 || target > longGameScore) return null;
+  // One tag a pool: the default score is the plain tag's, never named,
+  // and a score is said one way.
+  if (poolTag(parts.first, target: target) != tag) return null;
+  return (pool: parts.first, target: target);
+}
+
+/// The pools there are: a rated game, and one that is not.
+const pools = ['rated', 'unrated'];
+
+/// How long a pool's round is: the house seats a pool once a round
+/// ([PoolHost]), and a seating says which round it was.
+const poolRoundMs = 5000;
+
+/// How long someone waiting goes unheard before they are taken to have
+/// gone: a few of their heartbeats ([WaitingRoom.heartbeatMs]).
+const poolStaleMs = 7000;
+
+/// A player in a pool: says they are waiting, watches the others, and
+/// takes the first seating the house names them in.
 class WaitingRoom {
   WaitingRoom({
     required this.relay,
     required this.pool,
     required this.name,
     required this.rating,
+    required this.house,
     this.pace = 0,
-    this.roundMs = 5000,
+    this.roundMs = poolRoundMs,
     int botsAfterMs = defaultBotsAfterMs,
     this.heartbeatMs = 2000,
-    this.staleMs = 7000,
+    this.staleMs = poolStaleMs,
     int? nowMs,
-    Random? random,
     this.log,
-    this.botRating,
-    this.sealed = false,
     this.avatar,
     this.picture,
     this.target = gameOverScore,
-    this.timing = TableTiming.standard,
-    this.house,
     this.licence,
   })  : poolBotsAfterMs = botsAfterMs,
         botsAfterMs = botsAfterMs,
         since = nowMs ?? DateTime.now().millisecondsSinceEpoch {
-    _random = random ?? Random.secure();
     for (final e in List.of(relay.lobbySoFar)) {
       _onLobby(e);
     }
@@ -210,29 +234,20 @@ class WaitingRoom {
     // A picture is heavy for a heartbeat: once, stored under the pool,
     // so whoever is seated with this player has it.
     if (picture != null) relay.announce({'kind': 'picture', 'jpeg': picture});
-    _timer = Timer.periodic(Duration(milliseconds: roundMs ~/ 20), (_) => _tick());
+    _timer = Timer.periodic(Duration(milliseconds: heartbeatMs ~/ 4), (_) => _tick());
   }
 
   final RelayTransport relay;
   final String pool;
   final String name;
 
-  /// The score the tables this player sits at run to: it seats nobody
-  /// who asked for another, and the tables it hosts say so.
+  /// The score the tables this player sits at run to: it is seated in
+  /// that game's pool, and sits at no table of another.
   final int target;
 
-  /// The clocks of the tables this player hosts (timing.dart), from
-  /// its remote config. Only the host's counts: it rides in the
-  /// seating, and every seat takes it from there.
-  final TableTiming timing;
-
-  /// Whether this device deals sealed tables (docs/explanation/fair-deal.md): the tables it
-  /// seats are sealed, and it sits only at sealed ones.
-  final bool sealed;
-
-  /// The house this build plays with (docs/explanation/live-play.md): a
-  /// sealed table it hosts names it, and it sits at no sealed table that
-  /// names another.
+  /// The house this build plays with (docs/explanation/live-play.md):
+  /// the one key a seating is taken from, and the one a table it seats
+  /// names. A room with none is seated by nobody.
   final PublicKey? house;
   final int rating;
 
@@ -249,12 +264,15 @@ class WaitingRoom {
 
   /// This device's licence, said with every heartbeat and carried into
   /// every seating it is in. Where accounts are checked (licence.dart)
-  /// a waiter without one is not seated by anyone.
+  /// a waiter without one is not seated.
   final Licence? licence;
+
+  /// The house's round ([poolRoundMs]): a seating says the round it
+  /// was made in, and is for that round and no other.
   final int roundMs;
 
   /// The pool's wait before bots: what every waiter who has said
-  /// nothing else chose, whoever hosts the round.
+  /// nothing else gets.
   final int poolBotsAfterMs;
 
   /// How long this player waits for people before bots fill the empty
@@ -288,13 +306,10 @@ class WaitingRoom {
   final int since;
   final void Function(String line)? log;
 
-  /// The bots for a table of people rated about [rating], `count` of
-  /// them, no persona twice. Null seats the roster at the top.
-  final List<Persona> Function(int rating, int count, Random random)? botRating;
-
-  late final Random _random;
   final Map<PublicKey, Waiter> _others = {};
-  final Set<int> _seatedRounds = {};
+
+  /// Whom a seating took out of the pool: waiting no longer.
+  late final _Seated _gone = _Seated(staleMs);
   int _lastSaid = 0;
   StreamSubscription<NostrEvent>? _sub;
   Timer? _timer;
@@ -311,29 +326,22 @@ class WaitingRoom {
   final _seated = StreamController<TableSpec>.broadcast();
   Stream<TableSpec> get seated => _seated.stream;
 
-  /// Seatings that name this player, gathered for a tenth of a round
-  /// before one is taken: two hosts with different views may both have
-  /// seated them, and the lowest table id heard by then is taken.
-  final List<(TableSpec, Map<int, String>, Map<int, Map<String, Object?>>)> _offers = [];
-  Timer? _commit;
-
   PublicKey get me => relay.signer.publicKey;
   int get _now => DateTime.now().millisecondsSinceEpoch;
   int _roundOf(int ms) => ms ~/ roundMs;
 
-  /// Everyone present, this player included, freshest first by key.
+  /// Everyone waiting, as far as this device can tell, itself included,
+  /// by key: who it has heard lately and has not seen seated.
   List<Waiter> get present {
     final now = _now;
     final all = [
-      Waiter(key: me, name: name, rating: rating, since: since, avatar: avatar, licence: licence, botsAfterMs: botsAfterMs)..lastSeen = now,
+      Waiter(key: me, name: name, rating: rating, since: since, avatar: avatar, pace: pace, licence: licence, botsAfterMs: botsAfterMs)
+        ..lastSeen = now,
       ..._others.values.where((w) => now - w.lastSeen <= staleMs),
     ];
     all.sort((a, b) => a.key.compareTo(b.key));
     return all;
   }
-
-  /// Who hosts the current round: the lowest key present.
-  PublicKey get host => present.first.key;
 
   void _say() {
     if (spec != null) return;
@@ -354,81 +362,8 @@ class WaitingRoom {
 
   void _tick() {
     if (spec != null) return;
-    final now = _now;
-    if (now - _lastSaid >= heartbeatMs) _say();
-    final round = _roundOf(now);
-    final into = now - round * roundMs;
-    final ranked = present.map((w) => w.key).toList();
-    final mine = ranked.indexOf(me);
-    // The host acts a fifth of the way into the round, when the
-    // heartbeats have settled; the next in line a fifth later if nothing
-    // was seated, and so on down.
-    final myTurnAt = (roundMs ~/ 5) * (1 + mine);
-    if (into >= myTurnAt && !_seatedRounds.contains(round) && !_anySeating(round)) {
-      _seatedRounds.add(round);
-      _hostRound(round, now);
-    }
-  }
-
-  final Map<int, int> _seatingsSeen = {};
-  bool _anySeating(int round) => (_seatingsSeen[round] ?? 0) > 0;
-
-  void _hostRound(int round, int now) {
-    final all = present;
-    // The pool's wait for anyone who said nothing else: never the
-    // host's own choice, which is the host's alone.
-    final p = plan(all, nowMs: now, roundMs: roundMs, botsAfterMs: poolBotsAfterMs, random: Random(round));
-    if (p.tables.isEmpty) return;
-    log?.call('$pool round $round: hosting, ${all.length} present, ${p.tables.length} table(s)');
-    for (final humans in p.tables) {
-      final salt = newSalt(_random);
-      final seed = _random.nextInt(1 << 31);
-      final mean = humans.map((w) => w.rating).reduce((a, b) => a + b) ~/ humans.length;
-      final wanted = seatCount - humans.length;
-      final bots = botRating?.call(mean, wanted, Random(seed)) ?? (List.of(Persona.roster)..shuffle(Random(seed))).take(wanted).toList();
-      final seats = <Map<String, Object?>>[];
-      for (var s = 0; s < seatCount; s++) {
-        if (s < humans.length) {
-          seats.add({
-            'key': humans[s].key,
-            'name': humans[s].name,
-            if (humans[s].avatar != null) 'avatar': humans[s].avatar,
-            if (humans[s].licence != null) 'licence': humans[s].licence!.toJson(),
-          });
-        } else {
-          seats.add({'bot': bots[s - humans.length].id});
-        }
-      }
-      // The table's id is its spec's (spec.dart, TableSpec.id), as every
-      // device seated works it out again.
-      final table = TableSpec(
-        seed: seed,
-        seats: [
-          for (var s = 0; s < seatCount; s++)
-            s < humans.length ? HumanSeat(humans[s].key, licence: humans[s].licence) : BotSeat(bots[s - humans.length]),
-        ],
-        rated: pool == 'rated',
-        sealed: sealed,
-        target: target,
-        timing: timing,
-        house: sealed ? house : null,
-        salt: salt,
-      );
-      relay.announce({
-        'kind': 'match',
-        'round': round,
-        'table': table.id,
-        'salt': salt,
-        'seed': seed,
-        'rated': pool == 'rated',
-        'sealed': sealed,
-        'target': target,
-        'timing': timing.toJson(),
-        if (sealed) 'house': house,
-        'seats': seats,
-        'policy': botPolicyVersion,
-      });
-    }
+    _gone.prune(_now);
+    if (_now - _lastSaid >= heartbeatMs) _say();
   }
 
   void _onLobby(NostrEvent e) {
@@ -445,9 +380,9 @@ class WaitingRoom {
         final jpeg = c['jpeg'];
         if (jpeg is String && jpeg.length <= 20000) pictures[e.pubkey] = jpeg;
       case 'wait':
-        if (e.kind != TableKinds.waiting || e.pubkey == me) return;
-        // A waiter is seated only with the service's word that its key
-        // is an account's device — and never beside this device's own
+        if (e.kind != TableKinds.waiting || e.pubkey == me || _gone.hides(e.pubkey, _now)) return;
+        // Whom the screen counts as waiting: whoever the service's word
+        // says is an account's device, and not this device's own
         // account, which is one person on two devices.
         final licence = Licence.parse(c['licence']);
         if (!licenceFits(licence, e.pubkey, at: DateTime.fromMillisecondsSinceEpoch(_now))) return;
@@ -465,44 +400,46 @@ class WaitingRoom {
           ),
         );
         w.lastSeen = _now;
-        // Said again with every heartbeat, and changed by a choice made
-        // while waiting; never past the most anyone waits.
-        w.botsAfterMs = switch (c['botsAfter']) { final int b when b >= 0 && b <= personAtMostMs => b, _ => null };
       case 'match':
-        if (e.kind != TableKinds.lobby) return;
+        // The house's, or no seating at all.
+        if (e.kind != TableKinds.lobby || house == null || e.pubkey != house) return;
         final round = c['round'] as int?;
-        // A seating is for the round that made it and no other. It
-        // goes out on the stored kind, so that a device arriving at a
-        // room code is handed the room announced before it got there
-        // (nostr.dart); a pool is subscribed to the same way and with
-        // no window on it, so a relay hands a device that comes back
-        // to the pool every seating it has ever carried there — this
-        // device's own from a game an hour ago among them, at a table
-        // whose people have long closed their apps.
+        // A seating is for the round that made it and no other. It goes
+        // out on the stored kind, so that a device arriving at a room
+        // code is handed the room announced before it got there
+        // (nostr.dart); a pool is subscribed to the same way, so a relay
+        // hands a device that comes back to the pool the seatings of the
+        // last minute (RelayTransport.poolHistorySeconds) — this device's
+        // own from its last game among them, at a table whose people
+        // have closed their apps.
         //
-        // A round or two either side, and no more. Rounds are a
-        // shared clock bucket and everything else here compares them
-        // exactly — the host acts a fifth of the way into its own
-        // round, and a seating is counted against the round it names
-        // — so a device whose clock is further out than that is one
-        // that could not have been seated anyway.
+        // A round or two either side of this device's clock, and no
+        // more: the round is the house's, by its clock, and a device
+        // further out than that is one that could not tell a seating of
+        // now from one of a minute ago.
         if (round == null || (round - _roundOf(_now)).abs() > 2) return;
-        _seatingsSeen[round] = (_seatingsSeen[round] ?? 0) + 1;
         _maybeSeated(c);
+        // Whoever it seated is waiting no longer, whether or not this
+        // device was among them.
+        if (c['seats'] case final List<Object?> seats) {
+          for (final s in seats) {
+            if (s case {'key': final String key}) {
+              _others.remove(key);
+              _gone.add(key, _now);
+            }
+          }
+        }
     }
   }
 
   void _maybeSeated(Map<String, Object?> c) {
-    // A table whose host computes the bots by another version of the
+    // A table whose house computes the bots by another version of the
     // policy would fork on the first bot's card: not one to sit at.
     if (c['policy'] != botPolicyVersion) return;
-    // A device that cannot run the deal cannot sit at a sealed table,
-    // and one that can does not sit at an unsealed one.
-    if ((c['sealed'] == true) != sealed) return;
-    // A sealed table is the house's to hold the bots of and to say the
-    // end of: this build's, or none it sits at.
-    if (sealed && (house == null || c['house'] != house)) return;
-    // A host on an older build says nothing about the target, which
+    // Every table a pool seats is sealed, and the house's to hold the
+    // bots of and to say the end of: this build's.
+    if (c['sealed'] != true || c['house'] != house) return;
+    // A house on an older build says nothing about the target, which
     // means the game it seats runs to fifty.
     if ((c['target'] as int? ?? gameOverScore) != target) return;
     final seats = <SeatHolder>[];
@@ -526,16 +463,16 @@ class WaitingRoom {
       }
       if (!mine || seats.length != seatCount) return;
       final offered = TableSpec(
-            seed: c['seed'] as int,
-            seats: seats,
-            rated: c['rated'] == true,
-            sealed: c['sealed'] == true,
-            target: target,
-            // The host's clocks, not this device's, said in full
-            // (TableTiming.exactly): a seating without them is no table.
-            timing: TableTiming.exactly(c['timing']) ?? (throw const FormatException('timing')),
-            house: sealed ? house : null,
-            salt: c['salt'] as String? ?? (throw const FormatException('salt')));
+          seed: c['seed'] as int,
+          seats: seats,
+          rated: c['rated'] == true,
+          sealed: true,
+          target: target,
+          // The house's clocks, said in full (TableTiming.exactly): a
+          // seating without them is no table.
+          timing: TableTiming.exactly(c['timing']) ?? (throw const FormatException('timing')),
+          house: house,
+          salt: c['salt'] as String? ?? (throw const FormatException('salt')));
       // A table is named by its id, which is its spec's: a seating whose
       // table is not the one it says is no table, and one with no salt
       // has an id anybody who saw the seats could work out.
@@ -550,25 +487,255 @@ class WaitingRoom {
         log?.call('$pool: a seating refused: $wrong');
         return;
       }
-      _offers.add((offered, names, avatars));
+      spec = offered;
+      seatNames = names;
+      seatAvatars = avatars;
     } catch (_) {
       return;
     }
-    _commit ??= Timer(Duration(milliseconds: roundMs ~/ 10), () {
-      _offers.sort((a, b) => a.$1.id.compareTo(b.$1.id));
-      spec = _offers.first.$1;
-      seatNames = _offers.first.$2;
-      seatAvatars = _offers.first.$3;
-      log?.call('$pool: seated at ${spec!.id}${_offers.length > 1 ? ' (of ${_offers.length} offers)' : ''}');
-      _timer?.cancel();
-      _seated.add(spec!);
-    });
+    log?.call('$pool: seated at ${spec!.id}');
+    _timer?.cancel();
+    _seated.add(spec!);
   }
 
   void close() {
     _timer?.cancel();
-    _commit?.cancel();
     _sub?.cancel();
     _seated.close();
   }
+}
+
+/// The house's side of a pool ([poolTag]): hears everyone waiting there,
+/// seats them a round at a time, and is done once nobody has waited
+/// there for [idleMs].
+///
+/// [relay] is the pool's tag, signed as the house: what it seats names
+/// [relay]'s key as its house. Whoever a seating names is out of the
+/// pool as it is said: what they say after is not heard for [staleMs],
+/// which is longer than any heartbeat they sent before it reached them
+/// takes to arrive. A device that never took the seating is still
+/// saying it waits after that, and is heard again.
+class PoolHost {
+  PoolHost({
+    required this.relay,
+    required this.pool,
+    required this.bots,
+    this.target = gameOverScore,
+    this.timing = TableTiming.standard,
+    this.roundMs = poolRoundMs,
+    this.staleMs = poolStaleMs,
+    this.botsAfterMs = WaitingRoom.defaultBotsAfterMs,
+    this.idleMs = 60000,
+    Future<void>? ready,
+    Random? random,
+    this.log,
+    this.onIdle,
+  }) : _heardAt = DateTime.now().millisecondsSinceEpoch {
+    _random = random ?? Random.secure();
+    if (ready == null) {
+      _ready = true;
+    } else {
+      // Nothing seated before what it waits on, and nothing for ever
+      // waited on: the bots are chosen by ratings it may still be
+      // reading.
+      unawaited(ready.whenComplete(() => _ready = true).catchError((_) {}));
+    }
+    for (final e in List.of(relay.lobbySoFar)) {
+      _onLobby(e);
+    }
+    _sub = relay.lobby.listen(_onLobby);
+    _timer = Timer.periodic(Duration(milliseconds: roundMs ~/ 20), (_) => _tick());
+  }
+
+  final RelayTransport relay;
+  final String pool;
+
+  /// The score the games this pool seats run to.
+  final int target;
+
+  /// The clocks of the tables it seats (timing.dart): the operator's, as
+  /// the house was last told them (service/do/bench.mjs). A change is
+  /// the next seating's.
+  TableTiming timing;
+
+  /// The bots for a table of people rated about `rating`, `count` of
+  /// them, no persona twice (bots.dart, botsNear).
+  final List<Persona> Function(int rating, int count, Random random) bots;
+
+  final int roundMs;
+
+  /// How long someone waiting goes unheard before they are taken to
+  /// have gone, and how long someone seated is not heard.
+  final int staleMs;
+
+  /// The pool's wait before bots, for whoever has said nothing else.
+  final int botsAfterMs;
+
+  /// How long with nobody heard waiting before this pool is left
+  /// ([onIdle]).
+  final int idleMs;
+
+  final void Function(String line)? log;
+
+  /// Told once nobody has waited in the pool for [idleMs].
+  final void Function()? onIdle;
+
+  late final Random _random;
+  final Map<PublicKey, Waiter> _waiting = {};
+
+  /// Whom this house seated: not heard for [staleMs] after.
+  late final _Seated _seated = _Seated(staleMs);
+  bool _ready = false;
+  int _hosted = -1;
+  int _heardAt;
+  bool _idle = false;
+  StreamSubscription<NostrEvent>? _sub;
+  Timer? _timer;
+
+  /// The house's key, which every table it seats names.
+  PublicKey get house => relay.signer.publicKey;
+  int get _now => DateTime.now().millisecondsSinceEpoch;
+
+  /// Everyone waiting now, as the house hears them, by key.
+  List<Waiter> get present {
+    final now = _now;
+    return [..._waiting.values.where((w) => now - w.lastSeen <= staleMs)]..sort((a, b) => a.key.compareTo(b.key));
+  }
+
+  void _onLobby(NostrEvent e) {
+    if (e.kind != TableKinds.waiting || e.pubkey == house) return;
+    Map<String, Object?> c;
+    try {
+      c = Map<String, Object?>.from(jsonDecode(e.content) as Map);
+    } catch (_) {
+      return;
+    }
+    if (c['kind'] != 'wait') return;
+    final now = _now;
+    if (_seated.hides(e.pubkey, now)) return;
+    // A waiter is seated only with the service's word that its key is an
+    // account's device.
+    final licence = Licence.parse(c['licence']);
+    if (!licenceFits(licence, e.pubkey, at: DateTime.fromMillisecondsSinceEpoch(now))) return;
+    final w = _waiting.putIfAbsent(
+      e.pubkey,
+      () => Waiter(
+        key: e.pubkey,
+        name: (c['name'] as String?)?.trim() ?? '',
+        rating: c['rating'] as int? ?? 1500,
+        pace: switch (c['pace']) { final int p when p > 0 && p <= 120 => p, _ => 0 },
+        // How long they have waited, by this clock: rounds, windows and
+        // the wait before bots are all the house's.
+        since: now,
+        avatar: c['avatar'] is Map ? Map<String, Object?>.from(c['avatar'] as Map) : null,
+        licence: licence,
+      ),
+    );
+    w.lastSeen = now;
+    // Said again with every heartbeat, and changed by a choice made
+    // while waiting; never past the most anyone waits.
+    w.botsAfterMs = switch (c['botsAfter']) { final int b when b >= 0 && b <= WaitingRoom.personAtMostMs => b, _ => null };
+    _heardAt = now;
+    _idle = false;
+  }
+
+  void _tick() {
+    final now = _now;
+    _seated.prune(now);
+    _waiting.removeWhere((_, w) => now - w.lastSeen > staleMs);
+    if (!_idle && now - _heardAt >= idleMs) {
+      _idle = true;
+      log?.call('$pool: nobody waiting');
+      onIdle?.call();
+      return;
+    }
+    // The house seats a fifth of the way into the round, when the
+    // heartbeats have settled.
+    final round = now ~/ roundMs;
+    if (!_ready || round == _hosted || now - round * roundMs < roundMs ~/ 5) return;
+    _hosted = round;
+    _seat(round, now);
+  }
+
+  void _seat(int round, int now) {
+    final all = present;
+    if (all.isEmpty) return;
+    final p = plan(all, nowMs: now, roundMs: roundMs, botsAfterMs: botsAfterMs, random: _random);
+    if (p.tables.isEmpty) return;
+    log?.call('$pool round $round: ${all.length} waiting, ${p.tables.length} table(s)');
+    for (final humans in p.tables) {
+      final salt = newSalt(_random);
+      final seed = _random.nextInt(1 << 31);
+      final mean = humans.map((w) => w.rating).reduce((a, b) => a + b) ~/ humans.length;
+      final wanted = seatCount - humans.length;
+      final picked = bots(mean, wanted, Random(seed));
+      final table = TableSpec(
+        seed: seed,
+        seats: [
+          for (var s = 0; s < seatCount; s++)
+            s < humans.length ? HumanSeat(humans[s].key, licence: humans[s].licence) : BotSeat(picked[s - humans.length]),
+        ],
+        rated: pool == 'rated',
+        sealed: true,
+        target: target,
+        timing: timing,
+        house: house,
+        salt: salt,
+      );
+      relay.announce({
+        'kind': 'match',
+        'round': round,
+        'table': table.id,
+        'salt': salt,
+        'seed': seed,
+        'rated': pool == 'rated',
+        'sealed': true,
+        'target': target,
+        'timing': timing.toJson(),
+        'house': house,
+        'seats': [
+          for (var s = 0; s < seatCount; s++)
+            if (s < humans.length)
+              {
+                'key': humans[s].key,
+                'name': humans[s].name,
+                if (humans[s].avatar != null) 'avatar': humans[s].avatar,
+                if (humans[s].licence != null) 'licence': humans[s].licence!.toJson(),
+              }
+            else
+              {'bot': picked[s - humans.length].id},
+        ],
+        'policy': botPolicyVersion,
+      });
+      for (final w in humans) {
+        _waiting.remove(w.key);
+        _seated.add(w.key, now);
+      }
+    }
+  }
+
+  void close() {
+    _timer?.cancel();
+    _sub?.cancel();
+  }
+}
+
+/// Whom a seating named, and when: not heard as waiting for [forMs]
+/// after, which is longer than a heartbeat they said before the seating
+/// reached them takes to arrive. What they say after that is heard: a
+/// device that never took its seating is still waiting.
+class _Seated {
+  _Seated(this.forMs);
+
+  final int forMs;
+  final Map<PublicKey, int> _at = {};
+
+  void add(PublicKey key, int now) => _at[key] = now;
+
+  bool hides(PublicKey key, int now) {
+    final at = _at[key];
+    return at != null && now - at < forMs;
+  }
+
+  void prune(int now) => _at.removeWhere((_, at) => now - at >= forMs);
 }

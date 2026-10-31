@@ -39,7 +39,7 @@ The kind numbers are `TableKinds` in `packages/table/lib/src/nostr.dart`. Kinds 
 
 | Kind | Name | Tags | Carries | Ephemeral |
 |---|---|---|---|---|
-| 4244 | `TableKinds.lobby` | `t`: the pool, room code or results tag | JSON with a `kind`: `match` (a pool's seating of a table), `start` (a room's table started), `picture` (a player's picture), `result` (a finished game's result, `GameResult`) | No |
+| 4244 | `TableKinds.lobby` | `t`: the pool, room code or results tag | JSON with a `kind`: `match` (a pool's seating of a table, said by the house), `start` (a room's table started), `picture` (a player's picture), `result` (a finished game's result, `GameResult`) | No |
 | 22242 | `TableKinds.auth` | `relay`, `challenge`, and `activation` (the device's activation, as JSON) | A device's answer to the relay's challenge (NIP-42), sent in an `AUTH` message. The house's answer carries no activation: its key is the one the relay admits by key alone. The relay reads it and does not forward it. | Yes |
 | 4250 | `TableKinds.log` | `t`: the table ID | A table event (`packages/table/lib/src/events.dart`) as JSON, for the table's log. The table's referee takes it, numbers it and stamps it with its time (`service/do/referee.mjs`), and sends it on only as an entry of the log. | No: kept in the table's log, and nowhere else |
 | 24243 | `TableKinds.signal` | `p`: the recipient; `t`: the table ID | A WebRTC offer, answer or ICE candidate, sealed to the recipient with NIP-44 v2 (`packages/table/lib/src/nip44.dart`) | Yes |
@@ -98,10 +98,13 @@ All are in `service/do/relay.mjs`. The operator can change the `online` limits w
 | Ephemeral kinds, on any tag | Not stored: forwarded to matching subscriptions, then forgotten | `ephemeral` in `service/do/relay.mjs` |
 | Anything on `online` that is not ephemeral | Refused | `refusalFor` |
 | Kind 4244 on a pool, room code or table tag, tagged `t` with that same tag | A day, in the object's own storage; an alarm deletes older events | `KEPT_MS` and `SWEEP_EVERY_MS` in `service/do/tag_store.mjs` |
+| A pool's seating (`match`) said by anybody but the house (`OH_HOUSE_KEY`), or by anybody with no house | Withheld: answered `OK` true with the reason, and neither stored nor sent on; one already stored is dropped as a subscription is served | `seatingHeld` in `service/do/pool.mjs` |
 | Kind 4244 on the results tag (`GameResult.tag`) | For good | `resultsTag` in `service/do/relay.mjs`; `tagStore` in `service/do/tag_store.mjs` |
 | Any other kind that is not ephemeral | Refused | `refusalFor` |
 
 A stored event survives the object being evicted. The object holds the newest `storedKeep(tag)` stored events in memory, and sends those that match to each new subscription before `EOSE`. A client reads a pool's seatings back only for `RelayTransport.poolHistorySeconds` (`packages/table/lib/src/relay_transport.dart`).
+
+A pool's object wakes the house, at most once every `wakeEveryMs` (`wakeLimiter` in `service/do/referee.mjs`), when somebody's device says it is waiting there (24245) and no socket on the pool answered the challenge as the house. It stops wanting the house `poolWantsMs` after the last device said so (`poolWatch` in `service/do/pool.mjs`).
 
 ## Reactions
 

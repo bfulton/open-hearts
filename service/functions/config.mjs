@@ -69,9 +69,10 @@ export function configOf(raw) {
     const mail = feedback.protocol === 'mailto:' && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(feedback.pathname);
     if (page || mail) c.feedback = feedback.toString();
   }
-  // The clocks of the tables a device starts: served only where the
-  // whole of it checks out, and left out otherwise, which the app
-  // reads as the standard table.
+  // The clocks of the tables a device starts, and of those the house
+  // seats in the pools (service/do/bench.mjs): served only where the
+  // whole of it checks out, and left out otherwise, which the app and
+  // the house read as the standard table.
   const table = tableTimingOf(raw.table);
   if (table) c.table = table;
   const waits = waitsOf(raw.waits);
