@@ -391,10 +391,12 @@ test("the house's key is made new, its secret set on the relay and shown to nobo
   const said = [...ctx.said, ...ctx.warned].join('\n');
   assert.ok(!said.includes(pair.secret));
   assert.ok(said.includes(pair.key));
-  // Made again, it is replaced where it is.
+  // Made again, it is replaced where it is: production's, and not the
+  // previews' beside it.
   const again = withHouseKey(written, 'e'.repeat(64));
   assert.equal(JSON.parse(again).houseKey, 'e'.repeat(64));
-  assert.equal(again.split('"houseKey"').length, 2);
+  assert.equal(again.match(/^ *"houseKey": /gm).length, 1);
+  assert.deepEqual(JSON.parse(again).preview, JSON.parse(text).preview, "the previews' keys as they were");
 });
 
 test("previews' secrets: without a key pair nothing is set, and what was said is not repeated", async () => {
