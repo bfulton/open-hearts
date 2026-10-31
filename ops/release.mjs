@@ -62,14 +62,54 @@ export async function relay(ctx, { flags }) {
   // while it is built.
   const dir = ctx.moduleDir ?? MODULE_DIR;
   await rm(dir, { recursive: true, force: true });
-  let code;
   try {
     const withModule = (await fetchModule(ctx, dir)) !== null;
-    code = await ctx.run('npx', ['--yes', `wrangler@${version}`, 'deploy', ...(withModule ? ['--alias', MODULE_ALIAS] : [])], { cwd: join(root, 'service/do') });
+    await deployRelay(ctx, version, 'relay', { flags: withModule ? ['--alias', MODULE_ALIAS] : [] });
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
-  if (code !== 0) throw new Failed(`relay: wrangler deploy exited ${code}`);
+}
+
+/// `wrangler deploy` of a relay worker from service/do, [env] naming
+/// which (`--env preview`, or nothing for production's) and [flags] the
+/// rest; [what] it is called in what is said. Wrangler uploads the
+/// worker, live at once, before it builds the house's image and pushes
+/// it, so an image that failed to build would leave the new worker
+/// beside the old house. So the deploy is built first with --dry-run,
+/// which runs the custom build and builds the image but uploads
+/// nothing; and should the deploy fail after its upload all the same
+/// (the image's push, say), the version that served before is put back.
+async function deployRelay(ctx, version, what, { env = [], flags = [] } = {}) {
+  const cwd = join(root, 'service/do');
+  const wrangler = (...args) => ['--yes', `wrangler@${version}`, ...args, ...env];
+  const built = await ctx.run('npx', wrangler('deploy', '--dry-run', ...flags), { cwd });
+  if (built !== 0) throw new Failed(`${what}: not deployed: its build or the house's image failed (wrangler deploy --dry-run exited ${built}), and nothing was uploaded`);
+  const before = await serving(ctx, wrangler('deployments', 'status', '--json'), cwd);
+  const code = await ctx.run('npx', wrangler('deploy', ...flags), { cwd });
+  if (code === 0) return;
+  const after = await serving(ctx, wrangler('deployments', 'status', '--json'), cwd);
+  if (!before || !after) throw new Failed(`${what}: wrangler deploy exited ${code}, and which version serves can't be told: see wrangler deployments status${env.length ? ` ${env.join(' ')}` : ''}, from service/do`);
+  if (after === before) throw new Failed(`${what}: wrangler deploy exited ${code}; ${before} still serves`);
+  const back = await ctx.run('npx', wrangler('rollback', before, '--message', `${what}: its deploy failed after the upload`, '--yes'), { cwd });
+  if (back !== 0) throw new Failed(`${what}: wrangler deploy exited ${code} with ${after} live, and putting ${before} back failed too (wrangler rollback exited ${back})`);
+  throw new Failed(`${what}: wrangler deploy exited ${code} with ${after} live; ${before}, which served before, serves again`);
+}
+
+/// The version serving all of a worker's traffic, from what [args]
+/// (wrangler deployments status --json) said; null when that can't be
+/// told, or the traffic is split.
+async function serving(ctx, args, cwd) {
+  const { code, out } = await ctx.capture('npx', args, { cwd });
+  if (code !== 0) return null;
+  let status;
+  try {
+    // What npx and Wrangler say on stderr comes with it.
+    status = JSON.parse(out.slice(out.indexOf('{'), out.lastIndexOf('}') + 1));
+  } catch (e) {
+    if (e instanceof SyntaxError) return null;
+    throw e;
+  }
+  return (status?.versions ?? []).find((v) => v?.percentage === 100)?.version_id ?? null;
 }
 
 /// The preview relay (wrangler.toml, [env.preview]), from whatever is
@@ -93,8 +133,7 @@ async function previewRelay(ctx, { flags }) {
     return;
   }
   if (!ready) throw new Failed('preview relay: not deployed (see above)');
-  const code = await ctx.run('npx', ['--yes', `wrangler@${version}`, 'deploy', '--env', 'preview'], { cwd: join(root, 'service/do') });
-  if (code !== 0) throw new Failed(`preview relay: wrangler deploy exited ${code}`);
+  await deployRelay(ctx, version, 'preview relay', { env: ['--env', 'preview'] });
 }
 
 export async function site(ctx, { flags }) {

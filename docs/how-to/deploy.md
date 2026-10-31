@@ -41,7 +41,9 @@ Use this guide to publish the site, the web app and the service's handlers to Cl
 
    The relay goes first because the `Household` object runs in the relay worker. A new site whose handlers ask the object something it does not know yet gets a 400 (`not a household operation`) until the relay is deployed. To deploy only one, use `./oh deploy relay --apply` or `./oh deploy site --apply`.
 
-   For the relay, Wrangler runs `service/bench/build.sh` first, which builds the deal and Schnorr libraries and compiles the house, and then builds and uploads the house's image.
+   For the relay, `oh` first runs `wrangler deploy --dry-run`, which runs `service/bench/build.sh` (it builds the deal and Schnorr libraries and compiles the house) and builds the house's image, but uploads nothing. A real deploy uploads the worker, live at once, before it builds the image, so an image that failed to build there would leave the new worker beside the old house. Only once the dry run has built both does `oh` deploy: the build again, the worker, and the house's image built and pushed.
+
+   If the deploy fails after its upload all the same, `oh` puts back the version that served before (`wrangler rollback`), and says so. If it can't tell which version served, it rolls nothing back: check with `npx wrangler deployments status` from `service/do`.
 
 ## Deploy a preview
 

@@ -170,6 +170,81 @@ test('a relay deploy says what it lacks before it starts', async () => {
   assert.equal(ctx.started.length, 0);
 });
 
+test('a relay deploy is built before anything is uploaded, and what served is put back if the deploy fails after its upload', async () => {
+  const moduleDir = join(mkdtempSync(join(tmpdir(), 'relay-')), 'private', 'photodna');
+  /// A production relay deploy where `wrangler deploy --dry-run` exits
+  /// [built], `wrangler deploy` [deployed] and `wrangler rollback`
+  /// [rolled]; `deployments status` says [serving] before the deploy and
+  /// [after] once it has run: one version at all of the traffic, its
+  /// versions as they are split, or none.
+  const run = async ({ built = 0, deployed = 0, rolled = 0, serving = 'v1', after = serving } = {}) => {
+    let done = false;
+    const versions = (v) => (Array.isArray(v) ? v : v ? [{ version_id: v, percentage: 100 }] : []);
+    const status = (v) => `▲ [WARNING] Proxy environment variables detected.\n${JSON.stringify({ id: 'd', versions: versions(v) }, null, 2)}\nnpm notice\n`;
+    const ctx = fake({
+      config: { appOrigin: 'https://play.example', houseKey: 'd'.repeat(64) },
+      moduleDir,
+      capture: async (command, args) => {
+        if (args.includes('HEAD') || args.includes('origin/main')) return { code: 0, out: 'abc\n' };
+        if (args.includes('deployments')) return { code: 0, out: status(done ? after : serving) };
+        return { code: 0, out: '' };
+      },
+    });
+    ctx.run = async (command, args, options = {}) => {
+      ctx.started.push({ command, args, ...options });
+      if (args.includes('--dry-run')) return built;
+      if (args.includes('rollback')) return rolled;
+      done = true;
+      return deployed;
+    };
+    const code = await main(['deploy', 'relay', '--apply'], ctx);
+    return { code, ran: ctx.started.map((s) => s.args.slice(2)), warned: ctx.warned.join('\n') };
+  };
+
+  // Its build or its image fails: nothing is uploaded.
+  const unbuilt = await run({ built: 1 });
+  assert.equal(unbuilt.code, 1);
+  assert.deepEqual(unbuilt.ran, [['deploy', '--dry-run']]);
+  assert.match(unbuilt.warned, /relay: not deployed: its build or the house's image failed \(wrangler deploy --dry-run exited 1\), and nothing was uploaded/);
+
+  // Built, then deployed.
+  const fine = await run();
+  assert.equal(fine.code, 0);
+  assert.deepEqual(fine.ran, [['deploy', '--dry-run'], ['deploy']]);
+
+  // The deploy fails before its upload: what served still does.
+  const before = await run({ deployed: 1 });
+  assert.equal(before.code, 1);
+  assert.deepEqual(before.ran, [['deploy', '--dry-run'], ['deploy']]);
+  assert.match(before.warned, /relay: wrangler deploy exited 1; v1 still serves/);
+
+  // The deploy fails after its upload: what served before is put back.
+  const after = await run({ deployed: 1, after: 'v2' });
+  assert.equal(after.code, 1);
+  assert.deepEqual(after.ran, [['deploy', '--dry-run'], ['deploy'], ['rollback', 'v1', '--message', 'relay: its deploy failed after the upload', '--yes']]);
+  assert.match(after.warned, /relay: wrangler deploy exited 1 with v2 live; v1, which served before, serves again/);
+
+  // And says so when that fails too.
+  const stuck = await run({ deployed: 1, after: 'v2', rolled: 1 });
+  assert.equal(stuck.code, 1);
+  assert.match(stuck.warned, /with v2 live, and putting v1 back failed too \(wrangler rollback exited 1\)/);
+
+  // What served can't be told: nothing is rolled back blind.
+  const blind = await run({ deployed: 1, serving: null, after: 'v2' });
+  assert.equal(blind.code, 1);
+  assert.equal(blind.ran.length, 2);
+  assert.match(blind.warned, /which version serves can't be told: see wrangler deployments status, from service\/do/);
+  const split = await run({ deployed: 1, serving: [{ version_id: 'v0', percentage: 50 }, { version_id: 'v1', percentage: 50 }], after: 'v2' });
+  assert.equal(split.ran.length, 2, 'nor when its traffic was split');
+  assert.match(split.warned, /can't be told/);
+  const partial = await run({ deployed: 1, serving: [{ version_id: 'v1', percentage: 90 }], after: 'v2' });
+  assert.equal(partial.ran.length, 2, 'nor when one version had only some of it');
+  const lost = await run({ deployed: 1, after: null });
+  assert.equal(lost.ran.length, 2, 'nor when what serves after the deploy can\'t be told');
+  assert.match(lost.warned, /can't be told/);
+  assert.ok(!existsSync(moduleDir), 'and the module folder is gone after each');
+});
+
 test('a run-time row is checked as the service checks it before it is written', async () => {
   assert.deepEqual(rejected(configOf, { live: false }), []);
   assert.deepEqual(rejected(configOf, { live: 'no', banner: { id: 'x', text: { en: 'Hi' } } }), ['live']);
@@ -371,8 +446,8 @@ test('the preview relay is deployed from what is checked out, without the PhotoD
   assert.equal(houseless.started.length, 0);
   const ctx = fake({ capture, config: { preview: { serviceKey: 'b'.repeat(64), houseKey: 'c'.repeat(64) } } });
   assert.equal(await main(['deploy', 'relay', '--preview', '--apply'], ctx), 0);
-  assert.deepEqual(ctx.started.map((s) => s.args.slice(2)), [['deploy', '--env', 'preview']]);
-  assert.ok(ctx.started[0].cwd.endsWith('service/do'));
+  assert.deepEqual(ctx.started.map((s) => s.args.slice(2)), [['deploy', '--dry-run', '--env', 'preview'], ['deploy', '--env', 'preview']]);
+  assert.ok(ctx.started.every((s) => s.cwd.endsWith('service/do')));
   // And production's is still held to main.
   const production = fake({ capture, config: { preview: { serviceKey: 'b'.repeat(64) } } });
   assert.equal(await main(['deploy', 'relay', '--apply'], production), 1);
