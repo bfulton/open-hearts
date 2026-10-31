@@ -1,4 +1,4 @@
-/// Strangers seating themselves on the relay, with nobody in charge.
+/// Strangers seated on the relay, by the house (packages/table, matching.dart).
 library;
 
 import 'dart:async';
@@ -67,11 +67,41 @@ void main() {
 
   group('over the relay', () {
     late Relay relay;
+    final house = SchnorrSigner.generate();
     setUp(() async {
-      relay = Relay();
+      relay = Relay(house: house.publicKey);
       await relay.serve();
     });
     tearDown(() => relay.close());
+
+    // The house seating [pool]'s tag, on a socket of its own as the house
+    // binary has one (service/bin/house.dart), at a round of two seconds.
+    // Its bots are the roster's at their starting ratings.
+    Future<(RelayTransport, PoolHost)> seats(
+        {String pool = 'unrated',
+        int target = gameOverScore,
+        TableTiming timing = TableTiming.standard,
+        int staleMs = 2000,
+        int botsAfterMs = 3000,
+        int idleMs = 60000,
+        void Function()? onIdle,
+        Relay? on,
+        SchnorrSigner? as}) async {
+      final t = RelayTransport(relays: [(on ?? relay).url], signer: as ?? house, table: poolTag(pool, target: target));
+      await t.ready;
+      final host = PoolHost(
+          relay: t,
+          pool: pool,
+          target: target,
+          bots: botsNear(Ledger(prior: botPrior)),
+          timing: timing,
+          roundMs: 2000,
+          staleMs: staleMs,
+          botsAfterMs: botsAfterMs,
+          idleMs: idleMs,
+          onIdle: onIdle);
+      return (t, host);
+    }
 
     // A waiter, and the table it is seated at, listened for as the room
     // is made: `seated` keeps nothing for a late listener, and a room
@@ -80,250 +110,255 @@ void main() {
     Future<(RelayTransport, WaitingRoom, Future<TableSpec>)> join(String name,
         {int rating = 1500,
         int target = gameOverScore,
-        TableTiming timing = TableTiming.standard,
         SchnorrSigner? signer,
         int botsAfterMs = 3000,
-        void Function(String)? log}) async {
+        int? clockOutMs,
+        Relay? on,
+        PublicKey? houseKey}) async {
       final s = signer ?? SchnorrSigner.generate();
-      final t = RelayTransport(relays: [relay.url], signer: s, table: poolTag('unrated', target: target));
+      final t = RelayTransport(relays: [(on ?? relay).url], signer: s, table: poolTag('unrated', target: target));
       await t.ready;
       final room = WaitingRoom(
           relay: t,
           pool: 'unrated',
           target: target,
-          timing: timing,
+          house: houseKey ?? house.publicKey,
           name: name,
           rating: rating,
           roundMs: 2000,
           botsAfterMs: botsAfterMs,
           heartbeatMs: 500,
           staleMs: 2000,
-          log: log);
+          nowMs: clockOutMs == null ? null : DateTime.now().millisecondsSinceEpoch + clockOutMs);
       final seated = room.seated.first..ignore();
       return (t, room, seated);
     }
 
-    test('two waiting for a person are left waiting, whoever hosts, until one of them takes bots', () async {
+    void closeAll(Iterable<(RelayTransport, Object, Object?)> them) {
+      for (final (t, x, _) in them) {
+        if (x is WaitingRoom) x.close();
+        if (x is PoolHost) x.close();
+        t.close();
+      }
+    }
+
+    test('two waiting for a person are left waiting until one of them takes bots', () async {
+      final h = await seats();
       final a = await join('A');
       final b = await join('B');
       a.$2.waitForPerson();
       b.$2.waitForPerson();
       // Past the pool's wait for bots (three seconds here), and nobody is
-      // seated: whoever hosts has heard the other wants a person.
+      // seated: the house has heard both want a person.
       final early = Future.any([a.$3, b.$3]);
       expect(await early.then((_) => true).timeout(const Duration(seconds: 7), onTimeout: () => false), isFalse);
       b.$2.playWithBots();
       final specs = await Future.wait([a.$3, b.$3].map((f) => f.timeout(const Duration(seconds: 15))));
       expect(specs.map((s) => s.id).toSet().length, 1, reason: 'one table, the two of them and two bots');
       expect(specs.first.seats.whereType<HumanSeat>().length, 2);
-      for (final r in [a, b]) {
-        r.$2.close();
-        r.$1.close();
-      }
+      closeAll([a, b, (h.$1, h.$2, null)]);
     });
 
-    test('whoever hosts, a waiter who said nothing waits the pool\'s time', () async {
-      // The host takes bots at once; the other said nothing, so waits the
-      // pool's eight seconds here, not the host's none. The other has
-      // waited a round longer (planned first) and is far from the host's
-      // rating (neither takes the other along): held to the host's choice,
-      // the other would be seated alone with bots at the host's first round.
-      //
-      // Far for as long as this test runs: a window widens 100 points a
-      // round of two seconds, so 3000 apart is a minute's wait. At 500,
-      // the other's window reached the host as its wait ran out, and a
-      // host slow to choose seated them together.
-      final signers = [SchnorrSigner.generate(), SchnorrSigner.generate()]..sort((a, b) => a.publicKey.compareTo(b.publicKey));
+    test('a waiter who said nothing waits the pool\'s time, whatever another chose', () async {
+      // One takes bots at once; the other said nothing, so waits the
+      // pool's eight seconds here. Far apart in rating for as long as
+      // this test runs (a window widens 100 points a round of two
+      // seconds, so 3000 apart is a minute's wait), so neither takes the
+      // other along.
       const pool = 8000;
-      final other = await join('Other', signer: signers[1], rating: 4500, botsAfterMs: pool);
-      await Future<void>.delayed(const Duration(milliseconds: 2500));
-      final host = await join('Host', signer: signers[0], botsAfterMs: pool);
-      while (host.$2.present.length < 2) {
-        await Future<void>.delayed(const Duration(milliseconds: 50));
-      }
+      final h = await seats(botsAfterMs: pool);
+      final other = await join('Other', rating: 4500, botsAfterMs: pool);
+      final eager = await join('Eager', botsAfterMs: pool);
       final otherSeated = other.$3.then((spec) => (spec, DateTime.now().millisecondsSinceEpoch));
-      host.$2.playWithBots();
-      final hosted = await host.$3.timeout(const Duration(seconds: 10));
-      expect(hosted.seats.whereType<HumanSeat>().single.key, signers[0].publicKey, reason: 'the host alone, with bots');
+      eager.$2.playWithBots();
+      final hosted = await eager.$3.timeout(const Duration(seconds: 10));
+      expect(hosted.seats.whereType<HumanSeat>().single.key, eager.$2.me, reason: 'alone, with bots, at once');
       final (seated, at) = await otherSeated.timeout(const Duration(seconds: 20));
       expect(at - other.$2.since, greaterThanOrEqualTo(pool), reason: 'not before the pool\'s wait');
-      expect(seated.seats.whereType<HumanSeat>().single.key, signers[1].publicKey);
-      for (final r in [host, other]) {
-        r.$2.close();
-        r.$1.close();
-      }
+      expect(seated.seats.whereType<HumanSeat>().single.key, other.$2.me);
+      closeAll([eager, other, (h.$1, h.$2, null)]);
     });
 
-    test('three waiting: one host seats them at one table with a bot, and two hosts each at a table that names them',
-        () async {
-      // Normally the lowest key alone seats the round. On a machine busy
-      // enough that its seating reaches the next in line after that one's
-      // turn to host has come, both seat it, and each device takes the
-      // lowest table id it has heard in time (matching.dart): together,
-      // or apart. A device stops hosting once it is seated, so once all
-      // three are, the hostings counted here are all there were.
-      var hostings = 0;
-      final rooms = [
-        for (final n in ['A', 'B', 'C'])
-          await join(n, log: (line) {
-            if (line.contains(': hosting,')) hostings++;
-          }),
-      ];
-      final specs = await Future.wait(rooms.map((r) => r.$3.timeout(const Duration(seconds: 15))));
-      expect(hostings, greaterThan(0), reason: 'somebody hosted the round');
-      for (var i = 0; i < rooms.length; i++) {
-        expect(specs[i].seats.whereType<HumanSeat>().map((h) => h.key), contains(rooms[i].$2.me),
-            reason: 'each sits at a table that names it');
-        expect(specs[i].rated, isFalse);
+    test('five waiting: four at a table, and the fifth seated with none of them, however long they stay heard', () async {
+      // Nobody is due bots for a minute, so a table is four people; and
+      // somebody seated is heard of, by their last heartbeat, for twenty
+      // seconds. The fifth is left over, and the pool's next rounds have
+      // only the fifth in them: the four left it as they were seated,
+      // not as they went quiet.
+      final h = await seats(staleMs: 20000, botsAfterMs: 60000);
+      final watching = RelayTransport(relays: [relay.url], signer: SchnorrSigner.generate(), table: poolTag('unrated'));
+      await watching.ready;
+      final seatings = <List<String>>[];
+      final heard = watching.lobby.listen((e) {
+        final c = jsonDecode(e.content) as Map;
+        if (c['kind'] == 'match') seatings.add([for (final s in c['seats'] as List) if ((s as Map)['key'] is String) s['key'] as String]);
+      });
+      final rooms = [for (var i = 0; i < 5; i++) await join('P$i', botsAfterMs: 60000)];
+      // The four, whoever they are.
+      while (seatings.isEmpty) {
+        await Future<void>.delayed(const Duration(milliseconds: 50));
       }
-      if (hostings == 1) {
-        expect(specs.map((s) => s.id).toSet().length, 1, reason: 'one seating, so one table');
-        expect(specs.first.seats.whereType<HumanSeat>().length, 3);
-        expect(specs.first.seats.whereType<BotSeat>().length, 1);
-      } else {
-        printOnFailure('$hostings hostings: the round was seated more than once');
-      }
-      for (final r in rooms) {
-        r.$2.close();
-        r.$1.close();
-      }
+      final four = seatings.single;
+      expect(four, hasLength(4));
+      final fifth = rooms.singleWhere((r) => !four.contains(r.$2.me));
+      // And the fifth's own screen counts nobody but itself, the four
+      // gone from the pool with the seating, not a heartbeat later.
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+      expect(fifth.$2.present.map((w) => w.key), [fifth.$2.me]);
+      // Three rounds on, the fifth is still waiting, and nobody else was
+      // seated.
+      await Future<void>.delayed(const Duration(seconds: 6));
+      expect(seatings, hasLength(1), reason: 'the four were seated once, and the fifth not with any of them');
+      expect(fifth.$2.spec, isNull);
+      // Then the fifth asks for bots, and sits with them alone.
+      fifth.$2.playWithBots();
+      final spec = await fifth.$3.timeout(const Duration(seconds: 10));
+      expect(spec.seats.whereType<HumanSeat>().map((s) => s.key), [fifth.$2.me]);
+      expect(seatings, hasLength(2));
+      await heard.cancel();
+      watching.close();
+      closeAll([...rooms, (h.$1, h.$2, null)]);
     });
 
-    // A seating as a host says it (matching.dart, _hostRound): these
-    // keys, bots in the other seats, salted with [salt], and the table
-    // its spec names.
-    Map<String, Object?> seating(String salt, List<PublicKey> keys) => {
-          'kind': 'match',
-          'round': DateTime.now().millisecondsSinceEpoch ~/ 2000,
-          'table': TableSpec(
-            seed: 1,
-            seats: [for (final k in keys) HumanSeat(k), for (var s = keys.length; s < seatCount; s++) BotSeat(Persona.roster[s])],
-            salt: salt,
-          ).id,
-          'salt': salt,
-          'seed': 1,
-          'rated': false,
-          'sealed': false,
-          'target': gameOverScore,
-          'timing': TableTiming.standard.toJson(),
-          'seats': [
-            for (final k in keys) {'key': k, 'name': 'W'},
-            for (var s = keys.length; s < seatCount; s++) {'bot': Persona.roster[s].id},
-          ],
-          'policy': botPolicyVersion,
-        };
+    test('somebody seated is not heard for a while, and then is: a device that never took its seating waits on', () async {
+      // A device that goes on saying it is waiting after its seating, as
+      // one that could not sit at the table would: a seating, then none
+      // while what it says may be from before it was seated, and then
+      // another.
+      final h = await seats(staleMs: 5000, botsAfterMs: 0);
+      final watching = RelayTransport(relays: [relay.url], signer: SchnorrSigner.generate(), table: poolTag('unrated'));
+      await watching.ready;
+      final stubborn = RelayTransport(relays: [relay.url], signer: SchnorrSigner.generate(), table: poolTag('unrated'));
+      await stubborn.ready;
+      final at = <int>[];
+      final heard = watching.lobby.listen((e) {
+        final c = jsonDecode(e.content) as Map;
+        if (c['kind'] == 'match' && (c['seats'] as List).any((s) => (s as Map)['key'] == stubborn.signer.publicKey)) {
+          at.add(DateTime.now().millisecondsSinceEpoch);
+        }
+      });
+      final since = DateTime.now().millisecondsSinceEpoch;
+      final beat = Timer.periodic(const Duration(milliseconds: 500), (_) {
+        stubborn.announce({'kind': 'wait', 'name': 'S', 'rating': 1500, 'since': since}, ephemeral: true);
+      });
+      // And somebody else waiting, for a person (the pool's own wait
+      // here being none) and far from it in rating, whose screen counts
+      // who is waiting by the same rule, over its own two seconds.
+      final other = await join('O', rating: 4500);
+      other.$2.waitForPerson();
+      bool counted() => other.$2.present.any((w) => w.key == stubborn.signer.publicKey);
+      while (!counted()) {
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+      }
+      while (at.isEmpty) {
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 1000));
+      expect(counted(), isFalse, reason: 'seated a second ago, so not waiting, whatever it still says');
+      await Future<void>.delayed(const Duration(milliseconds: 2000));
+      expect(counted(), isTrue, reason: 'still saying it waits, after the seating could have reached it: waiting');
+      while (at.length < 2) {
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+        if (DateTime.now().millisecondsSinceEpoch - since > 20000) fail('seated ${at.length} times in twenty seconds');
+      }
+      expect(at[1] - at[0], greaterThanOrEqualTo(5000), reason: 'not heard for the house\'s five seconds after its seating');
+      beat.cancel();
+      await heard.cancel();
+      watching.close();
+      stubborn.close();
+      closeAll([other, (h.$1, h.$2, null)]);
+    });
 
-    // The test as a host of its own, its seatings stored on the relay
-    // before it returns: a device that joins after is handed them with
-    // the relay's stored history, all at once.
-    Future<RelayTransport> host() async {
-      final t = RelayTransport(relays: [relay.url], signer: SchnorrSigner.generate(), table: poolTag('unrated'));
+    // A seating as the house says it (matching.dart, PoolHost): these
+    // keys, bots in the other seats, salted with [salt], naming [named]
+    // as its house, and the table its spec names.
+    Map<String, Object?> seating(String salt, List<PublicKey> keys, PublicKey named) {
+      final spec = TableSpec(
+        seed: 1,
+        seats: [for (final k in keys) HumanSeat(k), for (var s = keys.length; s < seatCount; s++) BotSeat(Persona.roster[s])],
+        sealed: true,
+        house: named,
+        salt: salt,
+      );
+      return {
+        'kind': 'match',
+        'round': DateTime.now().millisecondsSinceEpoch ~/ 2000,
+        'table': spec.id,
+        'salt': salt,
+        'seed': 1,
+        'rated': false,
+        'sealed': true,
+        'target': gameOverScore,
+        'timing': TableTiming.standard.toJson(),
+        'house': named,
+        'seats': [
+          for (final k in keys) {'key': k, 'name': 'W'},
+          for (var s = keys.length; s < seatCount; s++) {'bot': Persona.roster[s].id},
+        ],
+        'policy': botPolicyVersion,
+      };
+    }
+
+    test('a seating from anyone but the house: the relay carries none, and a device would take none', () async {
+      // Waiters nobody seats: no house is in the pool.
+      final rooms = [for (var i = 0; i < 3; i++) await join('W', botsAfterMs: 60000)];
+      final keys = [for (final r in rooms) r.$2.me];
+      final stranger = SchnorrSigner.generate();
+      final t = RelayTransport(relays: [relay.url], signer: stranger, table: poolTag('unrated'));
       await t.ready;
-      return t;
-    }
-
-    Future<void> publish(RelayTransport host, List<Map<String, Object?>> seatings) async {
-      final ids = {for (final s in seatings) s['table']};
-      final echoed = host.lobby.where((e) => ids.contains((jsonDecode(e.content) as Map)['table'])).take(ids.length).toList();
-      for (final s in seatings) {
-        host.announce(s);
-      }
-      await echoed.timeout(const Duration(seconds: 15));
-    }
-
-    // Waiters nobody else seats: nobody is due bots for a minute, so no
-    // room hosts a table of its own.
-    Future<List<(RelayTransport, WaitingRoom, Future<TableSpec>)>> waiters(List<SchnorrSigner> signers) async =>
-        [for (final s in signers) await join('W', signer: s, botsAfterMs: 60000)];
-
-    /// Two salts for seatings of [keys], the one whose table's id is
-    /// lower first, and those ids.
-    (List<String>, List<String>) twoOf(List<PublicKey> keys) {
-      String tableOf(String salt) => seating(salt, keys)['table'] as String;
-      final salts = [newSalt(), newSalt()]..sort((a, b) => tableOf(a).compareTo(tableOf(b)));
-      return (salts, [for (final s in salts) tableOf(s)]);
-    }
-
-    test('a device takes the lowest table id among the seatings it has in time, whichever came first', () async {
-      final signers = [for (var i = 0; i < 3; i++) SchnorrSigner.generate()];
-      final keys = [for (final s in signers) s.publicKey];
-      final (salts, ids) = twoOf(keys);
-      final h = await host();
-      await publish(h, [seating(salts[1], keys), seating(salts[0], keys)]);
-      final rooms = await waiters(signers);
-      final specs = await Future.wait(rooms.map((r) => r.$3.timeout(const Duration(seconds: 15))));
-      expect(specs.map((s) => s.id), everyElement(ids[0]), reason: 'the lower id, though it came second');
+      final watching = RelayTransport(relays: [relay.url], signer: SchnorrSigner.generate(), table: poolTag('unrated'));
+      await watching.ready;
+      final carried = <String>[];
+      final listening = watching.lobby.listen((e) {
+        if ((jsonDecode(e.content) as Map)['kind'] == 'match') carried.add(e.pubkey);
+      });
+      // One naming this relay's house, and one naming the stranger, as a
+      // house of its own: each answered as taken, so that the device
+      // that said it is not held out of the relay for it, and neither
+      // carried to anybody.
+      expect(await t.announceTaken(seating(newSalt(), keys, house.publicKey)), isTrue);
+      expect(await t.announceTaken(seating(newSalt(), keys, stranger.publicKey)), isTrue);
+      expect(t.refusal, isNull, reason: 'nothing this device says is refused');
+      await Future<void>.delayed(const Duration(milliseconds: 500));
+      expect(carried, isEmpty, reason: 'the relay carries a pool\'s seating from its house alone');
+      await listening.cancel();
+      watching.close();
+      // And a device whose house is not the relay's takes nothing the
+      // relay's house says: here a relay whose house is the stranger,
+      // and a device that plays with another.
+      final other = Relay(house: stranger.publicKey);
+      await other.serve();
+      final mine = await join('M', on: other, botsAfterMs: 60000);
+      final t2 = RelayTransport(relays: [other.url], signer: stranger, table: poolTag('unrated'));
+      await t2.ready;
+      // One naming this device's house, as its house's would, but said
+      // by the stranger, whom this relay carries.
+      expect(await t2.announceTaken(seating(newSalt(), [mine.$2.me], house.publicKey)), isTrue, reason: 'the relay\'s own house');
+      expect(await mine.$3.then((_) => true).timeout(const Duration(seconds: 3), onTimeout: () => false), isFalse,
+          reason: 'not said by this device\'s house');
       for (final r in rooms) {
-        r.$2.close();
-        r.$1.close();
+        expect(r.$2.spec, isNull);
       }
-      h.close();
+      t.close();
+      t2.close();
+      closeAll([...rooms, mine]);
+      await other.close();
     });
 
-    test('a seating that comes after a device has taken one does not move it', () async {
-      // What parts people seated together, when a second host's seating
-      // reaches some of them in time and the rest too late.
-      final signers = [for (var i = 0; i < 3; i++) SchnorrSigner.generate()];
-      final keys = [for (final s in signers) s.publicKey];
-      final (salts, ids) = twoOf(keys);
-      final h = await host();
-      await publish(h, [seating(salts[1], keys)]);
-      final rooms = await waiters(signers);
-      final specs = await Future.wait(rooms.map((r) => r.$3.timeout(const Duration(seconds: 15))));
-      expect(specs.map((s) => s.id), everyElement(ids[1]));
-      final heard = [
-        for (final r in rooms) r.$1.lobby.firstWhere((e) => (jsonDecode(e.content) as Map)['table'] == ids[0]),
-      ];
-      await publish(h, [seating(salts[0], keys)]);
-      await Future.wait(heard).timeout(const Duration(seconds: 15));
-      // A device that took it would within a tenth of a round of hearing
-      // it (matching.dart); three tenths on, none has. One that drops it
-      // as it arrives, as each must, cannot fail this however slow the
-      // machine: the wait only gives a wrong one time to show itself.
-      await Future<void>.delayed(Duration(milliseconds: rooms.first.$2.roundMs * 3 ~/ 10));
-      for (final r in rooms) {
-        expect(r.$2.spec!.id, ids[1], reason: 'every device heard the lower id, and none moved to it');
-      }
-      for (final r in rooms) {
-        r.$2.close();
-        r.$1.close();
-      }
-      h.close();
-    });
-
-    test('the host\'s clocks are the table\'s: the seating carries them to every seat', () async {
-      // Three devices whose remote configs say three different clocks.
-      // Whoever hosts the round seats the table, and every seat plays
-      // by the host's — none by its own.
-      //
-      // Normally that is the lowest key, alone. On a machine busy enough
-      // that the host's seating reaches the next in line after that one's
-      // turn to host has come, both seat the round (matching.dart): each
-      // table plays by the clocks of the device that seated it, and still
-      // of no other.
-      final timings = [
-        for (final grace in [3000, 4000, 5000]) TableTiming.parse({'graceMs': grace}),
-      ];
-      final hosted = <int>{};
-      final rooms = [
-        for (var i = 0; i < 3; i++)
-          await join('T$i', timing: timings[i], log: (line) {
-            if (line.contains(': hosting,')) hosted.add(i);
-          }),
-      ];
-      final specs = await Future.wait(rooms.map((r) => r.$3.timeout(const Duration(seconds: 15))));
-      expect(hosted, isNotEmpty, reason: 'somebody hosted the round');
-      for (final spec in specs) {
-        expect(spec.timing, anyOf([for (final h in hosted) timings[h]]),
-            reason: 'the clocks of the seating\'s host, of ${hosted.toList()..sort()}');
-      }
-      for (final r in rooms) {
-        r.$2.close();
-        r.$1.close();
-      }
+    test('the operator\'s clocks are the table\'s: as the house was last told them, whatever a device\'s say', () async {
+      final first = TableTiming.parse({'graceMs': 3000});
+      final then = TableTiming.parse({'graceMs': 5000});
+      final h = await seats(timing: first, botsAfterMs: 0);
+      final a = await join('A', botsAfterMs: 0);
+      expect((await a.$3.timeout(const Duration(seconds: 10))).timing, first);
+      h.$2.timing = then;
+      final b = await join('B', botsAfterMs: 0);
+      expect((await b.$3.timeout(const Duration(seconds: 10))).timing, then, reason: 'the next seating\'s');
+      closeAll([a, b, (h.$1, h.$2, null)]);
     });
 
     test('a game to another score waits in a pool of its own, and the table it gets says so', () async {
+      final hosts = [await seats(), await seats(target: longGameScore)];
       final rooms = [await join('Short'), await join('Long', target: longGameScore)];
       final specs = await Future.wait(rooms.map((r) => r.$3.timeout(const Duration(seconds: 15))));
       expect(specs[0].target, gameOverScore);
@@ -331,31 +366,27 @@ void main() {
       expect(specs[0].id, isNot(specs[1].id), reason: 'two games nobody can play at once are two tables');
       for (final spec in specs) {
         expect(spec.seats.whereType<HumanSeat>().length, 1, reason: 'each waited alone and got bots');
+        expect(spec.house, house.publicKey);
+        expect(spec.sealed, isTrue);
       }
-      for (final r in rooms) {
-        r.$2.close();
-        r.$1.close();
-      }
+      closeAll([...rooms, for (final h in hosts) (h.$1, h.$2, null)]);
     });
 
     test('a seating from a round long past does not seat somebody who has come back', () async {
       // The seating goes out on the stored kind, so that a device
       // arriving at a room code is handed the room announced before
       // it got there (nostr.dart, TableKinds.lobby). A pool is
-      // subscribed to the same way and with no window on it, so a
-      // relay hands a device that comes back to the pool every
-      // seating it has ever carried there — this device's own
-      // included.
+      // subscribed to the same way, so a relay hands a device that
+      // comes back to the pool the last minute's seatings — this
+      // device's own included.
+      final h = await seats();
       final mine = SchnorrSigner.generate();
       final first = [await join('A', signer: mine), await join('B'), await join('C')];
       final was = await first.first.$3.timeout(const Duration(seconds: 15));
       expect(was.seats.whereType<HumanSeat>().length, 3, reason: 'three were seated together');
       // That table is played and left; the others close their apps.
-      for (final r in first) {
-        r.$2.close();
-        r.$1.close();
-      }
-      // Rounds go by — four of them at this room's two-second round,
+      closeAll(first);
+      // Rounds go by — four of them at this pool's two-second round,
       // where the real gap is a game's worth — and this device asks
       // for a game again.
       await Future<void>.delayed(const Duration(seconds: 8));
@@ -365,8 +396,7 @@ void main() {
       expect(now.seats.whereType<HumanSeat>().map((h) => h.key), [again.$2.me],
           reason: 'alone at the pool, so alone at the table: B and C are gone, and a seat that never moves is worse '
               'than a bot in it');
-      again.$2.close();
-      again.$1.close();
+      closeAll([again, (h.$1, h.$2, null)]);
     });
 
     test('a device entering a pool is handed this round\'s seatings, not the pool\'s whole history', () async {
@@ -376,7 +406,6 @@ void main() {
       // ever carried. An hour of a busy pool's rounds, and one from now.
       // A socket a tag: on the deployed relay each tag is its own object.
       final sockets = <String, WebSocketChannel>{};
-      final host = SchnorrSigner.generate();
       final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
       // Each kept once the relay says so: what a device entering finds is
       // whatever the relay had taken by then.
@@ -391,7 +420,7 @@ void main() {
           });
           return s;
         });
-        final e = NostrEvent.sign(host, kind: TableKinds.lobby, content: jsonEncode({'what': what}), tags: [
+        final e = NostrEvent.sign(house, kind: TableKinds.lobby, content: jsonEncode({'kind': 'match', 'what': what}), tags: [
           ['t', tag],
         ], createdAt: at);
         unkept.add(e.id);
@@ -425,17 +454,60 @@ void main() {
       }
     });
 
-    test('if the lowest key falls silent, the next seats the round', () async {
-      final rooms = [for (final n in ['A', 'B']) await join(n)];
-      rooms.sort((a, b) => a.$2.me.compareTo(b.$2.me));
-      // The would-be host leaves without a word.
-      rooms.first.$2.close();
-      rooms.first.$1.close();
+    test('a pool nobody has waited in for a while is left, and one somebody waits in is not', () async {
+      final left = Completer<void>();
+      final h = await seats(idleMs: 3000, onIdle: left.complete);
+      final a = await join('A', botsAfterMs: 60000);
+      await Future<void>.delayed(const Duration(seconds: 4));
+      expect(left.isCompleted, isFalse, reason: 'somebody is waiting');
+      closeAll([a]);
+      await left.future.timeout(const Duration(seconds: 8));
+      closeAll([(h.$1, h.$2, null)]);
+    });
+
+    test('a device whose clock is out waits the pool\'s time all the same, by the house\'s clock', () async {
+      // Two minutes ahead, and two behind, as the service lets a phone
+      // be (service/functions/settings.mjs, requestToleranceS): ahead,
+      // it would seem never to have waited, and leave unseated; behind,
+      // to have waited two minutes, and get bots at once. Far apart in
+      // rating, so neither takes the other along.
+      final h = await seats();
+      final joined = DateTime.now().millisecondsSinceEpoch;
+      final ahead = await join('Ahead', clockOutMs: 120000);
+      final behind = await join('Behind', rating: 4500, clockOutMs: -120000);
+      for (final r in [ahead, behind]) {
+        await r.$3.timeout(const Duration(seconds: 10));
+        final waited = DateTime.now().millisecondsSinceEpoch - joined;
+        expect(waited, greaterThanOrEqualTo(3000), reason: '${r.$2.name}: not before the pool\'s three seconds');
+      }
+      closeAll([ahead, behind, (h.$1, h.$2, null)]);
+    });
+
+    test('somebody who goes without a word is seated with nobody', () async {
+      final h = await seats();
+      final rooms = [for (final n in ['A', 'B']) await join(n, botsAfterMs: 60000)];
+      // One leaves without a word; the other asks for bots once the
+      // house has stopped hearing the first.
+      closeAll([rooms.first]);
+      await Future<void>.delayed(const Duration(milliseconds: 2500));
+      rooms.last.$2.playWithBots();
       final spec = await rooms.last.$3.timeout(const Duration(seconds: 15));
       expect(spec.seats.whereType<HumanSeat>().map((h) => h.key), [rooms.last.$2.me]);
       expect(spec.seats.whereType<BotSeat>().length, 3);
-      rooms.last.$2.close();
-      rooms.last.$1.close();
+      closeAll([rooms.last, (h.$1, h.$2, null)]);
     });
+  });
+
+  test('bots near a table\'s rating, by the ratings the results say, no persona twice', () {
+    // Every bot at its starting rating but one, rated far above them all.
+    final ledger = Ledger(prior: botPrior);
+    final top = Persona.all.reduce((a, b) => Persona.priorRating(a.level) >= Persona.priorRating(b.level) ? a : b);
+    final ranked = (ledger.of(top.id).mu + 1000).round();
+    final pick = botsNear(ledger);
+    expect(pick(ranked, 1, Random(1)).single.level, top.level, reason: 'the nearest level to a rating above every bot');
+    final three = pick(1500, 3, Random(2));
+    expect(three.map((p) => p.name).toSet(), hasLength(3), reason: 'no name twice');
+    expect(botPrior(top.id)!.mu, Persona.priorRating(top.level));
+    expect(botPrior('ab' * 16), isNull, reason: 'an account starts fresh');
   });
 }

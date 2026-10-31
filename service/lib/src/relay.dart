@@ -19,9 +19,9 @@
 /// from there when asked for. A `refuse` policy is a Dart closure: the
 /// host asks over the pipe and waits for the answer, so a test that
 /// counts how often its policy was consulted is counting consultations
-/// that really happened. And a table that wants its house and does not
-/// have it is said on the host's stdout, where the deployed object wakes
-/// the house's container: [onWanted].
+/// that really happened. And a table or a pool that wants its house and
+/// does not have it is said on the host's stdout, where the deployed
+/// object wakes the house's container: [onWanted].
 library;
 
 import 'dart:async';
@@ -47,8 +47,9 @@ class Relay {
   final PublicKey? house;
 
   /// Told of a table each time it wants its house and the house is not
-  /// on its log: as a sealed table starts, and while the house is away.
-  final void Function(String table)? onWanted;
+  /// on its log: as a sealed table starts, and while the house is away;
+  /// and of a pool, while somebody waits there and the house is away.
+  final void Function(String tag)? onWanted;
 
   /// Tells the relay that [account]'s device in use is now the one of
   /// [epoch], as the account's own object tells the deployed one, and

@@ -14,6 +14,7 @@
 
 import { nameRefused } from '../functions/names.mjs';
 import { logKind, tableReferee, tableTag } from './referee.mjs';
+import { isPoolTag, poolWatch, seatingHeld } from './pool.mjs';
 
 /// Kinds 20000–29999 are ephemeral: forwarded to whoever is listening
 /// and then forgotten. Every kind presence uses is one of these, which
@@ -406,7 +407,12 @@ const finalWhy = (why) => typeof why === 'string' && why.length <= 120 && /^(sup
 /// and `admitted`: the relay then takes the table's events
 /// ([logKind]) for its log, and answers `["LOG", sub, from]` with the
 /// log from there and `["TICK"]` with the time.
-export function createRelay({ verify, store = memoryStore(), refuse = null, log = null, limits = null, now = Date.now, count = null, heard = null, kept = null, gate = null, withhold = null, screen = null, forget = null, referee = null }) {
+///
+/// [watcher], when given, makes what watches a pool's want of its house
+/// (pool.mjs, poolWatch) from the relay's own `holds`: it is told of
+/// each event the relay took, and says whether the pool wants its house
+/// ([wantsHouse]).
+export function createRelay({ verify, store = memoryStore(), refuse = null, log = null, limits = null, now = Date.now, count = null, heard = null, kept = null, gate = null, withhold = null, screen = null, forget = null, referee = null, watcher = null }) {
   /// socket -> subscription id -> {raw, filters}. The raw filters are
   /// kept beside the parsed ones because a hibernating socket has to
   /// carry them somewhere and JSON is what it can carry.
@@ -448,6 +454,18 @@ export function createRelay({ verify, store = memoryStore(), refuse = null, log 
 
   /// The table's referee, on a table's tag.
   const table = referee?.({ send: sendText, admitted }) ?? null;
+
+  /// Whether a socket that answered the gate as [key], for no account,
+  /// is carried now: the house, on this tag. Nobody, with no gate.
+  const holds = (key) => {
+    for (const [socket, a] of auths) {
+      if (a.who && !a.who.account && a.who.key === key && admitted(socket)) return true;
+    }
+    return false;
+  };
+
+  /// What watches a pool's want of its house, on a pool's tag.
+  const watching = watcher?.({ holds }) ?? null;
 
   /// A fresh challenge for [socket], whose answer ran out or never came.
   function challenge(socket) {
@@ -622,6 +640,7 @@ export function createRelay({ verify, store = memoryStore(), refuse = null, log 
     // Whatever the host wants to know of an event it took, and from
     // whom.
     heard?.(event, auths.get(from)?.who ?? null);
+    watching?.heard(event);
     // Written out once, not once a listener: the same text either way.
     const wire = JSON.stringify(event);
     let delivered = 0;
@@ -817,9 +836,10 @@ export function createRelay({ verify, store = memoryStore(), refuse = null, log 
     },
 
     /// Whether this table wants its house, and the house is not there
-    /// (referee.mjs).
+    /// (referee.mjs); or this pool, with somebody waiting in it
+    /// (pool.mjs).
     get wantsHouse() {
-      return table?.wantsHouse ?? false;
+      return table?.wantsHouse ?? watching?.wantsHouse ?? false;
     },
 
     /// What [socket] must carry to survive hibernation, as JSON.
@@ -853,6 +873,10 @@ export function createRelay({ verify, store = memoryStore(), refuse = null, log 
 /// the house is not there. [house] is this relay's house: the key a
 /// sealed table's spec has to name, and the one key the results are
 /// taken from.
+///
+/// A pool's tag is the house's to seat (pool.mjs): a seating there from
+/// anybody else is withheld, and [wanted] is told each time somebody
+/// waits there and the house is not there.
 export function objectRelay(
   verify,
   { tag = presenceTag, now = Date.now, count = null, limits = null, store = null, kept = null, also = null, gate = null, withhold = null, screen = null, forget = null, house = null, log = null, keepEntry = null, wanted = null, say = null } = {},
@@ -860,15 +884,17 @@ export function objectRelay(
   const presence = tag === presenceTag;
   const own = refusalFor(tag, { house });
   const lobby = !presence && tag !== resultsTag;
+  const pool = isPoolTag(tag);
   return createRelay({
     verify,
     gate,
     log: say,
     referee: tableTag.test(tag) ? ({ send, admitted }) => tableReferee({ table: tag, verify, house, now, entries: log ?? [], keep: keepEntry, wanted, send, admitted }) : null,
+    watcher: pool ? ({ holds }) => poolWatch({ house, here: () => holds(house), wanted, now }) : null,
     // Presence keeps nothing; a table's tag keeps its lobby.
     store: presence ? null : (store ?? memoryStore(storedKeep(tag))),
     kept: presence ? null : kept,
-    withhold: lobby ? withhold : null,
+    withhold: lobby ? (pool ? (event) => seatingHeld(event, house) ?? withhold?.(event) ?? null : withhold) : null,
     screen: lobby ? screen : null,
     forget: lobby ? forget : null,
     // [also]: a test's own policy on top, asked only of what the object

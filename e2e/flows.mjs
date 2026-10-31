@@ -828,6 +828,7 @@ stillFlow('one device at a time: the newest opened wins, and the other takes it 
   await waitFor(first, /^Rocket$/, { what: 'the profile' });
   await type(first, 'Your name', 'Ada');
   await click(first, /^Done$/);
+  await waitFor(first, /^Menu$/, { what: 'the home screen again' });
   await click(first, /^Menu$/);
   await waitFor(first, /^Subscription$/, { what: 'the menu' });
   await click(first, /^Subscription$/);

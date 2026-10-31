@@ -506,17 +506,16 @@ class Lobby extends ChangeNotifier {
     return true;
   }
 
-  /// Into the pool the options ask for, and wait to be seated — by
-  /// whoever among the waiting has the lowest key, this device
-  /// included. Everyone in a pool wants the same game, so the score it
-  /// plays to is part of the pool's own name. Not while the wait after
-  /// a game left early runs: the door says so, and offers nothing.
+  /// Into the pool the options ask for, and wait to be seated by the
+  /// house (packages/table, matching.dart). Everyone in a pool wants the
+  /// same game, so the score it plays to is part of the pool's own name.
+  /// Not while the wait after a game left early runs: the door says so,
+  /// and offers nothing.
   Future<void> play() async {
     if (livePaused || leftEarlyWait != null || _withoutDeal()) return;
     final options = this.options();
     final transport = await _connect(poolTag(options.pool, target: options.target), Opening.live);
     if (transport == null) return;
-    final ledger = _standing?.ledger ?? Ledger();
     final me = who();
     final queue = WaitingRoom(
       relay: transport,
@@ -527,16 +526,12 @@ class Lobby extends ChangeNotifier {
       // What this device has measured of its own play, so it is seated
       // with people who play at about its speed (pace_store.dart).
       pace: pace.stated,
-      botRating: Standing.botPicker(ledger),
       // Whose device this is, by the service's word: a seating names
       // every seat's account with it, and every seat checks them all.
       licence: Entitlement.current.licence,
-      sealed: true,
-      // Every table it seats names this build's house, and it sits at
-      // none that names another.
+      // The one key a seating is taken from, and the house every table
+      // it seats names.
       house: _house,
-      // The tables this device hosts keep its remote config's clocks.
-      timing: RemoteSettings.current.config.table,
       avatar: me.avatar.isDefault ? null : me.avatar.toJson(withPicture: false),
       picture: me.avatar.picture == null ? null : base64Encode(me.avatar.picture!),
     );
@@ -564,11 +559,12 @@ class Lobby extends ChangeNotifier {
     var patience = 0;
     _waitClock = Timer.periodic(const Duration(seconds: 1), (_) {
       // Bots take every seat still empty at ten seconds, so a device
-      // the relays can hear is seated a round or two after that. One
-      // still waiting at the far deadline is one nobody hears — it
-      // went offline, or its relays did — and even the seating it
-      // hosts itself has to come back to it off a relay: the spinner
-      // would turn for ever. So back to the door, saying why.
+      // the house can hear is seated a round or two after that, and
+      // one woken for the pool a few seconds later. One still waiting
+      // at the far deadline is one the house and it are not hearing
+      // each other through — it went offline, or its relays did — and
+      // the spinner would turn for ever. So back to the door, saying
+      // why.
       // Counted from when bots were due, for one who chose to wait
       // for a person.
       patience = max(patience, queue.botsAfterMs - queue.poolBotsAfterMs);
