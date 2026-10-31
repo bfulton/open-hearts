@@ -3,7 +3,7 @@
 This page explains what a stranger can make the system do, and how
 each part defends against it. It covers the Pages worker
 (`service/functions/worker.mjs`), the relay worker (`service/do/`), the
-local relay and juror (`service/bin`, `service/lib`), `deploy.sh`, the
+house (`service/bin`), the local relay host (`service/lib`), `deploy.sh`, the
 site's headers, and the app's side of each call (`app/lib/net/`). The
 fairness and privacy of the deal itself are covered in
 [the fair deal](fair-deal.md).
@@ -171,8 +171,8 @@ object runs on one thread shared by everyone on that tag.
   (`packages/table/lib/src/presence_relay.dart`,
   `presence_replay_test.dart`).
 
-The local relays, the Node host and the juror listen on loopback and
-are not deployed. The Node host's WebSocket framing closes the
+The Node host and the rig's house listen on loopback and are not
+deployed. The Node host's WebSocket framing closes the
 connection on an oversized or fragmented control frame or an unmasked
 frame (`service/do/ws.test.mjs`).
 
@@ -224,7 +224,7 @@ needs `wasm-unsafe-eval`, and the policy has to be tested against it.
 ## Secrets
 
 The service key, Stripe keys, the TURN token, the HMAC key and the
-backup jurors' secret are Cloudflare secrets, set by hand and checked
+house's secret are Cloudflare secrets, set by hand and checked
 only by name (`infra/apply.mjs`). The service key is minted with a
 CSPRNG by `service/bin/service_key.dart`, which prints it once and
 writes it nowhere. `deploy.sh` reads only environment
@@ -237,7 +237,8 @@ self-check) and NIP-44's vectors.
 branch was deployed to it, reviewed or not, so the secrets it signs
 with are its own ([previews](service.md#previews)): a service key pair
 of its own, whose public half every preview build and the preview relay
-name, and the preview relay's own backup jurors' secret. `oh preview
+name, and a house key pair of its own, whose secret only the preview
+relay holds. `oh preview
 secrets` makes them and sets them without showing them, and `oh secret
 set` puts production's on production alone. Nothing a preview signs is
 good in production, and a preview takes nothing production signed: its

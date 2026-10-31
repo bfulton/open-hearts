@@ -1,5 +1,5 @@
 # The deal builds into its own target/ as before the workspace above it
-# (../Cargo.toml): the VM's tests, the memo and the backup jurors' image
+# (../Cargo.toml): the VM's tests, the memo and the house's image
 # find it there (packages/deal, deal_binding.dart and memo.dart).
 [build]
 target-dir = "target"

@@ -13,14 +13,15 @@
 // preview has it ([configFor]).
 
 /// [config] as [deployment] runs it: production's as written; a
-/// preview's with the service key previews have (preview.serviceKey),
-/// and none at all while there is none. Never production's: a preview
+/// preview's with the service key and the house previews have
+/// (preview.serviceKey, preview.houseKey), and none at all while there
+/// is none. Never production's: a preview
 /// runs whatever branch was deployed to it, so what it signs is good on
 /// previews and nowhere else, and it takes nothing production signed.
 export function configFor(config, deployment) {
   if (deployment !== 'preview') return config;
   const { preview, ...rest } = config ?? {};
-  return { ...rest, serviceKey: preview?.serviceKey ?? null };
+  return { ...rest, serviceKey: preview?.serviceKey ?? null, houseKey: preview?.houseKey ?? null };
 }
 
 /// The file's fields as the env names the handlers read. A field left
@@ -30,6 +31,9 @@ export function configEnv(config) {
   const on = (flag) => (flag === true ? 'on' : null);
   const named = {
     OH_SERVICE_KEY: config?.serviceKey,
+    // The house's public key (docs/explanation/live-play.md): the key a
+    // sealed table's spec names, and the one the results are taken from.
+    OH_HOUSE_KEY: config?.houseKey,
     OH_TURN_KEY_ID: config?.turnKeyId,
     OH_STRIPE_PRICE: config?.stripePrice,
     OH_PRICE: priceOf(config),
@@ -87,6 +91,7 @@ export function appDefines(config) {
   const { apple = {}, google = {} } = config ?? {};
   const named = {
     OH_SERVICE_KEY: config?.serviceKey,
+    OH_HOUSE_KEY: config?.houseKey,
     OH_APP_ORIGIN: config?.appOrigin,
     OH_APPLE_SERVICE_ID: apple.servicesId,
     OH_GOOGLE_CLIENT_ID: google.webClientId,

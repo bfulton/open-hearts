@@ -158,6 +158,8 @@ async function secretFromInput(stdin = process.stdin, stderr = process.stderr) {
 }
 
 export async function secretSet(ctx, { args, flags }) {
+  const made = relay.madeBy?.[args.name];
+  if (made) throw new Usage(`${args.name} is not typed in: ${made} makes it, with the key that goes into config/openhearts.json beside it`);
   const places = placesOf(args.name);
   if (!places.length) throw new Usage(`${args.name} is not a secret infra/cloudflare.mjs defines`);
   ctx.log(`would set ${args.name} on ${places.map((p) => p.where).join(', ')}, from what you type (not shown) or pipe in`);

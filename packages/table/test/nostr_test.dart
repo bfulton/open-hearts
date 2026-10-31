@@ -33,10 +33,10 @@ void main() {
   test('filters match on kinds, authors, tags and time', () {
     final a = FakeSigner('a');
     final b = FakeSigner('b');
-    final e = NostrEvent.sign(a, kind: TableKinds.table, content: '{}', tags: [
+    final e = NostrEvent.sign(a, kind: TableKinds.log, content: '{}', tags: [
       ['t', 'T']
     ], createdAt: 1000);
-    expect(const Filter(kinds: [TableKinds.table]).matches(e), isTrue);
+    expect(const Filter(kinds: [TableKinds.log]).matches(e), isTrue);
     expect(const Filter(kinds: [1]).matches(e), isFalse);
     expect(Filter(authors: [a.publicKey]).matches(e), isTrue);
     expect(Filter(authors: [b.publicKey]).matches(e), isFalse);

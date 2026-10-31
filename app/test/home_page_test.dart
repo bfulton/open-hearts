@@ -552,7 +552,7 @@ void main() {
     expect(find.text('50 points · rated'), findsOneWidget, reason: 'nothing said of who is online until it is known');
     expect(find.textContaining('You are rated'), findsNothing, reason: 'the rating is a number in the corner');
     expect(find.bySemanticsLabel(RegExp('^rated ')), findsNothing, reason: 'and none before the standings are in');
-    expect(find.textContaining('Four seats, filled'), findsNothing);
+    expect(find.textContaining('Play live with other people'), findsNothing);
     expect(find.textContaining('A new table, and a link to send'), findsNothing);
     expect(find.text('Open source card game, no ads'), findsOneWidget);
   });
@@ -699,7 +699,7 @@ void main() {
     await tester.tap(find.text('Subscribe'));
     await tester.pumpAndSettle();
     expect(find.textContaining('Playing alone is free'), findsOneWidget);
-    expect(find.textContaining('No server sees a hand'), findsOneWidget);
+    expect(find.text('Create a friends-only game'), findsOneWidget);
     expect(find.text(r'$5.99 a year'), findsOneWidget);
   });
 }

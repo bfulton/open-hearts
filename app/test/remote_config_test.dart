@@ -108,11 +108,7 @@ void main() {
     expect(quick.bank.graceMs, 3000);
     expect(quick.bank.bankMs, 30000);
     expect(quick.botActsMs, TableTiming.standard.botActsMs, reason: 'a field not named is the standard');
-    // This build's standard, not what a start that says nothing means
-    // to every build (TableTiming.unsaid): the silence is where the two
-    // differ.
     expect(quick.silenceMs, TableTiming.standard.silenceMs);
-    expect(quick.silenceMs, isNot(TableTiming.unsaid.silenceMs));
     expect(RemoteConfig.parse({'table': {'graceMs': 3000, 'bankMs': 1}}).table, TableTiming.standard, reason: 'all or nothing');
     expect(RemoteConfig.parse({'table': 'fast'}).table, TableTiming.standard);
     expect(RemoteConfig.parse({'live': false, 'table': {'graceMs': 1}}).live, isFalse, reason: 'and the rest of the row stands');
@@ -123,11 +119,11 @@ void main() {
     expect(AppWaits.standard.relaySlow, const Duration(seconds: 8));
     expect(AppWaits.standard.relayGiveUp, const Duration(seconds: 40));
     expect(AppWaits.standard.configEvery, const Duration(minutes: 15));
-    final w = AppWaits.parse({'licenceMs': 9000, 'householdMs': 1, 'configEveryMin': 60, 'meshAnswerMs': '30000'});
+    final w = AppWaits.parse({'licenceMs': 9000, 'householdMs': 1, 'configEveryMin': 60, 'roomStartMs': '30000'});
     expect(w.licence, const Duration(seconds: 9));
     expect(w.household, AppWaits.standard.household, reason: 'under its least');
     expect(w.configEvery, const Duration(hours: 1));
-    expect(w.meshAnswer, AppWaits.standard.meshAnswer, reason: 'not a number');
+    expect(w.roomStart, AppWaits.standard.roomStart, reason: 'not a number');
     const record = {'recordAgainMs', 'recordForMs', 'recordSoonMs'};
     for (final MapEntry(key: name, value: (least, most)) in AppWaits.bounds.entries) {
       // The record's three go together, so are checked together (below).

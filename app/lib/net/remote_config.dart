@@ -118,7 +118,6 @@ class AppWaits {
     this.standing = const Duration(seconds: 8),
     this.standingAll = const Duration(seconds: 4),
     this.roomStart = const Duration(seconds: 10),
-    this.meshAnswer = const Duration(seconds: 20),
     this.record = const Duration(seconds: 30),
     this.recordAgain = const Duration(seconds: 3),
     this.recordFor = const Duration(seconds: 60),
@@ -137,7 +136,7 @@ class AppWaits {
   /// Opening a checkout.
   final Duration buy;
 
-  /// TURN credentials, before a table goes on over the relay alone.
+  /// TURN credentials, for a call between seats (net/turn.dart).
   final Duration turn;
 
   /// This config itself.
@@ -158,9 +157,6 @@ class AppWaits {
   /// A friends' room starts this long after the last arrival, once two
   /// are in.
   final Duration roomStart;
-
-  /// A direct connection to a peer not up by now is left to the relay.
-  final Duration meshAnswer;
 
   /// Keeping a game's record, or fetching one (net/game_records.dart).
   final Duration record;
@@ -187,7 +183,6 @@ class AppWaits {
     'standingMs': (3000, 30000),
     'standingAllMs': (1000, 20000),
     'roomStartMs': (3000, 60000),
-    'meshAnswerMs': (5000, 60000),
     'recordMs': (5000, 120000),
     'recordAgainMs': (1000, 30000),
     'recordForMs': (10000, 600000),
@@ -226,7 +221,6 @@ class AppWaits {
       standing: take('standingMs', s.standing),
       standingAll: take('standingAllMs', s.standingAll),
       roomStart: take('roomStartMs', s.roomStart),
-      meshAnswer: take('meshAnswerMs', s.meshAnswer),
       record: take('recordMs', s.record),
       recordAgain: again,
       recordFor: recordFor,
@@ -248,7 +242,6 @@ class AppWaits {
       other.standing == standing &&
       other.standingAll == standingAll &&
       other.roomStart == roomStart &&
-      other.meshAnswer == meshAnswer &&
       other.record == record &&
       other.recordAgain == recordAgain &&
       other.recordFor == recordFor &&
@@ -267,7 +260,6 @@ class AppWaits {
     standing,
     standingAll,
     roomStart,
-    meshAnswer,
     record,
     recordAgain,
     recordFor,
@@ -297,8 +289,8 @@ class RemoteConfig {
   static const none = RemoteConfig();
 
   /// The kill switch: false shuts the doors to live play — the buttons,
-  /// a link to a table, and this device's turn as a juror — for every
-  /// device that reads it. A game already at a table plays on.
+  /// and a link to a table — for every device that reads it. A game
+  /// already at a table plays on.
   final bool live;
 
   /// Whether the paid tier is offered to a device that has not bought
@@ -331,7 +323,7 @@ class RemoteConfig {
   final List<LegalNotice> notices;
 
   /// The clocks of a table this device starts — a person's grace and
-  /// bank, a held bot seat's deadlines, the waits on a jury — carried
+  /// bank, the house's deadlines, the wait on a closed line — carried
   /// in the start event, so every seat plays by the starter's
   /// (packages/table, timing.dart). A table someone else starts keeps
   /// theirs.

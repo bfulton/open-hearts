@@ -1,12 +1,14 @@
-/// ICE servers for a table.
+/// ICE servers for a call between seats.
 ///
-/// Every data channel goes through TURN (net/mesh_transport.dart). The
-/// credentials come from the service's turn-creds handler
-/// (docs/explanation/service.md; service/functions/turn.mjs) — Cloudflare's
-/// TURN in production, the rig's own on this machine — short-lived, and
-/// fetched when a device connects so they are in hand when its table
-/// starts. With none to give, a device makes no channels and its table
-/// plays over the relay.
+/// Nothing of a game goes over WebRTC: a table is played on its line to
+/// its referee (packages/table, relay_line.dart). This is kept for the
+/// voice and video chat among friends that is planned (ROADMAP.md),
+/// where every channel is to go through TURN and nowhere else, so that
+/// nobody at a table learns another's address. The credentials come
+/// from the service's turn-creds handler (docs/explanation/service.md;
+/// service/functions/turn.mjs) — Cloudflare's TURN in production, the
+/// rig's own on this machine — short-lived, and fetched when they are
+/// wanted. With none to give, there are none.
 library;
 
 import 'dart:convert';
@@ -30,7 +32,7 @@ Uri? turnEndpoint([Uri? at]) {
   return Uri(scheme: base.scheme, host: base.host, port: base.hasPort ? base.port : null, path: '/api/turn');
 }
 
-/// The ICE servers for this device's next table: from the handler at
+/// The ICE servers for a call: from the handler at
 /// [endpoint] (by default [turnEndpoint]); none when it has none, cannot
 /// be reached, or there is no endpoint.
 Future<List<Map<String, Object?>>> iceServersFor(Signer signer,

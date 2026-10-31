@@ -101,6 +101,7 @@ class Room extends ChangeNotifier {
     this.myAvatar = Avatar.none,
     this.target = gameOverScore,
     this.timing = TableTiming.standard,
+    this.house,
     this.heartbeatMs = 2000,
     this.staleMs = 7000,
     int? startAfterMs,
@@ -141,6 +142,7 @@ class Room extends ChangeNotifier {
     Avatar avatar = Avatar.none,
     int target = gameOverScore,
     TableTiming timing = TableTiming.standard,
+    PublicKey? house,
     Duration? startAfter,
     Licence? licence,
   }) =>
@@ -151,6 +153,7 @@ class Room extends ChangeNotifier {
         myAvatar: avatar,
         target: target,
         timing: timing,
+        house: house,
         startAfterMs: startAfter?.inMilliseconds,
         licence: licence,
       );
@@ -191,10 +194,15 @@ class Room extends ChangeNotifier {
 
   /// The clocks of a table started here (timing.dart in the table
   /// package), as this device's remote config has them. Only the
-  /// leader's count, and for the same reason as [target]: four seats
-  /// that disagree about when a boot is due back different sides of
-  /// it.
+  /// leader's count, and for the same reason as [target]: every side
+  /// applies them to the same log, and has to come to the same table.
   final TableTiming timing;
+
+  /// The house this build plays with (docs/explanation/live-play.md): a
+  /// table started here names it, and this device sits at no start that
+  /// names another, or none. Null in a build that names none, which
+  /// starts nothing and sits nowhere.
+  final PublicKey? house;
 
   final int heartbeatMs;
 
@@ -413,9 +421,10 @@ class Room extends ChangeNotifier {
   /// The leader starts the table now: everyone here, in an order drawn
   /// from the table's own seed rather than the order they arrived in,
   /// so the seat you get is not a prize for being early; bots in the
-  /// rest. A no-op for anyone else, or alone.
+  /// rest. A no-op for anyone else, alone, or in a build that names no
+  /// house.
   void start() {
-    if (!amLeader || spec != null || _started || members.length < 2) return;
+    if (!amLeader || spec != null || _started || members.length < 2 || house == null) return;
     _started = true;
     final rng = Random(seed);
     final draw = List.of(Persona.roster)..shuffle(rng);
@@ -433,17 +442,35 @@ class Room extends ChangeNotifier {
         seats.add({'bot': draw[s].id});
       }
     }
+    // The table's own id, not the code: a code is reused, and two
+    // tables that start under one code — two halves of a room that
+    // could not hear each other — must not hear each other's plays. It
+    // is the spec's (packages/table, spec.dart, TableSpec.id), as every
+    // member works it out again, salted so that nobody who saw the
+    // seats can work it out.
+    final salt = newSalt();
+    final table = TableSpec(
+      seed: seed,
+      seats: [
+        for (var s = 0; s < seatCount; s++) s < here.length ? HumanSeat(here[s].key, licence: here[s].licence) : BotSeat(draw[s]),
+      ],
+      sealed: true,
+      target: target,
+      timing: timing,
+      house: house,
+      salt: salt,
+    );
     channel.announce({
       'kind': 'start',
-      // The table's own id, not the code: a code is reused, and two
-      // tables that start under one code — two halves of a room that
-      // could not hear each other — must not hear each other's plays.
-      'table': newTableId(),
+      'table': table.id,
+      'salt': salt,
       'seed': seed,
       'seats': seats,
       'policy': botPolicyVersion,
-      // Every live table is sealed (docs/explanation/fair-deal.md).
+      // Every live table is sealed (docs/explanation/fair-deal.md), and
+      // the house holds its bots.
       'sealed': true,
+      'house': house,
       'target': target,
       'timing': timing.toJson(),
       'at': _nowMs(),
@@ -516,26 +543,41 @@ class Room extends ChangeNotifier {
       refusal = RoomRefusal.noDeal;
       return;
     }
-    // Named by the leader (above): a start without an id is another
-    // build's.
-    final id = c['table'];
-    if (id is! String || !validTableId(id)) {
+    // The house holds the bots of a sealed table and says how it came
+    // out: this build's, or no table it sits at.
+    if (mine && (house == null || c['house'] != house)) {
+      refusal = RoomRefusal.otherBuild;
+      return;
+    }
+    // And the leader's clocks, said in full (TableTiming.exactly): a
+    // start without them was made by another build.
+    final timing = TableTiming.exactly(c['timing']);
+    if (timing == null) {
+      if (mine) refusal = RoomRefusal.otherBuild;
+      return;
+    }
+    final salt = c['salt'];
+    if (salt is! String || !validTableId(salt)) {
       if (mine) refusal = RoomRefusal.otherBuild;
       return;
     }
     final made = TableSpec(
-      id: id,
       seed: seed,
       seats: seats,
       sealed: c['sealed'] == true,
       // The leader's game, not this device's: a start event from a
       // build that had no say says fifty.
       target: c['target'] as int? ?? gameOverScore,
-      // And the leader's clocks: none said, or one out of bounds, is
-      // the table every build reads that as (TableTiming.unsaid), at
-      // every seat alike.
-      timing: TableTiming.parse(c['timing']),
+      timing: timing,
+      house: house,
+      salt: salt,
     );
+    // Named by the leader (above) for its spec: a start whose table is
+    // not the spec it says was made by another build.
+    if (c['table'] != made.id) {
+      if (mine) refusal = RoomRefusal.otherBuild;
+      return;
+    }
     // Every seat an account's by the service's word, each account once:
     // a start that is not is not a table to sit at.
     if (made.licenceProblem(at: DateTime.fromMillisecondsSinceEpoch(_nowMs())) != null) {

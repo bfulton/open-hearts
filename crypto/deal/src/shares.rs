@@ -163,10 +163,10 @@ pub fn bytes_sum(parts: &[u8], len: usize, out: &mut [u8]) -> Option<usize> {
 /// [t] of which rebuild it — where [split] makes shares that are all
 /// needed at once.
 ///
-/// A threshold because a hand's escrow rests on the jurors it was
-/// sealed to still being reachable when a bot seat has to be opened
-/// (docs/explanation/live-play.md). "Any two of the jury" keeps one holder
-/// alone from being anything, with room to lose people.
+/// A threshold because escrow among several holders, as a v2 game's
+/// jury was, rests on enough of them being reachable when a bot seat
+/// has to be opened. "Any two of them" keeps one holder alone from
+/// being anything, with room to lose people.
 ///
 /// The shares are f(1)..f(n) of a polynomial of degree t−1 whose
 /// constant term is the key, drawn from [seed]. Written in index
@@ -204,8 +204,8 @@ pub fn split_threshold(secret: &[u8], n: usize, t: usize, seed: &[u8], out: &mut
 /// itself: Σ over the set of coefficient·share is the key, so Σ of
 /// coefficient·(share·C1) is the seat's own token, and the card comes
 /// out. At another index it is what the share is worth towards *that*
-/// index's share — which is how a newcomer to the jury is given one
-/// without anybody rebuilding the key (docs/explanation/live-play.md).
+/// index's share — which is how a holder brought on later is given
+/// one without anybody rebuilding the key.
 ///
 /// [have] is one byte per index, each 1..=255 and distinct; [index]
 /// must be among them.
@@ -311,7 +311,7 @@ mod tests {
     }
 
     /// A seat's secret in shares: any t rebuild it, t-1 say nothing,
-    /// and a juror arriving later is given one of its own.
+    /// and a holder arriving later is given one of its own.
     #[test]
     fn any_t_of_n_shares_rebuild_a_secret_and_a_newcomer_is_given_one() {
         let secret = seed(11);
@@ -378,7 +378,7 @@ mod tests {
         assert_eq!(bytes_sum(&[0u8; 5], 2, &mut out), None, "parts that are not whole shares");
     }
 
-    /// Any t of n open a card, t-1 do not, and a juror who arrives
+    /// Any t of n open a card, t-1 do not, and a holder who arrives
     /// later is given a share of its own without the key ever being
     /// put back together.
     #[test]
@@ -405,7 +405,7 @@ mod tests {
             share_key(share(i), &mut share_keys[(i - 1) * POINT..i * POINT]).unwrap();
         }
 
-        // The card, opened by the jurors at `have` plus the three
+        // The card, opened by the holders at `have` plus the three
         // seats still here — with every scaled token checked by
         // anybody, against a key anybody can work out.
         let open = |have: &[u8], shares: &[u8], share_keys: &[u8]| -> Option<usize> {
@@ -424,7 +424,7 @@ mod tests {
                 // published key, scaled by the same public coefficient.
                 let mut against = vec![0u8; POINT];
                 point_scale(&share_keys[(i as usize - 1) * POINT..i as usize * POINT], &coefficient, &mut against).unwrap();
-                assert!(verify_token(&against, masked, &token), "juror {i}'s scaled token checks");
+                assert!(verify_token(&against, masked, &token), "holder {i}'s scaled token checks");
                 assert!(!verify_token(&share_keys[..POINT], masked, &token) || i == 1, "and against nothing else");
                 tokens.extend_from_slice(&token[..POINT]);
                 keys.extend_from_slice(&against);
@@ -457,7 +457,7 @@ mod tests {
         // One is nothing: its part alone is not the seat's token.
         assert_ne!(open(&[4], &shares, &share_keys), Some(card), "one share opens nothing");
 
-        // A juror arriving later is given share seven, made by two
+        // A holder arriving later is given share seven, made by two
         // holders out of their own and sent sealed. Neither of them
         // ever holds the key, and what each sends is worth nothing by
         // itself.
@@ -553,7 +553,7 @@ mod tests {
         );
     }
 
-    /// And into more than two, for a table with no jury to escrow to,
+    /// And into more than two, for a table with no custodian to escrow to,
     /// where every other person holds a share and all of them are
     /// needed: the shares' keys still add to the seat's, and every
     /// share's token is needed to open a card.

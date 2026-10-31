@@ -57,10 +57,19 @@ test('a preview signs with the key previews have, and never with production\'s',
   // licenses nobody, rather than falling back on production's.
   assert.ok(!('OH_SERVICE_KEY' in withConfig({ OH_DEPLOYMENT: 'preview' }, { serviceKey: 'production' })));
   assert.deepEqual(configFor(file, 'production'), file);
-  assert.deepEqual(configFor(file, 'preview'), { serviceKey: 'preview', stripePrice: 'p' });
+  assert.deepEqual(configFor(file, 'preview'), { serviceKey: 'preview', houseKey: null, stripePrice: 'p' });
   // The committed one has a key of its own for previews, not production's.
   assert.match(committed.preview.serviceKey, /^[0-9a-f]{64}$/);
   assert.notEqual(committed.preview.serviceKey, committed.serviceKey);
+});
+
+test('a preview\'s tables are refereed by the house previews have, and never by production\'s', () => {
+  const file = { serviceKey: 'production', houseKey: 'house', preview: { serviceKey: 'preview', houseKey: 'preview house' } };
+  assert.equal(withConfig({}, file).OH_HOUSE_KEY, 'house');
+  assert.equal(withConfig({ OH_DEPLOYMENT: 'preview' }, file).OH_HOUSE_KEY, 'preview house');
+  // Without one of its own, a preview has none: it starts no sealed
+  // table and takes no result, rather than taking production's word.
+  assert.ok(!('OH_HOUSE_KEY' in withConfig({ OH_DEPLOYMENT: 'preview' }, { houseKey: 'house' })));
 });
 
 test('the price is the file\'s alone: what the terms state, which no setting on the project changes', () => {

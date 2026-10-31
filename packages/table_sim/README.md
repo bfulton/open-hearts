@@ -2,7 +2,7 @@
 
 The [table](../table/) over a simulated network, for tests and tools: a
 virtual clock that plays a whole game in milliseconds, a network that
-loses, delays and reorders what it carries, jurors, scripted people,
+loses, delays and reorders what it carries, the referee, the house, scripted people,
 fake signatures, seats that lie, and the walks that check what the
 table does under all of it. How the table is tested on it is in
 [testing](../../docs/explanation/testing.md).

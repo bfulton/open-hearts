@@ -90,7 +90,6 @@ Other strings are hashed or keyed with a tag of their own, and never signed:
 | `oh-store/1\n<key>` | SHA-256 | The device's account ID in a store's records: Play's obfuscated account ID and Apple's `appAccountToken` | `storeAccountOf` in `service/functions/stores.mjs`; `app/lib/net/store_buying.dart` |
 | `oh-play/1\n<token>` | SHA-256 | A Play subscription's ID, `google:<digest>` | `playSubscriptionOf` in `service/functions/stores.mjs` |
 | `<provider>:<subject>` | HMAC-SHA-256 under `OH_ID_HMAC` | A sign-in's row, `LOGIN#<provider>#<hmac>` | `loginRow` in `service/functions/logins.mjs` |
-| `oh-bench/1\n<key>` | HMAC-SHA-256 under `OH_JUROR_SECRET` | A backup juror's mark at the relay | `benchMark` in `service/do/relay.mjs` |
 
 ## Request limits
 

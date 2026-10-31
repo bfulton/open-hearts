@@ -47,7 +47,7 @@ Each suite is a `suite_<name>` function in `check.sh`, run from the repository's
 | `e2e_build` | `./e2e/build.sh` |
 | `e2e_flows` | `node e2e/flows.mjs` |
 | `e2e_run` | `node e2e/run.mjs` |
-| `e2e_escrow` | `node e2e/escrow.mjs` |
+| `e2e_house` | `node e2e/house.mjs` |
 | `e2e_offline` | `node e2e/offline.mjs` |
 | `e2e_site` | `node e2e/site.mjs` |
 | `e2e_move` | `node e2e/move.mjs` |
@@ -92,14 +92,14 @@ For the `app` suite, `quick` passes `-x slow`, and runs only the test files that
 | 2 | `app_analyze`, then `app` (every tier) |
 | 3 | `engine` and `deal` |
 | 4 | `relay_js`, `functions`, `site`, `infra`, `ops`, `workers`, `scripts` and `docs`; then `crypto`, only where `crypto/deal` has been built with cargo here and `cargo` is on the `PATH`. Otherwise `full` says that `crypto` didn't run. |
-| 5 | `e2e_build`; then `e2e_move` and `e2e_site`; then `service`, `service_js`, `service_object` and `e2e_escrow`; then `e2e_run` and `e2e_offline`; then `e2e_flows` |
+| 5 | `e2e_build`; then `e2e_move` and `e2e_site`; then `service`, `service_js`, `service_object` and `e2e_house`; then `e2e_run` and `e2e_offline`; then `e2e_flows` |
 
 
 ## Tiers and test settings
 
 | Package | `dart_test.yaml` | Tagged `slow` | Fast tier | Slow tier |
 |---|---|---|---|---|
-| `packages/table` | `concurrency: 4`; declares the tag `slow` | `chaos_sealed_test.dart`, `deal_worker_test.dart`, `game_record_test.dart`, `juror_summoned_again_test.dart`, `late_juror_verdict_test.dart`, `rejoin_test.dart`, `sealed_departures_test.dart`, `sealed_lies_test.dart`, `top_up_test.dart`, `undealt_hand_test.dart`, and the later seeds of `chaos_test.dart` | `dart test -x slow` | `dart test -t slow` |
+| `packages/table` | `concurrency: 4`; declares the tag `slow` | `chaos_sealed_test.dart`, `explore_test.dart`, and the seeds of `chaos_test.dart` from 8 on | `dart test -x slow` | `dart test -t slow` |
 | `app` | Declares the tag `slow` | `table_fits_test.dart`, `table_fits_live_test.dart`, `table_fits_live_end_test.dart`, `table_fits_wide_test.dart`, `tutorial_fits_test.dart`: the layout matrix in `app/test/fits.dart` | `flutter test -x slow` | `flutter test`, which runs every test |
 | `service` | `concurrency: 4` | None | `dart test` | None |
 | `packages/engine`, `packages/deal`, `packages/table_sim` | None | None | `dart test` | None |
@@ -114,10 +114,10 @@ The scripts in `e2e/`. Each suite exits non-zero on failure. For what they need 
 
 | Script | What it drives | Flags | Suite |
 |---|---|---|---|
-| `e2e/build.sh` | Builds the app the suites drive into `app/build/e2e`, compiled to take licences from the rig's own service, and compiles the relay and juror that the suites start. Does nothing while its inputs are unchanged. | `--force` builds anyway; other arguments go to `flutter build web` | `e2e_build` |
+| `e2e/build.sh` | Builds the app the suites drive into `app/build/e2e`, compiled to take licences from the rig's own service, and compiles the house that the suites start. Does nothing while its inputs are unchanged. | `--force` builds anyway; other arguments go to `flutter build web` | `e2e_build` |
 | `e2e/flows.mjs` | Every flow one device can drive: the front door, game options, a solo game and its record, a room to share, the phone turned. Uses a real pointer as well as the accessibility tree. | `--only <text>`, `--jobs <n>`, `--serial`, `--app-dir <path>` | `e2e_flows` |
-| `e2e/run.mjs` | Four browsers at one table over WebRTC; then one closed mid-hand, one stalled and booted, and one gone off its turn and ruled on by the jury | `--app-dir <path>` | `e2e_run` |
-| `e2e/escrow.mjs` | One browser and three bot seats held by backup jurors in their own processes. The juror holding a seat goes silent, and the others open the seat from the escrow and finish the hand. | `--app-dir <path>` | `e2e_escrow` |
+| `e2e/run.mjs` | Four browsers matched in a pool, and in a friends' room at one referee with the house; then one browser closed between hands, one person whose clock runs out, and one browser closed off its turn, and the last person plays the hand out with three bots | `--app-dir <path>` | `e2e_run` |
+| `e2e/house.mjs` | The house as a process of its own. At a table of one person and three bots, the house is stopped mid-hand; the relay wants it back, it is started again, goes on from the log, and the hand finishes. At a table of two people, one leaves mid-hand, and their seat is opened from the escrow and played out. | `--app-dir <path>` | `e2e_house` |
 | `e2e/offline.mjs` | The network, the relays and the site's worker taken away one at a time, or left silent. Solo play must keep working, and every wait must end in words on the screen. Leaves a screenshot of each flow in `app/build/offline/`. | `--only <text>`, `--jobs <n>`, `--serial`, `--app-dir <path>` | `e2e_offline` |
 | `e2e/move.mjs` | The hosts as production routes them: `openhearts.game/play/` and the site host's `/api/` answer 404; a device's storage is carried from `openhearts.game` through `/carry`; a key already at the app's host is kept; a device with nothing to carry is not held up; a carry that never answers holds the app up only briefly; a preview serves the app at `/play/` | `--only <text>`, `--app-dir <path>` | `e2e_move` |
 | `e2e/site.mjs` | The marketing site in each language: the language redirect, a chosen language kept, and every page fitting a phone | None | `e2e_site` |

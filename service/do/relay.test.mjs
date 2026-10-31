@@ -376,14 +376,10 @@ test('the object reads nothing bigger than presence ever says, and sends nothing
   assert.equal(listener.of('EVENT').length, 0);
   assert.match(a.said.at(-1)[1], /too big/);
 
-  // A summons is the largest thing presence says — a table, its jury
-  // and the draws it has carried — and is taken whole.
-  const summons = await sign.event(keys[0], {
-    kind: 24246,
-    content: JSON.stringify({ kind: 'summons', draws: 'd'.repeat(24 * 1024) }),
-    tags: [['t', 'online'], ['p', keys[1].public]],
-  });
-  await relay.message(a, JSON.stringify(['EVENT', summons]));
+  // Anything inside the limit is taken whole, however far past what
+  // presence says it is.
+  const large = await sign.event(keys[0], { kind: 24246, content: 'x'.repeat(24 * 1024), tags: [['t', 'online']] });
+  await relay.message(a, JSON.stringify(['EVENT', large]));
   assert.equal(a.of('OK').at(-1)[2], true);
   assert.equal(listener.of('EVENT').length, 1);
 });
@@ -397,8 +393,7 @@ test('the object holds a socket to a burst of events, and then a few a second', 
   const { burst } = objectLimits;
   const events = [];
   for (let i = 0; i < burst + 5; i++) events.push(await beat(keys[0], 2000 + i));
-  // A beat every five seconds, a summons to each juror of a draw at
-  // once: far inside the burst. A flood is not.
+  // A beat every five seconds is far inside the burst. A flood is not.
   await Promise.all(events.map((e) => relay.message(a, JSON.stringify(['EVENT', e]))));
   const oks = a.of('OK');
   assert.equal(oks.filter((m) => m[2]).length, burst);
@@ -587,14 +582,14 @@ test("a socket's line says what kind of tag, as what, how it closed and how long
   assert.equal(tagLabel(undefined), 'unknown');
 
   const device = { account: 'a'.repeat(32), key: 'b'.repeat(64), epoch: 3, until: 9 };
-  const juror = { account: null, key: 'c'.repeat(64), epoch: 0, until: 9 };
+  const house = { account: null, key: 'c'.repeat(64), epoch: 0, until: 9 };
   assert.deepEqual(socketLine('open', { tag: table, sockets: 3 }), { relay: 'open', tag: 'table:83167bb6', as: 'unanswered', sockets: 3 });
   const closed = socketLine('close', { tag: table, who: device, code: 1006, clean: false, why: '', openedAt: 1000, now: 62400, sockets: 2 });
   assert.deepEqual(closed, { relay: 'close', tag: 'table:83167bb6', as: 'device', code: 1006, clean: false, openS: 61, sockets: 2 });
-  assert.equal(socketLine('close', { tag: table, who: juror, code: 1000, clean: true, sockets: 0 }).as, 'juror');
+  assert.equal(socketLine('close', { tag: table, who: house, code: 1000, clean: true, sockets: 0 }).as, 'house');
   assert.equal(socketLine('error', { tag: 'online', why: 'x'.repeat(200), sockets: 0 }).why.length, 80);
-  for (const line of [closed, socketLine('close', { tag: table, who: juror, sockets: 0 })]) {
+  for (const line of [closed, socketLine('close', { tag: table, who: house, sockets: 0 })]) {
     const text = JSON.stringify(line);
-    for (const secret of [device.account, device.key, juror.key, table]) assert.ok(!text.includes(secret), text);
+    for (const secret of [device.account, device.key, house.key, table]) assert.ok(!text.includes(secret), text);
   }
 });

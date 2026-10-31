@@ -13,31 +13,27 @@ import 'package:deal/deal.dart';
 import 'package:table/table.dart';
 
 enum Lie implements SeatConduct {
-  /// Says it holds the two of clubs nowhere and deals itself the hand
-  /// all the same: it alone knows who leads, and it plays on while the
-  /// rest of the table waits for a lead that is never coming. The loud
-  /// version, and the table's clock has it at the audit it will not
-  /// answer.
+  /// Says it holds the two of clubs nowhere when it was dealt it: the
+  /// hand cannot be led, so it is opened by its audits and given up, and
+  /// the seat that lied is removed.
   declare,
-
-  /// The same word, and then it waits with everybody else and answers
-  /// the early audit like an honest seat. The patient version: nothing
-  /// it does is out of step, and only the opened deal says which seat
-  /// was dealt the card it disclaimed.
-  hide,
 
   /// Seals its pass to nothing: three cards of the right shape that the
   /// seat it passed to could never open. It gets no further than its own
   /// turn — every seat checks the argument beside a seal, and a pass
   /// that fails it is not taken — and the clock has its seat there.
-  seal;
+  seal,
+
+  /// Keeps its piece of a departed person's secret to itself: the
+  /// departed hand cannot be opened, and is given up.
+  withhold;
+
+  @override
+  bool get releases => this != withhold;
 
   @override
   Map<String, Object?> declaration(Map<String, Object?> honest) =>
-      this == seal ? honest : {'seat': honest['seat'], 'position': -1};
-
-  @override
-  int? leader(int? known) => this == hide ? null : known;
+      this == declare ? {'seat': honest['seat'], 'position': -1} : honest;
 
   /// Sealed to nothing anybody holds: the shape of a pass, and three
   /// cards the receiver will never open.

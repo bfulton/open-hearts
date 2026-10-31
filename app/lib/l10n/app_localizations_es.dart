@@ -398,8 +398,7 @@ class AppLocalizationsEs extends AppLocalizations {
   }
 
   @override
-  String get seatsOrFriends =>
-      'Cuatro asientos, para quien esté esperando — o un enlace que envías a tres amigos.';
+  String get pointLive => 'Juega en vivo con otras personas';
 
   @override
   String get subscribe => 'Suscribirse';
@@ -566,16 +565,14 @@ class AppLocalizationsEs extends AppLocalizations {
   }
 
   @override
-  String get pointRating =>
-      'Una clasificación propia, a partir de resultados que firman los cuatro.';
+  String get pointFriends => 'Crea una partida solo para amigos';
 
   @override
-  String get pointDeal =>
-      'Las cartas se reparten entre los cuatro. Ningún servidor ve una mano, tampoco el nuestro.';
+  String get pointStats => 'Sigue tu clasificación y otras estadísticas';
 
   @override
   String get whatMoneyPaysFor =>
-      'Jugar solo es gratis, igual que los registros, el motor y cada línea de esto, y no tenemos planes de cambiarlo. Lo que pagas cubre la parte que nos cuesta mantener: poner a los jugadores en contacto, un relé cuando dos dispositivos no encuentran un camino directo, y un jurado cuando una mesa se queda sola.';
+      'Jugar solo es gratis. Tu suscripción paga los servidores de las partidas en vivo.';
 
   @override
   String webRenewal(String price) {
@@ -949,25 +946,7 @@ class AppLocalizationsEs extends AppLocalizations {
   String get connectionDown => 'Tu conexión se ha caído — reconectando';
 
   @override
-  String get askingTheJury => 'Consultando al jurado';
-
-  @override
-  String get noJurorOnline =>
-      'Nadie en línea para formar un jurado — esperando';
-
-  @override
-  String get waitingForTheJury => 'Esperando al jurado';
-
-  @override
   String get openingDepartedHand => 'Abriendo la mano de un jugador que se fue';
-
-  @override
-  String get nobodyClaimsTwo => 'Nadie tiene el 2♣ — el reparto está atascado';
-
-  @override
-  String bootPlayer(String name) {
-    return 'Expulsar a $name';
-  }
 
   @override
   String get cannotDealTitle => 'Este dispositivo no puede repartir';
@@ -984,11 +963,11 @@ class AppLocalizationsEs extends AppLocalizations {
   String get connectionFailure => 'Fallo de conexión';
 
   @override
-  String get jurorQuorumLost => 'Sin quórum de jurados';
+  String get houseGone => 'El servidor de la partida dejó de responder';
 
   @override
-  String get jurorQuorumLostWhy =>
-      'Quedan muy pocos jurados conectados de los que guardan los asientos de los bots, así que la mano no puede seguir. La partida termina aquí, sin puntuar.';
+  String get houseGoneWhy =>
+      'El servidor que reparte las cartas y juega por los bots dejó de responder, así que la partida no puede seguir. Termina aquí, sin puntuar.';
 
   @override
   String get onWithIt => 'Seguir';
@@ -1014,9 +993,6 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get back => 'Volver';
-
-  @override
-  String get waitingForJurors => 'Esperando al jurado…';
 
   @override
   String get dealing => 'Repartiendo';
@@ -1493,7 +1469,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get openElsewhereBody =>
-      'Tu cuenta juega en un dispositivo a la vez, y gana el último que se abre. Este se ha hecho a un lado: fuera de la mesa, del jurado y de la espera. Úsalo aquí y será el otro el que se haga a un lado.';
+      'Tu cuenta juega en un dispositivo a la vez, y gana el último que se abre. Este se ha hecho a un lado: fuera de la mesa y de la espera. Úsalo aquí y será el otro el que se haga a un lado.';
 
   @override
   String get inGameElsewhereTitle => 'Estás en una partida en otro dispositivo';

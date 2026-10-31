@@ -8,10 +8,10 @@
 // a tap landing in the wrong place. `tapAt` in flows.mjs is the other
 // half.
 import { AsyncLocalStorage } from 'node:async_hooks';
-import { spawn, spawnSync } from 'node:child_process';
-import { createSocket } from 'node:dgram';
+import { spawn } from 'node:child_process';
 import { createServer } from 'node:http';
 import { createServer as createTcpServer } from 'node:net';
+import { createInterface } from 'node:readline';
 import { readFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { createWriteStream, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync } from 'node:fs';
@@ -84,43 +84,21 @@ export function withRelay(url, port, pace = null) {
   return u.toString();
 }
 
-/// The backup jurors, and how they are run.
-///
-/// A table whose bot seats the jury holds needs juryToHoldBots of
-/// them, and here there is nobody else online to make that number up,
-/// so every one of them is the service's. Normally it is one process
-/// serving all four, which is what the service itself runs.
-///
-/// `apart` gives each juror a process of its own, for a run that has
-/// to take a *single* juror off the air: which of them holds which
-/// bot seat is drawn, so the one to silence is not known until the
-/// deal says so, and killing a process that held four seats would say
-/// nothing about an escrow. It is not the default because it is not
-/// free — four Dart VMs against one, on a machine already running
-/// four headless browsers, a relay and a server, and four browsers
-/// each also serving as a juror for the others' tables. At that load
-/// a browser gets starved long enough to be judged silent, its bot
-/// seat goes to the escrow, and a run fails at something that is the
-/// machine rather than the protocol.
-///
-/// A secret each, so the keys are the same on every run and a process
-/// can be told from its key before either has said a word; each
-/// process still prints the key it derived, which is what the suite
-/// matches against.
-const benchSecrets = [
-  '1111111111111111111111111111111111111111111111111111111111111111',
-  '2222222222222222222222222222222222222222222222222222222222222222',
-  '3333333333333333333333333333333333333333333333333333333333333333',
-  '4444444444444444444444444444444444444444444444444444444444444444',
-];
+/// The rig's house (e2e/build.sh): BIP-340's third published pair, a
+/// key known to everyone and so to nothing that matters. Every table
+/// the rig's build seats names it, and the rig's relay referees sealed
+/// tables for it alone.
+export const rigHouse = {
+  secret: 'c90fdaa22168c234c4c6628b80dc1cd129024e088a67cc74020bbea63b14e5c9',
+  key: 'dd308afec5777e13121fa72b9cc1b7cc0139715309b086c960e18fd969774eb8',
+};
 
-/// The relay and the juror as programs compiled ahead of time, as the
-/// backup jurors' container runs the juror (service/bench/build.sh): made once
-/// for whatever service/ and the packages it takes are at, under
-/// service/.dart_tool/e2e/<their hash>, and shared by every suite and
-/// worker after. A suite starts four or five of them, and each `dart
-/// run` would compile the whole table package again before saying a
-/// word. Where the compiler is not to be had, `dart run` as before.
+/// The house as a program compiled ahead of time, as its container runs
+/// it (service/bench/build.sh): made once for whatever service/ and the
+/// packages it takes are at, under service/.dart_tool/e2e/<their hash>,
+/// and shared by every suite and worker after. Each `dart run` would
+/// compile the whole table package again before saying a word. Where
+/// the compiler is not to be had, `dart run` as before.
 const programs = new Map();
 export function serviceProgram(name) {
   if (!programs.has(name)) programs.set(name, compileProgram(name));
@@ -161,15 +139,33 @@ async function compileProgram(name) {
   return [exe];
 }
 
-/// The relay on [port] — one of its own unless told — its log named for
-/// [tag] (the suite, and the worker for a suite run side by side), and
-/// the jurors' lines said through [say].
-export async function startRelay({ apart = false, port = null, tag = suite, say = log } = {}) {
-  // The relay; and beside it, the backup jurors: the four browsers
-  // are all at one table, so a jury can only come from the service.
-  // Beside rather than inside, because a relay verifies every event it
-  // carries and must never wait on a juror's work.
-  // The relay's whole log, always, at a known path for a debugging run.
+/// Whether [p] has gone.
+const exited = (p) => p.exitCode !== null || p.signalCode !== null;
+
+/// [p] stopped, and gone.
+async function stopped(p) {
+  if (exited(p)) return;
+  const gone = new Promise((r) => p.once('exit', r));
+  p.kill();
+  await gone;
+}
+
+/// The relay on [port] — one of its own unless told — and beside it the
+/// house, as the deployment has them: the relay the Cloudflare object
+/// runs, on a node socket (service/do/host.mjs), asking every socket
+/// who it is by the rig's service and refereeing tables for the rig's
+/// house; and the house, started and woken for each table that wants
+/// it, as the object wakes its container (service/do/bench.mjs). Their
+/// log is named for [tag] (the suite, and the worker for a suite run
+/// side by side), and the house's word on its tables is said through
+/// [say]. Its bots think at [pace], the share of every beat the suite's
+/// app takes ([serveApp]; service/bin/house.dart, `--pace`).
+///
+/// `house.stop()` takes the house off the air, as a container that has
+/// gone; the next table that wants it starts it again, and it goes on
+/// from the log.
+export async function startRelay({ port = null, tag = suite, say = log, pace = 1 } = {}) {
+  // The whole log of both, always, at a known path for a debugging run.
   // A relay started again under the same tag — a worker's, flow after
   // flow — adds to the log this run began rather than starting it over.
   const logFile = join(root, 'app', 'build', 'logs', `relay-${tag}.log`);
@@ -177,74 +173,90 @@ export async function startRelay({ apart = false, port = null, tag = suite, say 
   const relayLog = createWriteStream(logFile, { flags: relayLogs.has(logFile) ? 'a' : 'w' });
   relayLogs.add(logFile);
   port ??= await freePort();
-  const [relayCmd, ...relayArgs] = await serviceProgram('service');
-  const jurorProgram = await serviceProgram('juror');
-  const proc = spawn(relayCmd, [...relayArgs, '--port', `${port}`], { cwd: join(root, 'service') });
-  const bench = [];
+  const house = houseOn(await freePort(), relayLog, say, pace);
+  const proc = spawn(process.execPath, [join(root, 'service', 'do', 'host.mjs'), '--port', `${port}`, '--object', '--gate', localService.key, '--house', rigHouse.key],
+      { cwd: root });
   const url = await new Promise((resolveUrl, reject) => {
-    let out = '';
-    proc.stdout.on('data', (d) => {
-      out += d.toString();
-      const m = out.match(/relay (ws:\/\/\S+)/);
-      if (m) resolveUrl(m[1]);
-      // The backup jurors' own lines, once the relay is up.
-      if (relayLog) relayLog.write(d);
-      if (m && bench.length === 0) {
-        if (apart) {
-          for (const secret of benchSecrets) bench.push(startJuror(jurorProgram, m[1], secret, relayLog, 1, say));
-        } else {
-          bench.push(startJuror(jurorProgram, m[1], benchSecrets[0], relayLog, benchSecrets.length, say));
-        }
+    const seen = [];
+    createInterface({ input: proc.stdout }).on('line', (line) => {
+      relayLog.write(`${line}\n`);
+      const at = line.match(/^relay (ws:\/\/\S+)$/);
+      if (at) {
+        house.relay = `${at[1]}/{tag}`;
+        return resolveUrl(at[1]);
       }
+      if (seen.length < 50) seen.push(line);
+      if (!line.startsWith('{')) return;
+      let said;
+      try {
+        said = JSON.parse(line);
+      } catch {
+        return;
+      }
+      // A table that wants its house, and the house not on its log.
+      if (typeof said.wanted === 'string') house.wake(said.wanted).catch((e) => say(`house: not woken for ${said.wanted.slice(0, 8)}: ${e.message}`));
     });
     proc.stderr.on('data', (d) => process.stderr.write(d));
-    proc.on('exit', (code) => reject(new Error(`relay exited ${code}\n${out}`)));
+    proc.on('exit', (code) => reject(new Error(`relay exited ${code}\n${seen.join('\n')}`)));
     setTimeout(() => reject(new Error('relay did not start')), 60000);
   });
   // Stopped, and gone: the port is free again once this resolves, for a
   // relay started on it after.
   const stop = async () => {
-    const gone = (p) => (p.exitCode !== null || p.signalCode !== null ? null : new Promise((r) => p.once('exit', r)));
-    const all = [proc, ...bench.map((j) => j.proc)].map(gone);
-    for (const j of bench) j.kill();
-    proc.kill();
-    await Promise.all(all);
+    await Promise.all([stopped(proc), house.stop()]);
     relayLog.end();
   };
-  return { url, port, bench, stop };
+  return { url, port, house, stop };
 }
 
 /// The relay logs this run has written, to add to rather than start over.
 const relayLogs = new Set();
 
-/// A juror process: `size` jurors served from it, each with a key
-/// derived from `secret`. `key` resolves to the eight characters it
-/// prints of the first one, which is how a run finds the juror that a
-/// deal named; `said` is every line it has written, for a run that
-/// has to check what a juror did rather than what a browser could see
-/// it do. Both are only meaningful when the jurors are `apart` and this
-/// process is one juror.
-function startJuror([cmd, ...args], relay, secret, relayLog, size, say) {
-  const juror = spawn(cmd, [...args, '--relay', relay, '--jurors', `${size}`],
+/// The house on [port], for the relay its `relay` names: started when a
+/// table first wants it, and again once it has gone, then woken for the
+/// table. `said` is every line it has written, for a run that has to
+/// check what the house did rather than what a browser could see.
+function houseOn(port, relayLog, say, pace) {
+  let proc = null;
+  let up = null;
+  const said = [];
+  const start = async () => {
+    const [cmd, ...args] = await serviceProgram('house');
+    const p = spawn(cmd, [...args, '--relay', house.relay, '--port', `${port}`, '--pace', `${pace}`], {
+      cwd: join(root, 'service'),
       // The rig's service key, to hold every seat to its licence as a
       // device does (packages/table, licence.dart).
-      { cwd: join(root, 'service'), env: { ...process.env, OH_JUROR_SECRET: secret, OH_SERVICE_KEY: localService.key } });
-  const said = [];
-  let named;
-  const key = new Promise((resolve) => { named = resolve; });
-  // Its whole log goes with the relay's, for a debugging run.
-  juror.stdout.on('data', (d) => {
-    if (relayLog) relayLog.write(d);
-    for (const line of d.toString().split('\n')) {
-      if (line === '') continue;
-      said.push(line);
-      const m = line.match(/^backup jurors (\w{8}) /);
-      if (m) named(m[1]);
-      if (/juror|summoned|called|verdict|done with/.test(line)) say(`juror: ${line.trim()}`);
-    }
-  });
-  juror.stderr.on('data', (d) => process.stderr.write(d));
-  return { key, said, proc: juror, kill: () => juror.kill() };
+      env: { ...process.env, OH_HOUSE_SECRET: rigHouse.secret, OH_HOUSE_KEY: rigHouse.key, OH_SERVICE_KEY: localService.key },
+    });
+    proc = p;
+    p.stderr.on('data', (d) => process.stderr.write(d));
+    await new Promise((resolveUp, reject) => {
+      createInterface({ input: p.stdout }).on('line', (line) => {
+        relayLog.write(`house: ${line}\n`);
+        said.push(line);
+        if (/^house: answering on port /.test(line)) resolveUp();
+        if (/ (woken|over: )| refused: /.test(line)) say(`house: ${line}`);
+      });
+      p.on('exit', (code) => reject(new Error(`the house exited ${code}\n${said.join('\n')}`)));
+    });
+  };
+  const house = {
+    relay: null,
+    said,
+    async wake(table) {
+      // One start at a time: two tables that want the house at once
+      // wait on the same one, as the container is started once
+      // (service/do/bench.mjs). Started again once it has gone.
+      if (!up || (proc && exited(proc))) up = start();
+      await up;
+      const res = await fetch(`http://127.0.0.1:${port}/wake?table=${table}`, { method: 'POST' });
+      if (!res.ok) throw new Error(`the house answered ${res.status}`);
+    },
+    async stop() {
+      if (proc) await stopped(proc);
+    },
+  };
+  return house;
 }
 
 const types = {
@@ -263,42 +275,7 @@ export const localService = {
   secret: 'b7e151628aed2a6abf7158809cf4f3c762e7160f38b4da56a784d9045190cfef',
 };
 
-/// A TURN server on this machine (coturn's turnserver), for the app's
-/// channels to go through as they go through Cloudflare's in
-/// production: TURN only, so the rig plays the path production plays.
-/// The handlers hand out its address and the user `rig`.
-export async function startTurn({ tag = suite } = {}) {
-  if (spawnSync('turnserver', ['--version']).error) {
-    throw new Error("coturn's turnserver is needed for the browser suites (apt-get install coturn)");
-  }
-  // A free port, as the system gives one; coturn takes no port 0.
-  const port = await new Promise((resolve) => {
-    const probe = createSocket('udp4');
-    probe.bind(0, '127.0.0.1', () => {
-      const p = probe.address().port;
-      probe.close(() => resolve(p));
-    });
-  });
-  const logFile = join(root, 'app', 'build', 'logs', `turn-${tag}.log`);
-  mkdirSync(dirname(logFile), { recursive: true });
-  const proc = spawn('turnserver', [
-    '-n', '--no-cli', '--no-tls', '--no-dtls',
-    '--listening-ip=127.0.0.1', '--relay-ip=127.0.0.1', `--listening-port=${port}`,
-    '--lt-cred-mech', '--user=rig:rig', '--realm=openhearts.local',
-    // The peers it relays between are on this machine too.
-    '--allow-loopback-peers',
-    `--log-file=${logFile}`, '--simple-log', '--no-stdout-log',
-  ]);
-  await new Promise((resolveUp, reject) => {
-    proc.on('exit', (code) => reject(new Error(`turnserver exited ${code}; see ${logFile}`)));
-    setTimeout(resolveUp, 500);
-  });
-  // Gone with the suite, however the suite ends.
-  process.on('exit', () => proc.kill());
-  return { url: `turn:127.0.0.1:${port}`, stop: () => proc.kill() };
-}
-
-async function handlersFor(serve, turn, records, store, config) {
+async function handlersFor(serve, records, store, config) {
   const { default: handler } = await import(new URL('../service/functions/worker.mjs', import.meta.url));
   // The operator's remote config (docs/explanation/service.md), where a suite
   // sets one: the row the worker checks and serves at /api/config.
@@ -307,7 +284,6 @@ async function handlersFor(serve, turn, records, store, config) {
     OH_SERVICE_SECRET: localService.secret,
     OH_SERVICE_KEY: localService.key,
     OH_OPEN_HOUSE: '1',
-    OH_TURN_LOCAL: turn,
     OH_STORE: {
       get: async (at, kind) => {
         const [pk, sk] = at.split('|');
@@ -375,11 +351,11 @@ const recordsBucket = () => ({
 /// a device made where the app used to be.
 ///
 /// [relayPort] is the rig's relay's, which `app.at` names in an address
-/// of the rig's for the app to find it; [tag] names the logs. [pace] is
+/// of the rig's for the app to find it. [pace] is
 /// the share of its tables' beats the app is asked to take (`pace=`,
 /// app/lib/net/address.dart), which `app.at` names as well; [config] is
 /// the operator's remote config, as the handlers serve it.
-export async function serveApp({ relayPort = null, tag = suite, pace = null, config = null } = {}) {
+export async function serveApp({ relayPort = null, pace = null, config = null } = {}) {
   const site = mkdtempSync(join(tmpdir(), 'oh-site-'));
   buildSite(site);
   // Static files as a fetch, which is what the worker's own ASSETS
@@ -398,13 +374,12 @@ export async function serveApp({ relayPort = null, tag = suite, pace = null, con
       return new Response(null, { status: 404 });
     }
   };
-  const turn = await startTurn({ tag });
   const records = recordsBucket();
   // The service's rows, which a flow can write as the operator's tools
   // do (`app.store`).
   const { memoryStore } = await import(new URL('../service/functions/rows.mjs', import.meta.url));
   const store = memoryStore();
-  const handlers = await handlersFor(asset, turn.url, records, store, config);
+  const handlers = await handlersFor(asset, records, store, config);
   let legacy = false;
   const server = createServer(async (req, res) => {
     const url = new URL(req.url, `http://${req.headers.host ?? '127.0.0.1'}`);
@@ -442,7 +417,6 @@ export async function serveApp({ relayPort = null, tag = suite, pace = null, con
     at: (url) => withRelay(url.startsWith('/') ? `http://play.openhearts.localhost:${port}${url}` : url, relayPort, pace),
     stop: () => {
       server.close();
-      turn.stop();
       rmSync(site, { recursive: true, force: true });
     },
   };
@@ -649,17 +623,27 @@ export const cardNodes = (page) =>
 export async function playUntil(pages, done, { timeout = 120000, idle = [] } = {}) {
   const until = Date.now() + timeout;
   const finished = new Set();
-  // How long one pass over every page takes, which is how often any
-  // one page is looked at. A state that comes and goes is caught only
-  // if that period is shorter than the state lasts, so when this
-  // times out the period is half the answer to why. The pages are
-  // looked at together, as four people look at their own screens: a
-  // pass is as long as its slowest page, not all four end to end.
-  const periods = [];
-  while (Date.now() < until) {
-    const round = Date.now();
-    const caught = await Promise.all(pages.map(async (page, i) => {
-      if (page.isClosed()) return true;
+  // One page's look that throws ends every page's.
+  let failed = false;
+  const isOver = () => failed || finished.size === pages.length || Date.now() >= until;
+  // Each page is looked at on its own, as four people look at their own
+  // screens: a page held up — on a busy machine, for seconds at a time —
+  // holds up nobody else's turn. Looked at together, a round of all
+  // four was as long as the slowest of them, and a player alone with
+  // bots, whose turns come one after another, was kept waiting out the
+  // others' rounds until her clock ran out.
+  //
+  // How long each page takes to be looked at again: a state that comes
+  // and goes is caught only if that is shorter than the state lasts, so
+  // when this times out it is half the answer to why.
+  const periods = pages.map(() => []);
+  const watch = async (page, i) => {
+    while (!isOver()) {
+      const round = Date.now();
+      if (page.isClosed()) {
+        finished.add(i);
+        return;
+      }
       if (!idle.includes(i)) {
         const did = await act(page);
         // A page that has shown "Your turn" fifteen polls running: what
@@ -673,19 +657,30 @@ export async function playUntil(pages, done, { timeout = 120000, idle = [] } = {
             `cards: ${(await cardNodes(page)).join(' | ')}`);
         }
       }
+      // A page done goes on playing until every page is: the others'
+      // tables may wait on its cards.
       if (!finished.has(i) && (await done(page, i))) finished.add(i);
-      return finished.has(i);
-    }));
-    const all = caught.every(Boolean);
-    if (all) return;
-    await sleep(300);
-    periods.push(Date.now() - round);
-  }
-  periods.sort((a, b) => a - b);
-  const at = (q) => periods[Math.min(periods.length - 1, Math.floor(periods.length * q))] ?? 0;
+      if (isOver()) return;
+      await sleep(300);
+      periods[i].push(Date.now() - round);
+    }
+  };
+  await Promise.all(pages.map(async (page, i) => {
+    try {
+      await watch(page, i);
+    } catch (e) {
+      failed = true;
+      throw e;
+    }
+  }));
+  if (finished.size === pages.length) return;
+  const spread = (ps) => {
+    const sorted = [...ps].sort((a, b) => a - b);
+    const at = (q) => sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * q))] ?? 0;
+    return `${sorted.length} looks, ${at(0)}–${at(0.99)} ms apart (median ${at(0.5)})`;
+  };
   throw new Error(
-    `timed out after ${periods.length} passes over the pages, each taking ${at(0)}–${at(0.99)} ms ` +
-      `(median ${at(0.5)}); ${finished.size} of ${pages.length} pages were caught: ` +
+    `timed out with ${finished.size} of ${pages.length} pages caught; each page ${periods.map((ps, i) => `${i}: ${spread(ps)}`).join('; ')}: ` +
       `${await Promise.all(pages.filter((p) => !p.isClosed()).map(async (p) => (await texts(p)).join(' | ')))}`,
   );
 }

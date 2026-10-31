@@ -1,7 +1,7 @@
 # table
 
-The table protocol: signed events, membership, departures, juries and
-the sealed deal, over an abstract transport and clock. Its tests run it
+The table protocol: signed events, the referee's log, departures, the
+house and the sealed deal, over an abstract transport and clock. Its tests run it
 on a simulated network, which is a package of its own
 ([table_sim](../table_sim/)) so that none of it ships. How a live table
 works is in [live play](../../docs/explanation/live-play.md), and its

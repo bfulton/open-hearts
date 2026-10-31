@@ -184,4 +184,4 @@ You now have a working clone: tested, built and running.
 - [Run the browser suites](../how-to/run-the-browser-suites.md) to drive the built app in a browser, as `./check.sh full` and CI do.
 - [How a change reaches a phone](../explanation/dev-loop.md) explains the development loop, from a commit to a phone.
 - [How Open Hearts is tested](../explanation/testing.md) explains the test tiers and why the suites are split as they are.
-- [Multiplayer without a game server](../explanation/multiplayer.md) and [the fair deal](../explanation/fair-deal.md) explain how live play works.
+- [Multiplayer through a referee](../explanation/multiplayer.md) and [the fair deal](../explanation/fair-deal.md) explain how live play works.

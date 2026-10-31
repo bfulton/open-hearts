@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# The backup jurors as a container image (Dockerfile here,
-# service/do/bench.mjs runs it): the juror compiled ahead of time, and
-# the deal's and Schnorr's native libraries beside it where the juror
-# looks for them (crypto/*/target/release under its working directory).
+# The house as a container image (Dockerfile here, service/do/bench.mjs
+# runs it): the house compiled ahead of time, and the deal's and
+# Schnorr's native libraries beside it where it looks for them
+# (crypto/*/target/release under its working directory).
 #
 # Built on the host and copied in, not built inside the image: both
 # crates build from their lockfiles with the host's cargo, and the Dart
@@ -29,5 +29,5 @@ mkdir -p "$out/crypto/deal/target/release" "$out/crypto/schnorr/target/release"
 ( cd "$root/crypto/schnorr" && cargo build --release --locked )
 cp "$root/crypto/deal/target/release/libdeal.so" "$out/crypto/deal/target/release/"
 cp "$root/crypto/schnorr/target/release/libschnorr.so" "$out/crypto/schnorr/target/release/"
-( cd "$root/service" && dart compile exe bin/juror.dart -o "$out/juror" )
+( cd "$root/service" && dart compile exe bin/house.dart -o "$out/house" )
 ls -la "$out" "$out/crypto/deal/target/release" "$out/crypto/schnorr/target/release"

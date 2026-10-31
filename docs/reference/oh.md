@@ -292,7 +292,7 @@ Putting the relay worker and the site into production, and checking production a
 oh deploy relay [--apply] [--preview]
 ```
 
-Deploys the relay worker, and the backup jurors' container with it, from main; with --preview, the preview relay, from what is checked out. Needs Docker running, Dart and Cargo. Production is refused unless HEAD is origin/main with nothing uncommitted. The preview relay is what every preview plays on: it reaches nothing of production's, and is refused until config/openhearts.json has the previews' service key (oh preview secrets).
+Deploys the relay worker, and the house's container with it, from main; with --preview, the preview relay, from what is checked out. Needs Docker running, Dart and Cargo. Production is refused unless HEAD is origin/main with nothing uncommitted. The preview relay is what every preview plays on: it reaches nothing of production's, and is refused until config/openhearts.json has the previews' service key (oh preview secrets).
 
 - **Needs:** `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`
 - **How-to:** [deploy.md](../how-to/deploy.md)
@@ -356,7 +356,7 @@ Playing live on a preview of the app: the secrets previews keep for themselves, 
 oh preview secrets [--apply]
 ```
 
-Makes the secrets previews keep for themselves, new, and shows them to nobody: the service key pair previews sign with, and the preview relay's backup jurors' secret. The pair's secret is set on the Pages project's preview environment as OH_SERVICE_SECRET, and its public half written to config/openhearts.json as preview.serviceKey: commit it. None of them is production's, since a preview runs whatever branch was deployed to it. A preview built before keeps the key it was built with: deploy the preview relay and each preview again afterwards.
+Makes the secrets previews keep for themselves, new, and shows them to nobody: the service key pair previews sign with, and the key pair of the previews' house. The service pair's secret is set on the Pages project's preview environment as OH_SERVICE_SECRET, the house's on the preview relay as OH_HOUSE_SECRET, and their public halves written to config/openhearts.json as preview.serviceKey and preview.houseKey: commit them. None of them is production's, since a preview runs whatever branch was deployed to it. A preview built before keeps the keys it was built with: deploy the preview relay and each preview again afterwards.
 
 - **Needs:** `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, Dart, and dart pub get in service/
 - **How-to:** [deploy.md](../how-to/deploy.md#play-live-on-a-preview)
@@ -384,7 +384,7 @@ What happened at a live table, from what each side of it said.
 oh table <table> [--days <days>]
 ```
 
-Prints, in one timeline, what the backup jurors, the relay and the device each said of one table: the jurors' traces, the relay's sockets coming and going, what was done with the backup jurors, and the device's own report of a game lost or a line down. --days says how far back to look (3 unless it says, at most 30; Workers Logs keeps what it keeps). Without New Relic's credentials the device's side is left out, and said so.
+Prints, in one timeline, what the house, the relay and the device each said of one table: the house's traces, the relay's sockets coming and going, what was done with the house, and the device's own report of a game lost or a line down. --days says how far back to look (3 unless it says, at most 30; Workers Logs keeps what it keeps). Without New Relic's credentials the device's side is left out, and said so.
 
 - **Needs:** `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, (Workers Observability Read), NEW_RELIC_API_KEY and NEW_RELIC_ACCOUNT_ID (for the device's side)
 - **How-to:** [look-into-a-lost-game.md](../how-to/look-into-a-lost-game.md)
@@ -477,6 +477,18 @@ Sets a secret wherever infra/cloudflare.mjs says it lives, from what you type (n
 - **Needs:** `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`
 - **How-to:** [rotate-the-service-key.md](../how-to/rotate-the-service-key.md)
 - **Example:** `oh secret set OH_SERVICE_SECRET --apply`
+
+### oh house key
+
+```bash
+oh house key [--apply]
+```
+
+Makes the house a new key pair and shows its secret to nobody: set on the relay worker as OH_HOUSE_SECRET, its public half written to config/openhearts.json as houseKey. Commit config/openhearts.json, then deploy the relay and the site from it: the relay takes results from that key and referees sealed tables only for it, and the app names it in every table it seats. A table started under the old key is one no house serves any more, so make it with no table playing.
+
+- **Needs:** `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, Dart, and dart pub get in service/
+- **How-to:** [deploy.md](../how-to/deploy.md#before-you-begin)
+- **Example:** `oh house key --apply`
 
 ### oh key mint
 

@@ -1,8 +1,8 @@
 # End to end
 
 Browser suites that drive the built web app through its accessibility
-tree, with the local relay, the backup jurors, the service's handlers
-and a TURN server running on this machine. The suites find buttons,
+tree, with the local relay, the house and the service's handlers
+running on this machine. The suites find buttons,
 cards and state pills by their labels, so they exercise the screen a
 person sees, and `flows.mjs` also taps with a real pointer, so a tap
 landing in the wrong place shows up.

@@ -13,6 +13,7 @@
 // second implementation in a third language.
 
 import { nameRefused } from '../functions/names.mjs';
+import { logKind, tableReferee, tableTag } from './referee.mjs';
 
 /// Kinds 20000–29999 are ephemeral: forwarded to whoever is listening
 /// and then forgotten. Every kind presence uses is one of these, which
@@ -36,7 +37,8 @@ export const rememberedIds = 40000;
 /// What the object (worker.mjs) holds one socket to. The node host under
 /// the suites carries whole tables, whose deal is the big one, and asks
 /// for no limits; the object carries presence, whose largest event is a
-/// summons of a few kilobytes, for everyone on the tag at once — and
+/// beat with the device's activation in it, under a kilobyte, for
+/// everyone on the tag at once — and
 /// takes a socket from anybody. Cloudflare hands an object messages of
 /// up to 32 MiB, and an event that matches presence is sent on to
 /// every device listening, on the one thread they all share.
@@ -48,8 +50,8 @@ export const objectLimits = Object.freeze({
   /// the 16 KiB an attachment may be.
   request: 1024,
   /// Events one socket may publish at once, and then each second. A
-  /// device beats every five seconds and summons a draw's jurors
-  /// together; a flood is refused before its signature is checked.
+  /// device beats every five seconds; a flood is refused before its
+  /// signature is checked.
   burst: 30,
   perSecond: 2,
 });
@@ -283,7 +285,8 @@ export function memoryStore(keep = 10000) {
 // shown to it, or the account's turn tells it one was given
 // ([createRelay], `revoke`), and opens none for an earlier one. Asking
 // a device to stop would leave a modified one going; refusing it does
-// not.
+// not. The house is the one key carried without an activation: the
+// operator's own, it shows nothing but its answer, signed by that key.
 
 /// The kind of a device's answer to the relay's challenge (NIP-42).
 export const authKind = 22242;
@@ -308,46 +311,23 @@ export async function activationOf(raw, service, verify, nowS) {
   return verify(service, digest, sig) ? { account, key, epoch, until } : null;
 }
 
-/// The mark a backup juror shows instead of an activation: an
-/// HMAC of its key under the backup jurors' own secret
-/// (OH_JUROR_SECRET), which the relay holds too. They belong to no
-/// account; they are the service's (docs/explanation/live-play.md).
-export async function benchMark(secret, key) {
-  const k = await crypto.subtle.importKey('raw', encoder.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
-  return toHex(new Uint8Array(await crypto.subtle.sign('HMAC', k, encoder.encode(`oh-bench/1\n${key}`))));
-}
-
-/// Whether [mark] is [key]'s mark under [secret] ([benchMark]), checked
-/// as an HMAC is checked, in time that says nothing of how much of it
-/// was right.
-export async function isBenchMark(secret, key, mark) {
-  if (typeof mark !== 'string' || !/^[0-9a-f]{64}$/.test(mark)) return false;
-  const k = await crypto.subtle.importKey('raw', encoder.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['verify']);
-  const bytes = new Uint8Array(32);
-  for (let i = 0; i < 32; i++) bytes[i] = parseInt(mark.slice(i * 2, i * 2 + 2), 16);
-  return crypto.subtle.verify('HMAC', k, bytes, encoder.encode(`oh-bench/1\n${key}`));
-}
-
-/// How long a backup juror's mark is taken for, in seconds, before it is
+/// How long the house's answer is taken for, in seconds, before it is
 /// asked again.
-const benchSeconds = 24 * 60 * 60;
+const houseSeconds = 24 * 60 * 60;
 
 /// The gate a relay holds its sockets to ([createRelay], `gate`): a
 /// fresh challenge per socket, and who answered it — {account, key,
 /// epoch, until} — or {refused: reason}. [service] is the service's
-/// public key, [bench] the backup jurors' secret, or null for none; [seen]
-/// asks the account's turn whether an activation is still the one in
-/// use, answering a reason when it is not, or null.
-export function serviceGate({ service, verify, bench = null, seen = null, now = Date.now }) {
+/// public key, [house] the house's, or null for none: the house belongs
+/// to no account, and its answer, signed by its key, is all it shows;
+/// [seen] asks the account's turn whether an activation is still the
+/// one in use, answering a reason when it is not, or null.
+export function serviceGate({ service, verify, house = null, seen = null, now = Date.now }) {
   return {
     challenge: () => toHex(crypto.getRandomValues(new Uint8Array(16))),
     async admit(event) {
       const said = (name) => event.tags.find((t) => t[0] === name)?.[1];
-      const mark = said('bench');
-      if (mark !== undefined) {
-        if (!bench || !(await isBenchMark(bench, event.pubkey, mark))) return { refused: 'restricted: not a backup juror' };
-        return { account: null, key: event.pubkey, epoch: 0, until: Math.floor(now() / 1000) + benchSeconds };
-      }
+      if (house && event.pubkey === house) return { account: null, key: house, epoch: 0, until: Math.floor(now() / 1000) + houseSeconds };
       let raw = null;
       try {
         raw = JSON.parse(said('activation') ?? 'null');
@@ -377,10 +357,10 @@ const supersededWhy = 'superseded: another device of this account is in use';
 /// Whether [why] is a refusal the relay will not change its mind about
 /// for this device: superseded, its account suspended
 /// (service/functions/suspension.mjs) or deleted
-/// (service/functions/deletion.mjs), or not admitted at all. The app
+/// (service/functions/deletion.mjs). The app
 /// goes by the same first word (packages/table, relays.dart,
 /// turnedAway).
-const finalWhy = (why) => typeof why === 'string' && why.length <= 120 && /^(superseded|suspended|deleted|restricted): /.test(why);
+const finalWhy = (why) => typeof why === 'string' && why.length <= 120 && /^(superseded|suspended|deleted): /.test(why);
 
 /// The relay itself. [verify] checks a signature, [refuse] is a policy
 /// that may turn an event away with a reason — an object that carries
@@ -420,7 +400,13 @@ const finalWhy = (why) => typeof why === 'string' && why.length <= 120 && /^(sup
 /// its account's picture now (service/do/profile_pictures.mjs). What is
 /// already held was screened as it came, so only [withhold] is asked of
 /// that.
-export function createRelay({ verify, store = memoryStore(), refuse = null, log = null, limits = null, now = Date.now, count = null, heard = null, kept = null, gate = null, withhold = null, screen = null, forget = null }) {
+///
+/// [referee], when given, makes the referee of the table this relay is
+/// the tag of (referee.mjs, tableReferee) from the relay's own `send`
+/// and `admitted`: the relay then takes the table's events
+/// ([logKind]) for its log, and answers `["LOG", sub, from]` with the
+/// log from there and `["TICK"]` with the time.
+export function createRelay({ verify, store = memoryStore(), refuse = null, log = null, limits = null, now = Date.now, count = null, heard = null, kept = null, gate = null, withhold = null, screen = null, forget = null, referee = null }) {
   /// socket -> subscription id -> {raw, filters}. The raw filters are
   /// kept beside the parsed ones because a hibernating socket has to
   /// carry them somewhere and JSON is what it can carry.
@@ -459,6 +445,9 @@ export function createRelay({ verify, store = memoryStore(), refuse = null, log 
     const who = auths.get(socket)?.who;
     return !!who && who.until > nowS();
   };
+
+  /// The table's referee, on a table's tag.
+  const table = referee?.({ send: sendText, admitted }) ?? null;
 
   /// A fresh challenge for [socket], whose answer ran out or never came.
   function challenge(socket) {
@@ -554,7 +543,7 @@ export function createRelay({ verify, store = memoryStore(), refuse = null, log 
     if (message[0] === 'EVENT') {
       const id = message[1] && typeof message[1] === 'object' && typeof message[1].id === 'string' ? message[1].id : '';
       send(socket, ['OK', id, false, why]);
-    } else if (message[0] === 'REQ') {
+    } else if (message[0] === 'REQ' || message[0] === 'LOG') {
       send(socket, ['CLOSED', typeof message[1] === 'string' ? message[1] : '', why]);
     }
     return true;
@@ -588,6 +577,14 @@ export function createRelay({ verify, store = memoryStore(), refuse = null, log 
       const id = json && typeof json === 'object' ? json.id : null;
       log?.(`rejected ${typeof id === 'string' ? id.slice(0, 6) : '?'}`);
       return send(from, ['OK', typeof id === 'string' ? id : '', false, 'invalid: bad id or signature']);
+    }
+    // A table's event is the referee's, and nobody else's: it goes into
+    // the log, which everybody reads, and nowhere else.
+    if (event.kind === logKind && table) {
+      const { ok, why } = await table.take(event);
+      count?.(ok ? (why ? 'duplicate' : 'events') : why.startsWith('invalid') ? 'invalid' : 'refused');
+      if (!ok) log?.(`not logged ${event.id.slice(0, 6)}: ${why}`);
+      return send(from, ['OK', event.id, ok, why]);
     }
     const why = await refuse?.(event);
     if (why) {
@@ -623,7 +620,7 @@ export function createRelay({ verify, store = memoryStore(), refuse = null, log 
     }
     send(from, ['OK', event.id, true, '']);
     // Whatever the host wants to know of an event it took, and from
-    // whom: a call for a juror (worker.mjs).
+    // whom.
     heard?.(event, auths.get(from)?.who ?? null);
     // Written out once, not once a listener: the same text either way.
     const wire = JSON.stringify(event);
@@ -695,7 +692,7 @@ export function createRelay({ verify, store = memoryStore(), refuse = null, log 
       return send(socket, ['NOTICE', 'not a message']);
     }
     if (message[0] === 'AUTH') return authenticate(socket, message[1]);
-    if (gate && (message[0] === 'EVENT' || message[0] === 'REQ' || message[0] === 'CLOSE') && heldBack(socket, message, raw)) return;
+    if (gate && ['EVENT', 'REQ', 'CLOSE', 'LOG', 'TICK'].includes(message[0]) && heldBack(socket, message, raw)) return;
     switch (message[0]) {
       case 'EVENT':
         if (message.length !== 2) {
@@ -715,7 +712,21 @@ export function createRelay({ verify, store = memoryStore(), refuse = null, log 
         count?.('subscriptions');
         return request(socket, message);
       case 'CLOSE':
-        if (message.length === 2 && typeof message[1] === 'string') sockets.get(socket)?.delete(message[1]);
+        if (message.length === 2 && typeof message[1] === 'string') {
+          sockets.get(socket)?.delete(message[1]);
+          table?.unfollow(socket, message[1]);
+        }
+        return;
+      case 'LOG':
+        if (message.length !== 3 || typeof message[1] !== 'string' || message[1].length > 64 || !Number.isSafeInteger(message[2]) || message[2] < 0) {
+          count?.('malformed');
+          return send(socket, ['NOTICE', 'LOG takes an id and the first entry wanted']);
+        }
+        if (!table) return send(socket, ['CLOSED', message[1], 'blocked: only a table\'s tag keeps a log']);
+        return table.follow(socket, message[1], message[2], auths.get(socket)?.who?.key ?? null);
+      case 'TICK':
+        if (!table) return send(socket, ['NOTICE', 'blocked: only a table\'s tag keeps a log']);
+        table.tick();
         return;
       default:
         return send(socket, ['NOTICE', `unknown message ${message[0]}`]);
@@ -724,10 +735,11 @@ export function createRelay({ verify, store = memoryStore(), refuse = null, log 
 
   return {
     /// A socket the host has accepted, with the subscriptions it was
-    /// already carrying if it is one that woke from hibernation — and
-    /// who it had answered as, [auth], which stands while it has not
-    /// run out.
-    open(socket, carried = null, auth = null) {
+    /// already carrying if it is one that woke from hibernation — who
+    /// it had answered as, [auth], which stands while it has not run
+    /// out, and the subscription it followed the table's log under,
+    /// [followed].
+    open(socket, carried = null, auth = null, followed = null) {
       const subscriptions = new Map();
       for (const [id, raw] of Object.entries(carried ?? {})) {
         const filters = [];
@@ -745,21 +757,33 @@ export function createRelay({ verify, store = memoryStore(), refuse = null, log 
           challenge(socket);
         }
       }
+      if (typeof followed === 'string') table?.resume(socket, followed, auth?.key ?? null);
       log?.(`connected (${sockets.size})`);
+    },
+
+    /// Every socket the object held through its sleep handed back
+    /// ([open]): a writer the log last said was there and now has none
+    /// was cut off while the object was gone (referee.mjs, settle).
+    settle() {
+      table?.settle();
     },
 
     /// One message from [socket], in its turn behind that socket's
     /// earlier ones. The promise is for a host that wants to know when
     /// the message has been answered.
     message(socket, raw) {
+      // A message that throws is a bug here, and said wherever this
+      // relay says anything, or on the console where it says nothing:
+      // its socket hears nothing back, so nothing else would say it.
       const turn = (turns.get(socket) ?? Promise.resolve())
         .then(() => handle(socket, raw))
-        .catch((e) => log?.(`relay: ${e}`));
+        .catch((e) => (log ?? console.error)(`relay: ${e?.stack ?? e}`));
       turns.set(socket, turn);
       return turn;
     },
 
     close(socket) {
+      table?.unfollow(socket);
       sockets.delete(socket);
       turns.delete(socket);
       buckets.delete(socket);
@@ -779,6 +803,23 @@ export function createRelay({ verify, store = memoryStore(), refuse = null, log 
     /// Who [socket] answered as, for it to carry through hibernation.
     authOf(socket) {
       return auths.get(socket)?.who ?? null;
+    },
+
+    /// The subscription [socket] follows the table's log under, for it
+    /// to carry through hibernation, or null.
+    followedBy(socket) {
+      return table?.followed(socket) ?? null;
+    },
+
+    /// The table's log, on a table's tag.
+    get log() {
+      return table?.entries ?? null;
+    },
+
+    /// Whether this table wants its house, and the house is not there
+    /// (referee.mjs).
+    get wantsHouse() {
+      return table?.wantsHouse ?? false;
     },
 
     /// What [socket] must carry to survive hibernation, as JSON.
@@ -805,14 +846,25 @@ export function createRelay({ verify, store = memoryStore(), refuse = null, log 
 /// to [objectLimits] or [tableLimits]. [withhold] and [forget] are asked
 /// only where pictures are put out: a lobby's tag, never presence or the
 /// results.
-export function objectRelay(verify, { tag = presenceTag, now = Date.now, count = null, limits = null, heard = null, store = null, kept = null, also = null, gate = null, withhold = null, screen = null, forget = null } = {}) {
+///
+/// A table's tag keeps the table's log besides (referee.mjs): [log] is
+/// the log as kept, [keepEntry] is told of each entry added to it, to
+/// write it down, and [wanted] each time the table wants its house and
+/// the house is not there. [house] is this relay's house: the key a
+/// sealed table's spec has to name, and the one key the results are
+/// taken from.
+export function objectRelay(
+  verify,
+  { tag = presenceTag, now = Date.now, count = null, limits = null, store = null, kept = null, also = null, gate = null, withhold = null, screen = null, forget = null, house = null, log = null, keepEntry = null, wanted = null, say = null } = {},
+) {
   const presence = tag === presenceTag;
-  const own = refusalFor(tag);
+  const own = refusalFor(tag, { house });
   const lobby = !presence && tag !== resultsTag;
   return createRelay({
-    heard,
     verify,
     gate,
+    log: say,
+    referee: tableTag.test(tag) ? ({ send, admitted }) => tableReferee({ table: tag, verify, house, now, entries: log ?? [], keep: keepEntry, wanted, send, admitted }) : null,
     // Presence keeps nothing; a table's tag keeps its lobby.
     store: presence ? null : (store ?? memoryStore(storedKeep(tag))),
     kept: presence ? null : kept,
@@ -846,15 +898,15 @@ export function tagLabel(tag) {
 /// One line for the operator's logs as a socket on [tag] comes and goes
 /// ([what]: open, close, error), for laying a device's account of its
 /// line beside the relay's (docs/how-to/look-into-a-lost-game.md): the
-/// kind of tag, whether the socket answered as a device or a backup
-/// juror ([who], the gate's answer), how it closed, how long it was
+/// kind of tag, whether the socket answered as a device or the house
+/// ([who], the gate's answer), how it closed, how long it was
 /// open, and how many sockets the tag has left. Nothing about who:
 /// presence is not kept, and neither is anybody's coming and going.
 export function socketLine(what, { tag, who = null, code, clean, why, openedAt, sockets, now = Date.now() }) {
   return {
     relay: what,
     tag: tagLabel(tag),
-    as: who ? (who.account ? 'device' : 'juror') : 'unanswered',
+    as: who ? (who.account ? 'device' : 'house') : 'unanswered',
     ...(code === undefined ? {} : { code, clean: clean === true }),
     ...(why ? { why: String(why).slice(0, 80) } : {}),
     ...(typeof openedAt === 'number' ? { openS: Math.round((now - openedAt) / 1000) } : {}),
@@ -890,10 +942,6 @@ export const reactionKind = 24248;
 /// The longest a reaction's content is, in characters: some thirty
 /// is what one says.
 export const reactionMost = 128;
-
-/// What a table's tag is (packages/table, spec.dart, newTableId): the
-/// only tag a reaction rides.
-const tableTag = /^[0-9a-f]{32}$/;
 
 /// Why this [tag]'s object does not carry [event], a reaction, or null
 /// when it does: on a table's own tag, tagged with that table and
@@ -971,6 +1019,9 @@ export function pictureInAvatar(event) {
 /// Why an event with a picture inside an avatar is not carried.
 export const PICTURE_IN_AVATAR_WHY = 'blocked: a picture travels as its own event';
 
+/// Why a result said by anybody but the house is not taken.
+export const RESULT_NOT_HOUSE_WHY = 'blocked: a result is the house\'s word';
+
 /// Why an event naming somebody as the filter refuses is not carried
 /// (service/functions/names.mjs): the app never sends one.
 export const NAME_REFUSED_WHY = 'blocked: a name that is not allowed';
@@ -983,9 +1034,15 @@ export const NAME_REFUSED_WHY = 'blocked: a name that is not allowed';
 /// shape but a reaction's ([reactionRefusal]). And anything that shows
 /// the others a name the filter refuses ([namesIn]), or a picture
 /// anywhere but in a picture of its own ([pictureInAvatar]).
-export function refusalFor(tag) {
+///
+/// The results are the house's to say ([house], its key): a game's
+/// result is the house's word on a game it refereed (packages/table,
+/// results.dart), and nothing new is taken from anybody else — with no
+/// house, from nobody.
+export function refusalFor(tag, { house = null } = {}) {
   return (event) => {
     if (event.kind === reactionKind) return reactionRefusal(tag, event);
+    if (tag === resultsTag && event.pubkey !== house) return RESULT_NOT_HOUSE_WHY;
     const carried = ephemeral(event.kind) || (tag !== presenceTag && event.kind === lobbyKind && event.tags?.some((t) => t[0] === 't' && t[1] === tag));
     if (!carried) {
       return tag === presenceTag
@@ -998,10 +1055,10 @@ export function refusalFor(tag) {
 }
 
 /// A table's tag carries what presence does not: a deal's steps of up
-/// to some tens of kilobytes, and every seat and juror saying its moves
-/// and repeating what is unsettled, in bursts at the deal. Measured
-/// against real tables through this relay (docs/explanation/relay.md);
-/// presence keeps [objectLimits].
+/// to some tens of kilobytes, in bursts at the deal, and every side
+/// asking for the log again from where it is whenever its socket comes
+/// back. Measured against real tables through this relay
+/// (docs/explanation/relay.md); presence keeps [objectLimits].
 export const tableLimits = Object.freeze({
   message: 128 * 1024,
   request: 1024,

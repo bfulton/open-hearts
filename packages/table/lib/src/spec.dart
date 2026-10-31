@@ -2,8 +2,10 @@
 /// seed an unsealed table's deal comes from.
 library;
 
+import 'dart:convert';
 import 'dart:math';
 
+import 'package:crypto/crypto.dart' show sha256;
 import 'package:engine/engine.dart';
 
 import 'licence.dart';
@@ -41,25 +43,60 @@ class BotSeat extends SeatHolder {
   String toString() => 'bot ${persona.id}';
 }
 
-/// A table's id: 128 bits from the system's own randomness, as 32 hex
-/// digits. It is the table's address — the tag its object on the relay
-/// is named by, and `/table/<id>` on play.openhearts.game — so it is unguessable, and two
-/// tables never share one.
-String newTableId([Random? random]) {
+/// A table's salt ([TableSpec.salt]): 128 bits from the system's own
+/// randomness, as 32 hex digits.
+String newSalt([Random? random]) {
   final rng = random ?? Random.secure();
   // Sixteen bits at a time: a wider shift folds to zero in JavaScript.
   return List.generate(8, (_) => rng.nextInt(1 << 16).toRadixString(16).padLeft(4, '0')).join();
 }
 
-/// Whether [id] is one [newTableId] would make.
+/// Whether [id] has a table id's shape: 32 hex digits.
 bool validTableId(String id) => RegExp(r'^[0-9a-f]{32}$').hasMatch(id);
 
 class TableSpec {
-  const TableSpec(
-      {required this.id, required this.seed, required this.seats, this.rated = false, this.sealed = false, this.target = gameOverScore,
-      this.timing = TableTiming.standard});
+  TableSpec(
+      {required this.seed,
+      required this.seats,
+      this.rated = false,
+      this.sealed = false,
+      this.target = gameOverScore,
+      this.timing = TableTiming.standard,
+      this.house,
+      this.salt})
+      : id = idOf(_written(salt: salt, seed: seed, rated: rated, sealed: sealed, target: target, timing: timing, house: house, seats: seats));
 
+  /// A table kept before the referee, under the id it had then: one
+  /// drawn at random, which nothing ties to the rest
+  /// (legacy/v2_record.dart).
+  TableSpec.kept(
+      {required this.id,
+      required this.seed,
+      required this.seats,
+      this.rated = false,
+      this.sealed = false,
+      this.target = gameOverScore,
+      this.timing = TableTiming.standard})
+      : house = null,
+        salt = null;
+
+  /// The table's id: the first 128 bits of the SHA-256 of everything
+  /// else the spec says, as it is written ([toJson]), in 32 hex digits.
+  ///
+  /// It is the table's address — the tag its object on the relay is
+  /// named by, and `/table/<id>` on play.openhearts.game — and it names
+  /// this spec and no other. The log's first entry is a start saying
+  /// the spec, from any one of its people, and the referee takes it only
+  /// when the spec is the one the id names (service/do/referee.mjs), as
+  /// every side does (rules.dart): so one person cannot start their
+  /// table as anything but the table everybody was seated at.
   final String id;
+
+  /// 128 random bits, as 32 hex digits ([newSalt]), drawn by whoever
+  /// seats the table: what keeps its id unguessable to somebody who
+  /// knows everything else about it — the seats, which a pool
+  /// publishes, and the options. None in a simulator's table.
+  final String? salt;
 
   /// Whether the cards come from the verifiable deal (docs/explanation/fair-deal.md) rather
   /// than the seed: every hand shuffled by every seat with proofs, each
@@ -78,33 +115,53 @@ class TableSpec {
   /// a hand.
   final int target;
 
-  /// The table's clocks: a person's grace and bank, a held bot seat's
-  /// deadlines, the silences and waits after which a seat proposes
-  /// what the table then settles (timing.dart). Chosen like [target],
-  /// by the device that starts the table from its remote config, and
-  /// carried in the signed start event for the same reason: seats that
-  /// disagree about when a boot is due back different sides of it.
+  /// The table's clocks: a person's grace and bank, the house's
+  /// deadlines, how long a closed connection is waited for
+  /// (timing.dart). Chosen like [target], by the device that seats the
+  /// table from its remote config, and carried in the start for the same
+  /// reason: sides that disagreed about when a deadline passed would
+  /// come to different tables.
   final TableTiming timing;
 
   /// The deal's seed at an unsealed table, where every seat can compute
-  /// every hand from it; at a sealed one, the randomness of the jury
-  /// draw and of the bots' public deal secrets.
+  /// every hand from it; at a sealed one, the randomness of the public
+  /// deal secret a seat takes when its person goes before its keys.
   final int seed;
+
+  /// The house's key at a sealed table: the operator's service, which
+  /// holds the bot seats and a piece of every person's escrow, and says
+  /// how the game came out (docs/explanation/live-play.md). The key the
+  /// build was made with; a table naming another is not sat at.
+  final PublicKey? house;
 
   /// Seat order, four holders.
   final List<SeatHolder> seats;
 
-  /// The spec on the wire: a start event's shape, and a summons's.
+  /// The spec on the wire, as the log's start carries it: its id, and
+  /// what the id is the hash of.
   Map<String, Object?> toJson() => {
         'id': id,
+        ..._written(salt: salt, seed: seed, rated: rated, sealed: sealed, target: target, timing: timing, house: house, seats: seats),
+      };
+
+  /// Everything a spec says but its id, as it is written.
+  static Map<String, Object?> _written(
+          {required String? salt,
+          required int seed,
+          required bool rated,
+          required bool sealed,
+          required int target,
+          required TableTiming timing,
+          required PublicKey? house,
+          required List<SeatHolder> seats}) =>
+      {
+        if (salt != null) 'salt': salt,
         'seed': seed,
         'rated': rated,
         'sealed': sealed,
         'target': target,
-        // Left out only where it is what every build reads a spec with
-        // none as (timing.dart): the standard has moved on from it, and
-        // a juror on another build reads this spec from a summons.
-        if (timing != TableTiming.unsaid) 'timing': timing.toJson(),
+        'timing': timing.toJson(),
+        if (house != null) 'house': house,
         'seats': [
           for (final h in seats)
             switch (h) {
@@ -114,8 +171,16 @@ class TableSpec {
         ],
       };
 
-  /// Null for anything that is not a four-seat spec.
-  static TableSpec? parse(Object? json) {
+  /// The id of a spec that says [written], all but its id: the first
+  /// 32 hex digits of the SHA-256 of its JSON. The referee works out the
+  /// same from a start's text (service/do/referee.mjs, specIdOf).
+  static String idOf(Map<String, Object?> written) => sha256.convert(utf8.encode(jsonEncode(written))).toString().substring(0, 32);
+
+  /// Null for anything that is not a four-seat spec whose id is the one
+  /// its fields name. [legacy] reads the spec of a game kept before the
+  /// referee (legacy/v2_record.dart), whose id was drawn at random and
+  /// whose clocks nothing checks any more, with whatever timing it says.
+  static TableSpec? parse(Object? json, {bool legacy = false}) {
     try {
       final m = json as Map;
       final seats = <SeatHolder>[];
@@ -126,14 +191,27 @@ class TableSpec {
             : HumanSeat(s['key'] as String, licence: s['licence'] == null ? null : Licence.parse(s['licence']) ?? (throw const FormatException('licence'))));
       }
       if (seats.length != seatCount) return null;
-      return TableSpec(
-          id: m['id'] as String,
+      if (legacy) {
+        return TableSpec.kept(
+            id: m['id'] as String,
+            seed: m['seed'] as int,
+            seats: seats,
+            rated: m['rated'] == true,
+            sealed: m['sealed'] == true,
+            target: m['target'] as int? ?? gameOverScore,
+            timing: TableTiming.parse(m['timing']));
+      }
+      final spec = TableSpec(
           seed: m['seed'] as int,
           seats: seats,
-          rated: m['rated'] == true,
-          sealed: m['sealed'] == true,
-          target: m['target'] as int? ?? gameOverScore,
-          timing: TableTiming.parse(m['timing']));
+          rated: m['rated'] as bool,
+          sealed: m['sealed'] as bool,
+          target: m['target'] as int,
+          timing: TableTiming.exactly(m['timing']) ?? (throw const FormatException('timing')),
+          house: m['house'] as String?,
+          salt: m['salt'] as String?);
+      // Written as it says, or another spec than the one its id names.
+      return spec.id == m['id'] && jsonEncode(spec.toJson()) == jsonEncode(m) ? spec : null;
     } catch (_) {
       return null;
     }

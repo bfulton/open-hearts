@@ -131,6 +131,7 @@ fi
 config_of() { node -p "const c = require('./config/openhearts.json'); String(($1) ?? '')"; }
 if [ "$LABEL" = main ]; then
   OH_SERVICE_KEY=${OH_SERVICE_KEY:-$(config_of c.serviceKey)}
+  OH_HOUSE_KEY=${OH_HOUSE_KEY:-$(config_of c.houseKey)}
 else
   # A preview is a deployment of its own (docs/how-to/deploy.md): its app
   # takes licences signed with the key previews have (preview.serviceKey),
@@ -139,6 +140,7 @@ else
   # to. Its worker takes the same key from the same file, since its
   # environment says it is a preview (OH_DEPLOYMENT, infra/cloudflare.mjs).
   OH_SERVICE_KEY=${OH_SERVICE_KEY:-$(config_of c.preview?.serviceKey)}
+  OH_HOUSE_KEY=${OH_HOUSE_KEY:-$(config_of c.preview?.houseKey)}
   PREVIEW_RELAY="wss://$(node --input-type=module -e "import { relayHost } from './ops/env.mjs'; process.stdout.write(await relayHost('preview'))")/{tag}"
   OH_RELAYS=${OH_RELAYS:-$PREVIEW_RELAY}
 fi
@@ -156,6 +158,12 @@ fi
 
 if [ "$LABEL" = main ] && ! [[ "${OH_SERVICE_KEY:-}" =~ ^[0-9a-f]{64}$ ]]; then
   echo "deploy: production needs the service's public key (64 hex), serviceKey in config/openhearts.json" >&2
+  exit 1
+fi
+# And without the house's, a build that seats nobody at a live table:
+# every table it seats names the house (packages/table, matching.dart).
+if [ "$LABEL" = main ] && ! [[ "${OH_HOUSE_KEY:-}" =~ ^[0-9a-f]{64}$ ]]; then
+  echo "deploy: production needs the house's public key (64 hex), houseKey in config/openhearts.json (./oh house key --apply)" >&2
   exit 1
 fi
 
@@ -230,6 +238,13 @@ node --input-type=module -e "await import('file://$(cd "$STAGE" && pwd)/_worker.
 # the alternative is a build that would take a licence from whoever
 # answered first.
 #
+# OH_HOUSE_KEY (houseKey, preview.houseKey for a preview) is the house
+# every live table this build seats names (docs/explanation/live-play.md,
+# app/lib/net/licence.dart): the house that deals its bot seats, holds
+# half of each person's escrow and says how the game came out, whose
+# secret is the relay worker's OH_HOUSE_SECRET. A build without it seats
+# nobody live.
+#
 # OH_GOOGLE_CLIENT_ID and OH_APPLE_SERVICE_ID (google.webClientId and
 # apple.servicesId in the config) are the sign-in providers' identifiers
 # (docs/explanation/service.md, app/lib/net/provider_tokens.dart).
@@ -250,6 +265,7 @@ node --input-type=module -e "await import('file://$(cd "$STAGE" && pwd)/_worker.
     --base-href / \
     --dart-define=OH_RELAYS="${OH_RELAYS:-}" \
     --dart-define=OH_SERVICE_KEY="${OH_SERVICE_KEY:-}" \
+    --dart-define=OH_HOUSE_KEY="${OH_HOUSE_KEY:-}" \
     --dart-define=OH_GOOGLE_CLIENT_ID="${OH_GOOGLE_CLIENT_ID:-}" \
     --dart-define=OH_APPLE_SERVICE_ID="${OH_APPLE_SERVICE_ID:-}" )
 FLUTTER="$FLUTTER" app/worker/build.sh app/build/web

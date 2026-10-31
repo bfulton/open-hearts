@@ -25,6 +25,7 @@ const temp = (name) => mkdtempSync(join(tmpdir(), `${name}-`));
 /// member pinning [module].
 const configText = (module) => `{
   "appOrigin": "https://play.example",
+  "houseKey": "${'d'.repeat(64)}",
   "photodna": {
     "endpoint": "https://photodna.example/MatchHash",
     "module": ${module === null ? 'null' : JSON.stringify(module)}

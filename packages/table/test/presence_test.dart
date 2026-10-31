@@ -1,7 +1,7 @@
 /// A relay that keeps one object per tag has to be told which object
 /// to open before a socket is any use, so it wears a mark in the list
 /// and the client that has a tag puts it there (presence_relay.dart).
-/// And who presence counts as people.
+/// And who presence counts as online.
 library;
 
 import 'dart:convert';
@@ -47,32 +47,20 @@ void main() {
     setUp(() => presence = RelayPresence(relays: [Uri.parse('ws://127.0.0.1:9')], signer: me));
     tearDown(() => presence.close());
 
-    test('leave out a backup juror, who is still there for a jury', () {
-      final them = FakeSigner('02');
-      final bench = FakeSigner('03');
-      presence.receive(here(bench, RelayPresence.lastResort));
-      presence.receive(here(them, 'online'));
-      expect(presence.online(withinMs: 15000), {me.publicKey, them.publicKey, bench.publicKey});
-      expect(presence.people(withinMs: 15000), {me.publicKey, them.publicKey});
-
-      // Somebody at a table is somebody.
-      presence.receive(here(them, RelayPresence.seated, after: 1));
-      expect(presence.people(withinMs: 15000), {me.publicKey, them.publicKey});
-    });
-
     test('count this device while it says it is here, not by its own beat heard back', () {
-      var able = true;
-      final mine = RelayPresence(relays: [Uri.parse('ws://127.0.0.1:9')], signer: me, canServe: () => able);
+      final mine = RelayPresence(relays: [Uri.parse('ws://127.0.0.1:9')], signer: me);
       addTearDown(mine.close);
-      // A relay sends a device its own beat, as it sends everyone's; the
-      // one it said before it could no longer serve stays a minute fresh.
+      // A relay sends a device its own beat, as it sends everyone's.
       mine.receive(here(me, 'online'));
       expect(mine.online(withinMs: 15000), {me.publicKey});
-      able = false;
-      expect(mine.online(withinMs: 15000), isEmpty, reason: 'a device that cannot serve is not here, whatever it heard of itself');
-      able = true;
       mine.silent = true;
-      expect(mine.online(withinMs: 15000), isEmpty, reason: 'nor while it is silent');
+      expect(mine.online(withinMs: 15000), isEmpty, reason: 'not while it is silent, whatever it heard of itself');
+    });
+
+    test('somebody at a table is somebody', () {
+      final them = FakeSigner('02');
+      presence.receive(here(them, RelayPresence.seated));
+      expect(presence.online(withinMs: 15000), {me.publicKey, them.publicKey});
     });
   });
 }

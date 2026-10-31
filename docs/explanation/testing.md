@@ -44,13 +44,14 @@ app's fits matrix (every shape, text size and language) is its `slow`
 - **The table's sealed games.** Not the clock: the simulator runs on its
   own (`VirtualClock`), and a table plays minutes of table time in
   milliseconds. The time is the deal's cryptography, run for real: every
-  person and juror at the table checks each shuffle proof, the verifier
-  checks it again, and a file's tests play the same seeds into one
+  side at the table, each person and the house, checks each shuffle
+  proof, the verifier checks it again, and a file's tests play the same seeds into one
   departure after another, so most calls into the library are ones it
   has answered before.
-- **The service's games over real sockets**, such as two tables whose
-  jurors are each other's people. These run on the wall clock on
-  purpose, with real relays and real signatures.
+- **The service's games over real sockets**, such as a sealed table
+  that wakes the house over the relay (`service/test/house_test.dart`).
+  These run on the wall clock on purpose, with the real relay and real
+  signatures.
 - **The app's widget tests**: rendering, and the fits matrix above all.
   They have no real-time waits; everything is pumped on the test clock.
 - **The browser suites**: real time by nature, and most of it the
@@ -77,12 +78,12 @@ app's fits matrix (every shape, text size and language) is its `slow`
 - **Files side by side.** The table and the service run four files at a
   time by default (`concurrency` in their `dart_test.yaml`), and
   `./check.sh` runs one file per core. A file's own tests run one after
-  another, so a long file is split: the sealed table's tests are three
-  files, the jury over the relay two.
-- **A game as long as the point needs.** The service's two tables play
-  to 27, which still guarantees two hands
-  (`service/test/two_tables_jury_each_other_test.dart`). A browser flow
-  that has to see a game end plays one hand (`?e2e=1&target=1`).
+  another, so a long file is split: the chaos walk's sealed seeds are a
+  file of their own (`chaos_sealed_test.dart`).
+- **A game as long as the point needs.** The service's tables play to
+  one, a single hand (`target: 1` in `service/test/house_test.dart`). A
+  browser flow that has to see a game end plays one hand
+  (`?e2e=1&target=1`).
 - **The browser suites side by side.** Each suite starts its relay on a
   port of its own and names that port in every address it opens
   (`?relay=PORT`, which only a build served from this machine reads).
@@ -91,8 +92,8 @@ app's fits matrix (every shape, text size and language) is its `slow`
   starts its own on its worker's port, and the relay goes when the flow
   does, so no flow inherits what another left running. The app is built
   once (`e2e/build.sh`, and not again until its sources change), and the
-  relay and the jurors are compiled ahead of time once, as the backup
-  jurors' container runs them.
+  house is compiled ahead of time once, as its container runs it
+  (`serviceProgram` in `e2e/drive.mjs`).
 - **The table's beats and clocks, shortened where a suite waits on
   them.** The browser suites open the app at a tenth of its tables'
   beats (`?pace=0.1`). Where a test waits on a table's clock, the rig's
@@ -123,13 +124,15 @@ To write a test that stays fast, see
   verifier that saw only the messages checks the result. The share-token
   path opens a departed seat's hand and a pass sealed to it while
   `knowsSecret` stays false.
-- `packages/table/test/sealed_test.dart`: whole sealed games at one, two
-  and four people that verify to the end. It covers leaving mid-hand and
-  during the deal, and a table of two surviving a crash through the jury.
-  It also commits both faults for real, every seat disclaiming the 2♣ and
-  a pass sealed to nothing, and each game still finishes and verifies.
-- `service/test` runs the jury sealed over real sockets, and the browser
-  suites deal every hand this way.
+- `packages/table/test/refereed_test.dart`: whole sealed games at one,
+  three and four people over the simulator's referee, with the house at
+  the table, that verify to the end. They cover people going mid-hand,
+  two in one hand, a device reloaded, and the house gone and back. They
+  also commit the faults for real, a seat disclaiming the 2♣, a piece
+  of a departed hand kept back, and a pass sealed to nothing, and each
+  game still goes on as the rules say and verifies.
+- `service/test` plays sealed tables over the real relay with the house
+  binary's own code, and the browser suites deal every hand this way.
 - `packages/engine/test/deal_seed_test.dart` and
   `packages/engine/test/solo_record_test.dart` cover the solo deal. They
   check the generator against known answers worked out in Python from
@@ -147,49 +150,44 @@ network (latency, drops, partitions) on a virtual clock, replayable from
 a seed, over real sockets, and in real browsers. Every scenario asserts
 that:
 
-- the game reaches its end with a bot in each departed seat, or pauses,
-  says why, and ends unscored ("juror quorum lost");
-- every survivor holds the same record, and the record verifies: every
-  play signed and legal, every bot play recomputable, and every proof,
-  token and audit at a sealed table;
-- nobody is removed without a strict majority of the last agreed
-  participants, so a partition never forks;
-- nothing hangs.
+- every side still reading the log saw the same table after every
+  entry, and came to the same end (`SimTable.lockstepProblems`);
+- the game reaches its end as the faults allow, with a bot in each
+  departed seat, and nobody lost a seat but by a fault of their own;
+- the log read alone comes to the same game, and verifies: every play
+  signed and legal, every bot play recomputable, and every proof, token
+  and audit at a sealed table, with the house's word on the end;
+- nothing was taken twice, and nothing hangs.
 
 The harnesses:
 
-- The departure matrix (`packages/table/test/matrix_test.dart`) runs
-  leaves, boots and silences on the simulated network on every commit.
-  It varies how many people start, who goes (players, jurors, the whole
-  jury), how (a signed leave, a silent drop, a boot, a partition) and
-  when (on or off turn, mid-trick, during the pass or deal, at a hand
-  boundary).
+- The departures (`packages/table/test/departures_test.dart`) play a
+  table through every way a person goes, a signed leave, the app gone,
+  doing nothing, the phone off the network, at every moment of a hand:
+  on or off turn, mid-trick, the last trick, the pass, the deal, a hand
+  boundary. Sealed and not.
 - The chaos walk (`packages/table_sim/lib/src/chaos_walk.dart`, run by
   `chaos_test.dart`, `chaos_sealed_test.dart` and
-  `packages/table/tool/chaos.dart`) throws random
-  faults at simulated tables: devices dropping, relays failing, loss,
-  jurors leaving once they have served, and accounts taken up on new
-  devices. It fails a run on any broken invariant, on two devices of one
-  account at the table at once, on a jury drawn from an account seated
-  at it, on a table left stopped where nobody up could move it, on sides
-  still apart on the escrow once the faults have stopped and the network
-  has healed (sides that ended the game for themselves aside), and on
-  any two records, the people's and every following juror's, naming
-  different exits for one seat.
-- The explorer (`packages/table/tool/explore.dart`) replays a short
-  sealed game once per event, peer and change, with the first copy lost
-  or every copy late and nothing else different (`SimNetwork.steer`),
-  and holds each run to what the table owes. It finds the ordering
-  faults that random walks miss.
-- The structure checker (`packages/table_sim/lib/src/structure.dart`)
-  reads every side against the
-  [table's machines](table-states.md#the-machines) during a run and at
-  its end ([how it is checked](table-states.md#how-it-is-checked)).
-- `service/test` runs the jury, and a backup juror summoned to a table,
-  over a real relay.
+  `packages/table/tool/chaos.dart`) throws random faults at tables of one
+  to four people: people going every way at every moment, devices
+  reloaded, sockets dropping, phones off the network for a while, a
+  slow line, the house started again, a seat that lies. It holds every
+  run to the invariants above (`tableProblems`).
+- The explorer (`packages/table_sim/lib/src/explore.dart`, run by
+  `explore_test.dart` and `packages/table/tool/explore.dart`) plays a
+  short sealed game once per event and change: the event lost on the
+  way, late, or sent twice, and nothing else different. It holds each
+  run to the same, and finds the ordering faults that random walks miss.
+- The record tests (`record_test.dart`, `kept_records_test.dart`) bend a
+  kept refereed game every way one event can be bent, and check that
+  every bend fails or changes nothing, as the house's word on the log's
+  hash says it must.
+- `service/test` plays tables over the real relay: a device reloaded,
+  and a sealed table that wakes the house, which deals its bots, holds
+  the escrow and says how the game came out.
 - The browser suites (`e2e/`) match strangers with bots and play a
-  friends' room through its departures, four headless browsers over
-  WebRTC.
+  friends' room through its departures, four headless browsers on one
+  referee, with the house.
 
 To run the walk and the explorer, see
 [Reproduce a table fault with the chaos walk](../how-to/run-the-chaos-walk.md).

@@ -1,20 +1,23 @@
 /// What a finished game says about ratings, and how it is published.
 ///
-/// At the end of a rated game every human at the table publishes the
-/// same result — the table, the seats, the final totals, who was there
-/// from the deal and who left — signed with their device's key. A
-/// person in a result is an account, not a device: each line names the
-/// account, with the licence that says the seat's key is one of its
-/// devices (licence.dart), so anyone folding results can check whose
-/// it is. A table's result stands when a majority of the accounts who
-/// sat down published the same one, each by the device it sat with.
-/// From every result that stands, in order, ratings fall out
-/// (rating.dart), for accounts and for the bots that started the game;
-/// a bot that took over a leaver's seat has no stake, and a leaver
-/// finishes last.
+/// A result is the table, the seats, the final totals, who was there
+/// from the deal and who left. A person in a result is an account, not
+/// a device: each line names the account, with the licence that says
+/// the seat's key is one of its devices (licence.dart), so anyone
+/// folding results can check whose it is. From every result that
+/// stands, in order, ratings fall out (rating.dart), for accounts and
+/// for the bots that started the game; a bot that took over a leaver's
+/// seat has no stake, and a leaver finishes last.
 ///
-/// A result is attested by the humans at the table alone, so a table
-/// of one human is attested by that one human.
+/// Since the referee (log.dart), a game's result is the house's to say
+/// — it saw the game through from the log's start, and names the log as
+/// it stood at the end — and it stands when the house said it, and only
+/// then (version 3). Before, every person at the table published the
+/// result and it stood when a majority of the table's accounts had
+/// published the same one (version 2): which let a person alone with
+/// three bots say any result they liked. Those are folded as they
+/// always were, and no more are taken (the relay's results tag, since
+/// the referee, takes the house's alone).
 ///
 /// Ratings began again with accounts: results go under their own tag
 /// ([GameResult.tag]), and a result that names no account — one from
@@ -28,6 +31,7 @@ import 'package:engine/engine.dart';
 import 'licence.dart';
 import 'nostr.dart';
 import 'rating.dart';
+import 'rules.dart';
 import 'signing.dart';
 import 'spec.dart';
 
@@ -99,10 +103,21 @@ class SeatResult {
 }
 
 class GameResult {
-  const GameResult({required this.table, required this.rated, required this.seats, required this.at});
+  const GameResult(
+      {required this.table, required this.rated, required this.seats, required this.at, this.v = 2, this.state, this.endN, this.endHash});
 
   final String table;
   final bool rated;
+
+  /// The result's form: 3, the house's word on a refereed table; 2, the
+  /// people's on one before.
+  final int v;
+
+  /// How the game came to its end — finished or ended (TableState) — and
+  /// the log as it stood then, by its length and hash: version 3's.
+  final String? state;
+  final int? endN;
+  final String? endHash;
 
   /// Seat order. A seat a human left holds two lines' worth: the human
   /// who left it, marked [SeatResult.left], and the bot that finished
@@ -118,15 +133,17 @@ class GameResult {
   /// accounts: ratings started again with them.
   static const tag = 'standings';
 
-  /// What a result says it is, so that one of another shape is never
-  /// read as one of these.
-  static const version = 2;
+  /// The forms a result may be in, and the one the house says.
+  static const versions = {2, 3};
+  static const version = 3;
 
   Map<String, Object?> toJson() => {
         'kind': 'result',
-        'v': version,
+        'v': v,
         'table': table,
         'rated': rated,
+        if (v >= 3) 'state': state,
+        if (v >= 3) 'end': {'n': endN, 'hash': endHash},
         'seats': [for (final s in seats) s.toJson()],
       };
 
@@ -136,13 +153,51 @@ class GameResult {
   static GameResult? parse(NostrEvent e) {
     try {
       final m = Map<String, Object?>.from(jsonDecode(e.content) as Map);
-      if (m['kind'] != 'result' || m['v'] != version) return null;
+      final v = m['v'];
+      if (m['kind'] != 'result' || v is! int || !versions.contains(v)) return null;
       final seats = [for (final s in m['seats'] as List) SeatResult.parse(s)!];
-      return GameResult(table: m['table'] as String, rated: m['rated'] == true, seats: seats, at: e.createdAt);
+      if (v == 2) return GameResult(table: m['table'] as String, rated: m['rated'] == true, seats: seats, at: e.createdAt);
+      final state = m['state'] as String;
+      if (state != TableState.finished.name && state != TableState.ended.name) return null;
+      final end = m['end'] as Map;
+      return GameResult(
+        table: m['table'] as String,
+        rated: m['rated'] == true,
+        seats: seats,
+        at: e.createdAt,
+        v: v,
+        state: state,
+        endN: end['n'] as int,
+        endHash: end['hash'] as String,
+      );
     } catch (_) {
       return null;
     }
   }
+
+  /// The house's word on a game the log has over ([TableRules.over]):
+  /// finished, or ended with nobody left. A game that failed has none —
+  /// nobody is rated on it.
+  static GameResult? ofTable(TableRules rules) {
+    final spec = rules.spec;
+    if (spec == null || rules.endN == null || (rules.state != TableState.finished && rules.state != TableState.ended)) return null;
+    final seats = GameResult.of(spec, rules.holders, rules.game.totals).seats;
+    return GameResult(
+      table: spec.id,
+      rated: spec.rated,
+      seats: seats,
+      at: 0,
+      v: version,
+      state: rules.state.name,
+      endN: rules.endN,
+      endHash: rules.endHash,
+    );
+  }
+
+  /// This result as [signer] publishes it, on the results tag.
+  NostrEvent signedBy(Signer signer) => NostrEvent.sign(signer, kind: TableKinds.lobby, content: jsonEncode(toJson()), tags: [
+        ['t', tag],
+      ]);
 
   /// Builds a result from a finished game: the spec says who sat down,
   /// the holders who finished, and the totals settle it.
@@ -287,14 +342,21 @@ class Ledger {
     }
   }
 
-  /// Folds every result on the relay that stands: grouped by table,
-  /// the version a majority of the table's accounts published, each by
-  /// the device it sat with, oldest first.
-  static Ledger from(Iterable<NostrEvent> events, {Rating? Function(String id)? prior}) {
+  /// Folds every result on the relay that stands, oldest first: for a
+  /// table since the referee, the house's word on it, said by [house];
+  /// for one before, the result a majority of the table's accounts
+  /// published, each by the device it sat with.
+  static Ledger from(Iterable<NostrEvent> events, {PublicKey? house, Rating? Function(String id)? prior}) {
     final byTable = <String, Map<String, ({GameResult result, Set<AccountId> signers})>>{};
+    final said = <String, GameResult>{};
     for (final e in events) {
       final r = GameResult.parse(e);
       if (r == null || !r.licensed) continue;
+      if (r.v >= 3) {
+        // The house's alone, and once: the first it said.
+        if (house != null && e.pubkey == house && !said.containsKey(r.table)) said[r.table] = r;
+        continue;
+      }
       // Only a seat may vouch for its table: the device that sat there
       // for its account, and nobody else of the account or not.
       final account = r.accountAt(e.pubkey);
@@ -303,8 +365,9 @@ class Ledger {
       final v = versions.putIfAbsent(r.digest, () => (result: r, signers: {}));
       v.signers.add(account);
     }
-    final standing = <GameResult>[];
+    final standing = <GameResult>[...said.values];
     for (final versions in byTable.values) {
+      if (said.isNotEmpty && versions.values.any((v) => said.containsKey(v.result.table))) continue;
       for (final v in versions.values) {
         if (v.signers.length >= v.result.humans.length ~/ 2 + 1) {
           standing.add(v.result);

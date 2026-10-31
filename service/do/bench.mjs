@@ -1,42 +1,39 @@
-// The backup jurors, as a Cloudflare Container
-// (docs/explanation/live-play.md; service/bench builds the image).
+// The house, as a Cloudflare Container (docs/explanation/live-play.md;
+// service/bench builds the image, service/bin/house.dart is what runs
+// in it).
 //
-// A table with bot seats is dealt only to a jury that can hold them, and
-// on a quiet night there is nobody online to make one. The table then
-// calls for a juror on the presence relay, every ten seconds while it is
-// short — and the presence relay is ours (worker.mjs, TagRelay), which
-// passes the call here. This object starts the backup jurors if they
-// are not running, waits for them to answer, and hands them the call,
-// so they come online for that table at once rather than at the
-// table's next call.
+// Every sealed table has the house at it: it deals and plays the bot
+// seats, holds half of each person's escrow, and says how the game came
+// out. A table's object (worker.mjs, TagRelay) calls on this one as the
+// table starts, and again whenever the house is not on the table's log
+// (referee.mjs, wanted). This object starts the house if it is not
+// running, waits for it to answer, and tells it of the table, which it
+// then follows from the log's first entry.
 //
-// Then it looks in on them once a minute. While they are serving a
-// table, or online and waiting to be drawn, they are left alone; once
-// they have gone quiet — they do that themselves, ten minutes after
-// the last call with nothing to serve (packages/table,
-// juror_duty.dart) — they are stopped, and stop costing anything. One
-// set for everyone, named `bench`: four jurors in one process, which
-// is what one quiet night needs, and one container to pay for.
+// Then it looks in on it once a minute. While it is serving a table, or
+// was woken in the last ten minutes, it is left alone; once it has gone
+// quiet it is stopped, and stops costing anything. One house for every
+// table, named `bench` for the container it has always been in.
 
 import { tagLabel } from './relay.mjs';
 
-/// The backup jurors' port (service/bin/juror.dart, `--port`).
+/// The house's port (service/bin/house.dart, `--port`).
 export const BENCH_PORT = 8080;
 
-/// How often the running backup jurors are looked in on, and how long
-/// the runtime may keep them without a word from here before stopping it: the
+/// How often the running house is looked in on, and how long the
+/// runtime may keep it without a word from here before stopping it: the
 /// second well past the first, so it is this object that decides.
 export const LOOK_EVERY_MS = 60 * 1000;
 const INACTIVITY_MS = 15 * 60 * 1000;
 
-/// How long starting backup jurors are waited for before the call is given up
-/// on: the table calls again in ten seconds anyway.
+/// How long a starting house is waited for before the wake is given up
+/// on: the table wakes it again when the time between wakes is up.
 const READY_TRIES = 100;
 const READY_WAIT_MS = 200;
 
-/// Where this object notes what it last started the backup jurors
-/// with: a digest of their environment, which holds a secret, and of
-/// the deploy that started them.
+/// Where this object notes what it last started the house with: a
+/// digest of its environment, which holds a secret, and of the deploy
+/// that started it.
 const STARTED_WITH = 'startedWith';
 
 /// The SHA-256 of [env] as JSON, in hex.
@@ -47,10 +44,10 @@ async function digestOf(env) {
 
 export class Bench {
   /// [log] takes a line for the operator's logs: what this object did
-  /// with the backup jurors and when, as JSON for Workers Logs — laid
-  /// beside the jurors' own traces and the relay's sockets when a game
-  /// is lost (docs/how-to/look-into-a-lost-game.md). A table by the
-  /// first eight of its id; nothing about anybody.
+  /// with the house and when, as JSON for Workers Logs — laid beside the
+  /// house's own traces and the relay's sockets when a game is lost
+  /// (docs/how-to/look-into-a-lost-game.md). A table by the first eight
+  /// of its id; nothing about anybody.
   constructor(state, env = {}, { log = (line) => console.log(JSON.stringify(line)) } = {}) {
     this.state = state;
     this.env = env;
@@ -84,20 +81,23 @@ export class Bench {
     const at = tagLabel(table);
     await c.setInactivityTimeout?.(INACTIVITY_MS);
     const env = {
-      ...(this.env.OH_JUROR_SECRET ? { OH_JUROR_SECRET: this.env.OH_JUROR_SECRET } : {}),
+      // The house's own secret, and the key the relay takes it by: the
+      // house does not start if the one is not the other's.
+      ...(this.env.OH_HOUSE_SECRET ? { OH_HOUSE_SECRET: this.env.OH_HOUSE_SECRET } : {}),
+      ...(this.env.OH_HOUSE_KEY ? { OH_HOUSE_KEY: this.env.OH_HOUSE_KEY } : {}),
       // The service's public key, to check the seats' licences by.
       ...(this.env.OH_SERVICE_KEY ? { OH_SERVICE_KEY: this.env.OH_SERVICE_KEY } : {}),
       ...(this.env.OH_BENCH_RELAYS ? { OH_RELAYS: this.env.OH_BENCH_RELAYS } : {}),
-      ...(this.env.OH_BENCH_PRESENCE_RELAYS ? { OH_PRESENCE_RELAYS: this.env.OH_BENCH_PRESENCE_RELAYS } : {}),
     };
     // The environment and the image are the container's from when it
     // started, and a deploy starts no container afresh: Cloudflare's
     // rollouts pass over containers an object starts, which take their
-    // image at start. One kept awake by calls would hold every seat to
-    // an old service key, sign with an old juror secret the relay no
-    // longer takes, or speak an old build's protocol. So one started
-    // with another environment, or under another deploy
-    // (CF_VERSION_METADATA, wrangler.toml), is stopped and started again.
+    // image at start. One kept awake by tables would hold every seat to
+    // an old service key, sign as a house the relay no longer takes, or
+    // speak an old build's protocol. So one started with another
+    // environment, or under another deploy (CF_VERSION_METADATA,
+    // wrangler.toml), is stopped and started again; the tables it was
+    // serving wake it again, and it follows each from its log.
     const started = await digestOf({ env, version: this.env.CF_VERSION_METADATA?.id ?? null });
     if (c.running && (await this.state.storage.get(STARTED_WITH)) !== started) {
       this.log({ bench: 'restart', table: at, why: 'started under another deploy or environment' });
@@ -128,7 +128,7 @@ export class Bench {
     return true;
   }
 
-  /// Whether the backup jurors answer on their port, waiting for it to start.
+  /// Whether the house answers on its port, waiting for it to start.
   async ready() {
     for (let i = 0; i < READY_TRIES; i++) {
       try {
@@ -141,7 +141,8 @@ export class Bench {
     return false;
   }
 
-  /// What the backup jurors say of themselves: {running, online, serving}.
+  /// What the house says of itself: {running, online, serving} — online
+  /// while it was woken in the last ten minutes.
   async status() {
     const c = this.container;
     if (!c?.running) return { running: false, online: false, serving: 0 };
@@ -153,10 +154,10 @@ export class Bench {
     }
   }
 
-  /// Once a minute while it runs: left alone while it serves or waits
-  /// to be drawn, stopped once it has gone quiet. A container that does
-  /// not answer is given the benefit of a minute more, once — it may be
-  /// busy — and stopped if it still does not.
+  /// Once a minute while it runs: left alone while it serves or was
+  /// woken lately, stopped once it has gone quiet. A container that
+  /// does not answer is given the benefit of a minute more, once — it
+  /// may be busy dealing — and stopped if it still does not.
   async alarm() {
     const c = this.container;
     if (!c?.running) return;
@@ -173,17 +174,5 @@ export class Bench {
     await this.state.storage.put('unanswered', s.unanswered === true);
     await c.setInactivityTimeout?.(INACTIVITY_MS);
     await this.state.storage.setAlarm(Date.now() + LOOK_EVERY_MS);
-  }
-}
-
-/// A call for a juror, as the presence relay carries it: kind 24246,
-/// content {"kind":"call","table":…} (packages/table, presence_relay.dart).
-export function callIn(event) {
-  if (event?.kind !== 24246 || typeof event.content !== 'string' || !event.content.includes('"call"')) return null;
-  try {
-    const said = JSON.parse(event.content);
-    return said?.kind === 'call' && typeof said.table === 'string' && said.table && said.table.length <= 128 ? said.table : null;
-  } catch {
-    return null;
   }
 }

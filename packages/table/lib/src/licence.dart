@@ -25,7 +25,7 @@ bool validAccount(String id) => RegExp(r'^[0-9a-f]{32}$').hasMatch(id);
 
 /// The service whose word a licence or an activation is taken on: the
 /// public half of its key, 64 hex. Set once at startup — by the app from
-/// the key compiled into it, by a juror from its environment — before
+/// the key compiled into it, by the house from its environment — before
 /// any table is read.
 ///
 /// Empty in the simulator and in the tests that do not set one, and
@@ -225,8 +225,8 @@ class Activation {
 /// The account behind [key], from [activation], where accounts are
 /// checked and it holds — or as stated where nothing is checked. Null
 /// when there is none to be had, which is a key the relay admitted on
-/// the service's own word: the backup jurors, who belong to no account
-/// (docs/explanation/live-play.md).
+/// the service's own word: the house, which belongs to no account
+/// (docs/explanation/live-play.md#the-house).
 AccountId? accountFrom(Activation? activation, PublicKey key, {DateTime? at}) {
   if (activation == null || activation.key != key) return null;
   if (!licencesChecked) return activation.account;

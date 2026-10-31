@@ -4,6 +4,7 @@ import 'dart:js_interop';
 
 import 'package:table/table.dart';
 
+import 'licence.dart' show houseKey;
 import 'record_check.dart';
 
 @JS('Worker')
@@ -53,9 +54,9 @@ Stream<RecordCheck> checkRecord(KeptGame game) {
         w.onerror = ((JSAny? _) => end(const RecordChecked(ok: false))).toJS;
         // The record as it came, for the worker to read — not read here
         // and written out again — with the service whose word makes each
-        // seat an account's: the worker is a program of its own, and
-        // checks the seats by it.
-        w.postMessage({'record': game.text, 'service': licenceService}.jsify());
+        // seat an account's, and the house this build plays with: the
+        // worker is a program of its own, and checks the game by them.
+        w.postMessage({'record': game.text, 'service': licenceService, 'house': houseKey}.jsify());
       } catch (_) {
         end(const RecordChecked(ok: false));
       }

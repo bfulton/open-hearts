@@ -20,8 +20,8 @@ class Player {
   final Bot bot;
 
   /// How long each decision takes. Thirty milliseconds plays a game in
-  /// seconds; a test that needs the game to outlast something slower —
-  /// the summoning of a juror — asks for more.
+  /// seconds; a test that needs the game to outlast something slower
+  /// asks for more.
   final int thinkMs;
   StreamSubscription<void>? _sub;
   bool _thinking = false;
@@ -44,7 +44,7 @@ class Player {
           seat: seat,
           hand: client.game.handOf(seat),
           trick: client.game.trick,
-          played: client.played,
+          played: client.rules.played,
           heartsBroken: client.game.heartsBroken,
           isFirstTrick: client.game.isFirstTrick,
           taken: client.game.taken,

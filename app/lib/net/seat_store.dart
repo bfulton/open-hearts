@@ -4,13 +4,13 @@
 ///
 /// What is kept: the table (its spec, the names and looks it was
 /// started with, and whether Play live seated it with strangers), when
-/// this device was last at it, and the table's
-/// journal — every event this device signed there, one key each,
-/// appended as it is signed, and each hand's deal secret. Written
-/// before an event goes out: localStorage takes a write at once, so a
-/// reload never forgets something the table has heard. One table at a
-/// time; cleared when the game is over or left, or found too old to
-/// come back to.
+/// this device was last at it, and the table's journal — each hand's
+/// deal secret, written as the client draws it, before anything made
+/// from it goes out: localStorage takes a write at once, so a reload
+/// never loses the secret its seat's keys were made from. Everything
+/// else the device said is in the table's log, which a device back at
+/// the table reads from its start. One table at a time; cleared when
+/// the game is over or left, or found too old to come back to.
 library;
 
 import 'dart:convert';
@@ -44,15 +44,13 @@ class SeatStore {
 
   static const _table = 'seat.table';
   static const _at = 'seat.at';
-  static const _count = 'seat.said';
-  static const _event = 'seat.said.';
   static const _secret = 'seat.secret.';
 
   /// Longer away than this and the seat is somebody else's by now: a
-  /// table counts a seat whose connection closed as silent after twenty
-  /// seconds, and removes it at its next turn (packages/table,
-  /// client.dart, reloadGraceMs). Room left for a slow load, and for a
-  /// turn that came round late.
+  /// table removes a seat whose connection has been closed for its
+  /// silence at its turn, half a minute (packages/table, rules.dart,
+  /// TableTiming.silenceMs). Room left for a slow load, and for a turn
+  /// that came round late.
   static const comeBackWithin = Duration(minutes: 2);
 
   final SharedPreferences _prefs;
@@ -61,7 +59,7 @@ class SeatStore {
 
   /// Starts keeping a new table, in place of any kept before; the
   /// journal its client writes to, already writing here. [journal] is
-  /// one read back by [load], whose events are here already.
+  /// one read back by [load], whose secrets are here already.
   TableJournal keep(TableSpec spec, Map<int, String> names, Map<int, Avatar> avatars, {TableJournal? journal, bool strangers = false}) {
     if (journal == null) clear();
     _prefs.setString(_table, jsonEncode({
@@ -72,12 +70,6 @@ class SeatStore {
     }));
     here();
     final j = journal ?? TableJournal();
-    var n = j.saidSoFar.length;
-    j.onSaid = (event) {
-      _prefs.setString('$_event$n', jsonEncode(event));
-      n++;
-      _prefs.setInt(_count, n);
-    };
     j.onKept = (hand, secret) => _prefs.setString('$_secret$hand', base64.encode(secret));
     return j;
   }
@@ -105,8 +97,6 @@ class SeatStore {
         clear();
         return null;
       }
-      final n = _prefs.getInt(_count) ?? 0;
-      final said = [for (var i = 0; i < n; i++) jsonDecode(_prefs.getString('$_event$i')!) as Map<String, Object?>];
       final secrets = <int, Uint8List>{
         for (final k in _prefs.getKeys())
           if (k.startsWith(_secret)) int.parse(k.substring(_secret.length)): base64.decode(_prefs.getString(k)!),
@@ -116,7 +106,7 @@ class SeatStore {
         names: {for (final e in (m['names'] as Map).entries) int.parse(e.key as String): e.value as String},
         avatars: {for (final e in (m['avatars'] as Map).entries) int.parse(e.key as String): Avatar.fromJson(e.value)},
         at: at,
-        journal: TableJournal(said: said, secrets: secrets),
+        journal: TableJournal(secrets: secrets),
         strangers: m['strangers'] == true,
       );
     } catch (_) {

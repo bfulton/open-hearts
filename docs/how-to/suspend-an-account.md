@@ -64,7 +64,7 @@ Each act below prints what it would do and changes nothing. Run it again with `-
 
 What the account's devices do then:
 
-- **The device in use** leaves live play at once: its table, where a bot takes its seat, scored as a leave in a rated game; the pool or room it waits in; any game it watches; and juror duty. A device the relay's word misses hears it at its next renewal, within 20 minutes, or the next time it connects to the relay.
+- **The device in use** leaves live play at once: its table, where a bot takes its seat, scored as a leave in a rated game; the pool or room it waits in; and any game it watches. A device the relay's word misses hears it at its next renewal, within 20 minutes, or the next time it connects to the relay.
 - **Every device** gets no licence. Where the app sells live play, it says instead that the account is suspended from live play, and to email `help@openhearts.game` to ask why or to appeal. Playing alone works as before.
 - **A device brought into the account later** is suspended too. A subscription that one of its devices buys stays with the suspended account.
 

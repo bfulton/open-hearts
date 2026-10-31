@@ -5,7 +5,7 @@
 /// on another device, the question: continue here, and lose that game?
 ///
 /// Over everything, because the device has left everything live: the
-/// table it sat at, the pool, the jury, a game it was watching. Solo play
+/// table it sat at, the pool, a game it was watching. Solo play
 /// needs no account, so "Not now" puts the screen aside and leaves the
 /// rest of the app as it was; the front door then says live play is open
 /// on the other device.

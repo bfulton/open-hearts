@@ -390,8 +390,7 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get seatsOrFriends =>
-      'Four seats, filled with whoever is waiting — or a link you send to three friends.';
+  String get pointLive => 'Play live with other people';
 
   @override
   String get subscribe => 'Subscribe';
@@ -553,16 +552,14 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get pointRating =>
-      'A rating of your own, from results the four of you sign.';
+  String get pointFriends => 'Create a friends-only game';
 
   @override
-  String get pointDeal =>
-      'The deal is dealt between the four of you. No server sees a hand, ours included.';
+  String get pointStats => 'Track your rating and other stats';
 
   @override
   String get whatMoneyPaysFor =>
-      'Playing alone is free, and so are the records, the engine and every line of this; we have no plans to change that. What the money pays for is the part that costs us to run: putting you in touch with each other, a relay when your two devices cannot find a way through, and a juror when a table is left alone.';
+      'Playing alone is free. Your subscription pays for the servers that run live games.';
 
   @override
   String webRenewal(String price) {
@@ -933,25 +930,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get connectionDown => 'Your connection is down — reconnecting';
 
   @override
-  String get askingTheJury => 'Asking the jury';
-
-  @override
-  String get noJurorOnline =>
-      'Nobody online to draw a jury from — waiting for one';
-
-  @override
-  String get waitingForTheJury => 'Waiting for the jury';
-
-  @override
   String get openingDepartedHand => 'Opening a departed player\'s hand';
-
-  @override
-  String get nobodyClaimsTwo => 'Nobody claims the 2♣ — the deal is stuck';
-
-  @override
-  String bootPlayer(String name) {
-    return 'Boot $name';
-  }
 
   @override
   String get cannotDealTitle => 'This device can\'t deal';
@@ -968,11 +947,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get connectionFailure => 'Connection failure';
 
   @override
-  String get jurorQuorumLost => 'Juror quorum lost';
+  String get houseGone => 'The game\'s server stopped answering';
 
   @override
-  String get jurorQuorumLostWhy =>
-      'Too few of the jurors keeping the bot seats are still online, so the hand cannot go on. The game ends here, unscored.';
+  String get houseGoneWhy =>
+      'The server that deals the cards and plays the bots stopped answering, so the game cannot go on. It ends here, unscored.';
 
   @override
   String get onWithIt => 'On with it';
@@ -998,9 +977,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get back => 'Back';
-
-  @override
-  String get waitingForJurors => 'Waiting for jury…';
 
   @override
   String get dealing => 'Dealing';
@@ -1472,7 +1448,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get openElsewhereBody =>
-      'Your account plays on one device at a time, and the newest one opened wins. This one has stepped back: off the table, the jury and the waiting list. Use it here, and the other one steps back instead.';
+      'Your account plays on one device at a time, and the newest one opened wins. This one has stepped back: off the table and the waiting list. Use it here, and the other one steps back instead.';
 
   @override
   String get inGameElsewhereTitle => 'You\'re in a game on another device';

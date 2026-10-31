@@ -7,13 +7,14 @@
 // relays.dart); served from localhost it looks for the local relay at
 // the port its address names, which is where the suite starts one.
 //
-// Starts the local relay and a static server for the built app, opens
-// four headless Chromium contexts — four devices, four keys — and
-// drives them through the app's accessibility tree: host a table, join
-// it, play a hand over real WebRTC, then the departure cells that only
-// a real browser can show: one closed mid-hand, one stalled on its
-// turn and booted, one gone off its turn and ruled on by the jury.
-// Exit code is the verdict.
+// Starts the local relay and the house beside it, and a static server
+// for the built app, opens four headless Chromium contexts — four
+// devices, four keys — and drives them through the app's accessibility
+// tree: host a table, join it, play a hand on the referee's log, then
+// the departure cells that only a real browser can show: one closed
+// mid-hand, one stalled on its turn until its clock runs out, one gone
+// off its turn while the last person plays on. Exit code is the
+// verdict.
 
 import { chromium } from './browser.mjs';
 import {
@@ -55,31 +56,38 @@ const roster = /^[A-Z][\w ]+, a bot: \d+ in the game, \d+ this hand/;
 
 /// Whether hand [n] is over on a page: its score sheet is up, or the
 /// sheet has been and gone and the header is on the next hand. Not the
-/// sheet alone: it goes by itself after six seconds, and one pass over
-/// four pages can take longer than that — on a hosted runner's two
+/// sheet alone: it goes by itself after six seconds, and two looks at a
+/// page can be further apart than that — on a hosted runner's two
 /// cores, up to half a minute — so a page whose sheet came and went
-/// between two looks would never count, though its hand was over.
+/// between them would never count, though its hand was over.
 const handOver = (n) => {
   const next = new RegExp(`^Hand ${n + 1} `);
   return async (p) => (await texts(p)).some((t) => t === 'On with it' || next.test(t));
 };
 
-/// How long a whole hand may take. Four browsers, a relay and the backup
-/// jurors on a hosted runner's two cores take some 173 s over the
-/// first cell's, and runners differ: one runs the table's suite 1.7
+/// How long a whole hand may take. Four browsers, a relay and the
+/// service's jurors on a hosted runner's two cores took some 173 s over
+/// the first cell's, and runners differ: one runs the table's suite 1.7
 /// times slower than another (ci.yml), which makes that hand nearly
-/// five minutes.
+/// five minutes. Measured before the referee; kept until a hosted run
+/// on the house says otherwise.
 const aHand = 480000;
 
 async function main() {
-  const relay = await startRelay();
+  const relay = await startRelay({ pace: 0.1 });
   // A tenth of a table's beats (app/lib/net/address.dart), and the
   // operator's word on the clocks (docs/explanation/service.md): a bank
-  // of ten seconds rather than forty-five is spent, the least it may be
-  // (packages/table, timing.dart), and a person silent for the
-  // standard's half minute is gone. The cells are the same; their waits
-  // are shorter.
-  const app = await serveApp({ relayPort: relay.port, pace: 0.1, config: { table: { bankMs: 10000 } } });
+  // of thirty seconds a hand rather than forty-five, and a person silent
+  // for the standard's half minute is gone. The cells are the same;
+  // their waits are shorter. Not the least a bank may be, ten seconds
+  // (packages/table, timing.dart): that is more than a player alone
+  // with three bots needs on a quiet machine, but on one busy with the
+  // full check her turns come back seconds late — the bots' cards
+  // reaching her page, the page showing them — and a hand of them
+  // spends it, as no player's real bank of forty-five is spent. And a
+  // bank longer than the silence less a card's grace lets the half
+  // minute, not the clock, take a closed browser's seat (cell 4).
+  const app = await serveApp({ relayPort: relay.port, pace: 0.1, config: { table: { bankMs: 30000 } } });
   log(`relay ${relay.url}, app ${app.url}`);
   const browser = await chromium.launch();
   const contexts = [];
@@ -120,27 +128,22 @@ async function main() {
       });
       const page = await ctx.newPage();
       page.on('pageerror', (e) => log(`page ${names[i]} error: ${e.message}\n${(e.stack || '').slice(0, 600)}`));
-      // A device's table and its jury duty are two clients in one tab
-      // and they are kept apart, because a duty following somebody
-      // else's table says a line a trick and would push the table's
-      // own account of why it stopped out of a shared list.
-      const said = { table: { first: [], last: [] }, duty: { first: [], last: [] } };
+      // What a device's table made of the log, and what its line to
+      // the referee did, kept apart: a line says something at every
+      // drop and reconnect, and would push the table's own account of
+      // why it stopped out of a shared list.
+      const said = { table: { first: [], last: [] }, line: { first: [], last: [] } };
       traces.push(said);
       page.on('console', (m) => {
         const t = m.text();
-        const which = t.startsWith('table: ') ? 'table' : t.startsWith('duty: ') ? 'duty' : null;
-        if (which && !/ emit (serve|heartbeat) /.test(t)) {
-          // Not the heartbeats. A client that has stopped says
-          // nothing else, so a ring that keeps them keeps five
-          // hundred copies of "still here" and throws away the last
-          // thing it did — which is the only line that matters.
-          //
-          // Without the bodies either: a deal step carries kilobytes
-          // of proof, and none of it says why a table stopped.
-          const line = t.length > 240 ? `${t.slice(0, 240)}…` : t;
+        const which = t.startsWith('table: ') ? 'table' : t.startsWith('line: ') ? 'line' : null;
+        if (which) {
+          // Without the bodies: a deal step carries kilobytes of proof,
+          // and none of it says why a table stopped.
+          const line = `${new Date().toISOString().slice(11, 23)} ${t.length > 240 ? `${t.slice(0, 240)}…` : t}`;
           // Both ends, not the last of it. A client that never moved
-          // is explained by its opening — the jury it heard, the deal
-          // it built — and a ring that keeps only the end throws that
+          // is explained by its opening — the log it read, the deal it
+          // built — and a ring that keeps only the end throws that
           // away and leaves a thousand identical lines saying it is
           // still asking. So the first of what a client said is kept
           // whole and the rest rolls.
@@ -151,12 +154,11 @@ async function main() {
             if (said_.last.length > 500) said_.last.splice(0, said_.last.length - 500);
           }
         }
-        // Errors, the table's and the duty's own traces about the
-        // jury, and the mesh: who this device dials and whether the
-        // channel came up, which is how a table that has fallen back
-        // to the relay lane shows itself.
+        // Errors, and the table's own word on its seats and hands:
+        // who left, ran out of time or went quiet, a hand given up, the
+        // house letting a turn run out.
         const verbose = /$^/;
-        if (m.type() === 'error' || verbose.test(t) || /^mesh: /.test(t) || /^duty: (?!.*emit )/.test(t) || /^table: .*(jury|juror|verdict|appeal|nobody online|summon)/.test(t)) log(`page ${names[i]}: ${t}`);
+        if (m.type() === 'error' || verbose.test(t) || /^table: (seat \d+ \w+ at #|hand \d+ given up|the house let)/.test(t)) log(`page ${names[i]}: ${t}`);
       });
       await page.goto(app.at(`/?${driven}`));
       contexts.push(ctx);
@@ -296,7 +298,7 @@ async function main() {
     for (const page of pages) await waitFor(page, /^4 of 4 here  ·  unrated$/, { what: 'the live table', timeout: 40000 });
     log('all four at the table');
 
-    // Cell 1: a whole hand over WebRTC.
+    // Cell 1: a whole hand on the referee's log.
     await playUntil(pages, handOver(1), { timeout: aHand });
     log('hand 1 played on every screen');
     // The sheet goes on its own after a few seconds, and the screens
@@ -317,41 +319,33 @@ async function main() {
     await playUntil(others, async (p) => (await texts(p)).some((t) => roster.test(t)), { timeout: 150000 });
     log('a bot took Dee\'s seat');
 
-    // Cell 3: Cara stops acting. On her turn the clock runs; once her
-    // grace and her bank are spent (sixteen seconds at most, with the
-    // rig's bank of ten) the others get the Boot button, and one press
-    // does it.
+    // Cell 3: Cara stops acting, her browser open. On her turn her
+    // clock runs; once her grace and her bank are spent (thirty-six
+    // seconds at most, with the rig's bank of thirty) the table gives her
+    // seat to a bot, every side alike, at the referee's time, and she
+    // is told.
     // Her turn can be most of a trick away, and on two cores the whole
     // of it can take 69 s.
-    await playUntil(others, (p, i) => i === 2 || has(p, /^Boot Cara$/), { timeout: 180000, idle: [2] });
-    await click(pages[0], /^Boot Cara$/);
-    log('Ada pressed Boot');
-    await playUntil([pages[0], pages[1]], (p) => has(p, /^2 of 4 here/), { timeout: 60000 });
-    await waitFor(pages[2], /^A bot took your seat$/, { what: "Cara's replacement notice", timeout: 30000 });
-    log('Cara booted, and told');
+    await playUntil(others, (p, i) => (i === 2 ? has(p, /^A bot took your seat$/) : has(p, /^2 of 4 here/)), { timeout: 180000, idle: [2] });
+    log("Cara's clock ran out: a bot in her seat, and she was told");
 
-    // Cell 4: two people left, and Bao's browser goes off his turn. Ada
-    // alone is no majority of two and claims nothing; her next play
-    // waits on a vote that will never come, and the table asks the
-    // jury — the service's backup juror, called for when this
-    // table found nobody else online. It rules once Bao has been
-    // silent the standard's half minute: Ada's play stands, and at
-    // Bao's own turn his seat goes to a bot. Ada finishes the hand with
-    // three bots.
+    // Cell 4: two people left, and Bao's browser goes off his turn.
+    // Nobody has to agree to anything: Ada plays on, her cards taken
+    // as the referee logs them, and at Bao's own turn — his line closed
+    // the standard's half minute before — his seat goes to a bot. Ada
+    // finishes the hand with three bots.
     await contexts[1].close();
     log("Bao's browser closed off his turn");
-    await playUntil([pages[0]], (p) => has(p, /^Asking the jury$/), { timeout: 150000 });
-    log('Ada is asking the jury');
-    // The ruling is Bao's badge going to a bot, and nothing sooner. Not
-    // "1 of 4 here", which counts who is connected and says so the
-    // moment his browser closes, half a minute before the jury rules. All
-    // four badges on the screen and none of them his, so a moment with
-    // no badges drawn is not taken for one without Bao.
+    // Bao's badge going to a bot, and nothing sooner. Not "1 of 4
+    // here", which counts who is connected and says so the moment his
+    // browser closes, half a minute before his seat goes. All four
+    // badges on the screen and none of them his, so a moment with no
+    // badges drawn is not taken for one without Bao.
     await playUntil([pages[0]], async (p) => {
       const badges = (await texts(p)).filter((t) => /^[A-Z][\w ]*(, a bot)?: \d+ in the game/.test(t));
       return badges.length === 4 && !badges.some((t) => t.startsWith('Bao: '));
     }, { timeout: 300000 });
-    log('the jury ruled; Ada alone with three bots');
+    log("Bao's seat to a bot; Ada alone with three bots");
     // The hand ends when the header moves on to the next one — a sheet
     // that comes and goes is not the thing to wait for — or the game
     // ends, which a game to fifty can do here.
@@ -370,10 +364,10 @@ async function main() {
     // go in.
     for (const [i, page] of pages.entries()) {
       if (page.isClosed()) continue;
-      for (const which of ['table', 'duty']) {
+      for (const which of ['table', 'line']) {
         const keep = traces[i]?.[which] ?? { first: [], last: [] };
         if (!keep.first.length) continue;
-        const whose = `${names[i]}'s ${which === 'table' ? 'own table' : 'jury duty'}`;
+        const whose = `${names[i]}'s ${which === 'table' ? 'table' : 'line to the referee'}`;
         log(`--- the first of ${whose} ---`);
         for (const l of keep.first) log(`    ${l}`);
         if (keep.last.length) {

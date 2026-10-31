@@ -1,17 +1,17 @@
-// `oh table <id>`: what the backup jurors, the relay and the device each
-// said of one table, in one timeline (docs/how-to/look-into-a-lost-game.md).
+// `oh table <id>`: what the house, the relay and the device each said of
+// one table, in one timeline (docs/how-to/look-into-a-lost-game.md).
 //
 // Each side writes its own account and keeps it where it runs. The
-// backup jurors' traces are their container's output, every line of a
-// table's headed by the first eight of its id (packages/table,
-// juror_duty.dart). The relay says each socket's coming and going, and
-// the backup jurors' object what it did with them, as lines of JSON
-// naming the table the same way (service/do/relay.mjs, socketLine;
-// bench.mjs). All three are in Workers Logs. A device that lost a game,
-// or whose line was down for long, tells New Relic, with what it saw
-// (app/lib/net/report_error.dart, reportLine). Nothing here names a
-// person: the jurors' traces hold keys by their first four characters,
-// as they always have, and nothing else holds any.
+// house's traces are its container's output, every line of a table's
+// headed by the first eight of its id (service/bin/house.dart). The
+// relay says each socket's coming and going, and the house's object
+// what it did with the house, as lines of JSON naming the table the
+// same way (service/do/relay.mjs, socketLine; bench.mjs). All three are
+// in Workers Logs. A device that lost a game, or whose line was down for
+// long, tells New Relic, with what it saw (app/lib/net/report_error.dart,
+// reportLine). Nothing here names a person: the house's traces name
+// seats by number and keys by a few characters at most, and nothing
+// else holds any.
 
 import { Failed, Usage, need } from './env.mjs';
 
@@ -47,7 +47,7 @@ async function logs(ctx, { token, account }, dataset, filter, from, to) {
   return events;
 }
 
-/// A line of the relay's or the backup jurors' object, as it was said.
+/// A line of the relay's or the house's object, as it was said.
 function said(event) {
   const s = event.source ?? {};
   if (typeof s.relay === 'string') {
@@ -100,23 +100,23 @@ export async function table(ctx, { args, flags }) {
   const to = ctx.now();
   const from = to - days * 24 * 60 * 60 * 1000;
   ctx.log(`table ${short}, the last ${days} day(s):`);
-  const jurors = (await logs(ctx, { token, account }, 'containers', { key: '$metadata.message', operation: 'includes', value: short }, from, to)).map((e) => ({
+  const house = (await logs(ctx, { token, account }, 'containers', { key: '$metadata.message', operation: 'includes', value: short }, from, to)).map((e) => ({
     at: e.timestamp,
-    from: 'jurors',
+    from: 'house',
     text: e.$metadata?.message ?? e.source?.message ?? '',
   }));
-  // The relay's lines name the table as `tag`, the backup jurors'
-  // object's as `table` (service/do/relay.mjs, socketLine; bench.mjs).
+  // The relay's lines name the table as `tag`, the house's object's as
+  // `table` (service/do/relay.mjs, socketLine; bench.mjs).
   const tag = `table:${short}`;
   const objects = [
     ...(await logs(ctx, { token, account }, 'cloudflare-workers', { key: 'tag', operation: 'eq', value: tag }, from, to)),
     ...(await logs(ctx, { token, account }, 'cloudflare-workers', { key: 'table', operation: 'eq', value: tag }, from, to)),
   ].map((e) => ({ at: e.timestamp, ...said(e) }));
   const device = await reports(ctx, short, days);
-  const rows = [...jurors, ...objects, ...device].sort((a, b) => a.at - b.at);
-  ctx.log(`  ${jurors.length} from the backup jurors, ${objects.filter((r) => r.from === 'relay').length} from the relay, ${objects.filter((r) => r.from === 'bench').length} from their object, ${device.length} from the device`);
+  const rows = [...house, ...objects, ...device].sort((a, b) => a.at - b.at);
+  ctx.log(`  ${house.length} from the house, ${objects.filter((r) => r.from === 'relay').length} from the relay, ${objects.filter((r) => r.from === 'bench').length} from its object, ${device.length} from the device`);
   if (!rows.length) {
-    ctx.log('nothing: no backup juror served it, and nothing was said of it in that time');
+    ctx.log('nothing: the house never served it, and nothing was said of it in that time');
     return;
   }
   for (const r of rows) ctx.log(`${stamp(r.at)}  ${r.from.padEnd(6)}  ${r.text}`);

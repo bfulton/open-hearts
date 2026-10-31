@@ -1,21 +1,18 @@
-// The backup jurors as a Cloudflare Container (bench.mjs): a
-// call heard on the presence relay starts the backup jurors and is
-// passed to them; they are left alone while they serve or wait, and
-// stopped once they have gone quiet. The container here is a stand-in with the
-// runtime's shape (ctx.container); the image itself is checked against
-// a real table by service/tool/bench_check.dart. node --test service/do
+// The house as a Cloudflare Container (bench.mjs): a table that wants
+// it starts it and tells it of the table; it is left alone while it
+// serves or was woken lately, and stopped once it has gone quiet. The
+// container here is a stand-in with the runtime's shape
+// (ctx.container); the image itself is checked against a real table by
+// service/tool/house_check.dart. node --test service/do
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 
-import { Bench, LOOK_EVERY_MS, callIn } from './bench.mjs';
-import { objectRelay, schnorrVerifier } from './relay.mjs';
-import { wasmPath } from './host.mjs';
-import { keys, signing } from './sign.mjs';
+import { Bench, LOOK_EVERY_MS } from './bench.mjs';
 
-/// A container with the runtime's shape, and backup jurors inside it
-/// that answer as service/bin/juror.dart does once [startsAfter] pings
-/// have gone unanswered.
+/// A container with the runtime's shape, and a house inside it that
+/// answers as service/bin/house.dart does once [startsAfter] pings have
+/// gone unanswered.
 function container({ startsAfter = 2 } = {}) {
   const c = {
     running: false,
@@ -88,28 +85,28 @@ function state(c) {
 
 const wake = (bench, table = 'tbl1') => bench.fetch(new Request(`https://bench/wake?table=${table}`, { method: 'POST' }));
 
-test('a call starts the backup jurors, waits for them, and passes the call on', async () => {
+test('a table wanting the house starts it, waits for it, and tells it of the table', async () => {
   const c = container();
   const s = state(c);
-  const bench = new Bench(s, { OH_JUROR_SECRET: 'ab'.repeat(32), OH_BENCH_RELAYS: 'wss://r1' });
+  const bench = new Bench(s, { OH_HOUSE_SECRET: 'ab'.repeat(32), OH_HOUSE_KEY: 'cd'.repeat(32), OH_BENCH_RELAYS: 'wss://r1' });
   const res = await wake(bench);
   assert.equal(res.status, 200);
   assert.equal(c.started.length, 1);
   assert.equal(c.started[0].enableInternet, true);
-  assert.deepEqual(c.started[0].env, { OH_JUROR_SECRET: 'ab'.repeat(32), OH_RELAYS: 'wss://r1' });
+  assert.deepEqual(c.started[0].env, { OH_HOUSE_SECRET: 'ab'.repeat(32), OH_HOUSE_KEY: 'cd'.repeat(32), OH_RELAYS: 'wss://r1' });
   assert.deepEqual(c.bench.woken, ['tbl1']);
   assert.ok(s.storage.alarmAt() > Date.now(), 'and it is looked in on');
-  // A second call while it runs is passed on, and does not start another.
+  // A second table while it runs is told of, and does not start another.
   await wake(bench, 'tbl2');
   assert.equal(c.started.length, 1);
   assert.deepEqual(c.bench.woken, ['tbl1', 'tbl2']);
-  assert.equal((await bench.fetch(new Request('https://bench/wake', { method: 'POST' }))).status, 400, 'a call names its table');
+  assert.equal((await bench.fetch(new Request('https://bench/wake', { method: 'POST' }))).status, 400, 'a wake names its table');
 });
 
-test('backup jurors started with anything else are started again with this', async () => {
+test('a house started with anything else is started again with this', async () => {
   const c = container({ startsAfter: 0 });
   const s = state(c);
-  const env = { OH_SERVICE_KEY: 'aa'.repeat(32), OH_JUROR_SECRET: 'cc'.repeat(32), OH_BENCH_RELAYS: 'wss://r1', OH_BENCH_PRESENCE_RELAYS: 'wss://p1' };
+  const env = { OH_SERVICE_KEY: 'aa'.repeat(32), OH_HOUSE_SECRET: 'cc'.repeat(32), OH_HOUSE_KEY: 'ee'.repeat(32), OH_BENCH_RELAYS: 'wss://r1' };
   await wake(new Bench(s, env));
   await wake(new Bench(s, { ...env }), 'tbl2');
   assert.equal(c.destroyed, 0, 'the same: left running');
@@ -117,12 +114,12 @@ test('backup jurors started with anything else are started again with this', asy
   assert.ok(!String(await s.storage.get('startedWith')).includes('cc'.repeat(32)), 'the secret is not kept');
   // The relay deployed with each changed in turn: the object is new,
   // the container is not, and it would go on with the old for as long
-  // as calls kept it awake.
+  // as tables kept it awake.
   const changes = [
     ['OH_SERVICE_KEY', 'bb'.repeat(32), 'OH_SERVICE_KEY'],
-    ['OH_JUROR_SECRET', 'dd'.repeat(32), 'OH_JUROR_SECRET'],
+    ['OH_HOUSE_SECRET', 'dd'.repeat(32), 'OH_HOUSE_SECRET'],
+    ['OH_HOUSE_KEY', 'ff'.repeat(32), 'OH_HOUSE_KEY'],
     ['OH_BENCH_RELAYS', 'wss://r2', 'OH_RELAYS'],
-    ['OH_BENCH_PRESENCE_RELAYS', 'wss://p2', 'OH_PRESENCE_RELAYS'],
   ];
   for (const [i, [name, value, inside]] of changes.entries()) {
     env[name] = value;
@@ -173,7 +170,7 @@ test('left alone while they serve or wait, stopped once they are quiet', async (
   assert.ok(s.storage.alarmAt() >= Date.now() + LOOK_EVERY_MS - 1000);
   c.bench.serving = 0;
   await bench.alarm();
-  assert.deepEqual(c.signals, [], 'online and waiting to be drawn');
+  assert.deepEqual(c.signals, [], 'woken lately');
   c.bench.online = false;
   await bench.alarm();
   assert.deepEqual(c.signals, [15], 'quiet: stopped, with SIGTERM');
@@ -181,7 +178,7 @@ test('left alone while they serve or wait, stopped once they are quiet', async (
   assert.deepEqual(await bench.status(), { running: false, online: false, serving: 0 });
 });
 
-test('backup jurors that do not answer are given one more look, then stopped', async () => {
+test('a house that does not answer is given one more look, then stopped', async () => {
   const c = container({ startsAfter: 0 });
   const s = state(c);
   const bench = new Bench(s, {});
@@ -193,7 +190,7 @@ test('backup jurors that do not answer are given one more look, then stopped', a
   assert.deepEqual(c.signals, [15]);
 });
 
-test('backup jurors that never come up is not passed the call', async () => {
+test('a house that never comes up is not told of the table', async () => {
   const c = container({ startsAfter: 1e9 });
   const bench = new Bench(state(c), {});
   const res = await wake(bench);
@@ -201,37 +198,11 @@ test('backup jurors that never come up is not passed the call', async () => {
   assert.deepEqual(c.bench.woken, []);
 });
 
-test('a call for a juror is read off a presence event, and nothing else is', () => {
-  const ev = (content, kind = 24246) => ({ kind, content: JSON.stringify(content) });
-  assert.equal(callIn(ev({ kind: 'call', table: 'tbl1' })), 'tbl1');
-  assert.equal(callIn(ev({ kind: 'here', status: 'online' })), null);
-  assert.equal(callIn(ev({ kind: 'call', table: 'tbl1' }, 1)), null, 'not a presence kind');
-  assert.equal(callIn(ev({ kind: 'call', table: '' })), null);
-  assert.equal(callIn(ev({ kind: 'call', table: 'x'.repeat(129) })), null);
-  assert.equal(callIn({ kind: 24246, content: '{"call"' }), null);
-});
-
-test('the relay tells its host of an event it took, and not of one it refused', async () => {
-  const wasm = readFileSync(wasmPath);
-  const verify = await schnorrVerifier(wasm);
-  const sign = await signing(wasm);
-  const heard = [];
-  const relay = objectRelay(verify, { heard: (e) => heard.push(e) });
-  const said = [];
-  const sock = { send: (t) => said.push(JSON.parse(t)) };
-  relay.open(sock);
-  const call = await sign.event(keys[0], { kind: 24246, content: JSON.stringify({ kind: 'call', table: 'tbl1' }), tags: [['t', 'online']], created_at: 1000 });
-  await relay.message(sock, JSON.stringify(['EVENT', call]));
-  await relay.message(sock, JSON.stringify(['EVENT', { ...call, content: 'forged' }]));
-  assert.equal(heard.length, 1);
-  assert.equal(callIn(heard[0]), 'tbl1');
-});
-
-test('what it does with the backup jurors is said, a table by the first eight of its id', async () => {
+test('what it does with the house is said, a table by the first eight of its id', async () => {
   const c = container();
   const s = state(c);
   const lines = [];
-  const bench = new Bench(s, { OH_JUROR_SECRET: 'ab'.repeat(32) }, { log: (line) => lines.push(line) });
+  const bench = new Bench(s, { OH_HOUSE_SECRET: 'ab'.repeat(32) }, { log: (line) => lines.push(line) });
   const table = '83167bb6681da6f1b6f4ab8931028fbb';
   await wake(bench, table);
   assert.deepEqual(

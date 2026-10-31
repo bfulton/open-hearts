@@ -41,11 +41,11 @@ void reportError(Object error, StackTrace? stack, {String? where}) {
 
 /// Sends on a live game lost to the line, or a line down for long at a
 /// live table: [what] happened, with [account], the table as this
-/// device saw it (TableClient.lineAccount in packages/table), and
-/// [line], its transport's. Neither holds a key, a card or a name. The
-/// first eight characters of the table's id go with them, so that the
-/// operator can lay the device's side beside the relay's and the
-/// backup jurors' logs of the same table (docs/how-to/look-into-a-lost-game.md).
+/// device saw it (TableRules.describe in packages/table), and [line],
+/// its line's. Neither holds a key, a card or a name. The first eight
+/// characters of the table's id go with them, so that the operator can
+/// lay the device's side beside the relay's and the house's logs of the
+/// same table (docs/how-to/look-into-a-lost-game.md).
 /// Counted with the errors, a few to a page load.
 void reportLine(String what, {required String table, required String account, required String line}) {
   if (_reported >= reportedAtMost) return;

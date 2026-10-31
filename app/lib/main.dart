@@ -13,9 +13,9 @@ import 'identity.dart';
 import 'l10n/l10n.dart';
 import 'net/account_profile.dart';
 import 'net/address.dart' show driven, paceIn;
-import 'net/duty.dart';
 import 'net/in_use.dart';
 import 'net/licence.dart' show serviceKey;
+import 'net/online.dart';
 import 'net/remote_config.dart';
 import 'net/report_error.dart';
 import 'net/store_buying.dart';
@@ -91,12 +91,10 @@ void _askAgain() => Timer(waits.configEvery, () {
 /// The app, and the one thing the app as a whole has to say for
 /// itself: whether it is here.
 ///
-/// A device that closes its tab or goes into the background is no use
-/// as a juror, and a table that has drawn it should not have to wait
-/// out a missed heartbeat to find that out — five seconds in which a
-/// hand's escrow rests on somebody who is gone
-/// (docs/explanation/live-play.md). So say it, and say it again
-/// on the way back. Best effort by its nature: a crash, a killed tab
+/// A device that closes its tab or goes into the background is not
+/// there to play with, and the front door's count of who is online
+/// should not have to wait out a missed heartbeat to find that out
+/// (net/online.dart). So say it, and say it again on the way back. Best effort by its nature: a crash, a killed tab
 /// or a dead link says nothing at all, which is why silence is still
 /// timed out.
 class OpenHeartsApp extends StatefulWidget {
@@ -111,7 +109,7 @@ class _OpenHeartsAppState extends State<OpenHeartsApp> {
     onStateChange: (state) {
       switch (state) {
         case AppLifecycleState.resumed:
-          Duty.back();
+          Online.back();
           // Back from the background, perhaps after a long sleep: still
           // the device in use, or not; and its licence asked for now, if
           // the service has not answered yet.
@@ -120,13 +118,13 @@ class _OpenHeartsAppState extends State<OpenHeartsApp> {
           unawaited(AccountProfile.current.retry());
         // Hidden is a tab switched away from or a phone's home button:
         // timers throttle, sockets may go, and this device is not
-        // answering a summons until it is back. Detached is the page
+        // about to play until it is back. Detached is the page
         // unloading, which is the case worth having most.
         case AppLifecycleState.inactive:
         case AppLifecycleState.hidden:
         case AppLifecycleState.paused:
         case AppLifecycleState.detached:
-          Duty.leaving();
+          Online.leaving();
       }
     },
   );

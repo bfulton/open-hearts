@@ -1,84 +1,23 @@
-/// Presence over the relays: who is online, and a summons to a juror.
+/// Presence over the relay: who has the app open, and whose device each
+/// is.
 ///
 /// Every client with the app open says so on one well-known tag every
 /// few seconds — an ephemeral event, forwarded and forgotten — and
-/// everyone listening keeps a map of who was heard when. A summons is
-/// an event on the same tag addressed to one key, carrying the table's
-/// spec and the hand; a backup juror listens for a table's
-/// call on the tag as well. Its own sockets, apart from any table's:
-/// one to every relay in the list, the announcements written to all
-/// of them, since who is online has to be seen by devices that can
-/// read only some of the relays (relays.dart).
+/// everyone listening keeps a map of who was heard when. That is how the
+/// front door counts who is online, and how a device hears that another
+/// device of its account has taken the account up.
 ///
 /// A relay that keeps an object per tag ([tagMark], docs/explanation/service.md)
-/// takes the tag in its URL, and presence puts its own there. The
-/// announcements go to every relay in the list: a device is online for
-/// whoever can hear it, and what another device can hear is not
-/// assumed.
+/// takes the tag in its URL, and presence puts its own there.
 library;
 
 import 'dart:async';
 import 'dart:convert';
 
-import 'jury.dart';
 import 'licence.dart';
 import 'nostr.dart';
 import 'relays.dart';
 import 'signing.dart';
-import 'spec.dart';
-
-/// A summons as a juror receives it.
-class Summons {
-  const Summons(
-      {required this.spec,
-      required this.hand,
-      required this.jurors,
-      required this.from,
-      this.juryId,
-      this.first = false,
-      this.draws = const []});
-  final TableSpec spec;
-  final int hand;
-  final List<PublicKey> jurors;
-  final PublicKey from;
-
-  /// The jury event this summons names, where the sender said which.
-  final String? juryId;
-
-  /// Whether that event is the *first* jury drawn for [hand], as the
-  /// sender's record has it. A bot seat's holder is read from the
-  /// hand's first jury and no other, so a juror can act on the list
-  /// in a first summons before the event reaches it — and must not
-  /// act on the list in a redraw, which names the jury as it stands
-  /// now rather than the one the seats were dealt to.
-  final bool first;
-
-  /// The draws the sender's table had carried for [hand], each with
-  /// the witnesses that carried it, as signed events
-  /// (`TableClient.serveFor`).
-  final List<Map<String, Object?>> draws;
-
-  static Summons? parse(PublicKey from, Map<String, Object?> content) {
-    try {
-      final spec = TableSpec.parse(content['table']);
-      if (spec == null) return null;
-      return Summons(
-        spec: spec,
-        hand: content['hand'] as int,
-        jurors: [for (final k in content['jurors'] as List) k as String],
-        from: from,
-        juryId: content['jury'] as String?,
-        first: content['first'] == true,
-        draws: [
-          for (final d in content['draws'] as List? ?? const [])
-            if (d is Map) Map<String, Object?>.from(d),
-        ],
-      );
-    } catch (_) {
-      return null;
-    }
-  }
-}
 
 /// The mark a relay wears in the list when it keeps one object per tag
 /// and wants the tag in the URL: `wss://our.relay/{tag}`.
@@ -90,11 +29,6 @@ class Summons {
 /// first message crosses, so a client must put the tag on that one.
 /// Nobody else's URL carries the mark, so the list says which is which
 /// and nothing has to be inferred from a hostname.
-///
-/// The other half of the rule: a client with no tag cannot use a
-/// marked relay at all, so a list handed to one must not carry it.
-/// Tables and signalling still take the ordinary list
-/// (`app/lib/net/relays.dart`, `relay_transport.dart`).
 const tagMark = '{tag}';
 
 /// [relays] with [tag] put where each marked relay asks for it; every
@@ -107,16 +41,9 @@ List<Uri> relaysForTag(List<Uri> relays, String tag) => [
           relay,
     ];
 
-class RelayPresence implements Presence {
-  RelayPresence(
-      {required List<Uri> relays,
-      required this.signer,
-      this.status = 'online',
-      this.everyMs = 5000,
-      this.canServe,
-      this.activation,
-      this.log})
-      : relays = Relays.turnedBy(relaysForTag(relays, topic), signer.publicKey) {
+class RelayPresence {
+  RelayPresence({required List<Uri> relays, required this.signer, this.status = 'online', this.everyMs = 5000, this.activation, this.log})
+      : relays = relaysForTag(relays, topic) {
     _group = RelayGroup(
       auth: relayAuthFor(signer),
       urls: this.relays,
@@ -138,67 +65,35 @@ class RelayPresence implements Presence {
   final List<Uri> relays;
   final Signer signer;
 
-  /// What this client says of itself: `online`, [seated], or
-  /// [lastResort] for the juror a service brings up.
+  /// What this client says of itself: `online`, or [seated].
   String status;
   final int everyMs;
-
-  /// Whether this device can serve as a juror at the tables that would
-  /// draw it — for the app, whether its deal loaded and its worker has
-  /// not failed for good since. Every live table is sealed, so one that
-  /// cannot deal cannot serve any of them, and drawn it would hold a
-  /// bot seat and a piece of every escrow it never answers for. While
-  /// this is false the device says nothing of itself, and if it had
-  /// said it was here it says it is going; it still listens. Read at
-  /// every beat, so a device that stops being able to is gone for
-  /// everyone within one. Null is always.
-  final bool Function()? canServe;
   final void Function(String line)? log;
 
   /// This device's activation, as the service last gave it
   /// (licence.dart): said with every beat, so that everyone hears whose
-  /// device this is — a table draws no juror from an account it seats —
-  /// and another device of the same account hears that it has been
-  /// superseded. Read at every beat; null says no account, which only
-  /// the backup jurors may do on our relay.
+  /// device this is, and another device of the same account hears that
+  /// it has been superseded. Read at every beat.
   final Activation? Function()? activation;
 
   static const topic = 'online';
 
+  /// What a client says of itself while it is at a table, as against
+  /// the lobby.
+  static const seated = 'seated';
+
   late final RelayGroup _group;
   final Map<PublicKey, int> _seen = {};
 
-  /// When each key's current run of being here began, and what it
-  /// last said it was doing — the two things [settled] reads.
-  final Map<PublicKey, int> _since = {};
-  final Map<PublicKey, String> _doing = {};
-
   /// Keys that have said they are going. A device that closes says so
-  /// rather than leaving everyone to notice a missed heartbeat, which
-  /// is five seconds of the table believing somebody is there who is
-  /// not. Only the key itself can say it, since the event is signed
-  /// by it, and a later `here` undoes it.
+  /// rather than leaving everyone to notice a missed heartbeat. Only the
+  /// key itself can say it, since the event is signed by it, and a later
+  /// `here` undoes it.
   final Set<PublicKey> _went = {};
 
-  /// A run shorter than this is a fresh arrival rather than a return:
-  /// long enough to ride out one missed announcement, short enough
-  /// that somebody back from a real absence starts their run again.
-  static const _gapMs = 15000;
-
-  /// Whether this device has said it is here since it last said it
-  /// was going.
-  bool _announced = false;
-
-  bool get _able => canServe?.call() ?? true;
-
-  final _summonses = StreamController<Summons>.broadcast();
-  final _calls = StreamController<String>.broadcast();
   Timer? _beat;
   bool _closed = false;
   bool _silent = false;
-
-  /// Summonses addressed to this key.
-  Stream<Summons> get summonses => _summonses.stream;
 
   /// The account each key belongs to, as its activation says, and that
   /// activation's epoch.
@@ -212,11 +107,11 @@ class RelayPresence implements Presence {
   /// A later activation of this device's own account, heard from
   /// another device: this one is no longer the account's in use
   /// (docs/explanation/service.md). The relay closes a superseded device's
-  /// sockets itself; this is how a device hears it on a relay that does
-  /// not, and sooner where it does.
+  /// sockets itself; this is how a device hears it sooner.
   Stream<Activation> get superseded => _superseded.stream;
 
-  @override
+  /// The account [key] belongs to, as its activation says; the key
+  /// itself for one that has said none.
   AccountId accountOf(PublicKey key) {
     if (key == signer.publicKey) {
       final mine = activation?.call();
@@ -225,95 +120,40 @@ class RelayPresence implements Presence {
     return _accounts[key]?.account ?? key;
   }
 
-  /// Tables that said they had nobody to draw from.
-  Stream<String> get calls => _calls.stream;
-
-  /// Resolves once some relay has acknowledged the subscription.
+  /// Resolves once the relay has acknowledged the subscription.
   Future<void> get ready => _group.ready;
 
-  /// The reason the last relay gave when every relay refused this
-  /// client's latest announcement; null once one takes it again.
+  /// The reason the relay gave when it refused this client's latest
+  /// announcement; null once it takes one again.
   String? get refusal => _group.refusal;
 
-  /// Stops announcing, while still listening — a backup juror
-  /// stays quiet until called.
+  /// Stops announcing, while still listening.
   set silent(bool v) => _silent = v;
 
   static int get _nowMs => DateTime.now().millisecondsSinceEpoch;
 
-  @override
+  /// Who is online: heard from within [withinMs], not gone since, and
+  /// not a device whose account another has taken up. This device, while
+  /// it says it is here.
   Set<PublicKey> online({required int withinMs}) {
     final now = _nowMs;
     return {
-      // This device is here while it says so, and only then: a relay
-      // sends it its own beat as it sends everyone's, and the beat it
-      // said before it went silent or could no longer serve is fresh for
-      // a minute after.
       for (final e in _seen.entries)
         if (e.key != signer.publicKey && now - e.value < withinMs && !_went.contains(e.key) && !_outdone(e.key)) e.key,
-      if (!_silent && _able) signer.publicKey,
+      if (!_silent) signer.publicKey,
     };
   }
 
-  @override
-  Set<PublicKey> settled({required int withinMs, required int forMs}) {
-    final now = _nowMs;
-    return {
-      for (final k in online(withinMs: withinMs))
-        if (k == signer.publicKey || _doing[k] == seated || now - (_since[k] ?? now) >= forMs) k,
-    };
-  }
-
-  /// Who is online that is somebody: [online] less the backup jurors,
-  /// who say what they are (juror_duty.dart). What a device counts as
-  /// the players about; a table still draws its jury from [online].
-  Set<PublicKey> people({required int withinMs}) => {
-        for (final k in online(withinMs: withinMs))
-          if (_doing[k] != lastResort) k,
-      };
-
-  /// What a client says of itself while it is at a table, as against
-  /// the lobby: somebody mid-game has a reason to still be here in a
-  /// minute.
-  static const seated = 'seated';
-
-  /// What a backup juror says of itself: the service's, not a player.
-  static const lastResort = 'last-resort';
-
-  /// Says this device is going, so that nobody waits out a heartbeat
-  /// to find out. Best effort by its nature — a backgrounded phone, a
-  /// crash or a dead link says nothing at all — which is why the
-  /// table still times out anyone silent.
+  /// Says this device is going, so that nobody waits out a heartbeat to
+  /// find out. Best effort by its nature — a backgrounded phone, a crash
+  /// or a dead link says nothing at all.
   void leaving() {
     if (_closed || _silent) return;
-    _sayGone();
+    _group.publish(NostrEvent.sign(signer, kind: TableKinds.presence, content: jsonEncode({'kind': 'gone'}), tags: [
+      ['t', topic],
+    ]));
     // And stop saying it is here, or the next beat would undo this.
-    // Announcing resumes when something sets [silent] back.
     _silent = true;
-  }
-
-  void _sayGone() {
-    _announced = false;
-    _group.publish(
-        NostrEvent.sign(signer, kind: TableKinds.presence, content: jsonEncode({'kind': 'gone'}), tags: [
-          ['t', topic],
-        ]),
-        everywhere: true);
-  }
-
-  @override
-  void summon(PublicKey juror, Map<String, Object?> summons) {
-    _group.publish(NostrEvent.sign(signer, kind: TableKinds.presence, content: jsonEncode({'kind': 'summons', ...summons}), tags: [
-      ['t', topic],
-      ['p', juror],
-    ]), everywhere: true);
-  }
-
-  @override
-  void callForJuror(String table) {
-    _group.publish(NostrEvent.sign(signer, kind: TableKinds.presence, content: jsonEncode({'kind': 'call', 'table': table}), tags: [
-      ['t', topic],
-    ]), everywhere: true);
   }
 
   /// Whether [key] is a device whose account has since been taken up by
@@ -327,23 +167,13 @@ class RelayPresence implements Presence {
 
   void _announce() {
     if (_silent || _closed) return;
-    if (!_able) {
-      if (_announced) {
-        log?.call('presence: this device cannot serve as a juror; going');
-        _sayGone();
-      }
-      return;
-    }
-    _announced = true;
     final mine = activation?.call();
-    _group.publish(
-        NostrEvent.sign(signer,
-            kind: TableKinds.presence,
-            content: jsonEncode({'kind': 'here', 'status': status, if (mine != null) 'activation': mine.toJson()}),
-            tags: [
-              ['t', topic],
-            ]),
-        everywhere: true);
+    _group.publish(NostrEvent.sign(signer,
+        kind: TableKinds.presence,
+        content: jsonEncode({'kind': 'here', 'status': status, if (mine != null) 'activation': mine.toJson()}),
+        tags: [
+          ['t', topic],
+        ]));
   }
 
   /// What [key]'s beat says of its account: taken where it holds
@@ -368,11 +198,10 @@ class RelayPresence implements Presence {
   final Map<PublicKey, int> _newest = {};
 
   /// How old a presence event may be and still be news, in seconds: a
-  /// few beats. Every presence event is public and any relay will take
-  /// one again once it has forgotten its id, so an old `here` said again
-  /// would make a device that left look online — long enough to be
-  /// seated and booted — and an old `gone` would take a present one out
-  /// (docs/explanation/security-model.md).
+  /// few beats. Every presence event is public and a relay will take one
+  /// again once it has forgotten its id, so an old `here` said again
+  /// would make a device that left look online, and an old `gone` would
+  /// take a present one out (docs/explanation/security-model.md).
   int get _freshS => (everyMs * 4 ~/ 1000).clamp(20, 120);
 
   /// How far ahead of this device's clock an event may be dated: clocks
@@ -390,7 +219,7 @@ class RelayPresence implements Presence {
     return true;
   }
 
-  /// An event as it came off a relay: what the relays hand [_onEvent],
+  /// An event as it came off the relay: what the relay hands [_onEvent],
   /// for a test to hand it directly.
   bool receive(Map<String, Object?> raw) => _onEvent(raw);
 
@@ -407,20 +236,10 @@ class RelayPresence implements Presence {
     switch (c['kind']) {
       case 'here':
         _account(e.pubkey, c['activation']);
-        final now = _nowMs;
-        if (now - (_seen[e.pubkey] ?? -_gapMs * 2) > _gapMs) _since[e.pubkey] = now;
-        _seen[e.pubkey] = now;
-        _doing[e.pubkey] = c['status'] is String ? c['status'] as String : 'online';
+        _seen[e.pubkey] = _nowMs;
         _went.remove(e.pubkey);
       case 'gone':
         _went.add(e.pubkey);
-        _since.remove(e.pubkey);
-      case 'summons':
-        if (e.tag('p') != signer.publicKey) return true;
-        final s = Summons.parse(e.pubkey, c);
-        if (s != null) _summonses.add(s);
-      case 'call':
-        if (c['table'] is String) _calls.add(c['table'] as String);
     }
     return true;
   }
@@ -429,8 +248,6 @@ class RelayPresence implements Presence {
     _closed = true;
     _beat?.cancel();
     _group.close();
-    _summonses.close();
-    _calls.close();
     _superseded.close();
   }
 }

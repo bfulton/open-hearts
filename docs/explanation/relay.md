@@ -8,7 +8,7 @@ it keeps. Its tags, event kinds, limits and retention are in the
 
 ## One relay, ours
 
-Deployed builds and the backup jurors talk to no other relay. The list
+Deployed builds and the house talk to no other relay. The list
 is a constant of the build (`app/lib/net/relays.dart`), and the remote
 config may move tables only to another host under `openhearts.game`
 ([remote config](service.md#remote-config)). The wire format is

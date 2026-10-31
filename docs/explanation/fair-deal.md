@@ -49,12 +49,12 @@ functions over bytes in `crypto/deal`.
 All of this runs as turns of the table protocol
 ([live play](live-play.md), [table states](table-states.md)): four rounds before
 the pass (keys, shuffle in seat order, tokens, lead declared) and the
-audit after the last trick. Every step is checked by everyone when it
-arrives. A seat that does not take its turn is removed like any other
-silent seat.
+audit after the last trick. Every step is checked by every side as the
+log carries it. A seat whose clock runs out at a step of the deal is
+given to a bot, as at any other turn.
 
 One Rust crate builds twice. It builds as a cdylib that the Dart VM
-loads over FFI (tests, the verifier, the service's juror), and as a
+loads over FFI (tests, the verifier, the house), and as a
 wasm that the browser loads with no glue code (`app/web/deal.wasm`).
 Every random value comes in as a seed from the caller. The wasm has no
 entropy source of its own.
@@ -108,8 +108,8 @@ A Σ-protocol over both witnesses (commit to a random pair, derive the
 challenge from a hash of the statement, answer `z1 = a + c·sk` and
 `z2 = b + c·r`) proves this without revealing the token. It is five
 group elements and scalars (`SEAL_PROOF` in `crypto/deal/src/lib.rs`),
-and every seat checks it before accepting the pass. A pass that
-fails the check never settles, and the passer's clock runs out at its
+and every side checks it before it takes the pass. A pass that fails
+the check is taken by nobody, and the passer's clock runs out at its
 own turn. The receiver never has to complain.
 
 ### The one fault no proof catches
@@ -118,87 +118,86 @@ A seat holding the 2♣ can claim not to hold it. There is no proof to
 demand for a card you say you do not have. Every seat then says "not
 me", and nobody can lead. The table responds by opening the hand where
 it stands (the audit, called early) and giving it up: nothing is scored,
-the next hand is dealt in its place, and the seat the opened deal names
-is removed at its next turn. A verifier sees the same thing. A hand
+the seat the opened deal names is given to a bot for lying, and the next
+hand is dealt in its place. A verifier sees the same thing. A hand
 given up must show a seat that was dealt the 2♣ and disclaimed it, which
-only that seat could have caused, so a majority cannot throw away a hand
-it merely dislikes.
+only that seat could have caused, so nobody can throw away a hand they
+merely dislike.
 
 ## Seats nobody holds
 
 A bot's hand must be hidden from the table too. If it is not, a table
 of two people and two open bots shows each person 39 cards, and the
-other person's hand is the thirteen left over. So each bot seat is held
-by a **juror** ([live play](live-play.md)). The juror draws the seat's
-secret as a person would, plays the bot's policy, shuffles with an
-argument and makes tokens with proofs. The table checks all of it
-without seeing the hand. Each juror holds one bot seat, so no juror
-holds enough cards to work out a person's hand by subtraction. The
-juror for each seat is named by the jury draw the deal is sealed to,
-and that draw is on the record ([table states](table-states.md)). A bot seat's
-secret is published at the audit like everyone else's, so the verifier
-can check every bot move was the policy's.
+other person's hand is the thirteen left over. So at a sealed table
+every bot seat is held by **the house**, the operator's own side at
+every table ([the house](live-play.md#the-house)). The house makes the
+seat's secret for each hand from a secret of its own, the seat and the
+hand, so a house started again makes the same one and nobody else can.
+It plays the bot's policy, shuffles with an argument and makes tokens
+with proofs, and the table checks all of it without seeing the hand. A
+bot seat's secret is published at the audit like everyone else's, so
+the verifier can check every bot move was the policy's.
 
-A seat whose holder goes before its keys are read becomes a bot whose
-secret anybody can compute from public values. That applies only where
-nobody drew a secret for it. A held bot seat's secret is never guessed.
+Because the house holds every bot seat, it holds every card a bot was
+dealt. At a table of one person and three bots that is 39 cards, and the
+person's hand is the thirteen left over: there the house can work out
+the person's hand by subtraction, though no person can. With two or
+more people at the table it holds at most 26 cards and cannot. The
+privacy policy says so ([what the house can see](live-play.md#what-the-house-can-see)).
+
+A seat whose person goes before they said their keys becomes a bot whose
+secret anybody can compute from public values, and every side works out
+its steps for the rest of that hand. That applies only where nobody drew
+a secret for it. A secret drawn for a seat is never guessed.
 
 ## Escrow
 
-A departed seat's cards still have to open. With its keys message, each
-seat escrows its deal secret, wrapping each piece in a secret that the
-two table keys share (Diffie–Hellman on the same curve):
+A person's cards still have to open after they go. With their keys,
+each person's seat escrows its deal secret, split in two by XOR, each
+piece wrapped in a secret that the two table keys share (Diffie–Hellman
+on the same curve). One piece goes to the house and the other to every
+other person at the table. The house's piece and any one person's
+rebuild the secret. The house alone holds noise, and so do all the
+other people together. A person alone with bots has nobody to give the
+second piece to, so their hand can be opened by nobody; when they go,
+nobody is left at the table either, and the game ends. A seat the house
+holds escrows to nobody, since nobody else may see its cards, and the
+house can make its secret again.
 
-- **A person's seat** is split in two by XOR. One piece goes to every
-  other person and the other to every juror of the hand. Any one person
-  plus any one juror can rebuild it. All the people together hold
-  noise, and so does the whole jury. With no jury, the pieces go to the
-  other people, and all of them are needed.
-- **A bot seat a juror holds** is split into Shamir shares over GF(2⁸),
-  one per juror, and any `escrowThreshold` of them rebuild it
-  (`packages/deal/lib/deal.dart`). One juror alone has nothing. The pieces are released sealed to the other
-  custodians while the hand is played, since a piece said in the clear
-  would also be heard by the players. Once the hand is over they are
-  released in the clear, with the audit. A juror drawn later gets a
-  share of its own through `topUpPart`. Two holders each send what
-  their share contributes at the newcomer's index, sealed to the
-  newcomer, and the secret is never rebuilt anywhere in the process.
-
-When the table removes a seat, each holder releases its piece, and
-repeats the release every few seconds until the secret is known. The
-seat's turns stall meanwhile, and the screen says so. A held bot seat
-passes to the escrow when the record gives it there: the players claim
-it at its turn when its juror is gone or out of time. If fewer than
-`escrowThreshold` of its custodians remain and nobody who could open it
-is back within the lost-quorum clock (`quorumLostMs`), the game ends
-unscored as a connection failure ("juror quorum lost";
-[the lost-quorum ending](table-states.md#the-lost-quorum-ending)).
+When the table removes a person mid-hand before their hand is in the
+open, every clock stops ([the escrow](table-states.md#the-escrow)). The
+house and each other person say their piece once, as a release in the
+log, in the clear: the seat is played by every side from there, so the
+departed person's cards are open to the whole table for the rest of that
+hand. Once the house's piece and one person's are in, the hand is open.
+A hand still not open after the fixed clock (`fixedMs`) is given up,
+unscored ([the abandoned hand](table-states.md#the-abandoned-hand)).
 
 **Open.** Rebuilding a departed seat's secret opens that seat's whole
-hand to whoever rebuilt it. `crypto/deal` and `DealSession` also
-implement the alternative. A seat's key is split into a people's share
-and a jury's share, whose public keys must add to the seat's own. In
-play a holder then releases *share tokens* for exactly the positions
-still missing (`split`, `shareKey`, `shareToken`, `openShared`,
-`releaseShareTokens`). Survivors learn only the positions they open, and
-the key is never reconstructed. Keys messages already carry the shares
-and are checked against them, but the table still releases the secret
-pieces. Wiring it in needs a pass sealed to a seat that has since left
-to settle when its seal can open, not when it arrives.
+hand to the table. `crypto/deal` and `DealSession` also implement the
+alternative. A seat's key is split into two shares, one for the other
+people and one for the house, whose public keys must add to the seat's
+own. In play a holder then releases *share tokens* for exactly the
+positions still missing (`split`, `shareKey`, `shareToken`,
+`openShared`, `releaseShareTokens`). Survivors learn only the positions
+they open, and the key is never reconstructed. Keys messages already
+carry the shares and are checked against them, but the table releases
+the secret's pieces.
 
 ## Verification
 
 The verifier first holds every person's seat to its licence: one the
 service signed for that seat's key, naming its account, and no account
-seated twice ([the service](service.md)). Then it replays a sealed record
-through the deal. It checks every key's proof, every shuffle's argument
-against the deck before it, every token and the lead declaration. Then
-the audit's secrets open every card. Each play's token must open the
-card it named, and each play is checked against the hand it came from.
-Until a hand's audit is in, its plays are checked as far as the rules
-allow and the result is marked incomplete. A seat the record gave to the
-escrow is not audited, since its released pieces stand in for its audit.
-A record that continues past the end of the game is rejected.
+seated twice ([the service](service.md)). Then it plays the referee's
+log again with the same rules every side ran (`verifyRecord` in
+`packages/table/lib/src/record.dart`). It checks every key's proof,
+every shuffle's argument against the deck before it, every token and the
+lead declaration. Then the audit's secrets open every card. Each play's
+token must open the card it named, and each play is checked against the
+hand it came from. A seat opened from the escrow is not audited, since
+its released pieces stand in for its audit. A record that does not reach
+the end of the game, or whose end the house did not sign for, is
+rejected ([game records](live-play.md#game-records)).
 
 ## Cost, and keeping it off the page
 
@@ -209,49 +208,50 @@ or two to make or check natively, and a few in a browser. A four-person
 hand costs each seat well under a second of its own work, a phone two
 or three times that, and playing a card stays in the noise: one token
 and its proof. What a person notices is the wait for the deal's rounds
-to pass between the seats, which `packages/table/tool/time_to_deal.dart`
-measures.
+to pass between the seats, each a trip through the referee.
 
 Slow calls never run on the page's thread. The page runs the wasm in a
 Web Worker, `app/web/deal_worker.js` (an isolate on the VM;
-`packages/deal/lib/src/work.dart`). The session stays synchronous. The
-table sends the slow calls a step needs to the worker and parks the step
-until they are back (`DealDriver._workedOut`). When the session needs a
-slow result itself, it stops, says what it needs (`DealSession.wanted`),
-and continues from the answers (`resume`). Each answer is matched by a
-hash of the call. A slow call that was not sent to the worker throws
-(`PreparedDeal`), and the simulator's tests hold that count to zero.
-A worker that fails, or makes no progress for several ticks, is
-replaced once (`ResilientDealWorker` in `packages/deal/lib/src/work.dart`).
-The ticks use the page's own
-timer, so a sleeping phone is not judged stalled. If the replacement also
-fails, the device cannot deal (`TableClient.cannotDeal`). Seated, it
-leaves at once and says so. As a juror, it stops following the table,
-and no table draws it again.
+`packages/deal/lib/src/work.dart`). The session stays synchronous. A
+side sends the slow calls its own step needs to the worker and makes the
+step when they are back (`TableClient._workedOut`), and an entry whose
+check needs slow calls waits to be taken until they are back
+(`TableRules.waitingToTake`). When the session needs a slow result
+itself, it stops, says what it needs (`DealSession.wanted`), and
+continues from the answers (`resume`). Each answer is matched by a hash
+of the call. A slow call that was not sent to the worker throws
+(`PreparedDeal`), and the simulator's tests hold that count to zero. A
+worker that fails, or makes no progress for several ticks, is replaced
+once (`ResilientDealWorker` in `packages/deal/lib/src/work.dart`). The
+ticks use the page's own timer, so a sleeping phone is not judged
+stalled. If the replacement also fails, the device cannot deal
+(`TableClient.cannotDeal`), and a seated device leaves at once and says
+so.
 
 Every live table is sealed. A device that cannot load the deal, or whose
-worker does not start, does not go online: it opens no room, joins no
-pool, and is never drawn as a juror. A device that can deal refuses a
-start that is not sealed. The web build ships the wasm. Android release
-builds bundle the native library (`crypto/build_android.sh`), and iOS
-builds embed it as a framework (`crypto/build_ios.sh`).
+worker does not start, does not go online: it opens no room and joins
+no pool. A device that can deal refuses a start that is not sealed. The
+web build ships the wasm. Android release builds bundle the native
+library (`crypto/build_android.sh`), and iOS builds embed it as a
+framework (`crypto/build_ios.sh`).
 
-A juror summoned mid-hand replays the whole hand's events, so the VM
-signs with `crypto/schnorr` (k256, as the browser's wasm) instead of
-pure-Dart BIP-340, which is too slow to replay a hand in good time.
+The house, started again mid-game, reads the whole log from its start,
+so the VM signs and checks signatures with `crypto/schnorr` (k256, as
+the browser's wasm) instead of pure-Dart BIP-340, which is many times
+slower.
 
 ## What is guaranteed, and what is not
 
 - **The deal cannot be rigged.** One honest shuffler is enough.
-- **Nobody can see your cards**: not another player, not the operator
-  alone, and not whoever is left at the table after you go. Any
-  coalition able to open your hand must include a person at the table
-  and a juror of the hand. Jurors are other players online, drawn at
-  random; when too few are online to make a jury, the service's backup
-  jurors make up the number, and they are ours, so for those hands you
-  trust us not to collude with a player at your table. The other
-  exception is that a departed seat's hand is opened from escrow for
-  the rest of that hand (above).
+- **Nobody can see your cards**: not another player, and not the
+  operator alone, with one exception (next). Opening your hand from the
+  escrow takes the house's piece and another person's at your table,
+  so you trust us not to collude with a player at your table. If you
+  leave mid-hand, the rest of your hand is opened to the table and
+  played from there (above).
+- **The exception: alone with three bots.** The house holds every bot
+  seat, so at a table of one person and three bots it can work out that
+  person's hand by subtraction ([seats nobody holds](#seats-nobody-holds)).
 - **Nobody can play a card they were not dealt**, because the masked
   card fixes its value.
 - **Every game verifies end to end**, by anyone, after the fact.
@@ -262,11 +262,12 @@ two are out of scope, and the third is handled by clocks and the escrow.
 
 ## Solo games: where the randomness comes from
 
-At a live table, each seat (and each juror holding a bot seat) draws its
-deal secret and shuffle seed, 32 bytes each, from `Random.secure()`. In
-`crypto/deal` a seed drives ChaCha20 for the permutation and the
-remasking. The table's 31-bit seed in the signed start event picks the
-bots and draws the jury. It is never relied on for secrecy.
+At a live table, each person's seat draws its deal secret and shuffle
+seed, 32 bytes each, from `Random.secure()`; the house makes a bot
+seat's secret from its own. In `crypto/deal` a seed drives ChaCha20 for
+the permutation and the remasking. The table's 31-bit seed in the
+signed start event picks the bots, and the bot that takes each seat a
+person leaves. It is never relied on for secrecy.
 
 A solo game has nobody to shuffle against, so the only question is
 whether the shuffle is good (`packages/engine/lib/src/deal_seed.dart`):

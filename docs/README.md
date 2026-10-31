@@ -61,12 +61,12 @@ Operating:
 
 - [How a change reaches a phone](explanation/dev-loop.md): the checks,
   the deploy and how a device picks up a new build.
-- [Multiplayer without a game server](explanation/multiplayer.md): how
-  devices reach each other, and why through TURN.
+- [Multiplayer through a referee](explanation/multiplayer.md): how four
+  devices play one game, and who is in charge.
 - [The fair deal](explanation/fair-deal.md): the mental poker protocol,
   escrow, and what is guaranteed.
 - [Live play](explanation/live-play.md): matchmaking, bots, ratings,
-  turns, leaving, and the jury.
+  the referee, turns, leaving, and the house.
 - [The table's states](explanation/table-states.md): every state a
   table, hand, seat and turn can be in, and how each is decided.
 - [The relay](explanation/relay.md): why one object per tag, and what

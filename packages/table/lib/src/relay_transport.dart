@@ -1,18 +1,7 @@
-/// A [Transport] over relays, and the signalling that WebRTC needs on
-/// the same wire.
-///
-/// Every message the table broadcasts goes to a relay as an ephemeral
-/// event of kind [TableKinds.table], tagged with the table id and
-/// signed by this peer, with the message as its content. Everyone at
-/// the table subscribes to that kind and tag on every relay in the
-/// list and writes to one of them (relays.dart). What arrives is
-/// stamped `from` the event's signer — the peer that sent it, which
-/// for a relayed message is not its author — and that is the
-/// distinction the protocol's "heard from" depends on.
-///
-/// A relay is a meeting point, not a friend: it says nothing when a peer
-/// goes, so `disconnected` never fires here. The protocol's heartbeats
-/// carry that.
+/// A table tag's other lanes over our relay: the lobby a room or a pool
+/// meets in, the watch lane, the players' reactions, and the signalling
+/// a call between seats would need. The table's own events go to its
+/// referee instead (relay_line.dart).
 library;
 
 import 'dart:async';
@@ -23,12 +12,10 @@ import 'nip44.dart';
 import 'nostr.dart';
 import 'presence_relay.dart' show relaysForTag;
 import 'reactions.dart';
-import 'relay_policy.dart';
 import 'relays.dart';
 import 'signing.dart';
-import 'transport.dart';
 
-class RelayTransport implements Transport, ReactionLane {
+class RelayTransport implements ReactionLane {
   RelayTransport(
       {required List<Uri> relays,
       required this.signer,
@@ -51,7 +38,6 @@ class RelayTransport implements Transport, ReactionLane {
       subscriptions: watchOnly ? {'watch': [watch]} : {
         'table': [
           watch,
-          const Filter(kinds: [TableKinds.table]).toJson()..['#t'] = [table],
           Filter(kinds: const [TableKinds.signal], tags: {
             'p': [signer.publicKey]
           }).toJson()
@@ -91,8 +77,6 @@ class RelayTransport implements Transport, ReactionLane {
   final void Function(String line)? log;
 
   late final RelayGroup _group;
-  final _incoming = StreamController<({PublicKey from, Map<String, Object?> message})>.broadcast();
-  final _disconnected = StreamController<PublicKey>.broadcast();
   final _signals = StreamController<Signal>.broadcast();
   final _lobby = StreamController<NostrEvent>.broadcast();
   final _watch = StreamController<({PublicKey from, Map<String, Object?> content})>.broadcast();
@@ -111,15 +95,6 @@ class RelayTransport implements Transport, ReactionLane {
 
   /// [refusal] as it changes.
   Stream<String?> get refusals => _group.refusals;
-
-  @override
-  Stream<({PublicKey from, Map<String, Object?> message})> get incoming => _incoming.stream;
-
-  @override
-  Stream<PublicKey> get disconnected => _disconnected.stream;
-
-  @override
-  bool get cutOff => _group.cutOff;
 
   /// The line to the relays, in a few words ([RelayGroup.health]).
   String get health => _group.health;
@@ -191,38 +166,6 @@ class RelayTransport implements Transport, ReactionLane {
         ['t', table],
       ]);
 
-  @override
-  void broadcast(Map<String, Object?> message, {bool everywhere = false}) {
-    _group.publish(NostrEvent.sign(signer, kind: TableKinds.table, content: jsonEncode(message), tags: [
-      ['t', table],
-    ]), everywhere: everywhere, readBy: everywhere ? null : _readBy());
-  }
-
-  @override
-  List<String> get paths => [for (final u in _group.reading) u.toString()];
-
-  /// What each peer last said it reads, and when: a peer not heard
-  /// from in two minutes is out of the reckoning. Longer than the
-  /// standard silence after which a table counts a person gone
-  /// (timing.dart), so a peer the table still waits on is not left out
-  /// of where this device writes.
-  final Map<PublicKey, ({Set<Uri> reads, int at})> _peerReads = {};
-
-  @override
-  void heard(PublicKey peer, List<String> paths) {
-    final reads = <Uri>{};
-    for (final p in paths) {
-      final u = Uri.tryParse(p);
-      if (u != null) reads.add(u);
-    }
-    if (reads.isEmpty) return; // a peer with nothing to say about it
-    _peerReads[peer] = (reads: reads, at: DateTime.now().millisecondsSinceEpoch);
-  }
-
-  /// The relays every peer heard from lately reads; null when no peer
-  /// has said, so the writer's own order decides.
-  Set<Uri>? _readBy() => readByFrom(_peerReads, DateTime.now().millisecondsSinceEpoch, 120000);
-
   /// Sends one signalling message to [to], sealed to its key: an
   /// offer or a candidate carries an address, and a relay carries the
   /// event — every relay, since a peer that cannot read
@@ -248,19 +191,14 @@ class RelayTransport implements Transport, ReactionLane {
   Uint8List _conversationKeyWith(PublicKey other) =>
       _conversationKeys.putIfAbsent(other, () => Nip44.conversationKey(signer.sharedXWith(other)));
 
-  /// One event, from whichever relay delivered it first. A table
-  /// event's envelope signature is not checked here: the relay checked
-  /// it before carrying the event, what the envelope carries is signed
-  /// by the same key and checked by the client, and every signature
-  /// checked is milliseconds a peer flooded with repeats has not got.
-  /// Every other kind is checked. False for what fails, so the id is
-  /// not remembered and
-  /// the real event under it still gets in.
+  /// One event, from whichever relay delivered it first, its signature
+  /// checked. False for what fails, so the id is not remembered and the
+  /// real event under it still gets in.
   bool _onEvent(Map<String, Object?> raw) {
-    // A reaction nobody here shows — a juror's client, say — is not
+    // A reaction nobody here shows — the house's client, say — is not
     // worth its signature.
     if (raw['kind'] == TableKinds.react && !_reactions.hasListener) return true;
-    final e = NostrEvent.parse(raw, verifySignature: raw['kind'] != TableKinds.table);
+    final e = NostrEvent.parse(raw);
     if (e == null || e.tag('t') != table) return false;
     if (e.kind == TableKinds.lobby || e.kind == TableKinds.waiting) {
       if (e.kind == TableKinds.lobby) lobbySoFar.add(e);
@@ -274,11 +212,6 @@ class RelayTransport implements Transport, ReactionLane {
       } catch (_) {}
     } else if (e.kind == TableKinds.react) {
       _reactions.add((from: e.pubkey, id: e.id, createdAt: e.createdAt, content: e.content));
-    } else if (e.kind == TableKinds.table) {
-      try {
-        final message = Map<String, Object?>.from(jsonDecode(e.content) as Map);
-        _incoming.add((from: e.pubkey, message: message));
-      } catch (_) {}
     } else if (e.kind == TableKinds.signal && e.tag('p') == signer.publicKey) {
       final String text;
       try {
@@ -293,16 +226,8 @@ class RelayTransport implements Transport, ReactionLane {
     return true;
   }
 
-  @override
-  void reach(Set<PublicKey> peers) {
-    // A relay reaches whoever reads it; there is nobody to dial.
-  }
-
-  @override
   void close() {
     _group.close();
-    _incoming.close();
-    _disconnected.close();
     _signals.close();
     _lobby.close();
     _watch.close();

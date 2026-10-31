@@ -480,7 +480,7 @@ fn write_vectors() -> Value {
     }
     r.call("split", &[s("secret1"), i(1), s("splitseed2")], None);
 
-    // A threshold of the jury: six shares, any two.
+    // A threshold: six shares, any two.
     r.val("thresholdseed", &seed(60, 0));
     let th = r.must("split_threshold", &[s("secret0"), i(6), i(2), s("thresholdseed")], "threshold");
     let mut tkeys = Vec::new();

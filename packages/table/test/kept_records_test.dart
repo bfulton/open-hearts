@@ -1,12 +1,16 @@
-/// Games kept by an older library still read, to the end, and a copy
-/// bent anywhere the deal's cryptography vouches for does not.
+/// Games kept still read, to the end, and a copy bent anywhere the deal's
+/// cryptography or the house vouches for does not: those kept at a
+/// refereed table (record.dart), and those kept before the referee — and
+/// by an older library (legacy/v2_record.dart).
 ///
-/// test/fixtures/ holds two sealed games as the library built on
-/// arkworks 0.3 wrote them (tool/kept_records.dart, run once): four
-/// people to the end of the game, and three people and a bot where a
-/// person leaves mid-hand and the hand is finished from escrow. Records
-/// like them are kept for anyone to look at (game_record.dart), and the
-/// review page checks them in the browser exactly as here.
+/// test/fixtures/ holds one game of the referee's (refereed_four, made
+/// with tool/game_fixture.dart: four people with real keys, the browser
+/// rig's house, to the end of a game to fifty), and two sealed games as
+/// the library built on arkworks 0.3 wrote them (once, with a tool since
+/// gone): four people to the end of the game, and three people and a bot
+/// where a person leaves mid-hand and the hand is finished from escrow.
+/// Records like them are kept for anyone to look at, and the review page
+/// checks them in the browser exactly as here.
 ///
 /// Asked of the library itself, never of remembered answers
 /// (package:deal/memo.dart): `OH_DEAL_MEMO` does not reach this file.
@@ -18,7 +22,6 @@ import 'dart:typed_data';
 
 import 'package:deal/deal.dart';
 import 'package:table/table.dart';
-import 'package:table_sim/table_sim.dart';
 import 'package:test/test.dart';
 
 Map<String, Object?> fixture(String name) =>
@@ -29,9 +32,9 @@ void main() {
   setUpAll(() async => crypto = await DealCrypto.load());
 
   Verification check(Map<String, Object?> json, {bool signatures = true}) {
-    final r = GameRecord.parse(json, verifySignatures: signatures);
+    final r = GameRecordV2.parse(json, verifySignatures: signatures);
     expect(r, isNotNull, reason: 'the record reads');
-    return verifyRecord(r!.spec, r.record, juries: r.juries, crypto: crypto, releases: r.releases);
+    return verifyRecordV2(r!.spec, r.record, juries: r.juries, crypto: crypto, releases: r.releases);
   }
 
   /// [json] with the first event of [kind] (and [round], for the deal's)
@@ -44,10 +47,10 @@ void main() {
       final body = e['body'] as Map;
       if (e['kind'] != kind || (round != null && body['round'] != round) || !body.containsKey(field)) continue;
       body[field] = bend(body[field]);
-      e['id'] = TableEvent.idFor(
+      e['id'] = V2Event.idFor(
           table: e['table'] as String,
           author: e['author'] as String,
-          kind: EventKind.values.byName(kind),
+          kind: V2Kind.values.byName(kind),
           body: Map<String, Object?>.from(body));
       return copy;
     }
@@ -73,33 +76,6 @@ void main() {
       expect(v.complete, isTrue);
     });
   }
-
-  test('the escrow\'s game, played again today, is the same record to the byte', () {
-    // Every key, shuffle, token, seal, share and proof in it made again
-    // by this library from the same seeds, and the record they make the
-    // one the older library kept — in the form it kept it. Today's
-    // carries beside each removal the signed word of its backers
-    // (GameRecord.version); the older form named them by key alone.
-    final t = threeAndALeaver(crypto);
-    final today = GameRecord.of(t.people.first.client, names: threeNames).toJson();
-    t.stop();
-    final asKept = {
-      ...today,
-      'v': 1,
-      'record': [for (final d in today['record']! as List) Map<String, Object?>.of(d as Map<String, Object?>)..remove('backing')],
-    };
-    expect(jsonEncode(asKept), utf8.decode(gzip.decode(File('test/fixtures/sealed_three_leave.json.gz').readAsBytesSync())));
-
-    // And in today's form the leave travels with its backing — the
-    // leaver's own word and a witness's — and the game verifies by it.
-    final read = GameRecord.parse(jsonDecode(jsonEncode(today)))!;
-    final left = read.record.singleWhere((d) => d.removal);
-    expect(left.event.kind, EventKind.leave);
-    expect(left.backing!.map((e) => e.kind), containsAll([EventKind.leave, EventKind.witness]));
-    final v = verifyRecord(read.spec, read.record, juries: read.juries, crypto: crypto, releases: read.releases);
-    expect(v.ok, isTrue, reason: v.reason);
-    expect(v.complete, isTrue);
-  });
 
   test('the escrow\'s game carries its jury and its released pieces', () {
     final json = fixture('sealed_three_leave');
@@ -152,6 +128,139 @@ void main() {
       test(c.key, () {
         final v = check(c.value(three), signatures: false);
         expect(v.ok, isFalse, reason: 'bent ${c.key}, and still it verified');
+      });
+    }
+  });
+
+  group('a game kept at a refereed table', () {
+    // The browser rig's house, which played the game and signed for its
+    // log: BIP-340's third published pair (tool/game_fixture.dart).
+    const house = 'dd308afec5777e13121fa72b9cc1b7cc0139715309b086c960e18fd969774eb8';
+    late Map<String, Object?> refereed;
+    setUpAll(() => refereed = fixture('refereed_four'));
+
+    RecordVerdict verified(Map<String, Object?> json, {PublicKey by = house, bool signatures = true}) {
+      final r = GameRecord.parse(json, verifySignatures: signatures);
+      expect(r, isNotNull, reason: 'the record reads');
+      return verifyRecord(r!, crypto: crypto, house: by);
+    }
+
+    test('verifies to its end, and the house\'s word on it with it', () {
+      final v = verified(refereed);
+      expect(v.ok, isTrue, reason: v.reason);
+      expect(v.state, TableState.finished);
+      expect(v.vouched, isTrue);
+      expect(v.totals, [5, 34, 63, 28]);
+      expect(v.winners, [0]);
+    });
+
+    test('naming another house, it is no game of this build\'s', () {
+      expect(verified(refereed, by: 'ab' * 32).ok, isFalse);
+    });
+
+    /// A copy of the game with [change] made to its log.
+    Map<String, Object?> copy(void Function(List<Map<String, Object?>> log) change) {
+      final json = jsonDecode(jsonEncode(refereed)) as Map<String, Object?>;
+      change((json['log'] as List).cast<Map<String, Object?>>());
+      return json;
+    }
+
+    /// The [nth] event of [kind] in [log].
+    Map<String, Object?> eventOf(List<Map<String, Object?>> log, String kind, [int nth = 0]) =>
+        [for (final e in log) if ((e['e'] as Map?)?['kind'] == kind) e['e'] as Map<String, Object?>][nth];
+
+    /// [e] with its id worked out again for what it now says, as the
+    /// table works one out (events.dart): only its signature, which
+    /// nobody but its author can make again, still gives it away.
+    // Every map's keys in order at every depth, as events.dart hashes them.
+    Object? inOrder(Object? json) => json is List
+        ? [for (final e in json) inOrder(e)]
+        : json is Map
+            ? {for (final k in [for (final k in json.keys) k as String]..sort()) k: inOrder(json[k])}
+            : json;
+    void reId(Map<String, Object?> e) {
+      e['id'] = digestOf(Uint8List.fromList(utf8.encode(jsonEncode([e['table'], e['author'], e['kind'], inOrder(e['body'])]))));
+    }
+
+    test('its ids made again here are its own: what the bends below rely on', () {
+      final v = verified(copy((log) {
+        for (final e in log) {
+          if (e['e'] case final Map<String, Object?> ev) reId(ev);
+        }
+      }));
+      expect(v.ok, isTrue, reason: v.reason);
+    });
+
+    final bends = <String, ({void Function(List<Map<String, Object?>> log) change, bool signatures})>{
+      // Signed as they were: a log put together differently from the one
+      // the referee kept.
+      'two moves in another order': (
+        change: (log) {
+          final at = log.indexWhere((e) => (e['e'] as Map?)?['kind'] == 'play');
+          final e = log[at]['e'];
+          log[at]['e'] = log[at + 1]['e'];
+          log[at + 1]['e'] = e;
+        },
+        signatures: true,
+      ),
+      'a move left out, the rest numbered again': (
+        change: (log) {
+          log.removeAt(log.indexWhere((e) => (e['e'] as Map?)?['kind'] == 'play'));
+          for (final (n, e) in log.indexed) {
+            e['n'] = n;
+          }
+        },
+        signatures: true,
+      ),
+      'a move\'s time moved on': (
+        change: (log) {
+          final e = log.firstWhere((e) => (e['e'] as Map?)?['kind'] == 'play');
+          e['t'] = (e['t'] as int) + 1;
+        },
+        signatures: true,
+      ),
+      'a card played changed, its signature that of the card that was': (
+        change: (log) {
+          final e = eventOf(log, 'play', 5);
+          (e['body'] as Map)['card'] = (e['body'] as Map)['card'] == '2C' ? '3C' : '2C';
+          reId(e);
+        },
+        signatures: true,
+      ),
+      // Signatures not checked: what the house's word and the deal's
+      // proofs vouch for, each on its own.
+      'a card played changed': (
+        change: (log) {
+          final e = eventOf(log, 'play', 5);
+          (e['body'] as Map)['card'] = (e['body'] as Map)['card'] == '2C' ? '3C' : '2C';
+          reId(e);
+        },
+        signatures: false,
+      ),
+      'a shuffle\'s argument': (
+        change: (log) {
+          final e = eventOf(log, 'deal', 4);
+          final body = e['body'] as Map;
+          final key = body.containsKey('proof') ? 'proof' : body.keys.firstWhere((k) => body[k] is String && (body[k] as String).length > 100);
+          body[key] = flip(body[key], 100);
+          reId(e);
+        },
+        signatures: false,
+      ),
+      'the house\'s totals': (
+        change: (log) {
+          final e = eventOf(log, 'result');
+          final totals = List.of((e['body'] as Map)['totals'] as List)..[0] = 0;
+          (e['body'] as Map)['totals'] = totals;
+          reId(e);
+        },
+        signatures: false,
+      ),
+    };
+    for (final b in bends.entries) {
+      test(b.key, () {
+        final v = verified(copy(b.value.change), signatures: b.value.signatures);
+        expect(v.ok, isFalse, reason: 'bent: ${b.key}, and still it verified');
       });
     }
   });

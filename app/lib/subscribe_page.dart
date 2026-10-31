@@ -3,10 +3,9 @@
 ///
 /// Everything else is free and stays free — the bots, the records, the
 /// verifiable deal, the engine itself. What is paid for is the part
-/// that costs us money to run: relaying people to each other, a TURN
-/// server when a direct path will not form, and a juror when a table
-/// is left alone. That is worth saying on the page rather than leaving
-/// a price on a padlock.
+/// that costs us money to run: relaying people to each other, and the
+/// server that deals and plays the bots at every live table. That is
+/// worth saying on the page rather than leaving a price on a padlock.
 library;
 
 import 'dart:async';
@@ -510,9 +509,9 @@ class _SubscribePageState extends State<SubscribePage> {
                   if (suspended)
                     Text(l10n.accountSuspended, style: const TextStyle(fontSize: 13.5, height: 1.5, color: Palette.chrome))
                   else if (licence == null) ...[
-                    _Point(icon: Icons.groups_outlined, text: l10n.seatsOrFriends),
-                    _Point(icon: Icons.military_tech_outlined, text: l10n.pointRating),
-                    _Point(icon: Icons.lock_outline, text: l10n.pointDeal),
+                    _Point(icon: Icons.groups_outlined, text: l10n.pointLive),
+                    _Point(icon: Icons.group_add_outlined, text: l10n.pointFriends),
+                    _Point(icon: Icons.insights_outlined, text: l10n.pointStats),
                     const SizedBox(height: 18),
                     Text(
                       l10n.whatMoneyPaysFor,

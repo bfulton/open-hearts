@@ -50,10 +50,9 @@ suite_table() {
     cd packages/table && dart analyze --fatal-infos && dart test -j "$cores" -x slow
 }
 suite_table_slow() { cd packages/table && dart test -j "$cores" -t slow; }
+# Tables, presence and the waiting room over real sockets, against the
+# relay the Cloudflare object runs (service/lib/src/relay.dart).
 suite_service() { cd service && dart analyze --fatal-infos && dart test -j "$cores"; }
-# The same suite against the relay the Cloudflare object runs.
-suite_service_js() { cd service && OH_RELAY=js dart test -j "$cores"; }
-suite_service_object() { cd service && OH_RELAY=object dart test -j "$cores"; }
 suite_relay_js() { node --test service/do/*.test.mjs; }
 suite_functions() { node --test service/functions/*.test.mjs; }
 suite_site() { node --test site/*.test.mjs; }
@@ -123,13 +122,13 @@ suite_app() {
 suite_e2e_build() { ./e2e/build.sh; }
 suite_e2e_flows() { node e2e/flows.mjs; }
 suite_e2e_run() { node e2e/run.mjs; }
-suite_e2e_escrow() { node e2e/escrow.mjs; }
+suite_e2e_house() { node e2e/house.mjs; }
 suite_e2e_offline() { node e2e/offline.mjs; }
 suite_e2e_site() { node e2e/site.mjs; }
 suite_e2e_move() { node e2e/move.mjs; }
 
-all_suites="engine deal table table_slow service service_js service_object relay_js functions site infra ops workers crypto scripts docs app_analyze app
-  e2e_build e2e_flows e2e_run e2e_escrow e2e_offline e2e_site e2e_move"
+all_suites="engine deal table table_slow service relay_js functions site infra ops workers crypto scripts docs app_analyze app
+  e2e_build e2e_flows e2e_run e2e_house e2e_offline e2e_site e2e_move"
 
 # ---- running them ----------------------------------------------------------
 
@@ -203,7 +202,7 @@ lanes() {
   mkdir -p "$logs"
   local pids=() l s
   for s in ${*//,/ }; do
-    case $s in engine | deal | table | table_slow | service | service_js | service_object) run deps; break ;; esac
+    case $s in engine | deal | table | table_slow | service) run deps; break ;; esac
   done
   for l in "$@"; do
     # shellcheck disable=SC2086
@@ -246,7 +245,7 @@ quick() {
       packages/engine/*) add engine ;;
       packages/deal/*) add deal ;;
       packages/table/*|packages/table_sim/*) add table ;;
-      service/do/*) add relay_js service_js service_object ;;
+      service/do/*) add relay_js service ;;
       # The name filter: the relay reads it too, and the app is held to
       # its cases.
       service/functions/names.vectors.json) add functions ops relay_js app_analyze app; app_files+=(app/lib/names.dart) ;;
@@ -310,7 +309,7 @@ quick() {
 # run at the lowest priority (above), all at once. The ones that keep
 # time run in waves no bigger than a laptop can carry: the browser
 # suites' build; the move's timings, which hold the app's start to a
-# second and a half; the service's sockets all three ways and the escrow;
+# second and a half; the service's sockets all three ways and the house;
 # the four-browser run and the network taken away; the flows. All of
 # them at once is no sooner on a few cores, only less sure: their tables
 # keep deadlines that a starved process misses. The Rust crates' own
@@ -320,7 +319,7 @@ full() {
   local crypto="" s
   [ -d crypto/deal/target/release/.fingerprint ] && command -v cargo > /dev/null && crypto=crypto
   local plan=("table table_slow" "app_analyze app" "engine,deal" "relay_js,functions,site,infra,ops,workers,scripts,docs $crypto"
-    "e2e_build e2e_move,e2e_site service,service_js,service_object,e2e_escrow e2e_run,e2e_offline e2e_flows")
+    "e2e_build e2e_move,e2e_site service,e2e_house e2e_run,e2e_offline e2e_flows")
   # Every suite there is, in a lane: one left out would never run here.
   for s in $all_suites; do
     [ "$s" = crypto ] && [ -z "$crypto" ] && continue

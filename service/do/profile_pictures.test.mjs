@@ -346,7 +346,7 @@ test("the relay carries an account's picture now and nothing else", async () => 
   assert.equal(await screen(picture(1), { account: ADA }), NOT_THEIRS_WHY, 'hers no longer');
   assert.equal(await screen(picture(2), { account: BAO }), NOT_THEIRS_WHY, 'never his');
   assert.equal(await screen(picture(3), { account: ADA }), NOT_THEIRS_WHY, 'never set');
-  assert.equal(await screen(picture(2), { account: null }), NOT_THEIRS_WHY, 'a backup juror');
+  assert.equal(await screen(picture(2), { account: null }), NOT_THEIRS_WHY, 'the house, of no account');
   assert.equal(await screen(picture(2), null), NOT_THEIRS_WHY, 'nobody');
   assert.equal(await screen({ kind: picture(2).kind, content: JSON.stringify({ kind: 'picture', jpeg: '***' }) }, { account: ADA }), NOT_THEIRS_WHY, 'not base64');
   // Not a picture, or not the lobby kind: not this screen's.

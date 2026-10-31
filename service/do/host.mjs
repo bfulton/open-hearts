@@ -20,15 +20,20 @@
 // asking is real: a test that counts how often its policy was
 // consulted counts what the relay actually consulted. And `--gate
 // <service key>` asks every socket who it is, as the deployed relay
-// does (relay.mjs, serviceGate), with the backup jurors' mark under
-// OH_JUROR_SECRET; `{"revoke": {account, epoch, why?}}` on stdin is what
-// the account's own object tells the deployed one.
+// does (relay.mjs, serviceGate); `{"revoke": {account, epoch, why?}}`
+// on stdin is what the account's own object tells the deployed one.
+// `--house <key>` is the house: the one key carried on its answer
+// alone, the house a table's tag referees sealed tables for and takes
+// results from (referee.mjs). Each time a table wants it and it is not
+// there, `{"wanted": <table>}` is said on stdout: where the deployed
+// object wakes the house's container (worker.mjs), a test starts one.
 
 import { createHash } from 'node:crypto';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { createInterface } from 'node:readline';
 import { pathToFileURL } from 'node:url';
 
+import { wakeLimiter } from './referee.mjs';
 import { createRelay, memoryStore, objectRelay, schnorrVerifier, serviceGate, tagOf } from './relay.mjs';
 import { listen } from './ws.mjs';
 
@@ -56,20 +61,33 @@ export function alsoFakeSignatures(verify) {
 /// before anything is written back to the socket that moved them.
 /// With [object], each tag's relay is the deployed object's
 /// (worker.mjs): presence's limits on `online`, a table's on every other
-/// tag, and only the lobby kind tagged for the tag stored — so a table
+/// tag, only the lobby kind tagged for the tag stored, and a table's
+/// tag the table's referee, for [house], telling [onWanted] of the table
+/// whenever it wants the house and the house is not there — so a table
 /// played here meets the rules it will meet on Cloudflare.
-export async function serve({ port = 0, host = '127.0.0.1', keep = 10000, log = null, refuse = null, onChange = null, object = false, gate = null } = {}) {
+export async function serve({ port = 0, host = '127.0.0.1', keep = 10000, log = null, refuse = null, onChange = null, object = false, gate = null, house = null, onWanted = null } = {}) {
   const verify = alsoFakeSignatures(await schnorrVerifier(readFileSync(wasmPath)));
   const relays = new Map();
   // Who may use it, when asked to ask ([gate] is the service's key).
-  const gating = () => (gate ? serviceGate({ service: gate, verify, bench: process.env.OH_JUROR_SECRET ?? null }) : null);
+  const gating = () => (gate ? serviceGate({ service: gate, verify, house }) : null);
   const relayFor = (path) => {
     const tag = tagOf(path);
     if (tag === null) return null;
     let relay = relays.get(tag);
     if (!relay) {
+      // The house woken as the deployed object wakes it: at most one
+      // wake every twenty seconds, and one wanted sooner made then.
+      const wanted = onWanted ? wakeLimiter({ wake: () => onWanted(tag), stillWanted: () => relays.get(tag)?.wantsHouse ?? false }) : null;
       relay = object
-        ? objectRelay(verify, { tag: tag || 'online', also: refuse, gate: gating(), count: (what) => what === 'rateLimited' || what === 'refused' || what === 'tooBig' ? log?.(`${tag}: ${what}`) : null })
+        ? objectRelay(verify, {
+            tag: tag || 'online',
+            also: refuse,
+            gate: gating(),
+            house,
+            wanted,
+            count: (what) => (what === 'rateLimited' || what === 'refused' || what === 'tooBig' ? log?.(`${tag}: ${what}`) : null),
+            say: log && ((line) => log(`${tag || 'online'}: ${line}`)),
+          })
         : createRelay({ verify, store: memoryStore(keep), refuse, gate: gating(), log: log && ((line) => log(tag ? `${tag}: ${line}` : line)) });
       relays.set(tag, relay);
     }
@@ -135,6 +153,7 @@ async function main(argv) {
   let control = false;
   let object = false;
   let gate = null;
+  let house = null;
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === '--port') port = Number(argv[++i]);
     if (argv[i] === '--keep') keep = Number(argv[++i]);
@@ -143,6 +162,7 @@ async function main(argv) {
     if (argv[i] === '--control') control = true;
     if (argv[i] === '--object') object = true;
     if (argv[i] === '--gate') gate = argv[++i];
+    if (argv[i] === '--house') house = argv[++i];
   }
 
   // A policy on the other end of stdin: ask, and wait for the answer.
@@ -196,7 +216,8 @@ async function main(argv) {
       }
     : null;
 
-  relay = await serve({ port, keep, log: quiet ? null : (line) => process.stdout.write(`${line}\n`), refuse, onChange, object, gate });
+  const onWanted = (table) => process.stdout.write(`${JSON.stringify({ wanted: table })}\n`);
+  relay = await serve({ port, keep, log: quiet ? null : (line) => process.stdout.write(`${line}\n`), refuse, onChange, object, gate, house, onWanted });
   onChange?.(relay.counts());
   // Always say where, even when quiet: a harness reads this line.
   process.stdout.write(`relay ${relay.url}\n`);

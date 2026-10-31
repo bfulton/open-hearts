@@ -1,5 +1,5 @@
 /// A live table at the reader's text size, on the protocol's clock:
-/// who is here, a seat's clock and the Boot, the Auto switch, and the
+/// who is here, a seat's clock, the Auto switch, and the
 /// hand's sheet, a hand of it (fits.dart; to the game's end in
 /// table_fits_live_end_test.dart).
 @Tags(['slow'])

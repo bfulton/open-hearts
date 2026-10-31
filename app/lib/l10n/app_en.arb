@@ -511,9 +511,9 @@
       }
     }
   },
-  "seatsOrFriends": "Four seats, filled with whoever is waiting — or a link you send to three friends.",
-  "@seatsOrFriends": {
-    "description": "What live play is, where it is offered."
+  "pointLive": "Play live with other people",
+  "@pointLive": {
+    "description": "The subscription page's first point: what live play is."
   },
   "subscribe": "Subscribe",
   "@subscribe": {
@@ -684,15 +684,15 @@
       }
     }
   },
-  "pointRating": "A rating of your own, from results the four of you sign.",
-  "@pointRating": {
-    "description": "One of the points on the Live play page."
+  "pointFriends": "Create a friends-only game",
+  "@pointFriends": {
+    "description": "The subscription page's second point: a game of one's own that only the friends sent its link can join."
   },
-  "pointDeal": "The deal is dealt between the four of you. No server sees a hand, ours included.",
-  "@pointDeal": {
-    "description": "One of the points on the Live play page."
+  "pointStats": "Track your rating and other stats",
+  "@pointStats": {
+    "description": "The subscription page's third point: a live player's rating, and their live games counted on their profile."
   },
-  "whatMoneyPaysFor": "Playing alone is free, and so are the records, the engine and every line of this; we have no plans to change that. What the money pays for is the part that costs us to run: putting you in touch with each other, a relay when your two devices cannot find a way through, and a juror when a table is left alone.",
+  "whatMoneyPaysFor": "Playing alone is free. Your subscription pays for the servers that run live games.",
   "@whatMoneyPaysFor": {
     "description": "On the Live play page, under the points."
   },
@@ -1123,34 +1123,9 @@
   "@connectionDown": {
     "description": "Under the table while this device hears nothing back from the relay: its own internet connection is down or stalled, and it is reconnecting. The game waits for it."
   },
-  "askingTheJury": "Asking the jury",
-  "@askingTheJury": {
-    "description": "Under the table while other devices online settle a stuck turn."
-  },
-  "noJurorOnline": "Nobody online to draw a jury from — waiting for one",
-  "@noJurorOnline": {
-    "description": "Under the table while no other device is online to settle a stuck turn."
-  },
-  "waitingForTheJury": "Waiting for the jury",
-  "@waitingForTheJury": {
-    "description": "Under the table while other devices online settle a stuck turn."
-  },
   "openingDepartedHand": "Opening a departed player's hand",
   "@openingDepartedHand": {
     "description": "Under the table while a player who left has their hand opened so a bot can play it."
-  },
-  "nobodyClaimsTwo": "Nobody claims the 2♣ — the deal is stuck",
-  "@nobodyClaimsTwo": {
-    "description": "Under the table when no player says they hold the two of clubs."
-  },
-  "bootPlayer": "Boot {name}",
-  "@bootPlayer": {
-    "description": "Button: remove a player who has run out of time; a bot takes their seat.",
-    "placeholders": {
-      "name": {
-        "type": "String"
-      }
-    }
   },
   "cannotDealTitle": "This device can't deal",
   "@cannotDealTitle": {
@@ -1173,13 +1148,13 @@
   "@connectionFailure": {
     "description": "Title when a live game cannot go on."
   },
-  "jurorQuorumLost": "Juror quorum lost",
-  "@jurorQuorumLost": {
-    "description": "Under connectionFailure: too few of the devices keeping the bots' hands are still online."
+  "houseGone": "The game's server stopped answering",
+  "@houseGone": {
+    "description": "Under connectionFailure: the operator's server, which deals the cards and plays the bot seats, stopped answering, and the game cannot go on."
   },
-  "jurorQuorumLostWhy": "Too few of the jurors keeping the bot seats are still online, so the hand cannot go on. The game ends here, unscored.",
-  "@jurorQuorumLostWhy": {
-    "description": "Explains jurorQuorumLost."
+  "houseGoneWhy": "The server that deals the cards and plays the bots stopped answering, so the game cannot go on. It ends here, unscored.",
+  "@houseGoneWhy": {
+    "description": "Explains houseGone."
   },
   "onWithIt": "On with it",
   "@onWithIt": {
@@ -1215,10 +1190,6 @@
   "back": "Back",
   "@back": {
     "description": "Button: go back."
-  },
-  "waitingForJurors": "Waiting for jury…",
-  "@waitingForJurors": {
-    "description": "Under the table before a hand with bots can be dealt."
   },
   "dealing": "Dealing",
   "@dealing": {
@@ -1789,7 +1760,7 @@
   "@openElsewhereTitle": {
     "description": "Over everything on a device whose account another of its devices has taken up: one device at a time."
   },
-  "openElsewhereBody": "Your account plays on one device at a time, and the newest one opened wins. This one has stepped back: off the table, the jury and the waiting list. Use it here, and the other one steps back instead.",
+  "openElsewhereBody": "Your account plays on one device at a time, and the newest one opened wins. This one has stepped back: off the table and the waiting list. Use it here, and the other one steps back instead.",
   "@openElsewhereBody": {
     "description": "Under openElsewhereTitle."
   },

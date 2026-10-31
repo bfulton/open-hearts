@@ -1,25 +1,28 @@
-/// Drives the table's widgets from a live table: a [TableClient] over
-/// a real transport, with the protocol deciding whose turn it is and
-/// what has settled. The engine is the client's; this adds what a view
-/// needs — the pass selection, the score sheet of the hand just
-/// finished, the buttons a live table has that a solo one does not —
-/// and, above all, pace.
+/// Drives the table's widgets from a live table: a [TableClient] on the
+/// referee's log (packages/table), with the rules deciding whose turn it
+/// is and what the table did. The engine is the rules'; this adds what a
+/// view needs — the pass selection, the score sheet of the hand just
+/// finished, what a live table says besides — and, above all, pace.
 ///
-/// The client's game jumps: the moment a person's play settles, every
-/// bot that follows plays at once, and a finished trick is swept in the
-/// same instant. A person watching that sees their own card, two bots'
+/// The table jumps: two people's cards can land together, a full trick
+/// is swept the moment its last card is in, a departed person's cards,
+/// played by every side, come all at once. A person watching that sees
 /// cards and the sweep land in one frame, if they see them at all. So
-/// the view is fed a second game, replayed from the client's record at
-/// a human pace — each bot thinks for its persona's beat, a finished
-/// trick sits for a moment, another person's card lands a beat after
-/// the last — exactly as the solo table paces itself. The replay is the
-/// verifier's (record.dart): the record's passes and plays, with the
-/// bots recomputed, so it can only ever show what the table agreed.
-/// Meanwhile the player's own card goes on the table the instant it is
-/// tapped, ahead of the settlement that will confirm it.
+/// the rules hand the view the table after each change a person could
+/// see (packages/table, rules.dart, `Frame`), and the view shows them
+/// one at a time — a card a beat after the last, a finished trick held
+/// for a moment. A bot's moment of thought is the house's, in the log
+/// (packages/table, house.dart, `pace`), not the screen's: the player's
+/// clock runs from when the log opens their turn, and the screen offers
+/// it a beat or a trick's hold after. Nothing is worked out here, so it
+/// can only ever show what the table did, a moment later; what came
+/// while this device was catching up, after a reload or a dropped line,
+/// is shown at once. Meanwhile the player's own card goes on the table
+/// the instant it is tapped, ahead of the log that will carry it.
 library;
 
 import 'dart:async';
+import 'dart:collection';
 import 'dart:math';
 
 import 'package:deal/deal.dart';
@@ -41,11 +44,9 @@ class LiveController extends ChangeNotifier implements TableModel {
     required this.seatNames,
     this.seatAvatars = const {},
     required Signer signer,
-    required Transport transport,
-    RelayTransport? relay,
+    required RefereeLine line,
     String Function()? lineHealth,
     Clock? clock,
-    Presence? presence,
     DealCrypto? crypto,
     DealWorker? dealWorker,
     this.ratingOf,
@@ -55,46 +56,50 @@ class LiveController extends ChangeNotifier implements TableModel {
     this.canPlayAgain = false,
     this.strangers = false,
     TableJournal? journal,
+    Random? random,
     ReactionLane? reactions,
     ValueListenable<bool>? reactionMute,
-    int Function()? reactionClock,
+    int Function()? screenClock,
+    void Function(String line)? trace,
   })  : _lane = reactions,
-        _lineHealth = lineHealth ?? (() => relay?.health ?? ''),
+        _lineHealth = lineHealth ?? (() => line is RelayLine ? line.health : ''),
         _mute = reactionMute ?? ReactionMute.current,
-        _reactionRules = ReactionRules(now: reactionClock),
+        _screenClock = screenClock ?? _wallMs,
+        _trace = trace,
+        _reactionRules = ReactionRules(now: screenClock),
         client = TableClient(
+            tableId: spec.id,
             spec: spec,
             signer: signer,
-            transport: transport,
+            line: line,
             clock: clock ?? WallClock(),
-            presence: presence,
             crypto: crypto,
             dealWorker: dealWorker,
-            journal: journal) {
+            journal: journal,
+            random: random,
+            trace: trace) {
     _shown = HeartsGame(seed: spec.seed, sealed: spec.sealed, target: spec.target);
     _shownHolders = List.of(spec.seats);
+    client.rules.onFrame = (frame) => _frames.add((frame: frame, paced: client.caughtUp));
     _sub = client.changes.listen((_) => _onChange());
     pictures?.addListener(_pictured);
-    _refusals = relay?.refusals.listen((reason) {
-      relayRefusal = reason;
-      // A device whose events no relay will take does not get to say
-      // anyone else is absent (client.dart).
-      client.writesRefused = reason != null;
-      if (!_disposed) notifyListeners();
-    });
     _heardReactions = reactions?.reactions.listen(_heardReaction);
     _mute.addListener(_muteChanged);
-    _openedAtMs = client.clock.nowMs;
+    _downSince = client.clock.nowMs;
+    _armDown();
     client.start();
   }
 
   final TableClient client;
 
-  /// The reason the relays gave when every one of them refused this
-  /// device's latest event; null while one takes them. A table cut
-  /// off from the relays looks alive until it is said.
-  String? relayRefusal;
-  StreamSubscription<String?>? _refusals;
+  /// The table as this device was seated at it.
+  TableSpec get spec => client.spec!;
+
+  /// Why the referee turned this device away for good, if it did:
+  /// another device of the account took it up, or the account was
+  /// suspended (packages/table, relays.dart, `turnedAway`). A table cut
+  /// off like that looks alive until it is said.
+  String? get relayRefusal => client.line.refused;
 
   /// The humans' names by seat, from the lobby.
   final Map<int, String> seatNames;
@@ -105,7 +110,8 @@ class LiveController extends ChangeNotifier implements TableModel {
   /// Ratings by key or persona id, on a rated table; null elsewhere.
   final Rating Function(String id)? ratingOf;
 
-  /// Where a finished game's result goes, once, when the game ends.
+  /// Where a finished game's result goes, once the house has said it:
+  /// the device's own ledger, which folds it (net/standing.dart).
   final void Function(GameResult result)? onResult;
 
   /// What the game did to this player's rating, at a rated table:
@@ -158,108 +164,215 @@ class LiveController extends ChangeNotifier implements TableModel {
 
   late HeartsGame _shown;
   late List<SeatHolder> _shownHolders;
-  final Set<Card> _shownPlayed = {};
+  Set<Card> _shownPlayed = const {};
 
-  /// The decisions of the client's record the view has shown, in order.
-  final List<Decision> _consumed = [];
+  /// What the table has handed the view and it has not shown yet, each
+  /// with whether this device was caught up with the log when it came:
+  /// what came while it was not is shown without waiting.
+  final Queue<({Frame frame, bool paced})> _frames = Queue();
 
-  /// The player's card on the table before its settlement, and their
-  /// pass before its settlement.
+  /// The player's card on the table before the log carries it, and
+  /// their pass before the log carries it.
   Card? _pendingPlay;
   Set<Card> _pendingPass = const {};
 
   bool _pumping = false;
   bool _disposed = false;
-  final _rhythm = Random();
+
+  /// When the view last showed something, and last showed a card.
+  int _shownAt = 0;
   int _lastCardAt = 0;
 
-  static const _cardBeat = Duration(milliseconds: 320);
+  /// How long after the card before any other seat's card is shown:
+  /// the moment a card takes to land, so that two played at once are
+  /// seen one after the other.
+  static const cardBeat = Duration(milliseconds: 320);
+
+  /// The screen's own clock, in milliseconds since the epoch: what the
+  /// view's pace and the reactions' gaps go by, as its pauses are timers
+  /// on it. Real time, but in a test whose timers keep a time of their
+  /// own.
+  final int Function() _screenClock;
+  static int _wallMs() => DateTime.now().millisecondsSinceEpoch;
+
+  int get _nowMs => _screenClock();
+
+  final void Function(String line)? _trace;
+
+  /// This player's turn as this device met it, for the trace: which,
+  /// when the referee opened it, and by the wall clock when the table
+  /// here first owed it and when the screen first offered it. The
+  /// referee's time and this device's are one machine's in the browser
+  /// suites; elsewhere their difference is the clocks' too.
+  ({TurnId turn, int since, int here, int? shown})? _met;
+  bool _metSaid = false;
+
+  /// Says how long [_met] took to reach this device, its screen, and
+  /// [what] it came to, once.
+  void _traceMet(String what) {
+    final m = _met;
+    if (m == null || _metSaid) return;
+    _metSaid = true;
+    final now = _wallMs();
+    _trace?.call('my ${m.turn}, opened at ${m.since}: here +${m.here - m.since}, '
+        'shown ${m.shown == null ? 'never' : '+${m.shown! - m.since}'}, $what +${now - m.since} ms');
+  }
 
   /// The game is over as shown, and its last trick has been seen off
   /// the table: the game's sheet may show.
   bool get gameOverDue => _gameOverDue;
   bool _gameOverDue = false;
 
-  Duration _botThink(int seat) => Pacing.think((_shownHolders[seat] as BotSeat).persona, _rhythm);
+  /// The last hand whose sheet has been raised on this screen, or that
+  /// ended while this device was catching up and has none.
+  int _sheetsShownThrough = -1;
 
-  /// Enough of a pause after the last card shown that two cards never
-  /// land as one.
-  Duration _beat() {
-    final since = DateTime.now().millisecondsSinceEpoch - _lastCardAt;
-    return since >= _cardBeat.inMilliseconds ? Duration.zero : Duration(milliseconds: _cardBeat.inMilliseconds - since);
+  /// How long to wait before showing [f]: any other seat's card a beat
+  /// after the last card; a full trick held a moment before it is swept;
+  /// the bare felt of a hand given up. The player's own card, at once,
+  /// and the rest as they come.
+  Duration _before(Frame f) {
+    final now = _nowMs;
+    Duration after(Duration want, int since) {
+      final left = want - Duration(milliseconds: now - since);
+      return left > Duration.zero ? left : Duration.zero;
+    }
+
+    return switch (f.change) {
+      FrameChange.played when f.seat == mySeat => Duration.zero,
+      FrameChange.played => after(cardBeat, _lastCardAt),
+      FrameChange.collected => after(Pacing.trickHold, _shownAt),
+      FrameChange.givenUp => after(Pacing.sweepBeat, _shownAt),
+      _ => Duration.zero,
+    };
   }
 
-  /// The transport's line in a few words, for a report of it: the
-  /// mesh's (net/mesh_transport.dart, health), or the relays'
-  /// ([RelayTransport.health]).
-  final String Function() _lineHealth;
-
-  /// Since when the line has been down, while it is; and what has been
-  /// told of it ([_watchLine]).
-  int? _cutOffSince;
-  bool _toldLost = false, _toldDown = false;
-
-  /// When this table opened here, by its clock, and whether its line
-  /// has been up since ([lineDown]).
-  late final int _openedAtMs;
-  bool _lineUp = false;
-
-  /// Whether to say this device's own line is down: cut off
-  /// ([TableClient.cutOff]) once its line has been up, or, where it
-  /// never has, once it has been trying for as long as a line that was
-  /// up is given ([unansweredMs]). A table's line opens a moment after
-  /// the table does, and the client is cut off until it has — rightly,
-  /// as it hears nobody yet — with nothing down.
-  bool get lineDown => client.cutOff && (_lineUp || client.clock.nowMs - _openedAtMs >= unansweredMs);
-
-  /// How long a line may be down at a live table before it is told of:
-  /// past anything a train's tunnel or a lift does, and well short of
-  /// the minutes a player waits before giving up.
-  static const downTooLongMs = 2 * 60 * 1000;
-
-  /// Tells the operator of a game this device lost — the line down or
-  /// the jury gone, which the account says — and of a line down for
-  /// [downTooLongMs] at a game it waits on: each once a table, and
-  /// with what the device saw of it (report_error.dart, reportLine).
-  void _watchLine() {
-    final failure = client.failure;
-    if (failure != null) {
-      if (_toldLost) return;
-      _toldLost = true;
-      return reportLine('game lost: ${failure.label}', table: client.spec.id, account: client.lineAccount, line: _lineHealth());
+  /// The table as the frame has it, on the screen.
+  void _show(Frame f) {
+    _shown = f.game;
+    _shownHolders = List.of(f.holders);
+    _shownPlayed = f.played;
+    _shownAt = _nowMs;
+    if (f.change == FrameChange.played) _lastCardAt = _shownAt;
+    if (f.seat == mySeat && f.change == FrameChange.played) _pendingPlay = null;
+    if (f.seat == mySeat && f.change == FrameChange.passed) _pendingPass = const {};
+    // A new hand, or one given up: nothing of the last is in flight.
+    if (f.change == FrameChange.nextHand || f.change == FrameChange.givenUp) {
+      _pendingPlay = null;
+      _pendingPass = const {};
     }
-    if (!client.cutOff) {
-      _cutOffSince = null;
-      _lineUp = true;
-      return;
-    }
-    final now = client.clock.nowMs;
-    final since = _cutOffSince ??= now;
-    if (_toldDown || now - since < downTooLongMs) return;
-    _toldDown = true;
-    reportLine('line down ${(now - since) ~/ 1000} s', table: client.spec.id, account: client.lineAccount, line: _lineHealth());
   }
+
+  /// The hand shown out to its sheet. The next one is dealt under it,
+  /// as the table has it.
+  void _sheet() {
+    final g = _shown;
+    _sheetsShownThrough = g.handNumber;
+    handJustEnded = (hand: g.handNumber, scores: g.handScores, totals: g.totals, moonShooter: g.moonShooter);
+    _sheetTimer?.cancel();
+    _sheetTimer = Timer(const Duration(seconds: 6) * tableBeats, dismissHandSheet);
+  }
+
+  /// The next thing the view should show, and how long to wait before
+  /// showing it; null when there is nothing yet.
+  ({Duration delay, void Function() act})? _next() {
+    // Once this device's seat is gone the shown game stops. The page
+    // draws the notice rather than the table, and the table plays the
+    // player's hand out without them; this screen does not follow it.
+    if (!client.amSeated) return null;
+    final shown = _shown;
+    final next = _frames.firstOrNull;
+    // A hand over as shown: the beat of bare felt that ends any hand,
+    // then its sheet. A hand that ended while this device was catching
+    // up is over and done with: no sheet for it now.
+    if (shown.phase == Phase.handOver && shown.handNumber > _sheetsShownThrough) {
+      if (next != null && !next.paced) return (delay: Duration.zero, act: () => _sheetsShownThrough = shown.handNumber);
+      return (delay: Pacing.sweepBeat, act: _sheet);
+    }
+    // The game over as shown: the same beat, then its sheet.
+    if (shown.phase == Phase.gameOver) {
+      if (_gameOverDue) return null;
+      return (delay: Pacing.sweepBeat, act: () => _gameOverDue = true);
+    }
+    if (next == null) return null;
+    return (delay: next.paced ? _before(next.frame) : Duration.zero, act: () => _show(_frames.removeFirst().frame));
+  }
+
+  /// Advances the shown game as far as the table has gone, at pace. One
+  /// loop runs at a time; a frame that arrives while it runs is picked
+  /// up on its next step.
+  Future<void> _pump() async {
+    if (_pumping) return;
+    _pumping = true;
+    try {
+      while (!_disposed) {
+        final step = _next();
+        if (step == null) break;
+        if (paced && step.delay > Duration.zero) {
+          await _wait(step.delay);
+          if (_disposed) return;
+        }
+        step.act();
+        notifyListeners();
+      }
+    } finally {
+      _pumping = false;
+      if (!_disposed) {
+        notifyListeners();
+        _autoPlay();
+      }
+    }
+  }
+
+  Timer? _waitTimer;
+
+  /// A pause the controller can cancel: nothing outlives the widget.
+  Future<void> _wait(Duration d) {
+    final done = Completer<void>();
+    _waitTimer?.cancel();
+    _waitTimer = Timer(d * tableBeats, done.complete);
+    return done.future;
+  }
+
+  /// Whether the view has shown everything the table has done, so the
+  /// player is looking at the position they are asked to play.
+  bool get _caughtUp => !_pumping && _frames.isEmpty;
+
+  /// What the screen is waiting on, for the debug line a driven build
+  /// carries (live/live_page.dart). A table stuck from the outside is
+  /// often a screen that has not caught up with it.
+  String get behind => 'shown ${_shown.phase.name} h${_shown.handNumber}; ${_frames.length} frames to show; '
+      'pumping $_pumping; pending ${_pendingPlay?.code ?? '-'}/${_pendingPass.length}';
+
+  // ---- the table changed ------------------------------------------------
 
   void _onChange() {
+    final mine = client.myTurn;
+    if (mine != null && mine.turn != _met?.turn) {
+      _met = (turn: mine.turn, since: mine.since, here: _wallMs(), shown: null);
+      _metSaid = false;
+    }
+    if (!client.amSeated) _traceMet('seat gone');
     _watchLine();
-    if (client.done && !_reported) {
+    _beatClocks();
+    final result = client.rules.result;
+    if (result != null && !_reported) {
       _reported = true;
-      _report(GameResult.of(client.spec, client.holders, client.game.totals));
+      final r = GameResult.ofTable(client.rules);
+      if (r != null) _report(r);
     }
     if (!client.awaitingMyPass) _selected.clear();
     unawaited(_pump());
     notifyListeners();
   }
 
-  /// The finished game out to whoever publishes it, and what it did to
-  /// this player's rating on the way: the ratings are read either side
-  /// of the report, since folding a result into the ledger is
-  /// arithmetic this device does itself and nothing here may wait on a
-  /// relay. A rating that has not moved is one nobody has folded yet.
+  /// The house's word on the finished game, folded where it goes, and
+  /// what it did to this player's rating on the way: the ratings are
+  /// read either side of the fold, which is arithmetic this device does
+  /// itself. A rating that has not moved is one nobody has folded yet.
   void _report(GameResult result) {
     final rating = ratingOf;
-    final seat = client.mySeat;
-    final holder = seat == null ? null : client.spec.seats[seat];
+    final holder = spec.seats[mySeat];
     // A rating is the account's, whichever of its devices played.
     final account = holder is HumanSeat ? holder.account : null;
     if (rating == null || account == null) {
@@ -272,332 +385,117 @@ class LiveController extends ChangeNotifier implements TableModel {
     if (after.mu != before.mu) ratingChange = (before: before, after: after);
   }
 
-  /// Whether the shown decisions are still the record's first ones —
-  /// the record is kept in turn order, so a late decision about an
-  /// earlier turn can land behind what has been shown.
-  bool _inSync(List<Decision> record) {
-    if (_consumed.length > record.length) return false;
-    for (var i = 0; i < _consumed.length; i++) {
-      if (!identical(record[i], _consumed[i])) return false;
-    }
-    return true;
-  }
+  /// A second's beat while a person's turn is open at the table: the
+  /// table's entries come only when something happens, and a clock
+  /// counts down on the screen between them (clockMs).
+  Timer? _clockBeat;
 
-  /// The last hand whose sheet has been raised on this screen.
-  /// Whether the record has left behind the hand the view is still
-  /// showing: nothing of it remains, and what comes next is a later
-  /// hand's. That is a hand the table gave up where it stood
-  /// (docs/explanation/fair-deal.md) — nobody could lead it, or a pass into a
-  /// seat would never open — and there is nothing more of it to show.
-  ///
-  /// Asked only where the view has run out of things to do of its own:
-  /// a bot's move is not in the record, so a hand that ends on three of
-  /// them has nothing left in the record either, and is not given up.
-  bool _givenUp(List<Decision> record) =>
-      _consumed.length < record.length && record[_consumed.length].turn.hand > _shown.handNumber;
-
-  /// A deal the view cannot show yet: it waits for the table to have
-  /// the hand and its lead. Unless the table gave the hand up before
-  /// either came — its deal abandoned when a held seat's juror could
-  /// not take its step, or the hand opened and given up when nobody
-  /// could lead it (the table's hand states, packages/table
-  /// model.dart). That deal will never be shown, and the record has
-  /// moved on to the next hand's pass, which a view still waiting here
-  /// would never offer.
-  ({Duration delay, void Function() act})? _dealNotShown(int hand) => switch (client.handOutcome(hand)) {
-        HandState.abandoned || HandState.givenUp => (delay: Pacing.sweepBeat, act: _giveUpShownHand),
-        _ => null,
-      };
-
-  /// A hand given up, as the view shows it: the beat of bare felt that
-  /// ends any hand, and then the next one dealt. No sheet — nothing was
-  /// scored, because no hand happened.
-  void _giveUpShownHand() {
-    _shown.abandonHand();
-    _shownPlayed.clear();
-    _pendingPlay = null;
-    _pendingPass = const {};
-  }
-
-  int _sheetsShownThrough = -1;
-
-  /// The hand shown out to its sheet, and the next one begun under it.
-  ///
-  /// A hand's sheet shows once: a rebuild replays hands the player has
-  /// already watched end, and a hand does not end twice. A rebuild that
-  /// lands on a hand whose end was never shown still shows it.
-  void _endOfHand() {
-    final hand = _shown.handNumber;
-    if (hand > _sheetsShownThrough) {
-      _sheetsShownThrough = hand;
-      handJustEnded = (hand: hand, scores: _shown.handScores, totals: _shown.totals, moonShooter: _shown.moonShooter);
-      _sheetTimer?.cancel();
-      _sheetTimer = Timer(const Duration(seconds: 6) * tableBeats, dismissHandSheet);
-    }
-    _shown.nextHand();
-    _shownPlayed.clear();
-  }
-
-  /// Replays the whole record at once. A jump, for the rare case where
-  /// the shown past was rewritten.
-  void _rebuild(List<Decision> record) {
-    _shown = HeartsGame(seed: client.spec.seed, sealed: client.spec.sealed, target: client.spec.target);
-    _shownHolders = List.of(client.spec.seats);
-    _shownPlayed.clear();
-    _consumed.clear();
-    for (var guard = 0; guard < 10000; guard++) {
-      final step = _next(record);
-      if (step == null) break;
-      step.act();
-    }
-  }
-
-  /// Whether this view has to work a seat's move out for itself. A bot
-  /// seat is everyone's to compute — unless a juror holds it, and then
-  /// its move arrives as a signed event like a person's and its hand
-  /// is not ours to see at all (docs/explanation/live-play.md). Asked of the
-  /// hand being shown, which runs behind
-  /// the table's: a seat can be a person's in the hand on screen and a
-  /// bot the jury holds in the one the table is already dealing.
-  bool _worksOutMove(int seat) =>
-      _shownHolders[seat] is BotSeat && !client.botHolders(_shown.handNumber).containsKey(seat);
-
-  /// A bot seat's hand, for the shown game to compute its move: dealt
-  /// open, or a departed person's opened from escrow since. False
-  /// while it is still closed.
-  bool _seesHand(int seat) {
-    if (_shown.knowsHand(seat)) return true;
-    final deal = client.dealOf(_shown.handNumber);
-    if (deal == null) return false;
-    // As the shown game holds it: dealt while its pass is unresolved;
-    // during its play, what the seat holds at the table plus whatever
-    // it has played there that this view has yet to show — the shown
-    // game runs behind the table.
-    final List<int>? cards;
-    if (_shown.phase == Phase.playing) {
-      final held = deal.handOf(seat);
-      cards = held == null ? null : [...held, for (final c in deal.playedCardsOf(seat)) if (!_shownPlayed.contains(Card.deck[c])) c];
+  void _beatClocks() {
+    final r = client.rules;
+    final running = client.started &&
+        !client.done &&
+        r.owed.values.any((o) => (o.turn.isPass || o.turn.isPlay) && r.holders[o.seat] is HumanSeat);
+    if (!running) {
+      _clockBeat?.cancel();
+      _clockBeat = null;
     } else {
-      cards = deal.dealtHandOf(seat);
-    }
-    if (cards == null) return false;
-    _shown.revealHand(seat, [for (final i in cards) Card.deck[i]]);
-    return true;
-  }
-
-  void _botActs(int seat, {required bool passing}) {
-    final bot = Bot(persona: (_shownHolders[seat] as BotSeat).persona);
-    if (passing) {
-      _declareLead();
-      _shown.setPass(seat, bot.choosePass(_shown.handOf(seat)));
-    } else {
-      final view = BotView(
-        seat: seat,
-        hand: _shown.handOf(seat),
-        trick: _shown.trick,
-        played: _shownPlayed,
-        heartsBroken: _shown.heartsBroken,
-        isFirstTrick: _shown.isFirstTrick,
-        taken: _shown.taken,
-      );
-      final card = bot.chooseCard(view, _shown.legalPlaysFor(seat));
-      _shown.play(seat, card);
-      _shownPlayed.add(card);
-      _lastCardAt = DateTime.now().millisecondsSinceEpoch;
+      _clockBeat ??= Timer.periodic(const Duration(seconds: 1), (_) {
+        if (!_disposed) notifyListeners();
+      });
     }
   }
 
-  /// Tells the shown game who leads, from where the deal has the 2♣.
-  void _declareLead() {
-    final leader = client.dealOf(_shown.handNumber)?.leader;
-    if (leader != null && (_shown.phase == Phase.dealing || _shown.phase == Phase.passing)) _shown.declareLeader(leader);
+  // ---- this device's line ------------------------------------------------
+
+  /// The line in a few words, for a report of it ([RelayLine.health]).
+  final String Function() _lineHealth;
+
+  /// Since when this device's line to the referee has been down, while
+  /// it is — from the table's opening, until it is first up — and
+  /// whether it has been up since the table opened.
+  int? _downSince;
+  bool _wasUp = false;
+  Cancel? _downTimer;
+  bool _toldLost = false, _toldDown = false, _toldCannotDeal = false;
+
+  /// How long a line that was up may be down before it is said: a
+  /// socket made again takes a moment, and that is not news. A table's
+  /// line that has never been up is given as long as an unanswered one
+  /// is ([unansweredMs]): it opens a moment after the table does.
+  static const downSaidAfterMs = 3000;
+
+  /// How long a line may be down at a live table before it is told of:
+  /// past anything a train's tunnel or a lift does, and well short of
+  /// the minutes a player waits before giving up.
+  static const downTooLongMs = 2 * 60 * 1000;
+
+  int get _downSaidAfter => _wasUp ? downSaidAfterMs : unansweredMs;
+
+  /// Whether to say this device's own line is down.
+  bool get lineDown {
+    final since = _downSince;
+    return since != null && client.lineDown && client.clock.nowMs - since >= _downSaidAfter;
   }
 
-  /// The cards of a settled pass, as this side can see them: from the
-  /// event at a seeded table; at a sealed one from the deal, which
-  /// opened them when they are this side's own, a bot's, or a departed
-  /// seat's — null otherwise.
-  List<Card>? _passCards(Decision d) {
-    if (!client.spec.sealed) return [for (final c in d.event.body['cards'] as List) Card.parse(c as String)];
-    final deal = client.dealOf(d.turn.hand);
-    if (deal == null) return null;
-    final cards = <Card>[];
-    for (final p in d.event.body['positions'] as List) {
-      final c = deal.openedCardAt(p as int);
-      if (c == null) return null;
-      cards.add(Card.deck[c]);
+  /// Tells the operator of a game lost — the house let a turn run out —
+  /// of a deal this device could no longer run, and of a line down for
+  /// [downTooLongMs]: each once a table, and with what the device saw of
+  /// it (report_error.dart, reportLine).
+  void _watchLine() {
+    if (client.state == TableState.failed && !_toldLost) {
+      _toldLost = true;
+      reportLine('game lost: the house let a turn run out', table: spec.id, account: _seen, line: _lineHealth());
     }
-    return cards;
+    final cannotDeal = client.cannotDeal;
+    if (cannotDeal != null && !_toldCannotDeal) {
+      _toldCannotDeal = true;
+      reportLine('cannot deal: $cannotDeal', table: spec.id, account: _seen, line: _lineHealth());
+    }
+    if (!client.lineDown) {
+      _wasUp = true;
+      _downSince = null;
+      _downTimer?.call();
+      _downTimer = null;
+      return;
+    }
+    if (_downSince != null) return;
+    _downSince = client.clock.nowMs;
+    _armDown();
   }
 
-  /// The next thing the view should show, and how long to wait before
-  /// showing it; null when the view is waiting on a person, or the
-  /// game is over.
-  ({Duration delay, void Function() act})? _next(List<Decision> record) {
-    // Once this device's seat is gone the shown game stops advancing
-    // at all. The page draws the notice rather than the table, but a
-    // screen is not a guarantee: nothing should be able to move this
-    // player's cards, from a bot here or from a play recorded
-    // elsewhere. The table plays their hand out without them; this
-    // device simply stops following it.
-    if (!client.amSeated) return null;
-    // Departures recorded next take effect at once.
-    if (_consumed.length < record.length && record[_consumed.length].removal) {
-      final d = record[_consumed.length];
-      return (
-        delay: Duration.zero,
-        act: () {
-          _consumed.add(d);
-          final seat = d.event.seat;
-          if (_shownHolders[seat] is! HumanSeat) return;
-          if (seat == mySeat) {
-            // Never a bot on this player's own seat in the shown game.
-            // The table is not drawn once the seat is gone, but the
-            // shown game runs underneath whatever is drawn, and a bot
-            // installed here would play this player's cards — a ghost
-            // at their own hand. Their seat simply stops.
-            _pendingPlay = null;
-            _pendingPass = const {};
-            return;
-          }
-          _shownHolders[seat] = BotSeat(client.spec.replacementFor(seat));
-        }
-      );
-    }
-    // The deal's own steps and the audit are the table's, not the
-    // view's: taken as read the moment they are there.
-    if (_consumed.length < record.length && (record[_consumed.length].turn.isDeal || record[_consumed.length].turn.isAudit)) {
-      final d = record[_consumed.length];
-      return (delay: Duration.zero, act: () => _consumed.add(d));
-    }
-    if (_shown.phase == Phase.dealing) {
-      // Shown once the table has the hand: what this side can see of
-      // it, the rest as card backs.
-      final hand = _shown.handNumber;
-      final deal = client.dealOf(hand);
-      final dealt = deal != null && (client.game.handNumber > hand || client.game.phase != Phase.dealing);
-      if (!dealt) return _dealNotShown(hand);
-      final leader = deal.leader;
-      if (leader == null) return _dealNotShown(hand);
-      return (
-        delay: Duration.zero,
-        act: () {
-          _shown.declareLeader(leader);
-          _shown.deal([
-            for (var s = 0; s < seatCount; s++)
-              switch (deal.dealtHandOf(s)) {
-                null => null,
-                final cards => [for (final i in cards) Card.deck[i]],
-              },
-          ]);
-        }
-      );
-    }
-    if (_shown.phase == Phase.passing) {
-      for (var s = 0; s < seatCount; s++) {
-        if (_worksOutMove(s) && !_shown.hasPassed(s)) {
-          if (!_seesHand(s)) return null; // a departed seat's hand, not open here yet
-          return (delay: Duration.zero, act: () => _botActs(s, passing: true));
-        }
+  /// Where the table stands as this device saw it, for a report of a
+  /// game lost or a line down: the log's length and the hand, what was
+  /// owed and whether its actor's line was down, and this device's own.
+  /// No key, card or name.
+  String get _seen {
+    final r = client.rules;
+    final owed = [for (final o in r.owed.values) '${o.turn} seat ${o.seat}${r.down.containsKey(o.actor) ? ' (down)' : ''}'];
+    final hand = r.spec == null ? '' : ', hand ${r.game.handNumber} ${r.game.phase.name}';
+    return '${r.state.name} at #${r.log.length}$hand; owed ${owed.isEmpty ? 'nothing' : owed.join(', ')}; '
+        '${r.down.length} down; line ${client.lineDown ? 'down' : 'up'}';
+  }
+
+  /// The moments a line down is said, and is told of.
+  void _armDown() {
+    final since = _downSince;
+    if (since == null || _disposed) return;
+    final now = client.clock.nowMs;
+    final sayAt = since + _downSaidAfter;
+    final at = now < sayAt ? sayAt : (_toldDown ? null : since + downTooLongMs);
+    _downTimer?.call();
+    _downTimer = null;
+    if (at == null) return;
+    _downTimer = client.clock.schedule(max(0, at - now), () {
+      _downTimer = null;
+      final since = _downSince;
+      if (_disposed || since == null) return;
+      if (!_toldDown && client.clock.nowMs - since >= downTooLongMs && client.lineDown) {
+        _toldDown = true;
+        reportLine('line down ${(client.clock.nowMs - since) ~/ 1000} s', table: spec.id, account: _seen, line: _lineHealth());
       }
-      if (_givenUp(record)) return (delay: Pacing.sweepBeat, act: _giveUpShownHand);
-      if (_consumed.length >= record.length) return null; // a person's pass is owed
-      final d = record[_consumed.length];
-      if (d.event.kind != EventKind.pass) return null; // not what the replay expects: leave it to a rebuild
-      final cards = _passCards(d);
-      return (
-        delay: Duration.zero,
-        act: () {
-          _consumed.add(d);
-          _declareLead();
-          _shown.setPass(d.event.seat, cards);
-          if (d.event.seat == mySeat) _pendingPass = const {};
-        }
-      );
-    }
-    // The game is over as shown: the beat of bare felt that ends any
-    // hand, and then its sheet.
-    if (_shown.phase == Phase.gameOver) {
-      if (_gameOverDue) return null;
-      return (delay: Pacing.sweepBeat, act: () => _gameOverDue = true);
-    }
-    // The hand is over as shown: the same beat, then the sheet with the
-    // next hand dealt under it.
-    //
-    // A step of the pump, rather than a timer beside it. A rebuild
-    // replays the record through [_next], so anywhere _next will not
-    // step past is where a rebuild leaves the shown game for good — and
-    // a beat kept by a timer that the next rebuild cancels is a beat
-    // that never ends: the table deals and passes the next hand while
-    // this screen holds, and every decision it hears is another
-    // rebuild.
-    if (_shown.phase == Phase.handOver) return (delay: Pacing.sweepBeat, act: _endOfHand);
-    if (_shown.pendingTrick != null) return (delay: Pacing.trickHold, act: _shown.collectTrick);
-    final seat = _shown.currentSeat!;
-    if (_worksOutMove(seat)) {
-      if (!_seesHand(seat)) return null; // a departed seat's hand, not open here yet
-      return (delay: _botThink(seat), act: () => _botActs(seat, passing: false));
-    }
-    if (_givenUp(record)) return (delay: Pacing.sweepBeat, act: _giveUpShownHand);
-    if (_consumed.length >= record.length) return null; // a person's play is owed
-    final d = record[_consumed.length];
-    if (d.event.kind != EventKind.play || d.event.seat != seat) return null;
-    return (
-      delay: seat == mySeat ? Duration.zero : _beat(),
-      act: () {
-        _consumed.add(d);
-        final card = Card.parse(d.event.body['card'] as String);
-        _shown.play(seat, card);
-        _shownPlayed.add(card);
-        _lastCardAt = DateTime.now().millisecondsSinceEpoch;
-        if (seat == mySeat) _pendingPlay = null;
-      }
-    );
-  }
-
-  /// Advances the shown game as far as the record allows, at pace. One
-  /// loop runs at a time; a change that arrives while it runs is picked
-  /// up on its next step.
-  Future<void> _pump() async {
-    if (_pumping) return;
-    _pumping = true;
-    try {
-      var rebuilt = false;
-      while (!_disposed) {
-        final record = client.record;
-        if (!_inSync(record)) {
-          _rebuild(record);
-          rebuilt = true;
-          notifyListeners();
-          continue;
-        }
-        final step = _next(record);
-        if (step == null) {
-          // Nothing to show — unless the record holds more than the
-          // replay expects, which one rebuild settles.
-          if (_consumed.length < record.length && !rebuilt) {
-            _rebuild(record);
-            rebuilt = true;
-            notifyListeners();
-            continue;
-          }
-          break;
-        }
-        if (paced && step.delay > Duration.zero) {
-          await _wait(step.delay);
-          if (_disposed) return;
-          if (!_inSync(client.record)) continue; // the past changed while waiting
-        }
-        step.act();
-        notifyListeners();
-      }
-    } finally {
-      _pumping = false;
-      if (!_disposed) {
-        notifyListeners();
-        _autoPlay();
-      }
-    }
+      notifyListeners();
+      _armDown();
+    });
   }
 
   // ---- the Auto switch ---------------------------------------------------
@@ -619,42 +517,37 @@ class LiveController extends ChangeNotifier implements TableModel {
 
   /// The player's turn, played for them when the switch is on: their
   /// own play, sent as any tap sends it. Only once the screen has
-  /// caught up with the table and nothing of theirs is in flight
-  /// ([awaitingPlay]), which is also what keeps it from playing twice —
-  /// the card is pending from the moment it is sent.
+  /// caught up with the table ([awaitingPlay]); and once, since the
+  /// table's client counts the turn said from the moment the card is
+  /// sent (packages/table, client.dart).
   void _autoPlay() {
     if (_disposed) return;
     _auto.watch(this);
     final card = _auto.cardFor(this);
-    if (card != null) playCard(card);
+    if (card != null) _play(card, timed: false);
   }
 
-  /// Every change the table shows is one the switch may be offered on.
+  /// Every change the table shows is one the switch may be offered on,
+  /// and one the player's own clock over a card may start at.
   @override
   void notifyListeners() {
     _auto.watch(this);
+    _offeredAt = awaitingPlay ? (_offeredAt ?? _nowMs) : null;
+    final m = _met;
+    if (m != null && m.shown == null && (awaitingPlay || awaitingPass)) _met = (turn: m.turn, since: m.since, here: m.here, shown: _wallMs());
     super.notifyListeners();
   }
 
-  Timer? _waitTimer;
+  // ---- this player's pace -------------------------------------------------
 
-  /// A pause the controller can cancel: nothing outlives the widget.
-  Future<void> _wait(Duration d) {
-    final done = Completer<void>();
-    _waitTimer?.cancel();
-    _waitTimer = Timer(d * tableBeats, done.complete);
-    return done.future;
-  }
+  /// When the screen offered the player the card they owe now.
+  int? _offeredAt;
 
-  /// Whether the view has shown everything the table has settled, so
-  /// the player is looking at the position they are asked to play.
-  bool get _caughtUp => !_pumping && _consumed.length == client.record.length;
-
-  /// What the screen is waiting on, for the debug line a driven build
-  /// carries (live/live_page.dart). A table stuck from the outside is
-  /// often a screen that has not caught up with it.
-  String get behind => 'shown ${_shown.phase.name} h${_shown.handNumber}; consumed ${_consumed.length}/${client.record.length}; '
-      'pumping $_pumping; pending ${_pendingPlay?.code ?? '-'}/${_pendingPass.length}';
+  /// How long the player took over each of their own cards, in order:
+  /// from the moment the screen offered the play to the tap. Cards the
+  /// Auto switch played are not theirs to time. Nobody else's business
+  /// and in no signed record (packages/table, pace.dart).
+  final List<int> myCardMs = [];
 
   /// A seat's name with its rating: "Roxane 1520". The rating is the
   /// seat's as dealt — a bot that took over a leaver's seat shows the
@@ -662,7 +555,7 @@ class LiveController extends ChangeNotifier implements TableModel {
   String nameWithRating(int seat) {
     final r = ratingOf;
     if (r == null) return _plainName(seat);
-    final id = switch (client.spec.seats[seat]) {
+    final id = switch (spec.seats[seat]) {
       HumanSeat(:final account) => account,
       BotSeat(:final persona) => persona.id,
     };
@@ -678,7 +571,7 @@ class LiveController extends ChangeNotifier implements TableModel {
 
   // ---- TableModel -------------------------------------------------------
 
-  /// The game as shown: the client's, replayed at pace.
+  /// The game as shown: the table's, a moment behind it, at pace.
   @override
   HeartsGame get game => _shown;
 
@@ -714,20 +607,25 @@ class LiveController extends ChangeNotifier implements TableModel {
       };
 
   @override
-  Set<Card> get playedThisHand => Set.unmodifiable(_shownPlayed);
+  Set<Card> get playedThisHand => _shownPlayed;
 
   @override
   Set<Card> get selected => Set.unmodifiable(_selected);
 
+  /// The player's pass is owed, and the screen shows the hand it is
+  /// owed in. Others' passes still to be shown do not hold it up.
   @override
   bool get awaitingPass =>
-      client.awaitingMyPass && _shown.phase == Phase.passing && !_shown.hasPassed(mySeat) && _pendingPass.isEmpty;
+      client.awaitingMyPass &&
+      _shown.handNumber == client.game.handNumber &&
+      _shown.phase == Phase.passing &&
+      !_shown.hasPassed(mySeat);
 
   @override
   bool get canConfirmPass => awaitingPass && _selected.length == passSize;
 
   @override
-  bool get awaitingPlay => client.awaitingMyPlay && _caughtUp && _pendingPlay == null;
+  bool get awaitingPlay => client.awaitingMyPlay && _caughtUp && _shown.currentSeat == mySeat;
 
   @override
   Set<Card> get legalNow => awaitingPlay ? _shown.legalPlaysFor(mySeat).toSet() : const {};
@@ -759,23 +657,28 @@ class LiveController extends ChangeNotifier implements TableModel {
   void confirmPass() {
     if (!canConfirmPass) return;
     final cards = _selected.toList();
-    // Marked in flight before the client hears of it: at a table of one
-    // person the pass settles inside the call, and the settlement is
-    // what clears the mark.
+    // Marked in flight before the client hears of it: the log carries
+    // it back, and its frame is what clears the mark.
     _pendingPass = cards.toSet();
     _selected.clear();
+    _traceMet('passed');
     client.pass(cards);
     notifyListeners();
   }
 
   @override
-  String? playCard(Card card) {
+  String? playCard(Card card) => _play(card, timed: true);
+
+  String? _play(Card card, {required bool timed}) {
     if (!awaitingPlay) return null;
     if (!_shown.legalPlaysFor(mySeat).contains(card)) return refusalFor(_shown, mySeat, card, words);
+    final offered = _offeredAt;
+    if (timed && offered != null) myCardMs.add(_nowMs - offered);
     // Pending before the client hears of it, for the same reason as the
-    // pass: the settlement that clears it can come back synchronously.
+    // pass.
     _pendingPlay = card;
-    _lastCardAt = DateTime.now().millisecondsSinceEpoch;
+    _lastCardAt = _nowMs;
+    _traceMet('played');
     client.play(card);
     notifyListeners();
     return null;
@@ -787,11 +690,26 @@ class LiveController extends ChangeNotifier implements TableModel {
 
   /// Over, as shown: the last trick has been seen.
   bool get done => _shown.phase == Phase.gameOver;
-  TableState get tableState => client.tableState;
-  Pause? get pause => client.pause;
-  SeatState seatStateOf(int seat) => client.seatStateOf(seat);
-  bool canBoot(int seat) => client.canBoot(seat);
-  int? bootCountdownMs(int seat) => client.bootCountdownMs(seat);
+  TableState get tableState => client.state;
+
+  /// The game cannot go on: a turn of the house's ran out — the
+  /// operator's service stopped answering, and nobody else can play a
+  /// bot seat's cards. Nobody is rated on it.
+  bool get failed => client.state == TableState.failed;
+
+  /// Every clock stopped while a departed person's hand is opened from
+  /// the escrow (docs/explanation/fair-deal.md).
+  bool get openingHand => client.started && client.rules.paused;
+
+  /// The table waits on somebody whose line to it is down: a turn owed
+  /// by another person, or by the house, not connected now. It goes on
+  /// when they are back, or when the table gives up on them.
+  bool get waitingOnSomeoneDown {
+    if (!client.started) return false;
+    final r = client.rules;
+    return r.owed.values.any((o) => o.actor != client.signer.publicKey && r.down.containsKey(o.actor));
+  }
+
   @override
   int? clockMs(int seat) => client.clockMs(seat);
 
@@ -841,15 +759,11 @@ class LiveController extends ChangeNotifier implements TableModel {
       flagged: picture != null && pictures != null && pictures.wasFlagged(holder.account, picture),
     );
   }
-  void boot(int seat) {
-    client.boot(seat);
-    notifyListeners();
-  }
 
-  /// How long the wire is kept open after a leave is announced. The
-  /// leaving is a message like any other and has to reach the relay
-  /// and the peers, and the wire it goes on is this one — so it is
-  /// closed a beat later rather than under its own message.
+  /// How long the line is kept open after a leave is said. The leaving
+  /// is an event like any other and has to reach the referee, and the
+  /// line it goes on is this one — so it is closed a beat later rather
+  /// than under its own event.
   static const leaveBeat = Duration(milliseconds: 600);
   bool _left = false;
 
@@ -858,7 +772,7 @@ class LiveController extends ChangeNotifier implements TableModel {
 
   /// Seated in a game still going: leaving now gives the seat to a bot
   /// for good.
-  bool get inGame => amSeated && !done && client.failure == null;
+  bool get inGame => amSeated && !done && !failed;
 
   /// Called once, as the table's page goes, however it went: by a way
   /// out of its own, or by a browser's Back (router.dart), which
@@ -881,14 +795,12 @@ class LiveController extends ChangeNotifier implements TableModel {
     return false;
   }
 
-  /// Whether leaving now would leave other people's game: one still on,
-  /// not stopped for want of anything, with somebody else still seated.
-  /// Leaving a game that is over, that cannot go on or has stopped, or
-  /// that nobody else is in, costs nobody anything. Over by the table's
-  /// account, not the screen's, which plays the last trick out after.
-  bool get othersPlaying => !_over && client.failure == null && pause == null && othersSeated;
-
-  bool get _over => client.game.phase == Phase.gameOver;
+  /// Whether leaving now would leave other people's game: one still
+  /// going, with somebody else still seated. Leaving a game that is
+  /// over, that cannot go on, or that nobody else is in, costs nobody
+  /// anything. Over by the table's account, not the screen's, which
+  /// plays the last trick out after.
+  bool get othersPlaying => client.state == TableState.playing && othersSeated;
 
   /// [othersPlaying], as it was when this device left.
   bool _walkingOut = false;
@@ -903,29 +815,25 @@ class LiveController extends ChangeNotifier implements TableModel {
     if (!strangers) return false;
     if (_left) return _walkingOut;
     final c = client;
-    return c.mySeat != null && !c.amSeated && !_over && c.failure == null && c.cannotDeal == null && othersSeated;
+    return c.mySeat != null && !c.amSeated && c.state == TableState.playing && c.cannotDeal == null && othersSeated;
   }
 
-  /// Humans at the table and heard from lately, this device included.
-  int get here => client.heardLately.length;
-
-  /// The hand's jury: drawn and heard from.
-  ({int drawn, int live}) get jury => client.jury;
-
-  /// The table found nobody online to draw a jury from.
-  bool get needsJuror => client.needsJuror;
+  /// People still seated whose line to the table is open, this device
+  /// included.
+  int get here {
+    final down = client.started ? client.rules.down : const <PublicKey, int>{};
+    return [
+      for (final h in client.holders)
+        if (h is HumanSeat && (h.key == client.signer.publicKey || !down.containsKey(h.key))) h,
+    ].length;
+  }
 
   /// What the deal is doing, while the table deals; null otherwise.
   String? get dealNote {
     if (client.game.phase != Phase.dealing) return null;
-    // This hand's: the client's last deal stays the one it has until the
-    // next is begun, and read here, a hand waiting on its jury said it
-    // was dealing — for as long as the wait, which can be for good.
+    // This hand's: the last hand's deal stays the one the table has
+    // until the next is begun.
     final d = client.dealOf(client.game.handNumber);
-    // Before there is a deal at all: a hand with bot seats waits for
-    // jurors enough to hold them, because a bot seat nobody holds is
-    // a hand everyone can see (docs/explanation/live-play.md).
-    if (d == null && client.shortOfJurors) return words.waitingForJurors;
     if (d == null) return words.dealing;
     return switch (d.phase) {
       DealPhase.keys => words.dealingKeys,
@@ -940,8 +848,8 @@ class LiveController extends ChangeNotifier implements TableModel {
   // A seated player's 👍, shown for a moment beside their badge here and
   // on every other screen at the table and watching it (packages/table,
   // reactions.dart). Nothing of it reaches the client: it is said on a
-  // lane of its own, beside the table's events and never among them, so
-  // no turn, clock or jury can be moved by one.
+  // lane of its own, beside the table's log and never in it, so no turn
+  // or clock can be moved by one.
 
   /// Where this table's reactions are said and heard; null where there
   /// are none.
@@ -1024,10 +932,12 @@ class LiveController extends ChangeNotifier implements TableModel {
     _disposed = true;
     onClosed?.call();
     onClosed = null;
+    client.rules.onFrame = null;
     _waitTimer?.cancel();
     _sheetTimer?.cancel();
+    _clockBeat?.cancel();
+    _downTimer?.call();
     _sub?.cancel();
-    _refusals?.cancel();
     _heardReactions?.cancel();
     _mute.removeListener(_muteChanged);
     for (final r in _reacting.values) {
@@ -1035,9 +945,9 @@ class LiveController extends ChangeNotifier implements TableModel {
     }
     pictures?.removeListener(_pictured);
     // Nothing here reacts to the table any more, whichever way this
-    // goes; only the socket waits, and only for a leave that is still
-    // on its way out. Waiting before the page is gone would be the
-    // player standing at a table they have left.
+    // goes; only the line waits, and only for a leave that is still on
+    // its way out. Waiting before the page is gone would be the player
+    // standing at a table they have left.
     if (_left) {
       Timer(leaveBeat, client.close);
     } else {

@@ -28,14 +28,15 @@ async function said(pair, kind, body, table = TABLE) {
   return { id, author: pair.public, kind, body, sig: signer.sign(pair.secret, id) };
 }
 
-/// A game's record, as its players send it: a play each from Ada and
-/// Bao.
+/// A game's record, as its players send it: the referee's log, with a
+/// play each from Ada and Bao in it.
 const game = {
-  v: 2,
+  v: 3,
   spec: { id: TABLE, seed: 1, seats: [{ key: ADA }, { key: BAO }, { bot: 'Romeo' }, { bot: 'Juliet' }] },
-  record: [
-    { turn: [0, 4], event: await said(ada, 'play', { hand: 0, turn: 4, seat: 0, card: '2C' }), witnesses: [BAO] },
-    { turn: [0, 5], event: await said(bao, 'play', { hand: 0, turn: 5, seat: 1, card: '3C' }), witnesses: [ADA] },
+  log: [
+    { n: 0, t: 1000, e: await said(ada, 'play', { hand: 0, turn: 4, seat: 0, card: '2C' }) },
+    { n: 1, t: 1250 },
+    { n: 2, t: 2000, e: await said(bao, 'play', { hand: 0, turn: 5, seat: 1, card: '3C' }) },
   ],
 };
 
@@ -80,6 +81,35 @@ test('an event\'s id is worked out here as the table works it out', async () => 
   assert.ok(ids.length > 50);
 });
 
+test('an event\'s id does not hang on the order of any object\'s keys, at any depth, as the table works it out', async () => {
+  // The id the Dart table gives this event; JavaScript lists the
+  // keys of `known` as 0, 2, 3, 10 whatever order they were written in.
+  const body = { hand: 1, turn: 57, seat: 1, round: 4, secret: 's', known: { 3: 'c', 0: 'a', 2: 'b', 10: 'd' }, deeper: [{ b: 1, a: 2 }] };
+  const event = { author: '14261433f12e255e017d79fd36bb2845f6417d399f19fd1f3aa455577c1aabf4', kind: 'deal', body };
+  assert.equal(await eventIdOf('ab'.repeat(16), event), '35461adc14d3ef3efdac798ed5d2e426ab81ddca685cb25dbb922de94bcaed97');
+});
+
+test('a game played at a refereed table, its record as the app sends it, is kept from each of its people', async () => {
+  // A real game, played to its end over the referee's log, its house's
+  // result in it, and licences from the rig's service (BIP-340's second
+  // pair; packages/table, tool/game_fixture.dart).
+  const text = gunzipSync(await readFile(new URL('../../packages/table/test/fixtures/refereed_four.json.gz', import.meta.url))).toString();
+  const real = JSON.parse(text);
+  const events = real.log.filter((entry) => entry.e).map((entry) => entry.e);
+  assert.deepEqual(await Promise.all(events.map((e) => eventIdOf(real.spec.id, e))), events.map((e) => e.id));
+  assert.ok(events.some((e) => e.kind === 'result' && e.author === real.spec.house));
+  const [, service] = keys;
+  const from = (b, key) => keepRecord(b, key, real.spec.id, text, { verify: signer.verify, service: service.public });
+  for (const seat of real.spec.seats) {
+    const b = bucket();
+    assert.deepEqual(await from(b, seat.key), { status: 200, body: { kept: true } });
+    assert.equal(gunzipSync(b.kept.get(`tables/${real.spec.id}.json`).body).toString(), text, 'as it was sent');
+  }
+  // The house signed in it too, but sits at no seat: a record is sent by
+  // a player.
+  assert.equal((await from(bucket(), real.spec.house)).status, 403);
+});
+
 test('a player at the table sends its record, and it is kept packed, once', async () => {
   const b = bucket();
   const text = record();
@@ -100,9 +130,12 @@ test('only a player at that table, with that table\'s record, of a game\'s size'
   assert.equal((await keep(b, ADA, 'ROOM-1-2', named('ROOM-1-2'))).status, 400, 'not a table id');
   assert.equal((await keep(b, ADA, TABLE, named('f'.repeat(32)))).status, 400, 'another table\'s');
   assert.equal((await keep(b, ADA, TABLE, 'not json')).status, 400);
-  assert.equal((await keep(b, ADA, TABLE, JSON.stringify({ v: 2, spec: { id: TABLE } }))).status, 400);
-  // The form before, whose removals named their backers by key alone.
-  assert.deepEqual(await keep(b, ADA, TABLE, record((r) => ({ ...r, v: 1 }))), { status: 400, body: { error: 'a record of form 2' } });
+  assert.equal((await keep(b, ADA, TABLE, JSON.stringify({ v: 3, spec: { id: TABLE } }))).status, 400);
+  // The forms before the referee, kept as they were and kept no more.
+  for (const v of [1, 2]) {
+    assert.deepEqual(await keep(b, ADA, TABLE, record((r) => ({ ...r, v }))), { status: 400, body: { error: 'a record of form 3' } });
+  }
+  assert.equal((await keep(b, ADA, TABLE, record(({ log, ...r }) => ({ ...r, record: log })))).status, 400, 'no log');
   assert.equal((await keep(b, ADA, TABLE, ' '.repeat(recordMost + 1))).status, 413);
   assert.equal((await keep(null, ADA, TABLE, record())).status, 503, 'no bucket bound');
   assert.equal(b.kept.size, 0);
@@ -116,13 +149,13 @@ test('only a record with moves its sender signed at that table in it', async () 
   assert.equal((await keep(b, CY, TABLE, seated)).status, 403, 'seated, but none of it signed by them');
   // Their own events, each said differently from what they signed.
   const changed = record((r) => {
-    for (const d of r.record) if (d.event.author === ADA) d.event.body = { ...d.event.body, hand: d.event.body.hand + 1 };
+    for (const d of r.log) if (d.e?.author === ADA) d.e.body = { ...d.e.body, hand: d.e.body.hand + 1 };
     return r;
   });
   assert.equal((await keep(b, ADA, TABLE, changed)).status, 403, 'not what was signed');
   // Their own events, with signatures that are not theirs.
   const forged = record((r) => {
-    for (const d of r.record) if (d.event.author === ADA) d.event.sig = 'ab'.repeat(64);
+    for (const d of r.log) if (d.e?.author === ADA) d.e.sig = 'ab'.repeat(64);
     return r;
   });
   assert.equal((await keep(b, ADA, TABLE, forged)).status, 403, 'not signed by them');

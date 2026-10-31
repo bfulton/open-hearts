@@ -27,14 +27,14 @@ const tokenBytes = 128;
 const sealedBytes = 64;
 const sealProofBytes = 160;
 
-/// How many custodians have to answer to open a bot seat: any two of
-/// the jury.
+/// How many custodians have to answer to open a bot seat escrowed to
+/// several, as a v2 game's jury held one: any two of them.
 ///
-/// Two is the least that is still a secret — one juror alone is
+/// Two is the least that is still a secret — one custodian alone is
 /// nothing, which is the whole point of a bot seat's hand being
-/// hidden from a player with one juror's help (docs/explanation/live-play.md).
-/// Above two buys secrecy against a wider ring at the cost of
-/// availability.
+/// hidden from a player with one custodian's help. Above two buys
+/// secrecy against a wider ring at the cost of availability. A
+/// refereed table's bot seats escrow to nobody: the house holds them.
 const escrowThreshold = 2;
 
 /// One argument for a batch of reveal tokens, however many
@@ -121,9 +121,9 @@ abstract class DealCrypto {
   /// in index order, [scalarBytes] each; a share's index is its place
   /// in the list counted from one, which is what [lagrange] takes.
   ///
-  /// What it buys is availability: a hand's escrow rests on the
-  /// jurors it was sealed to still being reachable when a bot seat has
-  /// to be opened (docs/explanation/live-play.md). Any two of the jury keeps one
+  /// What it buys is availability: escrow among several holders, as a
+  /// v2 game's jury was, rests on enough of them being reachable when
+  /// a bot seat has to be opened. Any two of them keeps one
   /// holder alone from being anything, with room to lose people. The
   /// key is still never anywhere: a share's token is scaled by its
   /// public coefficient and the scaled tokens add.
@@ -131,7 +131,7 @@ abstract class DealCrypto {
 
   /// What the share at [index] is worth among the shares [have] holds,
   /// evaluated [at] an index: zero for the key itself, or another
-  /// index to make *that* share — which is how a juror arriving later
+  /// index to make *that* share — which is how a holder arriving later
   /// is given one without anybody rebuilding the key.
   Uint8List lagrange(List<int> have, int index, {int at = 0});
 

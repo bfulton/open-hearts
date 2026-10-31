@@ -28,7 +28,7 @@ void main() {
   test('a rated game rates people and the bots that started it; a leaver is last; a replacement has no stake', () {
     final a = FakeSigner('a').publicKey;
     final b = FakeSigner('b').publicKey;
-    final spec = TableSpec(id: 't1', seed: 1, rated: true, seats: [
+    final spec = TableSpec(seed: 1, rated: true, seats: [
       HumanSeat(a),
       const BotSeat(Persona.romeo),
       HumanSeat(b),
@@ -54,7 +54,7 @@ void main() {
     final b = SchnorrSigner.generate();
     final c = SchnorrSigner.generate();
     final stranger = SchnorrSigner.generate();
-    final spec = TableSpec(id: 't3', seed: 1, rated: true, seats: [
+    final spec = TableSpec(seed: 1, rated: true, seats: [
       HumanSeat(a.publicKey),
       HumanSeat(b.publicKey),
       HumanSeat(c.publicKey),

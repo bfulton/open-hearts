@@ -12,9 +12,9 @@
 /// the door with the waiting screen or the room, and leaving either
 /// brings it back.
 ///
-/// This is also where a device comes online: it says it is here and
-/// serves as a juror from the front door, not only from a table
-/// (live/lobby.dart, docs/explanation/live-play.md).
+/// This is also where a device comes online: it says it is here from
+/// the front door, not only from a table (live/lobby.dart,
+/// net/online.dart).
 library;
 
 import 'dart:async';
@@ -39,9 +39,9 @@ import 'net/account_profile.dart';
 import 'net/address.dart';
 import 'net/buying.dart';
 import 'net/copy.dart';
-import 'net/duty.dart';
 import 'net/household.dart';
 import 'net/in_use.dart';
+import 'net/online.dart';
 import 'net/remote_config.dart';
 import 'net/room.dart';
 import 'net/share.dart';
@@ -152,8 +152,7 @@ class _HomePageState extends State<HomePage> {
     // of the account changed the profile (net/account_profile.dart).
     AccountProfile.current.addListener(_reprofiled);
     // A device that cannot play live has no business in the count of
-    // who is here, or in a jury — nor one whose live play the operator
-    // has paused.
+    // who is here — nor one whose live play the operator has paused.
     if (_goesOnline) _lobby.goOnline();
     // Neither of these is the relays, which is what `online` is about:
     // they are one call to the service each, and a test stands its own
@@ -295,13 +294,13 @@ class _HomePageState extends State<HomePage> {
   void _licensed() {
     if (!mounted) return;
     setState(() {});
-    if (_goesOnline && Duty.current == null) _lobby.goOnline();
+    if (_goesOnline && Online.current == null) _lobby.goOnline();
   }
 
   /// Another device of the account took it up, or this one took it back,
   /// or the account is suspended (net/in_use.dart). Shut, nothing live is
-  /// left open here: the pool or the room goes, and the duty and any
-  /// table go with their own listeners (net/duty.dart,
+  /// left open here: the pool or the room goes, and presence and any
+  /// table go with their own listeners (net/online.dart,
   /// live/live_page.dart). Taken back, this device comes online again.
   void _inUse() {
     if (!mounted) return;
@@ -310,18 +309,16 @@ class _HomePageState extends State<HomePage> {
       return;
     }
     setState(() {});
-    if (_goesOnline && Duty.current == null && InUse.current.standing == Use.here) _lobby.goOnline();
+    if (_goesOnline && Online.current == null && InUse.current.standing == Use.here) _lobby.goOnline();
   }
 
   /// The operator said something new. A pause shuts the doors from here
-  /// on and leaves whatever is already under way alone: a device that is
-  /// online stays a juror to the tables that drew it until the app is
-  /// next started, since a game it holds a bot's hand in would end
-  /// without it. A pause lifted opens them again.
+  /// on and leaves whatever is already under way alone: a game being
+  /// played goes on. A pause lifted opens them again.
   void _configured() {
     if (!mounted) return;
     setState(() {});
-    if (_goesOnline && Duty.current == null) _lobby.goOnline();
+    if (_goesOnline && Online.current == null) _lobby.goOnline();
   }
 
   /// Back from a checkout. The licence is behind a webhook Stripe sends

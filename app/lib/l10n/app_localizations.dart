@@ -566,11 +566,11 @@ abstract class AppLocalizations {
   /// **'{amount} a year'**
   String pricePerYear(String amount);
 
-  /// What live play is, where it is offered.
+  /// The subscription page's first point: what live play is.
   ///
   /// In en, this message translates to:
-  /// **'Four seats, filled with whoever is waiting — or a link you send to three friends.'**
-  String get seatsOrFriends;
+  /// **'Play live with other people'**
+  String get pointLive;
 
   /// Button: buy live play.
   ///
@@ -758,22 +758,22 @@ abstract class AppLocalizations {
   /// **'Open on this device, to {day}'**
   String openUntil(String day);
 
-  /// One of the points on the Live play page.
+  /// The subscription page's second point: a game of one's own that only the friends sent its link can join.
   ///
   /// In en, this message translates to:
-  /// **'A rating of your own, from results the four of you sign.'**
-  String get pointRating;
+  /// **'Create a friends-only game'**
+  String get pointFriends;
 
-  /// One of the points on the Live play page.
+  /// The subscription page's third point: a live player's rating, and their live games counted on their profile.
   ///
   /// In en, this message translates to:
-  /// **'The deal is dealt between the four of you. No server sees a hand, ours included.'**
-  String get pointDeal;
+  /// **'Track your rating and other stats'**
+  String get pointStats;
 
   /// On the Live play page, under the points.
   ///
   /// In en, this message translates to:
-  /// **'Playing alone is free, and so are the records, the engine and every line of this; we have no plans to change that. What the money pays for is the part that costs us to run: putting you in touch with each other, a relay when your two devices cannot find a way through, and a juror when a table is left alone.'**
+  /// **'Playing alone is free. Your subscription pays for the servers that run live games.'**
   String get whatMoneyPaysFor;
 
   /// Under the Subscribe button on the web, where Stripe takes the payment and Link, Stripe's affiliate, sells the subscription: the price and that tax is added, that it is a year, that it renews by itself until cancelled, and where to cancel (Manage subscription, on this page once subscribed). California's automatic renewal law asks for all of it beside the button.
@@ -1298,41 +1298,11 @@ abstract class AppLocalizations {
   /// **'Your connection is down — reconnecting'**
   String get connectionDown;
 
-  /// Under the table while other devices online settle a stuck turn.
-  ///
-  /// In en, this message translates to:
-  /// **'Asking the jury'**
-  String get askingTheJury;
-
-  /// Under the table while no other device is online to settle a stuck turn.
-  ///
-  /// In en, this message translates to:
-  /// **'Nobody online to draw a jury from — waiting for one'**
-  String get noJurorOnline;
-
-  /// Under the table while other devices online settle a stuck turn.
-  ///
-  /// In en, this message translates to:
-  /// **'Waiting for the jury'**
-  String get waitingForTheJury;
-
   /// Under the table while a player who left has their hand opened so a bot can play it.
   ///
   /// In en, this message translates to:
   /// **'Opening a departed player\'s hand'**
   String get openingDepartedHand;
-
-  /// Under the table when no player says they hold the two of clubs.
-  ///
-  /// In en, this message translates to:
-  /// **'Nobody claims the 2♣ — the deal is stuck'**
-  String get nobodyClaimsTwo;
-
-  /// Button: remove a player who has run out of time; a bot takes their seat.
-  ///
-  /// In en, this message translates to:
-  /// **'Boot {name}'**
-  String bootPlayer(String name);
 
   /// Title when this device can no longer run the fair deal.
   ///
@@ -1358,17 +1328,17 @@ abstract class AppLocalizations {
   /// **'Connection failure'**
   String get connectionFailure;
 
-  /// Under connectionFailure: too few of the devices keeping the bots' hands are still online.
+  /// Under connectionFailure: the operator's server, which deals the cards and plays the bot seats, stopped answering, and the game cannot go on.
   ///
   /// In en, this message translates to:
-  /// **'Juror quorum lost'**
-  String get jurorQuorumLost;
+  /// **'The game\'s server stopped answering'**
+  String get houseGone;
 
-  /// Explains jurorQuorumLost.
+  /// Explains houseGone.
   ///
   /// In en, this message translates to:
-  /// **'Too few of the jurors keeping the bot seats are still online, so the hand cannot go on. The game ends here, unscored.'**
-  String get jurorQuorumLostWhy;
+  /// **'The server that deals the cards and plays the bots stopped answering, so the game cannot go on. It ends here, unscored.'**
+  String get houseGoneWhy;
 
   /// Button on the sheet after a hand at a live table, where the next hand is already under way.
   ///
@@ -1405,12 +1375,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Back'**
   String get back;
-
-  /// Under the table before a hand with bots can be dealt.
-  ///
-  /// In en, this message translates to:
-  /// **'Waiting for jury…'**
-  String get waitingForJurors;
 
   /// Under the table while the cards are dealt.
   ///
@@ -2099,7 +2063,7 @@ abstract class AppLocalizations {
   /// Under openElsewhereTitle.
   ///
   /// In en, this message translates to:
-  /// **'Your account plays on one device at a time, and the newest one opened wins. This one has stepped back: off the table, the jury and the waiting list. Use it here, and the other one steps back instead.'**
+  /// **'Your account plays on one device at a time, and the newest one opened wins. This one has stepped back: off the table and the waiting list. Use it here, and the other one steps back instead.'**
   String get openElsewhereBody;
 
   /// Asked before this device takes the account from another device of it that is at a live table.

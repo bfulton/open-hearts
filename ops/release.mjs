@@ -17,8 +17,8 @@ import { stripe as stripeDefinition } from '../infra/stripe.mjs';
 import { checkoutFields } from '../service/functions/stripe.mjs';
 
 /// The programs a relay deploy builds with: its custom build
-/// (service/bench/build.sh) compiles the juror and the native libraries,
-/// and Wrangler builds the backup jurors' image with Docker.
+/// (service/bench/build.sh) compiles the house and the native libraries,
+/// and Wrangler builds the house's image with Docker.
 const RELAY_NEEDS = [
   ['docker', ['info'], 'Docker, running (start dockerd)'],
   ['dart', ['--version'], 'Dart (the Flutter SDK’s bin on PATH)'],
@@ -48,6 +48,7 @@ export async function relay(ctx, { flags }) {
   ctx.log(`the relay worker (service/do) from ${await head(ctx)}, with wrangler ${version}`);
   const gone = await missing(ctx, RELAY_NEEDS);
   for (const g of gone) ctx.log(`  not ready: needs ${g}`);
+  if (!(await ctx.config()).houseKey) gone.push('the house\'s key in config/openhearts.json, houseKey, without which no sealed table is refereed and no result taken (./oh house key --apply)');
   const ready = (await cleared(ctx, 'relay', flags.apply)) && !gone.length;
   const pinned = pinsOf(await ctx.config());
   ctx.log(pinned ? `  with the PhotoDNA module config/openhearts.json pins, from the private bucket (${Object.keys(pinned).length} files)` : '  without a PhotoDNA module: config/openhearts.json pins none, so the relay asks PhotoDNA nothing');
@@ -74,17 +75,19 @@ export async function relay(ctx, { flags }) {
 /// The preview relay (wrangler.toml, [env.preview]), from whatever is
 /// checked out, as a preview of the site is: it reaches nothing of
 /// production's, and checks no picture, so it is built without the
-/// PhotoDNA module. Its devices are held to the key previews have, which
-/// config/openhearts.json names (preview.serviceKey).
+/// PhotoDNA module. Its devices are held to the key previews have, and
+/// its tables to the house previews have, which config/openhearts.json
+/// names (preview.serviceKey, preview.houseKey).
 async function previewRelay(ctx, { flags }) {
   const version = await wranglerVersion();
   const name = (await relayWrangler('preview')).name;
   ctx.log(`the preview relay (${name}, service/do [env.preview]) from ${await head(ctx)}, with wrangler ${version}`);
   const gone = await missing(ctx, RELAY_NEEDS);
   for (const g of gone) ctx.log(`  not ready: needs ${g}`);
-  const key = (await ctx.config()).preview?.serviceKey;
+  const { serviceKey: key, houseKey: house } = (await ctx.config()).preview ?? {};
   if (!key) ctx.log('  not ready: config/openhearts.json has no preview.serviceKey, so the preview relay would carry nobody (./oh preview secrets --apply)');
-  const ready = !gone.length && !!key;
+  if (!house) ctx.log('  not ready: config/openhearts.json has no preview.houseKey, so the preview relay would referee no sealed table (./oh preview secrets --apply)');
+  const ready = !gone.length && !!key && !!house;
   if (!flags.apply) {
     ctx.log(ready ? 'nothing deployed; --apply deploys it' : 'nothing deployed');
     return;
