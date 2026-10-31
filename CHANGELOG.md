@@ -443,6 +443,13 @@ squashed from a pull request, the pull request's number.
 
 ### Fixed
 
+- Previews play live again. Since the referee, every live table has the
+  house at it, and the preview relay had no house of its own: now it
+  has, its key the previews' (`./oh preview secrets`), with a new
+  service key for the previews beside it. A preview deployed since
+  plays live on the preview relay with the people invited to it.
+  (2026-10-31, #46)
+
 - The house seats the pools. Until now the waiting devices seated each
   other: the lowest key waiting hosted each round, and the next in line
   stepped in when its seating was late. Two hosts could seat one round,
