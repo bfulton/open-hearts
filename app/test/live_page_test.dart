@@ -366,15 +366,25 @@ void main() {
     final waits = <int>[];
     var at = 0;
     int? opened;
+    int? offered;
     var inLog = c.client.rules.moves.length;
     var onScreen = c.playedThisHand.length;
     for (var guard = 0; guard < 4000 && c.client.game.tricksPlayed < 5; guard++) {
       final playing = c.client.game.phase == engine.Phase.playing;
       if (c.awaitingPass) await act(tester, live);
       if (c.awaitingPlay) {
-        waits.add(at - (opened ?? at));
-        opened = null;
-        await act(tester, live);
+        if (offered == null) {
+          offered = at;
+          waits.add(at - (opened ?? at));
+          opened = null;
+        }
+        // The player takes a bot's quickest moment over each card, so no
+        // bot keeps up with them by thinking less than its own: what the
+        // log shows is the house's thought (house.dart, pace).
+        if (at - offered >= engine.BotPace.quick.minMs) {
+          offered = null;
+          await act(tester, live);
+        }
       }
       await live.tick(tester, step, step: step);
       at += step;
@@ -387,7 +397,7 @@ void main() {
       }
       if (playing && c.playedThisHand.length > onScreen && c.game.trick.isNotEmpty && c.game.trick.last.seat != c.mySeat) shown.add(at);
       onScreen = c.playedThisHand.length;
-      if (c.client.awaitingMyPlay && opened == null) opened = at;
+      if (c.client.awaitingMyPlay && opened == null && offered == null) opened = at;
     }
     expect(logged.length, greaterThanOrEqualTo(9), reason: 'the bots played: $logged');
     // In the log, each bot card a bot's thought after the move before it.

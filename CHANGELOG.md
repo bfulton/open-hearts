@@ -269,6 +269,14 @@ squashed from a pull request, the pull request's number.
 
 ### Changed
 
+- Bots never take longer over a card than the quickest person at the
+  table. A person's pace is the middle of the times they took over their
+  last three cards; at a live table the house keeps each bot's thinking
+  to the quickest pace there by the log's clock, and at a solo table
+  the bots keep up with their player, though never quicker than a card
+  can land or the trick before it be swept. Someone who plays fast, or
+  turns on Auto, has the bots keep up within a card or two; someone who
+  takes their time slows nobody. (2026-10-31, #44)
 - A live table is refereed. Each table's object on our relay keeps its
   log: every event its people and the house send, in one order and
   stamped with one clock, and when each seat's connection to it closed

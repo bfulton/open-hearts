@@ -103,11 +103,12 @@ class TableClient {
   final Uint8List? houseSecret;
 
   /// For the house's seat: how long its bot thinks over a card, drawn
-  /// for its persona each time (house.dart, pace), or null for not at
+  /// for its persona each time and kept up with the people at the table
+  /// as [TableRules] has them (house.dart, pace), or null for not at
   /// all. The card is said after it, so the log has the bot's rhythm in
   /// its own times: a screen shows each card as it lands, and the next
   /// person's clock starts when they can see that it is their turn.
-  final int Function(Persona persona)? botThinkMs;
+  final int Function(Persona persona, TableRules rules)? botThinkMs;
 
   /// What this seat says where it could say something else: the
   /// honest conduct everywhere but the simulator.
@@ -333,7 +334,7 @@ class TableClient {
     if (t.isPass) {
       _sayPass(s, bot.choosePass(g.handOf(s)));
     } else if (t.isPlay) {
-      final think = botThinkMs?.call(persona) ?? 0;
+      final think = botThinkMs?.call(persona, rules) ?? 0;
       if (think > 0 && _thought != t) {
         if (_thinking == t) return;
         _thinking = t;

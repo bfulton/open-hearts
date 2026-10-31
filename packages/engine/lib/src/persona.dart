@@ -35,9 +35,10 @@ enum PassStyle {
 }
 
 /// How long a bot appears to think. Rhythm, not strategy: the engine
-/// decides instantly and the table waits this long before showing it.
-/// A person's own pace is a different thing and lives in packages/table
-/// (pace.dart): that one is measured, this one is manners.
+/// decides instantly and the table waits this long before showing it,
+/// or less, where a person at the table plays faster (packages/table,
+/// pace.dart, tablePaceOf). A person's own pace is a different thing
+/// and lives there too: that one is measured, this one is manners.
 enum BotPace {
   quick(400, 700),
   measured(600, 1100),

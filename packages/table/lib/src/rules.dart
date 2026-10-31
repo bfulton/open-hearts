@@ -39,6 +39,7 @@ import 'package:engine/engine.dart';
 
 import 'events.dart';
 import 'log.dart';
+import 'pace.dart' show tablePaceCards;
 import 'sealed_pass.dart';
 import 'signing.dart';
 import 'spec.dart';
@@ -226,6 +227,14 @@ class TableRules {
   /// Each seat's bank this hand, in milliseconds.
   List<int> get banks => List.unmodifiable(_banks);
   final List<int> _banks = List.filled(seatCount, 0);
+
+  /// How long the person at [seat] took over each of their last cards
+  /// ([tablePaceCards] at most), from the turn's opening to the card, by
+  /// the referee's clock, oldest first: how quick the people at the table
+  /// are, which the house keeps its bots up with (house.dart). Empty for
+  /// a seat a bot holds, and for a person's before their first card.
+  List<int> cardTimesOf(int seat) => List.unmodifiable(_cardTimes[seat]);
+  final List<List<int>> _cardTimes = List.generate(seatCount, (_) => <int>[]);
 
   /// When each key's connection to the log closed, while it is closed.
   Map<PublicKey, int> get down => Map.unmodifiable(_down);
@@ -482,8 +491,13 @@ class TableRules {
     }
     if (o.turn.isPass || o.turn.isPlay) {
       if (_holders[seat] is HumanSeat) {
-        final spent = (_pausedAt ?? _now) - o.since - timing.bank.graceOf(o.turn);
+        final took = (_pausedAt ?? _now) - o.since;
+        final spent = took - timing.bank.graceOf(o.turn);
         if (spent > 0) _banks[seat] = max(0, _banks[seat] - spent);
+        if (o.turn.isPlay) {
+          final times = _cardTimes[seat]..add(took);
+          if (times.length > tablePaceCards) times.removeAt(0);
+        }
       }
     }
     taken.add(ev);
@@ -584,6 +598,7 @@ class TableRules {
     _holders[seat] = BotSeat(_spec!.replacementFor(seat));
     _removals[seat] = Removal(how, n: log.length - 1, t: _now, hand: game.handNumber);
     _owed.remove(seat);
+    _cardTimes[seat].clear();
     trace?.call('seat $seat ${how.name} at #${log.length - 1}${why == null ? '' : ': $why'}');
     final d = _deal;
     if (d != null) {

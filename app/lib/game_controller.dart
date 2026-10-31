@@ -11,6 +11,7 @@ import 'dart:math';
 
 import 'package:engine/engine.dart';
 import 'package:flutter/foundation.dart';
+import 'package:table/table.dart' show tablePaceCards, tablePaceOf;
 
 import 'avatar.dart';
 import 'l10n/l10n.dart';
@@ -19,10 +20,23 @@ import 'record_store.dart';
 import 'table_model.dart';
 
 class GameController extends ChangeNotifier implements TableModel {
-  GameController({this.seed, this.paced = true, this.target = gameOverScore, RecordStore? store, this.hold})
-      : _store = store ?? PrefsRecordStore() {
+  GameController({
+    this.seed,
+    this.paced = true,
+    this.target = gameOverScore,
+    RecordStore? store,
+    this.hold,
+    int Function()? screenClock,
+  })  : _store = store ?? PrefsRecordStore(),
+        _screenClock = screenClock ?? _wallMs {
     _start();
   }
+
+  /// The screen's own clock, in milliseconds: what the player's time
+  /// over a card is measured by, as the table's pauses are timers on it.
+  /// Real time, but in a test whose timers keep a time of their own.
+  final int Function() _screenClock;
+  static int _wallMs() => DateTime.now().millisecondsSinceEpoch;
 
   /// Fixes the shuffle, so [newGame] reshuffles the same way a test
   /// expects: dealt by [Random] from it. Null in the app, where every
@@ -68,6 +82,7 @@ class GameController extends ChangeNotifier implements TableModel {
     _auto.reset();
     _played.clear();
     _selected.clear();
+    _offeredAt = null;
     _pump();
   }
 
@@ -133,14 +148,35 @@ class GameController extends ChangeNotifier implements TableModel {
   bool _disposed = false;
   bool _pumping = false;
 
-  /// How long [seat]'s bot appears to think: its persona's rhythm. With
-  /// the Auto switch on nobody is thinking, and a card comes as soon as
-  /// the one before it has landed.
+  /// How long [seat]'s bot appears to think: its persona's rhythm, but
+  /// never longer than the player takes over a card of their own
+  /// (packages/table, tablePaceOf), so a player who plays fast has bots
+  /// that keep up; nor quicker than the Auto switch's pace: a card once
+  /// the one before it has landed, a lead once the trick before it is
+  /// swept. With the switch on nobody is thinking, and a card comes as
+  /// soon as the one before it has landed.
   Duration _botThink(int seat) {
     if (!paced) return Duration.zero;
-    if (_auto.on) return _game.trick.isEmpty ? Duration.zero : Pacing.cardLands;
-    return Pacing.think(_bots[seat]!.persona, _rhythm);
+    final landed = _game.trick.isEmpty ? Duration.zero : Pacing.cardLands;
+    if (_auto.on) return landed;
+    final own = Pacing.think(_bots[seat]!.persona, _rhythm);
+    final yours = tablePaceOf(_cardMs);
+    if (yours == null) return own;
+    final quick = Duration(milliseconds: yours);
+    if (own <= quick) return own;
+    // The switch's own pace waits out a sweep before the lead ([_swept]);
+    // a bot kept up with the player waits it out in its thought.
+    final quickest = _game.trick.isEmpty && _game.tricksPlayed > 0 ? Pacing.trickSweeps : landed;
+    return quick < quickest ? quickest : quick;
   }
+
+  /// When the player was last offered a card to play, by [_screenClock],
+  /// while they owe it; and how long they took over their last cards
+  /// ([tablePaceCards] at most), oldest first, the games before this one
+  /// on this screen among them: the same player. Cards the Auto switch
+  /// plays are nobody's pace.
+  int? _offeredAt;
+  final List<int> _cardMs = [];
 
   /// A finished trick on the felt: held to be read, or, with the Auto
   /// switch on, until its last card has landed.
@@ -253,6 +289,11 @@ class GameController extends ChangeNotifier implements TableModel {
     if (!awaitingPlay) return null;
     final legal = _game.legalPlaysFor(humanSeat);
     if (!legal.contains(card)) return refusalFor(_game, humanSeat, card, words);
+    final offered = _offeredAt;
+    if (offered != null) {
+      _cardMs.add(_screenClock() - offered);
+      if (_cardMs.length > tablePaceCards) _cardMs.removeAt(0);
+    }
     _playMine(card);
     _pump();
     return null;
@@ -260,6 +301,7 @@ class GameController extends ChangeNotifier implements TableModel {
 
   /// The player's card, played: by their hand, or by the Auto switch.
   void _playMine(Card card) {
+    _offeredAt = null;
     _record.plays.add(card);
     _game.play(humanSeat, card);
     _played.add(card);
@@ -367,7 +409,10 @@ class GameController extends ChangeNotifier implements TableModel {
           // since nobody is thinking.
           _auto.watch(this);
           final card = _auto.cardFor(this);
-          if (card == null) break;
+          if (card == null) {
+            _offeredAt ??= _screenClock();
+            break;
+          }
           if (!await _held()) return;
           _playMine(card);
           continue;

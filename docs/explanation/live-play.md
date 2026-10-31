@@ -196,10 +196,19 @@ tools are listed in the [tools reference](../reference/tools.md).
 
 At a live table the bots are the [house](#the-house)'s to play, and a
 bot's moment of thought is the house's too: it says each bot card its
-persona's moment after the card before (`House.pace`). So the log has
-the bots' rhythm in its own times, and the screen shows each card as it
-lands, a beat after the last, with a finished trick held for a moment,
-so a person sees every card land (`live_controller.dart`).
+persona's moment after the card before (`House.pace`), but never later
+than the quickest person at the table would. A person's pace is the
+middle of the times they took over their last three cards, by the log's
+clock (`tablePaceOf`, `TableRules.cardTimesOf`), so a table never waits
+longer on its bots than on its people: someone who plays fast, or turns
+on Auto, has the bots keep up within a card or two, without anything
+telling the house why. So the log has the bots' rhythm in its own
+times, and the screen shows each card as it lands, a beat after the
+last, with a finished trick held for a moment, so a person sees every
+card land (`live_controller.dart`). A solo table keeps its bots up with
+its player the same way, though never quicker than the Auto switch: a
+card waits for the one before it to land, and a lead for the trick
+before it to be swept (`game_controller.dart`).
 
 ## Ratings
 

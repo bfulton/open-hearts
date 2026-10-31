@@ -7,7 +7,8 @@
 /// `--pace` is how long a bot thinks over a card, as a share of its
 /// persona's pace (packages/table, house.dart): 1, the standard, but
 /// for the browser suites, which run a table's beats at a tenth
-/// (e2e/drive.mjs).
+/// (e2e/drive.mjs). Whatever it is, no bot takes longer over a card than
+/// the quickest person at its table.
 ///
 /// Woken for a table (`POST /wake?table=…`), it follows the table's log
 /// from the first entry (packages/table, house.dart): it deals and plays
