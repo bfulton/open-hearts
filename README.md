@@ -70,7 +70,8 @@ its own licence beside it:
   (`service/do/pdq.LICENSE.txt`).
 - **New Relic's browser agent** (`app/web/observability.js`): its loader,
   as New Relic serves it, on play.openhearts.game only. Apache-2.0
-  (`app/web/nr-loader-full-1.324.0.min.js.LICENSE.txt`).
+  (the `app/web/nr-loader-*.LICENSE.txt` beside it, which its banner
+  names).
 - **Noto Color Emoji** (`app/fonts/ReactionEmoji.ttf`): the six
   emoji of the table's reactions, cut from Google's font for the web
   build. SIL Open Font License 1.1 (`app/fonts/OFL.txt`); how it was
