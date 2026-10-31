@@ -74,7 +74,6 @@ const handOver = (n) => {
 const aHand = 480000;
 
 async function main() {
-  const relay = await startRelay({ pace: 0.1 });
   // A tenth of a table's beats (app/lib/net/address.dart), and the
   // operator's word on the clocks (docs/explanation/service.md): a bank
   // of thirty seconds a hand rather than forty-five, and a person silent
@@ -87,7 +86,10 @@ async function main() {
   // spends it, as no player's real bank of forty-five is spent. And a
   // bank longer than the silence less a card's grace lets the half
   // minute, not the clock, take a closed browser's seat (cell 4).
-  const app = await serveApp({ relayPort: relay.port, pace: 0.1, config: { table: { bankMs: 30000 } } });
+  // The house seats the pool by the same word (service/do/bench.mjs).
+  const config = { table: { bankMs: 30000 } };
+  const relay = await startRelay({ pace: 0.1, config });
+  const app = await serveApp({ relayPort: relay.port, pace: 0.1, config });
   log(`relay ${relay.url}, app ${app.url}`);
   const browser = await chromium.launch();
   const contexts = [];

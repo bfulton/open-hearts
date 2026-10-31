@@ -443,6 +443,22 @@ squashed from a pull request, the pull request's number.
 
 ### Fixed
 
+- The house seats the pools. Until now the waiting devices seated each
+  other: the lowest key waiting hosted each round, and the next in line
+  stepped in when its seating was late. Two hosts could seat one round,
+  parting people seated together. And a device forgot somebody seated
+  only once they went quiet, so a player left over could seat
+  themselves with people already playing elsewhere: those seats waited
+  out their clocks before bots took them, and in a rated pool each
+  absent player was rated as having left a game they never saw. Now
+  the pool's object on the relay wakes the house while anybody waits
+  there; the house seats every round, and takes whoever it seats out of
+  the pool at once; a device takes a seating from its house alone; and
+  the relay carries a pool's seating from nobody else. The table's
+  clocks are the operator's, as the house is told them with every wake,
+  and its bots are chosen by the ratings the house folds from the
+  results. (2026-10-31, #45)
+
 - A relay deploy no longer leaves the new relay live beside the old
   house. Wrangler uploads the worker before it builds the house's image,
   so when the image's base could not be fetched (the AWS public

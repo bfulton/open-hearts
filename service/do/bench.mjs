@@ -6,16 +6,27 @@
 // seats, holds half of each person's escrow, and says how the game came
 // out. A table's object (worker.mjs, TagRelay) calls on this one as the
 // table starts, and again whenever the house is not on the table's log
-// (referee.mjs, wanted). This object starts the house if it is not
-// running, waits for it to answer, and tells it of the table, which it
-// then follows from the log's first entry.
+// (referee.mjs, wanted). It seats the pools too, and a pool's object
+// calls on this one while somebody waits there and the house is not
+// (pool.mjs). This object starts the house if it is not running, waits
+// for it to answer, and tells it of the table, which it then follows
+// from the log's first entry, or of the pool, which it then seats; and
+// with every wake, of the operator's clocks for the tables it seats.
 //
-// Then it looks in on it once a minute. While it is serving a table, or
-// was woken in the last ten minutes, it is left alone; once it has gone
-// quiet it is stopped, and stops costing anything. One house for every
-// table, named `bench` for the container it has always been in.
+// Then it looks in on it once a minute. While it is serving a table or
+// a pool, or was woken in the last ten minutes, it is left alone; once
+// it has gone quiet it is stopped, and stops costing anything. One
+// house for every table and every pool (wrangler.toml, max_instances),
+// named `bench` for the container it has always been in.
 
 import { tagLabel } from './relay.mjs';
+import { isPoolTag } from './pool.mjs';
+import { CONFIG_ROW, configOf } from '../functions/config.mjs';
+
+/// The wake for [tag], as this object and the house's own port both
+/// take it: `/wake?pool=…` for a pool's tag, `/wake?table=…` for a
+/// table's.
+export const wakePath = (tag) => `/wake?${isPoolTag(tag) ? 'pool' : 'table'}=${encodeURIComponent(tag)}`;
 
 /// The house's port (service/bin/house.dart, `--port`).
 export const BENCH_PORT = 8080;
@@ -65,16 +76,31 @@ export class Bench {
   async fetch(request) {
     const url = new URL(request.url);
     if (request.method === 'POST' && url.pathname === '/wake') {
-      const table = url.searchParams.get('table') ?? '';
-      if (!table || table.length > 128) return new Response('a table to wake for\n', { status: 400 });
-      return (await this.wake(table)) ? new Response('awake\n') : new Response('not up yet\n', { status: 503 });
+      const tag = url.searchParams.get(url.searchParams.has('pool') ? 'pool' : 'table') ?? '';
+      if (!tag || tag.length > 128) return new Response('a table or a pool to wake for\n', { status: 400 });
+      return (await this.wake(tag)) ? new Response('awake\n') : new Response('not up yet\n', { status: 503 });
     }
     if (request.method === 'GET' && url.pathname === '/status') return Response.json(await this.status());
     return new Response('not found\n', { status: 404 });
   }
 
-  /// Started if it is not running, and told of [table]. False when it
-  /// did not come up in time.
+  /// The operator's clocks for the tables the house seats in the pools
+  /// (service/functions/config.mjs, the row's `table`), as a device is
+  /// served them: `{timing}`, null for the standard table's, or `{}`
+  /// when the row could not be read, which leaves the house with what it
+  /// was last told.
+  async clocks() {
+    try {
+      const row = (await this.env.OH_STORE?.get(CONFIG_ROW.join('|'), 'json')) ?? null;
+      return { timing: configOf(row).table ?? null };
+    } catch {
+      return {};
+    }
+  }
+
+  /// Started if it is not running, and told of [table] — a table's tag
+  /// or a pool's ([wakePath]) — with the operator's clocks ([clocks]).
+  /// False when it did not come up in time.
   async wake(table) {
     const c = this.container;
     if (!c) return false;
@@ -117,7 +143,11 @@ export class Bench {
       return false;
     }
     try {
-      const said = await this.port().fetch(`http://bench/wake?table=${encodeURIComponent(table)}`, { method: 'POST' });
+      const said = await this.port().fetch(`http://bench${wakePath(table)}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(await this.clocks()),
+      });
       this.log({ bench: 'woken', table: at, status: said.status, waitedMs: Date.now() - waited });
       if (!said.ok) return false;
     } catch (e) {

@@ -40,6 +40,9 @@ const other = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 9, 8, 7]).toString('base64');
 /// [key]'s picture put out under [tag], as a pool or a room puts it.
 const picture = (key, jpeg, { tag = pool, at = 1000 } = {}) =>
   sign.event(key, { kind: lobbyKind, content: JSON.stringify({ kind: 'picture', jpeg }), tags: [['t', tag]], created_at: at });
+/// The pool's house (pool.mjs): a seating is its alone to say.
+const house = keys[3];
+/// A seating of the pool, said by [key].
 const seating = (key, at = 1000) => sign.event(key, { kind: lobbyKind, content: JSON.stringify({ kind: 'match', seats: [] }), tags: [['t', pool]], created_at: at });
 
 /// The list's row, naming [jpegs], as the account's turn writes it.
@@ -52,7 +55,7 @@ async function listing(...jpegs) {
 test('a picture on the list is taken and kept to itself: not stored, not passed on, and its sender not refused; any other goes as before', async () => {
   const row = await listing(taken);
   const screen = pictureScreen({ read: () => row });
-  const relay = objectRelay(verify, { tag: pool, withhold: (e) => screen.withheld(e) });
+  const relay = objectRelay(verify, { tag: pool, house: house.public, withhold: (e) => screen.withheld(e) });
   const sender = socket();
   const waiting = socket();
   relay.open(sender);
@@ -66,7 +69,7 @@ test('a picture on the list is taken and kept to itself: not stored, not passed 
   assert.equal(waiting.of('EVENT').length, 0);
 
   const fine = await picture(keys[1], other);
-  const seat = await seating(keys[1]);
+  const seat = await seating(house);
   await relay.message(sender, JSON.stringify(['EVENT', fine]));
   await relay.message(sender, JSON.stringify(['EVENT', seat]));
   assert.deepEqual(sender.of('OK').slice(1).map((m) => m[2]), [true, true]);
@@ -78,12 +81,12 @@ test('a picture already held when the list names it is let go of before anyone i
   let row = null;
   const forgotten = [];
   const screen = pictureScreen({ read: () => row, everyMs: 0 });
-  const relay = objectRelay(verify, { tag: pool, withhold: (e) => screen.withheld(e), forget: (e) => forgotten.push(e.id) });
+  const relay = objectRelay(verify, { tag: pool, house: house.public, withhold: (e) => screen.withheld(e), forget: (e) => forgotten.push(e.id) });
   const sender = socket();
   relay.open(sender);
   const down = await picture(keys[0], taken, { at: 1000 });
   const kept = await picture(keys[1], other, { at: 1001 });
-  const seat = await seating(keys[1], 1002);
+  const seat = await seating(house, 1002);
   for (const e of [down, kept, seat]) await relay.message(sender, JSON.stringify(['EVENT', e]));
   assert.equal(relay.stored, 3, 'before the operator took it down');
 

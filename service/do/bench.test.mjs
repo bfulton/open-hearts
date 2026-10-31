@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 
-import { Bench, LOOK_EVERY_MS } from './bench.mjs';
+import { Bench, LOOK_EVERY_MS, wakePath } from './bench.mjs';
 
 /// A container with the runtime's shape, and a house inside it that
 /// answers as service/bin/house.dart does once [startsAfter] pings have
@@ -20,7 +20,7 @@ function container({ startsAfter = 2 } = {}) {
     signals: [],
     timeouts: [],
     pings: 0,
-    bench: { online: false, serving: 0, woken: [], answers: true },
+    bench: { online: false, serving: 0, woken: [], pools: [], told: [], answers: true },
     start(options) {
       this.running = true;
       this.started.push(options);
@@ -50,7 +50,9 @@ function container({ startsAfter = 2 } = {}) {
           if (!c.bench.answers) throw new Error('no answer');
           if (u.pathname === '/status') return Response.json({ online: c.bench.online, serving: c.bench.serving });
           if (u.pathname === '/wake' && init.method === 'POST') {
-            c.bench.woken.push(u.searchParams.get('table'));
+            if (u.searchParams.has('pool')) c.bench.pools.push(u.searchParams.get('pool'));
+            else c.bench.woken.push(u.searchParams.get('table'));
+            c.bench.told.push(JSON.parse(init.body ?? 'null'));
             c.bench.online = true;
             return new Response('awake');
           }
@@ -101,6 +103,43 @@ test('a table wanting the house starts it, waits for it, and tells it of the tab
   assert.equal(c.started.length, 1);
   assert.deepEqual(c.bench.woken, ['tbl1', 'tbl2']);
   assert.equal((await bench.fetch(new Request('https://bench/wake', { method: 'POST' }))).status, 400, 'a wake names its table');
+});
+
+test('a pool wanting the house wakes it for the pool, and every wake says the operator\'s clocks', async () => {
+  const c = container({ startsAfter: 0 });
+  const s = state(c);
+  // The operator's row (service/functions/config.mjs), as a device is
+  // served it: the table's clocks it names, and nothing it does not.
+  let row = { live: true, table: { bankMs: 30000, nonsense: 1 } };
+  let down = false;
+  const store = {
+    get: async (key, type) => {
+      if (down) throw new Error('the store is down');
+      assert.equal(type, 'json');
+      return key === 'config|app' ? row : null;
+    },
+  };
+  const bench = new Bench(s, { OH_HOUSE_SECRET: 'ab'.repeat(32), OH_STORE: store });
+  // As the pool's object asks (worker.mjs, wake).
+  assert.equal(wakePath('queue:unrated:100'), '/wake?pool=queue%3Aunrated%3A100');
+  assert.equal(wakePath('ab'.repeat(16)), `/wake?table=${'ab'.repeat(16)}`);
+  const res = await bench.fetch(new Request(`https://bench${wakePath('queue:unrated:100')}`, { method: 'POST' }));
+  assert.equal(res.status, 200);
+  assert.deepEqual(c.bench.pools, ['queue:unrated:100']);
+  assert.deepEqual(c.bench.woken, [], 'a pool, not a table');
+  assert.deepEqual(c.bench.told.at(-1), { timing: { bankMs: 30000 } });
+  // A table's wake says them too, so the house seating a busy pool
+  // hears of a change.
+  row = { table: { bankMs: 5 } };
+  await wake(bench, 'tbl1');
+  assert.deepEqual(c.bench.told.at(-1), { timing: null }, 'a row out of bounds is the standard table, as a device is served it');
+  row = null;
+  await wake(bench, 'tbl2');
+  assert.deepEqual(c.bench.told.at(-1), { timing: null }, 'no row: the standard table');
+  down = true;
+  await wake(bench, 'tbl3');
+  assert.deepEqual(c.bench.told.at(-1), {}, 'a store that cannot be read says nothing, and the house keeps what it has');
+  assert.equal((await bench.fetch(new Request('https://bench/wake?pool=', { method: 'POST' }))).status, 400, 'a wake names its pool');
 });
 
 test('a house started with anything else is started again with this', async () => {

@@ -450,12 +450,13 @@ const chosenSizes = sizes.filter((s) => !argOf('size') || s.name === argOf('size
 const chosenLanguages = languages.filter((l) => !argOf('lang') || l.code === argOf('lang'));
 const chosenShots = shots.filter((s) => !only || s.name === only);
 
-const relay = await startRelay();
 // The longest grace the operator may set before a turn's clock shows
 // (packages/table, timing.dart): a clock counting down by the second
 // never lets the live table's screen come to rest, and is no part of
-// the picture.
-const app = await serveApp({ relayPort: relay.port, config: { table: { graceMs: 60000 } } });
+// the picture. The house seats the pool by it as the app is served it.
+const config = { table: { graceMs: 60000 } };
+const relay = await startRelay({ config });
+const app = await serveApp({ relayPort: relay.port, config });
 const browser = await chromium.launch();
 try {
   for (const size of chosenShots.length ? chosenSizes : []) {

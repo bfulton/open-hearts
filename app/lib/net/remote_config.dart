@@ -322,11 +322,12 @@ class RemoteConfig {
   /// service was deployed with.
   final List<LegalNotice> notices;
 
-  /// The clocks of a table this device starts — a person's grace and
-  /// bank, the house's deadlines, the wait on a closed line — carried
-  /// in the start event, so every seat plays by the starter's
+  /// The clocks of a friends' table this device starts — a person's
+  /// grace and bank, the house's deadlines, the wait on a closed line —
+  /// carried in the start event, so every seat plays by the starter's
   /// (packages/table, timing.dart). A table someone else starts keeps
-  /// theirs.
+  /// theirs, and a pool's has the house's, from the same row
+  /// (service/do/bench.mjs).
   final TableTiming table;
 
   /// How long this device waits on the network before it says so or

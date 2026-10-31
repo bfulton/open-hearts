@@ -24,9 +24,11 @@
 // on stdin is what the account's own object tells the deployed one.
 // `--house <key>` is the house: the one key carried on its answer
 // alone, the house a table's tag referees sealed tables for and takes
-// results from (referee.mjs). Each time a table wants it and it is not
-// there, `{"wanted": <table>}` is said on stdout: where the deployed
-// object wakes the house's container (worker.mjs), a test starts one.
+// results from (referee.mjs), and the one a pool's seating is carried
+// from (pool.mjs). Each time a table or a pool wants it and it is not
+// there, `{"wanted": <table or pool>}` is said on stdout: where the
+// deployed object wakes the house's container (worker.mjs), a test
+// starts one.
 
 import { createHash } from 'node:crypto';
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -63,8 +65,9 @@ export function alsoFakeSignatures(verify) {
 /// (worker.mjs): presence's limits on `online`, a table's on every other
 /// tag, only the lobby kind tagged for the tag stored, and a table's
 /// tag the table's referee, for [house], telling [onWanted] of the table
-/// whenever it wants the house and the house is not there — so a table
-/// played here meets the rules it will meet on Cloudflare.
+/// — or of a pool, while somebody waits there — whenever it wants the
+/// house and the house is not there: so a table played here, and a pool
+/// waited in, meet the rules they will meet on Cloudflare.
 export async function serve({ port = 0, host = '127.0.0.1', keep = 10000, log = null, refuse = null, onChange = null, object = false, gate = null, house = null, onWanted = null } = {}) {
   const verify = alsoFakeSignatures(await schnorrVerifier(readFileSync(wasmPath)));
   const relays = new Map();

@@ -67,16 +67,24 @@ all.
 
 ### Matchmaking
 
-There is no matchmaker (`packages/table/lib/src/matching.dart`).
-Players who want a game say so on the relay at every heartbeat
-(`heartbeatMs`), in a pool whose tag names the target score and whether
-it is rated. Each says its rating, its pace, how long it has waited and
-its licence. Time is cut into rounds (`roundMs`). In each round the
-lowest key present acts as host: it runs the seating rule over everyone
-it has heard from and publishes one signed seating per table. If the
-host says nothing, the next key steps in, so a host can waste a round
-but cannot forge a play. A device entering a pool reads the seatings of
-the last minute (`poolHistorySeconds`).
+The house seats the pools (`PoolHost` in
+`packages/table/lib/src/matching.dart`). Players who want a game say so
+on the relay at every heartbeat (`heartbeatMs`), in a pool whose tag
+names the target score and whether it is rated. Each says its rating,
+its pace, how long it has waited and its licence. The pool's object on
+the relay wakes the house while anybody waits there and the house is
+not there (`service/do/pool.mjs`), as a table's object wakes it for a
+table. Time is cut into rounds (`poolRoundMs`). In each round the house
+runs the seating rule over everyone it hears and publishes one seating
+per table, signed by its key. A device entering a pool reads the
+seatings of the last minute (`poolHistorySeconds`).
+
+A seating is the house's alone. A device takes one from its build's
+house and nobody else, and the pool's object carries one from nobody
+else either: anybody else's is answered as taken, so that the device
+that said it is not held out of the relay for it, and goes to nobody.
+That one is a stray: an app from before the house seated the pools, or
+somebody trying it on.
 
 The rule:
 
@@ -98,7 +106,7 @@ does. Choosing it tells the operator, so that someone can come and play
 agree on: the seats with their licences, the target score, whether it
 is rated, the table's clocks and the house. The table's id is the first
 128 bits of the SHA-256 of all of it, as it is written, with 128 bits of
-salt from the host so that nobody who saw the seats can work the id out
+salt from the house so that nobody who saw the seats can work the id out
 (`TableSpec.id` in `spec.dart`). The id is the table's address: the tag
 its object on the relay is named by. A device seated works the id out
 again from the seating, and sits only at one whose id is its own. The
@@ -106,21 +114,26 @@ referee takes the log's start only as the spec its table's id names
 ([the referee](#the-referee)), so one person at a table cannot start it
 as anything but the table everybody was seated at.
 
-Two hosts with different views may both seat a round: the next in line
-steps in when the host's seating has not reached it in time. A device
-takes the lowest table id among the seatings naming it that arrive
-within a tenth of a round of the first, and no later one. Usually that
-is the same table for everyone. When a seating reaches some devices in
-time and others too late, people seated together end up at different
-tables. Each person still sits at exactly one table, and a seat nobody
-comes to loses its first turn to its clock and is played by a bot. Only
-something in charge of seating could rule this out, and nothing is.
+**Each player is seated once.** Whoever a seating names leaves the
+pool as it is said. The house hears nothing from them for
+`poolStaleMs`, longer than any heartbeat they sent before the seating
+reached them takes to arrive, and after that hears them only if they
+are still saying they wait, as a device that never took its seating
+is. So nobody is named at two tables, and people seated together sit
+together. There is one house for every pool and every table
+(`max_instances` in `service/do/wrangler.toml`).
+
+Every table a pool seats is sealed and has the house at it, so a pool
+needs nothing of the house that its tables did not. With the house
+away, nobody is seated, as no sealed table could start without it, and
+a device still waiting at its far deadline goes back to the door, saying
+so (`relayGiveUp`).
 
 A seating names each seat's licence. Nobody sits at one where a seat's
 licence is not the service's word for that seat's key, or where an
-account sits twice, and a waiter without a licence is not seated by
-anyone. A sealed seating names the house of the build that made it
-(`OH_HOUSE_KEY`), and a device sits only at one naming its own.
+account sits twice, and a waiter without a licence is not seated. A
+seating names the house that made it (`OH_HOUSE_KEY`), and a device
+sits only at one naming its own.
 
 **Pace**, seconds a card, is matched because three fast players and one
 slow one make a bad evening for all four. It is a device's own account
@@ -379,9 +392,12 @@ and no bank: a bot's move is worked out, not thought about. Past them
 it is waited for `houseGraceMs` more, time for a house started again to
 come back and read the log, and then the game fails.
 
-A table's clocks are chosen by the device that seats it, from its
-remote config ([the service](service.md#remote-config)), and ride in
-the start in full (`TableTiming` in `timing.dart`, `TableTiming.exactly`):
+A table's clocks are the operator's, from the `table` field of the
+remote config row ([the service](service.md#remote-config)): a pool's
+table has them from the house, which the relay tells them with every
+wake (`clocks` in `service/do/bench.mjs`), and a friends' table from
+the remote config of the device that starts it. They ride in the start
+in full (`TableTiming` in `timing.dart`, `TableTiming.exactly`):
 every side has to time the same table by the same clocks. A start that
 leaves a clock out, or names one this build does not know, is no table
 it sits at. Every clock, with its standard value and bounds, is in the

@@ -819,10 +819,15 @@ Container running `service/bin/house.dart` if it is not running, waits
 for it to answer, and tells it of the table. The house reads the table's
 log from its first entry, so a house started again goes on where the log
 is. Its signing key and every secret it makes come from one secret,
-`OH_HOUSE_SECRET`, so they are the same across restarts. Once it has
-served no table and been woken by none for ten minutes, the object stops
-the container. The image is built from the repository on every relay
-deploy (`service/bench/build.sh`).
+`OH_HOUSE_SECRET`, so they are the same across restarts. A pool's object
+wakes it the same way while somebody waits there and the house is not
+(`service/do/pool.mjs`), and the house then seats the pool
+([matchmaking](live-play.md#matchmaking)). Every wake tells it the
+operator's clocks for the tables it seats, from the remote config row
+as a device is served it (`clocks` in `service/do/bench.mjs`). Once it
+has served no table or pool and been woken by none for ten minutes, the
+object stops the container. The image is built from the repository on
+every relay deploy (`service/bench/build.sh`).
 
 ## Deployment
 

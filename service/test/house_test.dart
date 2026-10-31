@@ -1,7 +1,8 @@
 /// The house as it runs (service/bin/house.dart): a process of its own,
-/// woken on its port for a table that wants it — as the Cloudflare
-/// Container is, by the table's object (service/do/bench.mjs) — and
-/// following the table from its log, on real sockets, with real keys.
+/// woken on its port for a table or a pool that wants it — as the
+/// Cloudflare Container is, by the tag's object (service/do/bench.mjs) —
+/// and following the table from its log, or seating the pool, on real
+/// sockets, with real keys.
 library;
 
 import 'dart:async';
@@ -56,10 +57,11 @@ class HouseProcess {
 
   Uri at(String path, [Map<String, String>? query]) => Uri(scheme: 'http', host: '127.0.0.1', port: port, path: path, queryParameters: query);
 
-  Future<(int, String)> ask(String method, String path, [Map<String, String>? query]) async {
+  Future<(int, String)> ask(String method, String path, [Map<String, String>? query, Object? body]) async {
     final client = HttpClient();
     try {
       final req = await client.openUrl(method, at(path, query));
+      if (body != null) req.write(jsonEncode(body));
       final res = await req.close();
       return (res.statusCode, await res.transform(utf8.decoder).join());
     } finally {
@@ -153,6 +155,66 @@ void main() {
         within: const Duration(seconds: 10));
     expect(jsonDecode((await house.ask('GET', '/status')).$2)['online'], isTrue);
   }, timeout: const Timeout(Duration(minutes: 5)));
+
+  test('woken for a pool, the house seats it, by the clocks the wake says', () async {
+    late HouseProcess house;
+    final wanted = <String>[];
+    // The operator's clocks, as the bench says them with every wake.
+    final clocks = TableTiming.parse({'graceMs': 4000});
+    final relay = Relay(
+      house: _house,
+      // What the pool's object does: the house woken on its port.
+      onWanted: (tag) {
+        wanted.add(tag);
+        final what = tag.startsWith(RelayTransport.poolPrefix) ? 'pool' : 'table';
+        unawaited(house.ask('POST', '/wake', {what: tag}, {'timing': clocks.toJson()}).then((_) {}, onError: (_) {}));
+      },
+    );
+    await relay.serve();
+    addTearDown(relay.close);
+    house = await HouseProcess.start(relay, env: {'OH_HOUSE_KEY': _house});
+    addTearDown(house.stop);
+    await until('the house did not come up: ${house.said}', house.up, within: const Duration(seconds: 60));
+    for (final tag in ['queue:ranked', 'queue:unrated:50', 'queue:unrated:0', 'ROOM42']) {
+      expect((await house.ask('POST', '/wake', {'pool': tag})).$1, 400, reason: '$tag is no pool');
+    }
+    expect(jsonDecode((await house.ask('GET', '/status')).$2)['serving'], 0, reason: 'nothing woken for that');
+
+    final me = SchnorrSigner.generate();
+    final t = RelayTransport(relays: [relay.url], signer: me, table: poolTag('unrated'));
+    await t.ready;
+    final room = WaitingRoom(relay: t, pool: 'unrated', name: 'Ada', rating: 1500, house: _house);
+    addTearDown(() {
+      room.close();
+      t.close();
+    });
+    final seated = room.seated.first;
+    room.playWithBots();
+    final spec = await seated.timeout(const Duration(seconds: 60), onTimeout: () => fail('not seated: ${house.said.join('\n')}'));
+    expect(wanted.first, poolTag('unrated'), reason: 'the pool woke the house');
+    expect(spec.house, _house);
+    expect(spec.sealed, isTrue);
+    expect(spec.timing, clocks, reason: 'the clocks the wake said, not the standard table\'s');
+    expect(spec.seats.whereType<HumanSeat>().map((h) => h.key), [me.publicKey]);
+    expect(spec.seats.whereType<BotSeat>(), hasLength(3));
+    expect(jsonDecode((await house.ask('GET', '/status')).$2), {'online': true, 'serving': 1}, reason: 'seating the pool');
+
+    // The operator changes the clocks; the next wake says so, and the
+    // pool's next seating has them.
+    final later = TableTiming.parse({'graceMs': 6000});
+    expect((await house.ask('POST', '/wake', {'table': 'ab' * 16}, {'timing': later.toJson()})).$1, 200, reason: 'a table\'s wake says them too');
+    final you = SchnorrSigner.generate();
+    final t2 = RelayTransport(relays: [relay.url], signer: you, table: poolTag('unrated'));
+    await t2.ready;
+    final again = WaitingRoom(relay: t2, pool: 'unrated', name: 'Bao', rating: 1500, house: _house);
+    addTearDown(() {
+      again.close();
+      t2.close();
+    });
+    final next = again.seated.first;
+    again.playWithBots();
+    expect((await next.timeout(const Duration(seconds: 30))).timing, later);
+  }, timeout: const Timeout(Duration(minutes: 3)));
 
   test('a house whose secret is not the key the relay takes does not start', () async {
     final relay = Relay(house: _house);

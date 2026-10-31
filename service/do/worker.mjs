@@ -50,7 +50,7 @@ import { PICTURES_ROW } from '../functions/pictures.mjs';
 import { alertKnownProblem, alertPicturesProblem, alertsOf } from '../functions/alerts.mjs';
 import { Household as HouseholdObject } from '../functions/household.mjs';
 import { storeOf } from '../functions/rows.mjs';
-import { Bench as BenchObject } from './bench.mjs';
+import { Bench as BenchObject, wakePath } from './bench.mjs';
 import { withConfig } from '../functions/deployment.mjs';
 // The service's settings that are not secret, as the Pages worker reads
 // them (service/functions/deployment.mjs): here, the service's public
@@ -98,8 +98,9 @@ export class TagRelay {
     // OH_METRICS): a line of counts a minute, and one when the last
     // socket goes, nothing about anyone.
     this.tally = tally(env.OH_METRICS ?? null);
-    // The house woken for this table, when it is wanted and away
-    // (referee.mjs, wakeLimiter): at most one wake every twenty seconds.
+    // The house woken for this table or pool, when it is wanted and away
+    // (referee.mjs, wakeLimiter; pool.mjs): at most one wake every
+    // twenty seconds.
     this.wakeHouse = wakeLimiter({
       wake: () => this.wake(),
       stillWanted: async () => (await this.ready()).wantsHouse,
@@ -113,16 +114,15 @@ export class TagRelay {
     this.owned = ownedScreen({ bucket: this.env.OH_PICTURES ?? null, log: (line) => console.log(line) });
   }
 
-  /// This table's house woken where it is bound (wrangler.toml, BENCH)
-  /// and told of the table, not awaited — the referee has said what it
-  /// had to already, and a wake that does not get through is made again
-  /// on the table's next entry.
+  /// This table's or this pool's house woken where it is bound
+  /// (wrangler.toml, BENCH) and told of the tag, not awaited — the
+  /// referee has said what it had to already, and a wake that does not
+  /// get through is made again on the table's next entry, or as
+  /// somebody next says they are waiting in the pool.
   wake() {
     if (!this.env.BENCH) return;
     const bench = this.env.BENCH.get(this.env.BENCH.idFromName('bench'));
-    this.state.waitUntil(
-      bench.fetch(`https://bench/wake?table=${encodeURIComponent(this.tag)}`, { method: 'POST' }).catch((e) => console.log(`house not woken: ${e}`)),
-    );
+    this.state.waitUntil(bench.fetch(`https://bench${wakePath(this.tag)}`, { method: 'POST' }).catch((e) => console.log(`house not woken: ${e}`)));
   }
 
   /// The relay for this object, built on first use — which is the
