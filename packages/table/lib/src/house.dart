@@ -20,8 +20,10 @@ import 'package:engine/engine.dart' show Persona, seatCount;
 import 'client.dart';
 import 'clock.dart';
 import 'nostr.dart';
+import 'pace.dart' show tablePaceOf;
 import 'referee_line.dart';
 import 'results.dart';
+import 'rules.dart' show TableRules;
 import 'signing.dart';
 import 'spec.dart';
 
@@ -77,16 +79,22 @@ class House {
   /// pace (packages/engine, persona.dart, BotPace): 1 in service, less
   /// in the browser suites, which run every beat of a table faster
   /// (service/bin/house.dart, `--pace`), and 0 — no thought at all —
-  /// in the simulator. The bot's moment is the table's own, in the log
+  /// in the simulator. Never longer than the quickest person at the
+  /// table takes over a card ([quickestPersonMs]): a table does not wait
+  /// on its bots more than on its people, so a person who plays fast, or
+  /// has the Auto switch on, brings the bots along without anybody
+  /// telling them. The bot's moment is the table's own, in the log
   /// (client.dart, botThinkMs), and not a screen's to add: a person's
   /// clock runs from when their turn opens in the log.
   final double pace;
 
   late final Random _rhythm = random ?? Random.secure();
 
-  int _thinkMs(Persona persona) {
+  int _thinkMs(Persona persona, TableRules rules) {
     final p = persona.pace;
-    return ((p.minMs + _rhythm.nextInt(p.maxMs - p.minMs + 1)) * pace).round();
+    final own = ((p.minMs + _rhythm.nextInt(p.maxMs - p.minMs + 1)) * pace).round();
+    final quickest = quickestPersonMs(rules);
+    return quickest == null ? own : min(own, quickest);
   }
 
   final void Function(String table, String line)? trace;
@@ -186,4 +194,17 @@ class _Served {
   TableClient? follower;
   final Map<int, TableClient> seats = {};
   bool told = false;
+}
+
+/// The pace of the quickest person seated at the table [rules] is of
+/// (pace.dart, tablePaceOf), in milliseconds over a card by the
+/// referee's clock; null while nobody seated has played a card. A seat
+/// a bot holds has no card times (TableRules.cardTimesOf).
+int? quickestPersonMs(TableRules rules) {
+  int? quickest;
+  for (var seat = 0; seat < seatCount; seat++) {
+    final ms = tablePaceOf(rules.cardTimesOf(seat));
+    if (ms != null && (quickest == null || ms < quickest)) quickest = ms;
+  }
+  return quickest;
 }

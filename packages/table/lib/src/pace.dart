@@ -98,3 +98,19 @@ class Pace {
 /// no distance from anybody: a new player is seated on their rating
 /// alone, and learns their own pace by playing.
 int paceApart(int a, int b) => a == 0 || b == 0 ? 0 : (a - b).abs();
+
+/// A person's pace at the table, which the bots keep up with: the middle
+/// of [cardMs], the times they took over their last few cards (the
+/// slower of two, or the one), so that one quick card is not a pace and
+/// a few are; null before their first. A person who plays fast, or has
+/// the Auto switch play for them, is quick by it within a card or two.
+/// The house paces its bots by the quickest person at a live table
+/// (house.dart), and a solo table by its one (app, game_controller.dart).
+int? tablePaceOf(List<int> cardMs) {
+  if (cardMs.isEmpty) return null;
+  final sorted = [...cardMs]..sort();
+  return sorted[sorted.length ~/ 2];
+}
+
+/// How many of a person's last cards [tablePaceOf] is taken over.
+const tablePaceCards = 3;

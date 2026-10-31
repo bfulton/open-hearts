@@ -80,6 +80,97 @@ void main() {
       t.close();
     }, timeout: const Timeout(Duration(minutes: 5)));
 
+    // A person's card over the sim's line: their thought, and its 30 ms
+    // each way; a bot's, after the card before: its thought, and the
+    // house's line's 30 ms each way.
+    const line = 30;
+    int took(int thinkMs) => thinkMs + 2 * line;
+
+    test('a house keeps its bots up with the quickest person at the table, and a slow one slows nobody', () {
+      final t = SimTable(humans: 2, seed: 5, crypto: crypto, housePace: 1, target: 1);
+      t.people[0].thinkMs = 3000;
+      t.people[1].thinkMs = 100;
+      t.start();
+      expect(t.run(), isTrue, reason: 'the game plays out');
+      agree(t);
+      final quick = t.clients[1];
+      expect(quick.rules.cardTimesOf(quick.mySeat!), [took(100), took(100), took(100)], reason: 'the quick person\'s last three cards, as the log timed them');
+      final plays = [
+        for (final e in t.referee.log)
+          if (e.event?.kind == EventKind.play) e,
+      ];
+      var quickCards = 0;
+      var kept = 0;
+      for (var i = 0; i < plays.length; i++) {
+        final by = plays[i].event!.author;
+        if (by == quick.signer.publicKey) quickCards++;
+        if (i == 0 || by != t.houseSigner.publicKey || quickCards == 0) continue;
+        kept++;
+        expect(plays[i].t - plays[i - 1].t, lessThanOrEqualTo(took(100) + 2 * line), reason: 'card $i: no longer than the quick person over theirs');
+      }
+      expect(kept, greaterThan(20), reason: 'the house played bots\' cards after the quick person\'s first: $kept');
+      t.close();
+    }, timeout: const Timeout(Duration(minutes: 5)));
+
+    test('a person\'s pace is their cards, not their pass, and goes with them when they leave', () {
+      final t = SimTable(humans: 2, seed: 5, crypto: crypto, housePace: 1);
+      final person = t.people[0];
+      final seat = t.clients[0].mySeat!;
+      person.thinkMs = 5000;
+      t.start();
+      expect(t.clock.runUntil(() => t.clients[0].started && t.clients[0].game.phase == Phase.playing, limitMs: 600000), isTrue, reason: 'the pass, slowly');
+      person.thinkMs = 100;
+      final watcher = t.clients[1].rules;
+      expect(t.clock.runUntil(() => watcher.cardTimesOf(seat).length >= 2, limitMs: 600000), isTrue);
+      expect(watcher.cardTimesOf(seat), [took(100), took(100)], reason: 'two cards, quickly; the pass is not a card');
+      person.depart(Going.leave);
+      expect(t.clock.runUntil(() => watcher.holders[seat] is BotSeat, limitMs: 60000), isTrue, reason: 'the seat a bot\'s');
+      expect(watcher.cardTimesOf(seat), isEmpty, reason: 'a person gone keeps no pace at the table');
+      t.close();
+    }, timeout: const Timeout(Duration(minutes: 5)));
+
+    test('a person who speeds up, as the Auto switch does, has the bots keep up within two of their cards', () {
+      final t = SimTable(humans: 1, seed: 5, crypto: crypto, housePace: 1, target: 1);
+      final person = t.people.single;
+      person.thinkMs = 2500;
+      t.start();
+      bool played(int n) => t.referee.log.where((e) => e.event?.kind == EventKind.play && e.event!.author != t.houseSigner.publicKey).length >= n;
+      expect(t.clock.runUntil(() => played(5), limitMs: 600000), isTrue, reason: 'five of the person\'s cards, slowly');
+      person.thinkMs = 100;
+      expect(t.run(), isTrue, reason: 'the game plays out');
+      agree(t);
+      final plays = [
+        for (final e in t.referee.log)
+          if (e.event?.kind == EventKind.play) e,
+      ];
+      var theirs = 0;
+      var before = 0;
+      var after = 0;
+      for (var i = 0; i < plays.length; i++) {
+        if (plays[i].event!.author != t.houseSigner.publicKey) {
+          theirs++;
+          continue;
+        }
+        if (i == 0) continue;
+        final gap = plays[i].t - plays[i - 1].t;
+        if (theirs <= 5) {
+          // Slower than any bot: each bot takes its own moment.
+          if (theirs > 0) before++;
+          expect(gap, greaterThanOrEqualTo(BotPace.quick.minMs + 2 * line), reason: 'card $i, the person still slow');
+        } else if (theirs == 6) {
+          // One quick card among slow ones is not a pace yet.
+          expect(gap, greaterThanOrEqualTo(BotPace.quick.minMs + 2 * line), reason: 'card $i, one quick card');
+        } else if (theirs >= 7) {
+          // Two quick cards: the middle of their last three is quick.
+          after++;
+          expect(gap, lessThanOrEqualTo(took(100) + 2 * line), reason: 'card $i, the person quick for two cards');
+        }
+      }
+      expect(before, greaterThan(5), reason: 'bots\' cards while the person was slow: $before');
+      expect(after, greaterThan(10), reason: 'bots\' cards once the person was quick: $after');
+      t.close();
+    }, timeout: const Timeout(Duration(minutes: 5)));
+
     test('four people play a whole sealed game', () {
       final t = SimTable(humans: 4, seed: 7, crypto: crypto);
       t.start();
