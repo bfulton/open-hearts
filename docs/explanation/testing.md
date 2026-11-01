@@ -12,7 +12,8 @@ by side (`.github/workflows/ci.yml`). One more needs a Mac, so
 `./check.sh` does not run it: the `ios` workflow
 (`.github/workflows/ios.yml`) builds the deal's frameworks and the app,
 and checks on a simulator that the libraries load as the app loads them
-and make the same bytes as the build the other suites test
+and make the same bytes as the build the other suites test, and that the
+iPhone's native side for the device's secret key answers
 (`app/integration_test/native_libs_test.dart`).
 
 `quick` checks what a change touches. It reads the paths that differ from

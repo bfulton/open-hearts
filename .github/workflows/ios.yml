@@ -1,9 +1,10 @@
 # The iOS app and the deal and Schnorr libraries it embeds
 # (crypto/build_ios.sh): the XCFrameworks built, the app built for a
-# simulator and the libraries loaded there the way the app loads them
-# (app/integration_test/native_libs_test.dart), then the release build,
-# unsigned, as an archive makes it. Without the libraries an iPhone
-# plays no live table.
+# simulator and the libraries loaded there the way the app loads them,
+# and the native call that keeps the device's secret key out of backups
+# asked (app/integration_test/native_libs_test.dart), then the release
+# build, unsigned, as an archive makes it. Without the libraries an
+# iPhone plays no live table.
 #
 # On a Mac, which is minutes the Linux jobs in ci.yml do not wait on,
 # and only when something it builds changed. The repository is public,

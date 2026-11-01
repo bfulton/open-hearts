@@ -755,7 +755,44 @@ A device's identity is a keypair made on the device when first needed
 (`app/lib/identity.dart`): an x-only secp256k1 key with BIP-340 Schnorr
 signatures (`signing.dart`, and on the web the wasm built from
 `crypto/schnorr_wasm`). The key signs every move and never leaves the
-device. A person is an **account**, made when they subscribe
+device.
+
+That includes the phone's backups. A phone backs up an app's
+preferences, to its owner's Google or iCloud account and to the next
+phone, so on a phone the key is not kept among them
+(`app/lib/secret_store.dart`):
+
+- **Android** keeps it in a preferences file of its own, `identity.xml`.
+  `res/xml/data_extraction_rules.xml` (Android 12 and later: Google's
+  backup, and a transfer to a new phone) and `res/xml/backup_rules.xml`
+  (11 and earlier) leave that file out, and nothing else.
+- **The iPhone** keeps it in a file in Application Support marked as not
+  to be backed up (`IosSecretStore`, with two calls in
+  `app/ios/Runner/AppDelegate.swift`). The file is written only after it
+  is marked, and the app refuses a key its file does not say is marked.
+- Both go with the app when it is deleted, as the preferences did, so
+  deleting the app still removes the key. The Keychain is not used: its
+  items outlive the app.
+- The web keeps the key in the browser's storage, as before
+  ([the device, carried over](service.md#the-device-carried-over)).
+
+A phone restored from a backup, or moved to a new phone, comes back
+without its key, as a new player, and gets its account back with a
+backup code, a sign-in or Restore purchases. The rest of what the
+backup holds, the settings among it, comes back.
+
+A device that kept its key among the preferences before moves it at its
+first start (`Identity.signer`): the key is written to the store, read
+back, and taken out of the preferences only when the store gives back
+exactly what was written. A move that fails leaves the key where it was,
+still the device's key, and is tried again at the next start; no key is
+made while either place holds one, and a store that cannot be read is
+not taken for an empty one. A backup made before the move still carries
+the old copy, and a phone restored from it moves that key into its store
+at its first start. Starting afresh deletes the key from the store as
+well as clearing the preferences (`app/lib/start_afresh.dart`).
+
+A person is an **account**, made when they subscribe
 ([the service](service.md)), with a few devices (`mostDevices`, a
 [service setting](../reference/configuration.md)). The service's licence
 names a device's key beside its account's id, and every side checks it
