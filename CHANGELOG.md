@@ -751,7 +751,13 @@ squashed from a pull request, the pull request's number.
   a kept game is put there only by its own seat's device, so one player
   can no longer name everybody else's seats; until a seat's device has
   sent, the game shows that seat as "Player N", as a seat with no name
-  already was. (2026-11-01, #47)
+  already was. A game whose log holds events the table does not read,
+  which a person at the table can put there, is kept the same as any
+  other. A game the operator's deletion tool rewrites, which cannot
+  carry the note that marks it, is checked again when the next copy of
+  it is sent and marked again, so that a late copy of the same game does
+  not replace it and take the other players' names with it.
+  (2026-11-01, #47)
 - Signing in with Apple or Google signs the provider and its token
   with the request, so a sign-in request taken off the wire can no
   longer be sent again with somebody else's sign-in in its place. A
@@ -780,6 +786,17 @@ squashed from a pull request, the pull request's number.
   "Connection failure" screen shows at once instead of a minute later,
   and an earlier build, which does not read the house's word, waits on
   such a table as it did. (2026-11-01, #47)
+- A phone's backups no longer carry the device's secret key. On
+  Android it lives in a preferences file of its own that Google's backup
+  and a transfer to a new phone leave out, and on an iPhone in a file
+  marked as not to be backed up; both go with the app when it is
+  deleted, as before. A phone restored from a backup or moved to a new
+  phone now comes back as a new player, and gets its account back with a
+  backup code, a sign-in or Restore purchases; everything else, the
+  settings among it, is still backed up. A phone updating from an
+  earlier build moves its key at its first start, and keeps it where it
+  was, unchanged, if the move fails. A phone restored from a backup made
+  before this keeps that key in the backup. (2026-11-01, #47)
 - `oh account delete` ends a web subscription that is still running in
   Stripe before it deletes anything, as the app's own deletion does, with
   nothing refunded, and so no longer keeps that subscription's notes of
