@@ -4,6 +4,7 @@
 import { REFUSED } from './refusals.mjs';
 import { bytesOf64, digestOf, hex } from './rows.mjs';
 import { jwtOf } from './signin.mjs';
+import { appleSigned } from './x509.mjs';
 
 // ---- buying in a store -------------------------------------------------
 // On a phone, live play is the store's own subscription
@@ -45,6 +46,34 @@ export async function storeAccountOf(key) {
   u[8] = (u[8] & 0x3f) | 0x80;
   const x = hex(u);
   return { google: hex(h), apple: `${x.slice(0, 8)}-${x.slice(8, 12)}-${x.slice(12, 16)}-${x.slice(16, 20)}-${x.slice(20)}` };
+}
+
+// ---- the App Store -------------------------------------------------------
+
+/// A checked App Store transaction, as this service reads it: the
+/// subscription, when it runs to, whether it has ended, and whom it
+/// was bought for. {status, body} when it is not one of ours.
+export async function appleTransaction(jws, env, { now = Date.now() } = {}) {
+  const bundle = env.OH_APPLE_BUNDLE_ID;
+  const product = env.OH_APPLE_PRODUCT;
+  if (!bundle || !product) return { status: 503, body: { error: REFUSED.storeNotSetUp } };
+  const t = await appleSigned(jws, { now });
+  if (!t) return { status: 401, body: { error: REFUSED.notFromStore } };
+  // Another app's, another product's, or not a subscription at all.
+  if (t.bundleId !== bundle || t.productId !== product || t.type !== 'Auto-Renewable Subscription') {
+    return { status: 401, body: { error: REFUSED.notFromStore } };
+  }
+  if (typeof t.originalTransactionId !== 'string' || !/^\d{1,32}$/.test(t.originalTransactionId) || !Number.isFinite(t.expiresDate)) {
+    return { status: 401, body: { error: REFUSED.notFromStore } };
+  }
+  return {
+    subscription: `apple:${t.originalTransactionId}`,
+    until: t.expiresDate,
+    gone: t.revocationDate != null,
+    account: typeof t.appAccountToken === 'string' ? t.appAccountToken.toLowerCase() : null,
+    created: Number.isFinite(t.signedDate) ? Math.floor(t.signedDate / 1000) : null,
+    txn_ref: typeof t.transactionId === 'string' ? t.transactionId : null,
+  };
 }
 
 // ---- Google Play ---------------------------------------------------------

@@ -7,7 +7,7 @@ import { test } from 'node:test';
 import { BACKUP_CODES, backupCodeOf, backupsFor, backupsMade, devicesOn, entitlementOf, redeemBackup } from './accounts.mjs';
 import { backupMailHtml, backupMailText, mailerOf, moneyOf } from './household.mjs';
 import { memoryStore } from './rows.mjs';
-import { payerEmail, payerLookup, record } from './stripe.mjs';
+import { payerLookup, record } from './stripe.mjs';
 
 const KEY = 'ab'.repeat(32);
 const now = Date.UTC(2026, 9, 2);
@@ -187,11 +187,11 @@ test('the payer\'s address is read from Stripe when it is needed, and only for a
     asked.push({ url: String(url), auth: init.headers.authorization });
     return new Response(JSON.stringify({ id: 'cus_1', email: 'payer@example.com' }), { status: 200 });
   };
-  assert.equal(await payerEmail(store, 'sub_9', { OH_STRIPE_SECRET: 'rk_x' }, fetchImpl), 'payer@example.com');
+  assert.equal((await payerLookup(store, 'sub_9', { OH_STRIPE_SECRET: 'rk_x' }, fetchImpl)).email, 'payer@example.com');
   assert.deepEqual(asked, [{ url: 'https://api.stripe.com/v1/customers/cus_1', auth: 'Bearer rk_x' }]);
-  assert.equal(await payerEmail(store, 'sub_9', {}, fetchImpl), null, 'no key, no address');
-  assert.equal(await payerEmail(store, 'apple_1', { OH_STRIPE_SECRET: 'rk_x' }, fetchImpl), null);
-  assert.equal(await payerEmail(store, 'sub_9', { OH_STRIPE_SECRET: 'rk_x' }, async () => new Response('', { status: 500 })), null);
+  assert.equal((await payerLookup(store, 'sub_9', {}, fetchImpl)).email, null, 'no key, no address');
+  assert.equal((await payerLookup(store, 'apple_1', { OH_STRIPE_SECRET: 'rk_x' }, fetchImpl)).email, null);
+  assert.equal((await payerLookup(store, 'sub_9', { OH_STRIPE_SECRET: 'rk_x' }, async () => new Response('', { status: 500 }))).email, null);
   // And why not, for the log.
   const refused = async () => Response.json({ error: { code: 'secret_key_required' } }, { status: 403 });
   assert.equal((await payerLookup(store, 'sub_9', { OH_STRIPE_SECRET: 'rk_x' }, refused)).why, 'Stripe said 403 (secret_key_required)');

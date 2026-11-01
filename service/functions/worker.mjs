@@ -33,12 +33,12 @@ import { REFUSED } from './refusals.mjs';
 import { bytesOf64, isAccount, storeOf } from './rows.mjs';
 import { S, notConfigured, openHouse, settle } from './settings.mjs';
 import { APPLE_ID_GONE, PROVIDERS, appleIdNotice, supersede, unlinkFromAccount, whoSignedIn } from './signin.mjs';
-import { playPurchase, playSubscriptionOf, pushedByPlay, storeAccountOf } from './stores.mjs';
+import { appleTransaction, playPurchase, playSubscriptionOf, pushedByPlay, storeAccountOf } from './stores.mjs';
 import { checkout, endAtStripe, endRefunded, manage, payerLookup, record, sameSite, webSubscriptionsOf, webhookSigned } from './stripe.mjs';
 import { dateSubscription } from './subscriptions.mjs';
 import { SUSPENDED_WHY, isOrder, orderRow } from './suspension.mjs';
 import { LOCAL_TURN, mint } from './turn.mjs';
-import { appleSigned, appleTransaction } from './x509.mjs';
+import { appleSigned } from './x509.mjs';
 
 async function ticketRoute(request, env) {
   const pre = preflight(request, 'POST');
@@ -176,8 +176,7 @@ async function activateRoute(request, env) {
   // in shows the one, before the store here has the other.
   const { account, shown } = await accountAsking(store, key, body, env, { signer, now });
   if (!account) return json(request, 402, { error: REFUSED.noSubscription });
-  const seated = body.seated === undefined ? undefined : body.seated;
-  const took = await inHousehold(env, account, { op: 'activate', key, account, want: body.want, ...(seated !== undefined ? { seated } : {}), shown });
+  const took = await inHousehold(env, account, { op: 'activate', key, account, want: body.want, ...(body.seated !== undefined ? { seated: body.seated } : {}), shown });
   if (took.status !== 200) return json(request, took.status, took.body);
   // An hour, and never past the end of the day the subscription is paid
   // to.

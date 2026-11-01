@@ -1,6 +1,5 @@
 // Certificates, as little of X.509 as the App Store's chain needs.
 
-import { REFUSED } from './refusals.mjs';
 import { bytesOf64, un64 } from './rows.mjs';
 
 /// One DER element at [at]: its tag, where its content starts and ends.
@@ -147,19 +146,20 @@ export const forgetAppleRoots = () => (appleRoots = [APPLE_ROOT_G3]);
 const APPLE_INTERMEDIATE = '1.2.840.113635.100.6.2.1';
 const APPLE_STORE_LEAF = '1.2.840.113635.100.6.11.1';
 
-/// What an App Store JWS says, once its chain ends at one of [roots] and
-/// its signature is the leaf's; null when it does not check out. The
+/// What an App Store JWS says, once its chain ends at one of Apple's
+/// roots and its signature is the leaf's; null when it does not check
+/// out. The
 /// certificates are checked at the moment the payload says it was
 /// signed, which is how Apple's own library checks them: what Apple
 /// signed while a certificate was good stays signed after it expires.
-export async function appleSigned(jws, { roots = appleRoots, now = Date.now() } = {}) {
+export async function appleSigned(jws, { now = Date.now() } = {}) {
   try {
     const parts = String(jws ?? '').split('.');
     if (parts.length !== 3) return null;
     const header = JSON.parse(new TextDecoder().decode(un64(parts[0])));
     if (header.alg !== 'ES256' || !Array.isArray(header.x5c) || header.x5c.length !== 3) return null;
     const ders = header.x5c.map(bytesOf64);
-    if (!roots.some((r) => sameBytes(r, ders[2]))) return null;
+    if (!appleRoots.some((r) => sameBytes(r, ders[2]))) return null;
     const [leaf, middle, root] = ders.map(certOf);
     const payload = JSON.parse(new TextDecoder().decode(un64(parts[1])));
     const at = Number.isFinite(payload.signedDate) ? payload.signedDate : now;
@@ -175,30 +175,4 @@ export async function appleSigned(jws, { roots = appleRoots, now = Date.now() } 
   } catch {
     return null;
   }
-}
-
-/// A checked App Store transaction, as this service reads it: the
-/// subscription, when it runs to, whether it has ended, and whom it
-/// was bought for. {status, body} when it is not one of ours.
-export async function appleTransaction(jws, env, { roots, now = Date.now() } = {}) {
-  const bundle = env.OH_APPLE_BUNDLE_ID;
-  const product = env.OH_APPLE_PRODUCT;
-  if (!bundle || !product) return { status: 503, body: { error: REFUSED.storeNotSetUp } };
-  const t = await appleSigned(jws, { roots, now });
-  if (!t) return { status: 401, body: { error: REFUSED.notFromStore } };
-  // Another app's, another product's, or not a subscription at all.
-  if (t.bundleId !== bundle || t.productId !== product || t.type !== 'Auto-Renewable Subscription') {
-    return { status: 401, body: { error: REFUSED.notFromStore } };
-  }
-  if (typeof t.originalTransactionId !== 'string' || !/^\d{1,32}$/.test(t.originalTransactionId) || !Number.isFinite(t.expiresDate)) {
-    return { status: 401, body: { error: REFUSED.notFromStore } };
-  }
-  return {
-    subscription: `apple:${t.originalTransactionId}`,
-    until: t.expiresDate,
-    gone: t.revocationDate != null,
-    account: typeof t.appAccountToken === 'string' ? t.appAccountToken.toLowerCase() : null,
-    created: Number.isFinite(t.signedDate) ? Math.floor(t.signedDate / 1000) : null,
-    txn_ref: typeof t.transactionId === 'string' ? t.transactionId : null,
-  };
 }

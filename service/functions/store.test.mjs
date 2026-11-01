@@ -13,9 +13,9 @@ import { signerOn } from './licence.mjs';
 import { objectsAt, seenFrom } from './places.fixtures.mjs';
 import { memoryStore } from './rows.mjs';
 import { forgetProviderKeys } from './signin.mjs';
-import { forgetPlayAccess, playPurchase, storeAccountOf } from './stores.mjs';
+import { appleTransaction, forgetPlayAccess, playPurchase, storeAccountOf } from './stores.mjs';
 import { record } from './stripe.mjs';
-import { APPLE_ROOT_G3, appleSigned, appleTransaction, certOf, forgetAppleRoots, signedBy, trustAppleRoots } from './x509.mjs';
+import { APPLE_ROOT_G3, appleSigned, certOf, forgetAppleRoots, signedBy, trustAppleRoots } from './x509.mjs';
 import { keys } from '../do/sign.mjs';
 import * as pki from './store.fixtures.mjs';
 

@@ -450,16 +450,11 @@ export async function manage(key, back, store, env, fetchImpl = fetch) {
   return { status: 200, body: { url: session.url } };
 }
 
-/// The email Stripe holds for the customer behind [subscription], or
-/// null: read when backup codes are sent, and not kept. The account's
-/// subscription, for an account.
-export async function payerEmail(store, subscription, env, fetchImpl = fetch) {
-  return (await payerLookup(store, subscription, env, fetchImpl)).email;
-}
-
-/// [payerEmail], with why there is none: {email, why}. The why goes to
-/// the household with the ask, which logs it beside the send it
-/// stopped (the relay's log is the one that can be read afterwards).
+/// The email Stripe holds for the customer behind [subscription], the
+/// account's, with why there is none: {email, why}. Read when backup
+/// codes are sent, and not kept. The why goes to the household with the
+/// ask, which logs it beside the send it stopped (the relay's log is
+/// the one that can be read afterwards).
 export async function payerLookup(store, subscription, env, fetchImpl = fetch) {
   const secret = env.OH_STRIPE_SECRET;
   if (!secret) return { email: null, why: 'no Stripe key' };
