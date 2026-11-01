@@ -1,6 +1,6 @@
 /// A relay that keeps one object per tag has to be told which object
 /// to open before a socket is any use, so it wears a mark in the list
-/// and the client that has a tag puts it there (presence_relay.dart).
+/// and the client that has a tag puts it there (relays.dart).
 /// And who presence counts as online.
 library;
 
@@ -36,11 +36,11 @@ void main() {
     final me = FakeSigner('01');
     final nowS = DateTime.now().millisecondsSinceEpoch ~/ 1000;
 
-    Map<String, Object?> here(Signer who, String status, {int after = 0}) => NostrEvent.sign(who,
+    Map<String, Object?> here(Signer who, {Map<String, Object?> also = const {}}) => NostrEvent.sign(who,
             kind: TableKinds.presence,
-            content: jsonEncode({'kind': 'here', 'status': status}),
+            content: jsonEncode({'kind': 'here', ...also}),
             tags: [['t', RelayPresence.topic]],
-            createdAt: nowS + after)
+            createdAt: nowS)
         .toJson();
 
     late RelayPresence presence;
@@ -51,16 +51,18 @@ void main() {
       final mine = RelayPresence(relays: [Uri.parse('ws://127.0.0.1:9')], signer: me);
       addTearDown(mine.close);
       // A relay sends a device its own beat, as it sends everyone's.
-      mine.receive(here(me, 'online'));
+      mine.receive(here(me));
       expect(mine.online(withinMs: 15000), {me.publicKey});
       mine.silent = true;
       expect(mine.online(withinMs: 15000), isEmpty, reason: 'not while it is silent, whatever it heard of itself');
     });
 
-    test('somebody at a table is somebody', () {
+    test('somebody who says they are here is online, whatever else an older build says with it', () {
       final them = FakeSigner('02');
-      presence.receive(here(them, RelayPresence.seated));
-      expect(presence.online(withinMs: 15000), {me.publicKey, them.publicKey});
+      final older = FakeSigner('03');
+      presence.receive(here(them));
+      presence.receive(here(older, also: {'status': 'seated'}));
+      expect(presence.online(withinMs: 15000), {me.publicKey, them.publicKey, older.publicKey});
     });
   });
 }

@@ -191,26 +191,22 @@ void main() {
     final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
     Map<String, Object?> beat(Signer s, Activation? a) => NostrEvent.sign(s, kind: TableKinds.presence, content: jsonEncode({
           'kind': 'here',
-          'status': 'online',
           'activation': ?a?.toJson(),
         }), tags: [
           ['t', RelayPresence.topic]
         ], createdAt: now).toJson();
 
     presence.receive(beat(other, activationFor(other.publicKey, _bao, 4)));
-    expect(presence.accountOf(other.publicKey), _bao);
-    expect(presence.accountOf(phone.publicKey), _ada, reason: 'its own, from its own activation');
-    // Somebody claiming an account with an activation the service did
-    // not sign is an account of one device: its own key.
+    // Somebody claiming the account with an activation the service did
+    // not sign takes nothing up, however late its epoch.
     final forged = Activation(account: _ada, key: laptop.publicKey, epoch: 9, until: now + 600, signature: 'ab' * 64);
     presence.receive(beat(laptop, forged));
-    expect(presence.accountOf(laptop.publicKey), laptop.publicKey);
+    await Future<void>.delayed(Duration.zero);
     expect(superseded, isEmpty);
 
     // The laptop takes the account up, and says so.
     presence.receive(beat(laptop, activationFor(laptop.publicKey, _ada, 2)));
     await Future<void>.delayed(Duration.zero);
-    expect(presence.accountOf(laptop.publicKey), _ada);
     expect(superseded.single.key, laptop.publicKey, reason: 'this device hears it has been superseded');
 
     // And of two devices of one account, the later is online and the
@@ -220,6 +216,8 @@ void main() {
     addTearDown(watcher.close);
     watcher.receive(beat(phone, mine));
     expect(watcher.online(withinMs: 15000), contains(phone.publicKey));
+    watcher.receive(beat(laptop, forged));
+    expect(watcher.online(withinMs: 15000), contains(phone.publicKey), reason: 'a forged activation outdoes nobody');
     watcher.receive(beat(laptop, activationFor(laptop.publicKey, _ada, 2)));
     expect(watcher.online(withinMs: 15000), contains(laptop.publicKey));
     expect(watcher.online(withinMs: 15000), isNot(contains(phone.publicKey)));

@@ -8,7 +8,7 @@ For why the relay works this way, see [the relay](../explanation/relay.md).
 
 | Build | Relay | Defined in |
 |---|---|---|
-| Deployed (web and phone) | `wss://relay.openhearts.game/{tag}`: the tag replaces `{tag}` (`tagMark` in `packages/table/lib/src/presence_relay.dart`) | `ourRelay` in `app/lib/net/relays.dart` |
+| Deployed (web and phone) | `wss://relay.openhearts.game/{tag}`: the tag replaces `{tag}` (`tagMark` in `packages/table/lib/src/relays.dart`) | `ourRelay` in `app/lib/net/relays.dart` |
 | Deployed, with `relays` in the remote config | Up to `MOST_RELAYS` relays on `openhearts.game` or a subdomain | [Remote config](configuration.md#remote-config) |
 | Served from a local host | `ws://127.0.0.1:7448/{tag}`, or the port in the page's `?relay=PORT` | `localRelay` and `localRelayAt` in `app/lib/net/relays.dart` |
 | Built with the `OH_RELAYS` define | That comma list | `devRelay` in `app/lib/net/relays.dart` |
@@ -44,7 +44,7 @@ The kind numbers are `TableKinds` in `packages/table/lib/src/nostr.dart`. Kinds 
 | 4250 | `TableKinds.log` | `t`: the table ID | A table event (`packages/table/lib/src/events.dart`) as JSON, for the table's log. The table's referee takes it, numbers it and stamps it with its time (`service/do/referee.mjs`), and sends it on only as an entry of the log. | No: kept in the table's log, and nowhere else |
 | 24243 | `TableKinds.signal` | `p`: the recipient; `t`: the table ID | A WebRTC offer, answer or ICE candidate, sealed to the recipient with NIP-44 v2 (`packages/table/lib/src/nip44.dart`) | Yes |
 | 24245 | `TableKinds.waiting` | `t`: the pool or room code | A beat: `wait` from a player waiting in a pool, `here` from a member of a friends' room | Yes |
-| 24246 | `TableKinds.presence` | `t`: `online` | JSON with a `kind`: `here` (status and activation) or `gone` | Yes |
+| 24246 | `TableKinds.presence` | `t`: `online` | JSON with a `kind`: `here` (with the device's activation) or `gone` | Yes |
 | 24247 | `TableKinds.watch` | `t`: the table ID | A watcher saying it is watching (`{"watching": true, "licence": …}`), or a seated player's view of the table (`WatchedTable` in `packages/table/lib/src/watch.dart`) | Yes |
 | 24248 | `TableKinds.react` | `t`: the table ID, and nothing else | A reaction. See [Reactions](#reactions). | Yes |
 

@@ -10,7 +10,6 @@ import 'dart:typed_data';
 
 import 'nip44.dart';
 import 'nostr.dart';
-import 'presence_relay.dart' show relaysForTag;
 import 'reactions.dart';
 import 'relays.dart';
 import 'signing.dart';

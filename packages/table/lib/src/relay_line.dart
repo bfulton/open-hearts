@@ -13,7 +13,6 @@ import 'dart:convert';
 import 'events.dart';
 import 'log.dart';
 import 'nostr.dart';
-import 'presence_relay.dart' show relaysForTag;
 import 'referee_line.dart';
 import 'relays.dart';
 import 'signing.dart';

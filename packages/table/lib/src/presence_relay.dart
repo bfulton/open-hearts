@@ -19,30 +19,8 @@ import 'nostr.dart';
 import 'relays.dart';
 import 'signing.dart';
 
-/// The mark a relay wears in the list when it keeps one object per tag
-/// and wants the tag in the URL: `wss://our.relay/{tag}`.
-///
-/// It has to be marked and cannot be guessed at, in either direction.
-/// A relay that serves every tag on one socket at the root answers a
-/// path with a 404, so a client must not put a tag on one; a
-/// relay that shards has to be told which object to open before the
-/// first message crosses, so a client must put the tag on that one.
-/// Nobody else's URL carries the mark, so the list says which is which
-/// and nothing has to be inferred from a hostname.
-const tagMark = '{tag}';
-
-/// [relays] with [tag] put where each marked relay asks for it; every
-/// other relay is left exactly as it was.
-List<Uri> relaysForTag(List<Uri> relays, String tag) => [
-      for (final relay in relays)
-        if (relay.pathSegments.contains(tagMark))
-          relay.replace(pathSegments: [for (final s in relay.pathSegments) s == tagMark ? tag : s])
-        else
-          relay,
-    ];
-
 class RelayPresence {
-  RelayPresence({required List<Uri> relays, required this.signer, this.status = 'online', this.everyMs = 5000, this.activation, this.log})
+  RelayPresence({required List<Uri> relays, required this.signer, this.everyMs = 5000, this.activation, this.log})
       : relays = relaysForTag(relays, topic) {
     _group = RelayGroup(
       auth: relayAuthFor(signer),
@@ -64,9 +42,6 @@ class RelayPresence {
   /// The relays, with presence's tag in each that asks for one.
   final List<Uri> relays;
   final Signer signer;
-
-  /// What this client says of itself: `online`, or [seated].
-  String status;
   final int everyMs;
   final void Function(String line)? log;
 
@@ -77,10 +52,6 @@ class RelayPresence {
   final Activation? Function()? activation;
 
   static const topic = 'online';
-
-  /// What a client says of itself while it is at a table, as against
-  /// the lobby.
-  static const seated = 'seated';
 
   late final RelayGroup _group;
   final Map<PublicKey, int> _seen = {};
@@ -109,16 +80,6 @@ class RelayPresence {
   /// (docs/explanation/service.md). The relay closes a superseded device's
   /// sockets itself; this is how a device hears it sooner.
   Stream<Activation> get superseded => _superseded.stream;
-
-  /// The account [key] belongs to, as its activation says; the key
-  /// itself for one that has said none.
-  AccountId accountOf(PublicKey key) {
-    if (key == signer.publicKey) {
-      final mine = activation?.call();
-      if (mine != null) return mine.account;
-    }
-    return _accounts[key]?.account ?? key;
-  }
 
   /// Resolves once the relay has acknowledged the subscription.
   Future<void> get ready => _group.ready;
@@ -170,7 +131,7 @@ class RelayPresence {
     final mine = activation?.call();
     _group.publish(NostrEvent.sign(signer,
         kind: TableKinds.presence,
-        content: jsonEncode({'kind': 'here', 'status': status, if (mine != null) 'activation': mine.toJson()}),
+        content: jsonEncode({'kind': 'here', if (mine != null) 'activation': mine.toJson()}),
         tags: [
           ['t', topic],
         ]));

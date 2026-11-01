@@ -65,6 +65,28 @@ bool turnedAway(String reason) =>
     reason.startsWith('suspended:') ||
     reason.startsWith('deleted:');
 
+/// The mark a relay wears in the list when it keeps one object per tag
+/// and wants the tag in the URL: `wss://our.relay/{tag}`.
+///
+/// It has to be marked and cannot be guessed at, in either direction.
+/// A relay that serves every tag on one socket at the root answers a
+/// path with a 404, so a client must not put a tag on one; a
+/// relay that shards has to be told which object to open before the
+/// first message crosses, so a client must put the tag on that one.
+/// Nobody else's URL carries the mark, so the list says which is which
+/// and nothing has to be inferred from a hostname.
+const tagMark = '{tag}';
+
+/// [relays] with [tag] put where each marked relay asks for it; every
+/// other relay is left exactly as it was.
+List<Uri> relaysForTag(List<Uri> relays, String tag) => [
+      for (final relay in relays)
+        if (relay.pathSegments.contains(tagMark))
+          relay.replace(pathSegments: [for (final s in relay.pathSegments) s == tagMark ? tag : s])
+        else
+          relay,
+    ];
+
 /// The list itself: parsed from text, turned by a key.
 abstract final class Relays {
   /// `wss://a, wss://b` — commas, spaces or newlines between.

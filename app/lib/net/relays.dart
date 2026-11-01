@@ -23,7 +23,7 @@ import 'address.dart' show isLocalHost;
 import 'remote_config.dart';
 
 /// Our relay: a Cloudflare object per tag, which is why the tag is in
-/// the URL. The mark is `tagMark` (`packages/table`, presence_relay.dart);
+/// the URL. The mark is `tagMark` (`packages/table`, relays.dart);
 /// whoever opens a socket for a tag puts the tag there.
 const ourRelay = 'wss://relay.openhearts.game/{tag}';
 
