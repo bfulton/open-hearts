@@ -41,6 +41,13 @@ where
         statement: &Statement<Scalar, Comm>,
         fs_rng: &mut FiatShamirRng<D>,
     ) -> Result<(), CryptoError> {
+        // Open Hearts: the diagonals are checked for length before they
+        // are indexed, as in the Hadamard argument.
+        if self.vector_of_committed_diagonals.len() != 2 * proof_parameters.m + 1 {
+            return Err(CryptoError::ProofVerificationError(String::from(
+                "Zero Argument (5.2)",
+            )));
+        }
         if self.vector_of_committed_diagonals[proof_parameters.m + 1]
             != Comm::commit(
                 proof_parameters.commit_key,

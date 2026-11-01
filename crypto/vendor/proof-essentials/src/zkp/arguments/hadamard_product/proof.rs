@@ -35,6 +35,16 @@ where
         statement: &Statement<Scalar, Comm>,
         fs_rng: &mut FiatShamirRng<D>,
     ) -> Result<(), CryptoError> {
+        // Open Hearts: the proof's own vector is checked for length
+        // before it is indexed. It arrives from another seat, and a
+        // short one panicked here, which under panic = "abort" ended the
+        // whole process.
+        if self.b_commits.len() != proof_parameters.m {
+            return Err(CryptoError::ProofVerificationError(String::from(
+                "Hadamard Product (5.1)",
+            )));
+        }
+
         fs_rng.absorb(&to_bytes![b"hadamard_product_argument"]?);
 
         // check c_b_1 = c_a_1
