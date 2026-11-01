@@ -19,6 +19,7 @@ import 'package:open_hearts/net/watching.dart';
 import 'package:open_hearts/pictures.dart';
 import 'package:open_hearts/review_page.dart';
 import 'package:open_hearts/theme.dart';
+import 'package:open_hearts/ui/player_icon.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:table/table.dart';
 import 'package:table_sim/table_sim.dart';
@@ -336,6 +337,38 @@ void main() {
     // Let go by the page once the game was over: closed, not waited on.
     unawaited(views.close());
     await checking.close();
+  });
+
+  testWidgets('a person watched is the colour they are at the table and in the checked game: their account\'s, not their name\'s', (tester) async {
+    tester.view
+      ..physicalSize = const Size(390, 1600)
+      ..devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    final views = StreamController<Watched>();
+    await tester.pumpWidget(MaterialApp(
+      theme: buildTheme(),
+      home: ReviewPage(table: played.spec.id, load: (_) async => null, watch: (_) => views.stream),
+    ));
+    await tester.pump();
+    final accounts = [for (final s in played.spec.seats) (s as HumanSeat).account];
+    views.add(Viewed(WatchedTable(
+      table: played.spec.id,
+      target: 50,
+      seq: 10,
+      hand: 0,
+      phase: Phase.playing,
+      names: const ['Ada', 'Bao', 'Cy', 'Dee'],
+      totals: const [0, 0, 0, 0],
+      taken: const [0, 0, 0, 0],
+      plays: const [],
+      toPlay: 0,
+      accounts: accounts,
+    )));
+    await tester.pump();
+    expect(find.text('Live'), findsOneWidget);
+    expect([for (final i in tester.widgetList<PlayerIcon>(find.byType(PlayerIcon))) i.seed], accounts);
+    await tester.pump(const Duration(seconds: 10));
+    unawaited(views.close());
   });
 
   testWidgets('watching stops when the account is suspended, and the page says where live play would be sold', (tester) async {
