@@ -7,6 +7,7 @@ import { test } from 'node:test';
 import worker from './worker.mjs';
 import { claimWith, devicesOn, ticketFor } from './accounts.mjs';
 import { Household, forgetHouseholds, inHousehold, sequencer } from './household.mjs';
+import { textOf } from './http.mjs';
 import { memoryStore } from './rows.mjs';
 import { SERVICE_DEFAULTS } from './settings.mjs';
 import { record } from './stripe.mjs';
@@ -249,4 +250,27 @@ test('a body too big to be one of ours is not read', async () => {
     { OH_STRIPE_WEBHOOK_SECRET: 'whsec' },
   );
   assert.equal(event.status, 413);
+});
+
+test('a body sent with no length is read no further than what one of ours could be', async () => {
+  // Chunked, as HTTP/1.1 sends a body of no stated length: 8 MiB, 64 KiB
+  // at a time.
+  let pulled = 0;
+  const big = new ReadableStream({
+    pull(c) {
+      pulled += 65536;
+      c.enqueue(new Uint8Array(65536).fill(0x20));
+      if (pulled >= 8 * 1024 * 1024) c.close();
+    },
+  });
+  const at = 'https://dev.open-hearts.pages.dev/api/stripe';
+  const sent = new Request(at, { method: 'POST', body: big, duplex: 'half' });
+  assert.equal(sent.headers.get('content-length'), null);
+  const res = await worker.fetch(sent, { OH_STRIPE_WEBHOOK_SECRET: 'whsec' });
+  assert.equal(res.status, 413);
+  assert.ok(pulled <= 512 * 1024 + 2 * 65536, `read ${pulled} bytes`);
+  // What fits is read whole, as text, without a byte-order mark.
+  assert.equal(await textOf(new Request(at, { method: 'POST', body: new Uint8Array([0xef, 0xbb, 0xbf, 0x7b, 0x7d]) }), 16), '{}');
+  assert.equal(await textOf(new Request(at), 16), '', 'no body is an empty one');
+  assert.equal(await textOf(new Request(at, { method: 'POST', body: 'é'.repeat(9) }), 16), null, 'counted in bytes');
 });

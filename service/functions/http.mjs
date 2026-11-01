@@ -101,18 +101,33 @@ export const MOST_BODY = 16 * 1024;
 /// with its line items.
 export const MOST_EVENT = 512 * 1024;
 
-/// The body as text, or null when it is longer than [most] — said by its
-/// length where the request says one, and counted where it does not.
+/// The body as text, or null when it is longer than [most] bytes — said
+/// by its length where the request says one, and counted as it is read
+/// where it does not, so that a body sent with no length is never read
+/// much past [most].
 export async function textOf(request, most) {
   const said = Number(request.headers.get('content-length'));
   if (Number.isFinite(said) && said > most) return null;
-  let text;
+  const chunks = [];
+  let size = 0;
   try {
-    text = await request.text();
+    // No body at all is an empty one.
+    const reader = request.body?.getReader();
+    while (reader) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      size += value.byteLength;
+      if (size > most) {
+        await reader.cancel();
+        return null;
+      }
+      chunks.push(value);
+    }
   } catch {
+    // A body already read, or cut off.
     return null;
   }
-  return text.length > most ? null : text;
+  return new Blob(chunks).text();
 }
 
 /// The body as JSON, or null when it is longer than [most] or not JSON.
