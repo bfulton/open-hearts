@@ -442,6 +442,12 @@ test('a lobby keeps no event that weighs more than a picture needs, and carries 
   const wide = await lobby(4244, '一'.repeat(storedMost / 2));
   await relay.message(a, JSON.stringify(['EVENT', wide]));
   assert.deepEqual(a.of('OK').at(-1), ['OK', wide.id, false, STORED_TOO_BIG_WHY]);
+  // A lone surrogate is written in JSON as ASCII, but held as a wide
+  // character all the same.
+  const lone = await lobby(4244, `${'x'.repeat(storedMost - 500)}\ud800`);
+  assert.doesNotMatch(JSON.stringify(lone), /[^\u0000-\u00ff]/, 'nothing wide on the wire');
+  await relay.message(a, JSON.stringify(['EVENT', lone]));
+  assert.deepEqual(a.of('OK').at(-1), ['OK', lone.id, false, STORED_TOO_BIG_WHY]);
   const names = await lobby(4244, JSON.stringify({ kind: 'start', seats: ['山田花子', 'Ελένη', 'Анна', 'José'].map((name) => ({ name })) }));
   await relay.message(a, JSON.stringify(['EVENT', names]));
   assert.deepEqual(a.of('OK').at(-1), ['OK', names.id, true, '']);

@@ -1006,11 +1006,16 @@ export const storedKeep = (tag) => (tag === resultsTag ? 20000 : 2000);
 export const storedMost = 24 * 1024;
 
 /// What [event] weighs against [storedMost]: its JSON's length, and
-/// twice that once any character in it is past U+00FF, since V8 then
-/// holds the string at two bytes a character.
+/// twice that once any of its strings holds a character past U+00FF,
+/// since V8 then holds that string at two bytes a character. The
+/// strings themselves are looked at, not the JSON: a lone surrogate is
+/// written there as six characters of ASCII (`\ud800`), but kept as one
+/// that makes its string two bytes a character.
 export function storedWeight(event) {
-  const json = JSON.stringify(event);
-  return /[^\u0000-\u00ff]/.test(json) ? json.length * 2 : json.length;
+  const wide = (s) => /[^\u0000-\u00ff]/.test(s);
+  const strings = [event.id, event.pubkey, event.content, event.sig, ...event.tags.flat()];
+  const n = JSON.stringify(event).length;
+  return strings.some(wide) ? n * 2 : n;
 }
 
 /// A player's quick reaction at a live table (packages/table,
