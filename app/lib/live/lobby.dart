@@ -635,7 +635,12 @@ class Lobby extends ChangeNotifier {
     // Cleaned again here, whatever path the names came by (a room, a
     // seating, a restored table), since a modified build can send any
     // length or any characters (cleanName, packages/table names.dart).
-    final seatNames = {for (final MapEntry(:key, :value) in names.entries) key: cleanName(value)};
+    // A name that cleans to nothing is left out, so the seat is shown
+    // by its number, as a seat with no name is.
+    final seatNames = {
+      for (final MapEntry(:key, :value) in names.entries)
+        if (cleanName(value) case final name when name.isNotEmpty) key: name,
+    };
     final signer = _signer!;
     final relays = _relays;
     final line = RelayLine(relays: relays, signer: signer, table: spec.id, log: _debugging ? (l) => debugPrint('line: $l') : null);

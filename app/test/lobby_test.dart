@@ -215,4 +215,13 @@ void main() {
     expect(at.table.seatNames[0], 'Ada');
     at.close();
   });
+
+  test('another device\'s name that cleans to nothing is shown as its seat number', () async {
+    await standUp();
+    final at = await backAtTable({2: '\u202e'});
+    expect(at.table.seatNames.containsKey(2), isFalse, reason: 'no empty name kept');
+    expect(at.table.nameAlone(2), english.seatNumber(3));
+    expect(at.table.playerAt(2)?.name, english.seatNumber(3));
+    at.close();
+  });
 }
