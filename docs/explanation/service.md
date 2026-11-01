@@ -303,7 +303,11 @@ service signed that licence, and it names the account:
 - A handler that asks the account's object next asks the account the
   licence names, and the object, which knows the device, decides. These
   are taking the account up, the profile, the devices, the backup codes,
-  a code for another device, and linking a sign-in.
+  a code for another device, and linking a sign-in. The object acts only
+  for its own devices: one the store has in another account is refused,
+  never acted for in that account outside its turn. Emailing the backup
+  codes asks Stripe for the payer's address only once the device is
+  known to be the account's.
 - A handler that decides by itself goes by the store, as before, where
   the store backs the licence. Where the store names another account or
   none, it asks that account's object whether the device holds live

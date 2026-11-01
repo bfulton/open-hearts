@@ -53,7 +53,7 @@ async function ticketRoute(request, env) {
   // asks it next.
   const { account, shown } = await accountAsking(store, key, body, env, { signer });
   if (!account) return json(request, 402, { error: 'no subscription' });
-  const { status, body: out } = await inHousehold(env, account, { op: 'ticket', key, shown });
+  const { status, body: out } = await inHousehold(env, account, { op: 'ticket', key, account, shown });
   return json(request, status, out);
 }
 
@@ -106,9 +106,16 @@ async function backupsRoute(request, env) {
   if (!account) return json(request, 402, { error: 'no subscription' });
   const rotate = body.rotate === true;
   const send = !rotate && body.send === true;
+  // Stripe is asked for the payer's address only for a device of the
+  // account: one the store here backs, or else one the account's turn
+  // holds, as for a device just brought in.
+  if (send && (shown || !(await store.get(`ACCOUNT#${account}`, `DEVICE#${key}`)))) {
+    const held = await inHousehold(env, account, { op: 'held', key, account, shown });
+    if (held.status !== 200) return json(request, held.status, held.body);
+  }
   const subscription = (await store.get(`ACCOUNT#${account}`, 'META'))?.subscription;
   const payer = send ? await payerLookup(store, subscription, env) : { email: null, why: null };
-  const { status, body: out } = await inHousehold(env, account, { op: 'backups', key, rotate, send, email: payer.email, why: payer.why, shown });
+  const { status, body: out } = await inHousehold(env, account, { op: 'backups', key, account, rotate, send, email: payer.email, why: payer.why, shown });
   return json(request, status, out);
 }
 
@@ -215,10 +222,10 @@ async function devicesRoute(request, env) {
   const { account, shown } = await accountAsking(store, key, body, env, { signer });
   if (!account) return json(request, 402, { error: 'no subscription' });
   if (typeof drop === 'string') {
-    const { status, body: out } = await inHousehold(env, account, { op: 'drop', key, device: drop, shown });
+    const { status, body: out } = await inHousehold(env, account, { op: 'drop', key, account, device: drop, shown });
     if (status !== 200) return json(request, status, out);
   }
-  const { status, body: out } = await inHousehold(env, account, { op: 'list', key, shown });
+  const { status, body: out } = await inHousehold(env, account, { op: 'list', key, account, shown });
   return json(request, status, out);
 }
 
@@ -241,7 +248,7 @@ async function profileRoute(request, env) {
   if (!store) return json(request, 503, notConfigured('OH_STORE'));
   const { account, shown } = await accountAsking(store, key, body, env, { signer });
   if (!account) return json(request, 402, { error: 'no subscription' });
-  const { status, body: out } = await inHousehold(env, account, { op: 'profile', key, ...(body.profile !== undefined ? { profile: body.profile } : {}), shown });
+  const { status, body: out } = await inHousehold(env, account, { op: 'profile', key, account, ...(body.profile !== undefined ? { profile: body.profile } : {}), shown });
   return json(request, status, out);
 }
 
@@ -271,7 +278,7 @@ async function signInRoute(request, env, move) {
   const { status, body: out, entitlement } = move
     ? await supersede(who, key, store, env, login)
     : mine
-      ? await inHousehold(env, mine, { op: 'attest', who, key, login, shown })
+      ? await inHousehold(env, mine, { op: 'attest', who, key, account: mine, login, shown })
       : { status: 402, body: { error: 'no subscription' } };
   if (status !== 200) return json(request, status, out);
   // Straight back with the licence it is owed, if any: a device that
@@ -534,7 +541,7 @@ async function deleteRoute(request, env) {
       await alertUnwritten(env, { account, keys: unwritten });
     }
   }
-  const { status, body } = await inHousehold(env, account, { op: 'delete', key: asked.key });
+  const { status, body } = await inHousehold(env, account, { op: 'delete', key: asked.key, account });
   return json(request, status, body);
 }
 

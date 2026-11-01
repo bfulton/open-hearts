@@ -1030,6 +1030,48 @@ test('the routes: backup codes shown, one claimed with the licence back, and rep
   assert.equal(typeof (await sentTo.json()).emailed, 'boolean');
 });
 
+test("backup codes go only to the payer of the account they are of, and Stripe is asked only for a device of it", async () => {
+  const store = await household(Date.now(), ADA.public);
+  const account = await accountOfSub(store, 'sub_9');
+  await store.put('SUB#sub_9', 'CUSTOMER', { customer: 'cus_ada' });
+  const { codes } = await makeBackups(store, account);
+  const mailed = [];
+  const { send } = serving(store);
+  const held = {
+    ...env,
+    OH_SERVICE_SECRET: SERVICE_SECRET,
+    OH_SERVICE_KEY: SERVICE_KEY,
+    OH_STORE: kvOf(store),
+    OH_STRIPE_SECRET: 'sk',
+    EMAIL: { send: async (m) => mailed.push(m) },
+    OH_MAIL_FROM: 'noreply@openhearts.game',
+  };
+  const asked = [];
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async (url) => (asked.push(String(url)), Response.json({ email: 'ada@example.com' }));
+  try {
+    // Bao comes in with a code, and keeps the licence it is given.
+    const typed = codes[0].code;
+    const { licence: kept } = await (await worker.fetch(send('claim', await asking(BAO, 'claim', { what: typed, ticket: typed })), held)).json();
+    const sendCodes = async (licence) => worker.fetch(send('backups', { ...(await asking(BAO, 'backups', { what: 'send', send: true })), licence }), held);
+    assert.equal((await sendCodes(kept)).status, 200);
+    assert.deepEqual(asked, ['https://api.stripe.com/v1/customers/cus_ada']);
+    assert.equal(mailed.length, 1);
+
+    // Then it buys a subscription of its own, which moves it to an
+    // account of its own, and asks again with the licence it still holds.
+    await record({ type: 'checkout.session.completed', data: { object: { payment_status: 'paid', subscription: 'sub_bao', metadata: { key: BAO.public } } } }, store);
+    assert.notEqual(await accountOfKey(store, BAO.public), account);
+    asked.length = 0;
+    assert.equal((await sendCodes(kept)).status, 402);
+    assert.deepEqual(asked, [], 'nobody asked Stripe for the payer of an account it is not in');
+    assert.equal(mailed.length, 1, 'and its new account\'s codes mailed to nobody');
+    assert.equal((await worker.fetch(send('backups', { ...(await asking(BAO, 'backups')), licence: kept }), held)).status, 402, 'nor shown');
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+});
+
 test("a device brought in by a code is licensed at once, though the store where it asked has yet to hear of it", async () => {
   const store = await household(Date.now(), ADA.public);
   const account = await accountOfSub(store, 'sub_9');

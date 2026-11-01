@@ -146,6 +146,11 @@ export const accountOfKey = async (store, key) => {
   return isAccount(account) ? account : null;
 };
 
+/// Whether [key] is a device of [account] by both rows that say so: its
+/// own entitlement naming the account, and the account's row for it.
+export const deviceOf = async (store, account, key) =>
+  isAccount(account) && (await accountOfKey(store, key)) === account && !!(await store.get(`ACCOUNT#${account}`, `DEVICE#${key}`));
+
 /// A code for a new device to arrive with: {status, body}. The one
 /// already outstanding, while it is unspent and has time left: asking
 /// again is a read, not a new row and a listing of the account — a

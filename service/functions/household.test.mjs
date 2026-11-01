@@ -158,6 +158,37 @@ test('an order the store has not got wakes no account', async () => {
   assert.equal(woken, 0);
 });
 
+test("an account's turn acts only for its own devices, not for one the store has in another account", async () => {
+  forgetHouseholds();
+  const store = await household(2);
+  const account = await accountOf(store);
+  // Another subscriber, with an account of its own, asking in this
+  // account's turn: as a device does that still shows a licence for the
+  // account it has since left.
+  const OTHER = 'cc'.repeat(32);
+  await record({ type: 'checkout.session.completed', data: { object: { payment_status: 'paid', subscription: 'sub_8', metadata: { key: OTHER } } } }, store, { now });
+  const theirs = (await store.get(`KEY#${OTHER}`, 'ENTITLEMENT')).account;
+  assert.notEqual(theirs, account);
+  const env = { OH_STORE: kvOf(store) };
+  const rows = [...store.rows.keys()].sort();
+  const login = `LOGIN#google#${'a'.repeat(64)}`;
+  for (const op of [
+    { op: 'ticket' },
+    { op: 'list' },
+    { op: 'drop', device: OTHER },
+    { op: 'backups' },
+    { op: 'profile' },
+    { op: 'attest', who: { provider: 'google', sub: 's' }, login },
+  ]) {
+    assert.deepEqual(await inHousehold(env, account, { ...op, key: OTHER, account }), { status: 402, body: { error: 'no subscription' } }, op.op);
+  }
+  assert.deepEqual(await inHousehold(env, account, { op: 'delete', key: OTHER, account }), { status: 404, body: { error: 'no account' } });
+  assert.deepEqual([...store.rows.keys()].sort(), rows, 'nothing of either account touched');
+  // Its own account's turn acts for it, and this account's for its own.
+  assert.equal((await inHousehold(env, theirs, { op: 'list', key: OTHER, account: theirs })).status, 200);
+  assert.equal((await inHousehold(env, account, { op: 'list', key: KEY, account })).status, 200);
+});
+
 test('asking for a code again is a read: the one outstanding, while it has time', async () => {
   const store = await household(1);
   const counts = { put: 0, list: 0 };

@@ -9,6 +9,7 @@ import {
   backupsFor,
   backupsMade,
   claimWith,
+  deviceOf,
   devicesOn,
   entitlementOf,
   joinAccount,
@@ -219,6 +220,9 @@ export function sequencer({ now = Date.now } = {}) {
   };
 }
 
+/// The ops a device asks of its own account, in that account's turn.
+const FOR_THE_DEVICE = new Set(['ticket', 'list', 'drop', 'backups', 'attest', 'profile', 'delete']);
+
 /// What an account's turn is asked: {op: 'ticket' | 'claim' | 'drop' |
 /// 'list' | 'activate' | …, ...}. [active] is where the account's device
 /// in use is written ([activeInStore]); [revoke] tells relay objects a
@@ -226,6 +230,14 @@ export function sequencer({ now = Date.now } = {}) {
 /// sets, where the object runs in the relay worker
 /// (service/do/profile_pictures.mjs).
 export async function householdOp(op, store, { now = Date.now(), mail = null, active = activeInStore(store), revoke = null, pictures = null } = {}) {
+  // What a device asks for itself is done in the account whose turn this
+  // is, which the route names (op.account): a device the store has in
+  // another account, or in none, is refused, not acted for in that other
+  // account outside its turn. A site older than this names none, and the
+  // op finds the device's account by its row, as before.
+  if (FOR_THE_DEVICE.has(op.op) && typeof op.account === 'string' && !(await deviceOf(store, op.account, op.key))) {
+    return op.op === 'delete' ? { status: 404, body: { error: 'no account' } } : { status: 402, body: { error: 'no subscription' } };
+  }
   switch (op.op) {
     case 'ticket':
       return ticketFor(op.key, store, { now });
