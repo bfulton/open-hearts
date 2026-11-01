@@ -5,12 +5,15 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
+import { readFile } from 'node:fs/promises';
 import { gunzipSync } from 'node:zlib';
 
 import { accountFor } from './accounts.mjs';
 import { accountsNamed, accountsPaidBy, forgetAccount } from './deletion.mjs';
+import { signerOn } from './licence.mjs';
 import { memoryStore } from './rows.mjs';
-import { anonymizeGames, withoutNames } from './records.mjs';
+import { anonymizeGames, forgottenKey, keepRecord, withoutNames } from './records.mjs';
+import { keys } from '../do/sign.mjs';
 import { forget } from '../tool/forget.mjs';
 import { restBucket } from '../tool/r2.mjs';
 
@@ -179,6 +182,92 @@ test('the operator\'s tool rewrites only a record it would write back as it was 
     headers: { authorization: 'Bearer t', 'content-type': 'application/json', 'content-encoding': 'gzip' },
     body: { v: 1 },
   }]);
+});
+
+test('a game that is the whole of one stays the game when the operator\'s tool takes a name off it, though its API carries no custom metadata: no copy replaces it, and it is marked again', async (t) => {
+  // R2 as the worker reaches it (head, get, put with a condition on the
+  // etag) and as the tool does through Cloudflare's API, over the same
+  // objects. The API's write is the one Wrangler sends: the bytes, a type
+  // and an encoding, and no custom metadata (service/tool/r2.mjs).
+  const objects = new Map();
+  let etags = 0;
+  const binding = {
+    async head(key) {
+      const o = objects.get(key);
+      return o ? { key, etag: o.etag, customMetadata: o.custom } : null;
+    },
+    async get(key) {
+      const o = objects.get(key);
+      return o ? { body: new Blob([o.body]).stream(), etag: o.etag, customMetadata: o.custom } : null;
+    },
+    async put(key, body, options = {}) {
+      const { etagMatches, etagDoesNotMatch } = options.onlyIf ?? {};
+      if (etagMatches !== undefined && objects.get(key)?.etag !== etagMatches) return null;
+      if (etagDoesNotMatch !== undefined && objects.has(key)) return null;
+      objects.set(key, { body: Buffer.from(typeof body === 'string' ? body : new Uint8Array(body)), custom: options.customMetadata, etag: `etag-${++etags}` });
+      return { key };
+    },
+  };
+  const written = [];
+  t.mock.method(globalThis, 'fetch', async (url, init = {}) => {
+    const u = new URL(url);
+    if (!u.pathname.includes('/objects/')) {
+      const keys = [...objects.keys()].filter((k) => k.startsWith(u.searchParams.get('prefix')));
+      return Response.json({ success: true, result: keys.map((key) => ({ key })), result_info: { is_truncated: false } });
+    }
+    const key = decodeURIComponent(u.pathname.split('/objects/')[1]);
+    if (init.method === 'PUT') {
+      written.push(init.headers);
+      objects.set(key, { body: Buffer.from(init.body), custom: undefined, etag: `etag-${++etags}` });
+      return new Response(null, { status: 200 });
+    }
+    return objects.has(key) ? new Response(gunzipSync(objects.get(key).body)) : new Response(null, { status: 404 });
+  });
+
+  const text = gunzipSync(await readFile(new URL('../../packages/table/test/fixtures/refereed_four.json.gz', import.meta.url))).toString().trim();
+  const real = JSON.parse(text);
+  const verify = (await signerOn(await readFile(new URL('../../app/web/schnorr.wasm', import.meta.url)))).verify;
+  const send = (seat, copy = text) => keepRecord(binding, real.spec.seats[seat].key, real.spec.id, copy, { verify, service: keys[1].public, house: real.spec.house });
+  const at = `tables/${real.spec.id}.json`;
+  const names = () => JSON.parse(gunzipSync(objects.get(at).body).toString()).names;
+  const logLength = () => JSON.parse(gunzipSync(objects.get(at).body).toString()).log.length;
+  const accounts = real.spec.seats.map((seat) => seat.licence.account);
+
+  // The game is kept and marked, each player's device putting its own name
+  // beside it.
+  for (const seat of [0, 1, 2]) await send(seat);
+  assert.equal(objects.get(at).custom.vouched, '1');
+  assert.deepEqual(names(), { 0: 'Ada', 1: 'Bao', 2: 'Cy' });
+
+  // Bao's account is forgotten, through the tool: the mark first, then the
+  // name off the game, written through the API.
+  const store = memoryStore();
+  const said = [];
+  await forget({ ...store, list: keysOf(store) }, restBucket({ token: 't', account: 'a', bucket: 'b' }), accounts[1], { apply: true, now: Date.parse('2026-11-01T12:00:00Z'), log: (line) => said.push(line) });
+  assert.ok(said.some((line) => line.startsWith('took the name off') && line.includes(at)), said.join('\n'));
+  assert.deepEqual(names(), { 0: 'Ada', 2: 'Cy' });
+  assert.equal(logLength(), real.log.length);
+  assert.ok(objects.has(forgottenKey(accounts[1])));
+  assert.ok(written.every((h) => Object.keys(h).sort().join() === 'authorization,content-encoding,content-type'), 'the tool\'s writes carry a type and an encoding');
+  assert.equal(objects.get(at).custom, undefined, 'and so the mark is gone from the game');
+
+  // A later copy of the game cut short does not replace it...
+  const resultAt = real.log.findIndex((entry) => entry.e?.kind === 'result');
+  const stub = JSON.stringify({ ...real, log: real.log.slice(0, resultAt - 40) });
+  assert.deepEqual(await send(2, stub), { status: 200, body: { kept: true, already: true } });
+  assert.equal(logLength(), real.log.length);
+  // ...and the game is marked again, with the accounts at its seats.
+  assert.deepEqual(objects.get(at).custom, { accounts: accounts.join(','), vouched: '1' });
+  // Nor does a late copy of the whole game, which would take the names
+  // the others put beside it: it adds its own sender's, and Bao's, whose
+  // account is forgotten, is put back by no one.
+  objects.get(at).custom = undefined;
+  assert.deepEqual(await send(3), { status: 200, body: { kept: true, already: true } });
+  assert.deepEqual(names(), { 0: 'Ada', 2: 'Cy', 3: 'Dee' });
+  assert.deepEqual(await send(1), { status: 200, body: { kept: true, already: true } });
+  assert.deepEqual(names(), { 0: 'Ada', 2: 'Cy', 3: 'Dee' });
+  assert.equal(logLength(), real.log.length);
+  assert.equal(objects.get(at).custom.vouched, '1');
 });
 
 test('the operator\'s tool lists every page of kept games, cursor by cursor', async (t) => {

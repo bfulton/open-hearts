@@ -691,6 +691,80 @@ test('a copy that carries the house\'s word is kept in the place of one that doe
   assert.equal(keptAt(d).custom.vouched, undefined);
 });
 
+test('a game that has lost its mark, or never had one, is the game still: it is marked again when a copy comes, and no copy replaces it', async () => {
+  const whole = await mini();
+  const stub = await mini({ word: null });
+  const accounts = `${ACCT_ADA},${ACCT_BAO}`;
+  /// A game kept and marked, with both names beside it, as the operator's
+  /// tool leaves it after taking a name off a game: written again with
+  /// no custom metadata (service/tool/r2.mjs), which is all its API carries.
+  const rewritten = async (text = whole) => {
+    const b = bucket();
+    await keepAt(b, ADA, text);
+    await keepAt(b, BAO, text);
+    assert.deepEqual(JSON.parse(keptText(b)).names, { 0: 'Ada', 1: 'Bao' });
+    keptAt(b).custom = undefined;
+    keptAt(b).etag += '-rewritten';
+    return b;
+  };
+
+  // A stub does not replace it, and the game is marked again, with its
+  // accounts as they were noted before.
+  const a = await rewritten();
+  assert.deepEqual(await keepAt(a, ADA, stub), { status: 200, body: { kept: true, already: true } });
+  assert.deepEqual(keptAt(a).custom, { accounts, vouched: '1' });
+  assert.equal(JSON.parse(keptText(a)).log.length, JSON.parse(whole).log.length);
+  assert.deepEqual(JSON.parse(keptText(a)).names, { 0: 'Ada', 1: 'Bao' });
+
+  // Nor does a copy that carries the house's word, which would take the
+  // names the other players put beside the game with it.
+  const c = await rewritten();
+  const other = await mini({ change: (r) => { r.names = { 0: 'Ada', 1: 'Bao B' }; return r; } });
+  assert.deepEqual(await keepAt(c, BAO, other), { status: 200, body: { kept: true, already: true } });
+  assert.deepEqual(JSON.parse(keptText(c)).names, { 0: 'Ada', 1: 'Bao B' }, 'its sender\'s own name put beside the rest');
+  assert.deepEqual(keptAt(c).custom, { accounts, vouched: '1' });
+
+  // Without the house this service has there is no word to find in it: the
+  // first copy is kept, as it was, unmarked, and the game is not read for it.
+  const d = await rewritten();
+  d.read.length = 0;
+  assert.deepEqual(await keepAt(d, BAO, whole, null), { status: 200, body: { kept: true, already: true } });
+  assert.equal(keptAt(d).custom, undefined);
+  d.read.length = 0;
+  await keepAt(d, BAO, await mini({ change: (r) => { r.names = { 0: 'Ada' }; return r; } }), null);
+  assert.deepEqual(d.read, []);
+  // A game kept before there was a mark has what was noted of it, which
+  // stays when it is marked.
+  const h = bucket();
+  await h.put(`tables/${TABLE}.json`, gzipSync(whole), { httpMetadata: { contentType: 'application/json', contentEncoding: 'gzip' }, customMetadata: { from: ADA, accounts } });
+  assert.deepEqual(await keepAt(h, BAO, stub), { status: 200, body: { kept: true, already: true } });
+  assert.deepEqual(keptAt(h).custom, { from: ADA, accounts, vouched: '1' });
+  // And a game that is not the whole of one, kept before there was a mark
+  // or after it was lost, is replaced as it was.
+  const e = bucket();
+  await e.put(`tables/${TABLE}.json`, gzipSync(stub), { httpMetadata: { contentType: 'application/json', contentEncoding: 'gzip' } });
+  assert.deepEqual(await keepAt(e, BAO, whole), { status: 200, body: { kept: true } });
+  assert.equal(keptAt(e).custom.vouched, '1');
+  // One written another way than the app writes it is not found to have
+  // the house's word, and is replaced by a copy that has.
+  const spaced = await mini({ change: (r) => { r.names = { 0: 'Ada' }; return r; }, text: (r) => JSON.stringify(r, null, 1) });
+  const f = bucket();
+  await keepAt(f, ADA, spaced);
+  assert.equal(keptAt(f).custom.vouched, undefined);
+  assert.deepEqual(await keepAt(f, BAO, whole), { status: 200, body: { kept: true } });
+
+  // It is marked again only if it is the copy that was read: a change
+  // made meanwhile is not written over.
+  const g = await rewritten();
+  g.before = async () => {
+    g.before = null;
+    await keepAt(g, ADA, await mini({ change: (r) => { r.names = { 0: 'Ada B' }; return r; } }));
+  };
+  assert.deepEqual(await keepAt(g, BAO, whole), { status: 200, body: { kept: true, already: true } });
+  assert.deepEqual(JSON.parse(keptText(g)).names, { 0: 'Ada B', 1: 'Bao' });
+  assert.equal(keptAt(g).custom.vouched, '1');
+});
+
 test('each seat\'s name is put beside the game by its own device, from the seat it holds in the game kept, and by nobody else', async () => {
   const keepNames = async (b, names, key, house = HOUSE.public) => keepAt(b, key, await mini({ change: (r) => { r.names = names; return r; } }), house);
   const namesOf = (b) => JSON.parse(keptText(b)).names;

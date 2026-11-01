@@ -345,7 +345,7 @@ export async function keepRecord(bucket, key, table, text, { verify, service = n
       // Kept only if none is by the time it is written: if another device
       // has kept one first, the next try finds it.
       written = await write({ etagDoesNotMatch: '*' });
-    } else if (there.customMetadata?.vouched === '1' || !(await vouchedCopy())) {
+    } else if ((await keptVouched(bucket, table, there, house, verify)) || !(await vouchedCopy())) {
       if ((await mergedInto(bucket, table, key, record, mine)) === 'again') continue;
       return { status: 200, body: { kept: true, already: true } };
     } else {
@@ -355,6 +355,44 @@ export async function keepRecord(bucket, key, table, text, { verify, service = n
     if (written) return { status: 200, body: { kept: true } };
   }
   return { status: 409, body: { error: 'the record changed while it was being kept' } };
+}
+
+/// Whether the copy kept for [table], which [there] is the head of,
+/// carries the house's word: marked so, or else checked as a copy sent is
+/// (vouches), and marked then. The mark is a note of that and nothing
+/// more, so that it need not be worked out again; it is lost when the
+/// operator's tool rewrites a game (service/tool/r2.mjs writes through
+/// an API that carries no custom metadata), and a game kept before there
+/// was one never had it. A game that has lost it is the game still, and
+/// a copy of the same game replacing it would lose the names the other
+/// players' devices put beside it, which they send once.
+async function keptVouched(bucket, table, there, house, verify) {
+  if (there.customMetadata?.vouched === '1') return true;
+  if (!is64(house)) return false;
+  const got = await bucket.get(keyIn(table));
+  if (!got) return false;
+  const text = await unpacked(got.body);
+  let kept;
+  try {
+    kept = JSON.parse(text);
+  } catch {
+    return false;
+  }
+  let word;
+  try {
+    word = await vouches(kept, text, table, house, verify);
+  } catch {
+    word = false;
+  }
+  if (!word) return false;
+  // Marked again if it is still the copy that was read; if it is not, the
+  // next try finds it as it is then.
+  await bucket.put(keyIn(table), await packed(text), {
+    httpMetadata: KEPT_AS,
+    customMetadata: { ...got.customMetadata, accounts: seatedAccounts(kept).join(','), vouched: '1' },
+    onlyIf: { etagMatches: got.etag },
+  });
+  return true;
 }
 
 /// How a record is kept: gzipped, and said so.

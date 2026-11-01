@@ -72,6 +72,11 @@ export function restBucket({ token, account, bucket, fetchImpl = fetch }) {
       return record;
     },
     /// A record, written as records.mjs keeps one: gzipped, and said so.
+    /// With no custom metadata, which the API this writes through takes no
+    /// header for (Wrangler sends none either): a game written here loses
+    /// the notes beside it (`from`, `accounts`, `vouched`), and the worker
+    /// makes the mark good when the next copy for it arrives
+    /// (records.mjs, keptVouched).
     async put(key, record) {
       const res = await fetchImpl(at(key), {
         method: 'PUT',
