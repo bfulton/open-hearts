@@ -44,6 +44,20 @@ const tokenProofBytes = tokenBytes - pointBytes;
 /// (docs/explanation/fair-deal.md).
 const passSealBytes = sealedBytes + sealProofBytes;
 
+/// The revision of the deal's messages this build speaks, which a sealed
+/// table's spec says (packages/table, spec.dart): a table is played by
+/// the revision it was made under, and a build plays no other. A build
+/// of a later revision still reads the games of this one, and of the one
+/// before, and every verifier reads each by the revision its spec names,
+/// since a log that changed with the revision cannot say so itself.
+///
+/// 1 is every game kept before 2, which carried a proof of each passed
+/// token beside the seals of a pass (in the clear, and then hidden after
+/// them under a pad: `DealSession.readsOldPasses`), and played a passed
+/// card with the passer's token whole. 2 passes seals alone, and plays a
+/// passed card with its receiver's own opening of the seal.
+const dealRevision = 2;
+
 /// How many custodians have to answer to open a bot seat escrowed to
 /// several, as a v2 game's jury held one: any two of them.
 ///

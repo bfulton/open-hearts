@@ -124,7 +124,7 @@ class TableRules {
     this.worker,
     this.random,
     this.trace,
-    this.readsOldPasses = false,
+    this.readsOldGames = false,
   });
 
   /// The table the log is for: the start must name it.
@@ -166,11 +166,12 @@ class TableRules {
 
   final void Function(String line)? trace;
 
-  /// Whether the deal also reads a pass as passes were made before a
-  /// token's proof was hidden (`DealSession.readsOldPasses`). For the
-  /// verifier of a record, which has to check games kept then; a table
-  /// plays none.
-  final bool readsOldPasses;
+  /// Whether this side also reads the games of earlier revisions of the
+  /// deal's messages ([dealRevision]): the verifier of a record, which
+  /// has to check games kept then, each by the revision its spec says.
+  /// A table plays none, so that what a log is taken for is what the
+  /// table took it for.
+  final bool readsOldGames;
 
   // ---- what the log has said ---------------------------------------------
 
@@ -451,10 +452,17 @@ class TableRules {
     _settledSince = true;
   }
 
+  /// Whether this side reads the deal of [spec] as it says it is made:
+  /// by the revision of this build, or, for a verifier, an earlier one.
+  bool _speaks(TableSpec spec) => spec.deal == dealRevision || (readsOldGames && spec.deal < dealRevision);
+
   void _start(LogEntry e) {
     final ev = e.event;
     final spec = ev == null || ev.kind != EventKind.start ? null : TableSpec.parse(ev.body['spec']);
-    if (spec == null || spec.id != tableId || spec.seatOf(ev!.author) == null || (spec.sealed && (spec.house == null || crypto == null))) {
+    if (spec == null ||
+        spec.id != tableId ||
+        spec.seatOf(ev!.author) == null ||
+        (spec.sealed && (spec.house == null || crypto == null || !_speaks(spec)))) {
       trace?.call('the log does not start a table: ${e.event}');
       _state = TableState.failed;
       return;
@@ -749,7 +757,7 @@ class TableRules {
       // bot seat the house holds escrows to nobody, since nobody else
       // may see its cards.
       custodians: me != null && _dealtTo[me] is HumanSeat ? [house] : const [],
-      readsOldPasses: readsOldPasses,
+      readsOldPasses: _spec!.deal < dealRevision,
       mySecret: secret,
       random: random,
     )..log = (l) => trace?.call('deal: $l');

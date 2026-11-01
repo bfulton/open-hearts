@@ -262,7 +262,7 @@ void main() {
       expect(x.verifyPlay(1, play), passed[0], reason: 'everyone checks the play');
       expect(x.acceptPlay(1, play), passed[0], reason: 'everyone opened the play');
     }
-    expect(all[2].acceptPlay(1, {'position': 13, 'opening': play['opening']}), isNull, reason: 'an opening is for its position alone');
+    expect(all[2].acceptPlay(1, {'position': positions[1], 'opening': play['opening']}), isNull, reason: 'an opening is for its position alone');
     // Seat 2 plays one of its own.
     final own = all[2].positionOf(2, all[2].handOf(2)!.first)!;
     final play2 = all[2].playToken(own)!;
@@ -526,18 +526,64 @@ void main() {
     // the key away.
     final seats = [for (final k in ['a', 'b', 'c', 'd']) HumanDealSeat(k)];
     final secret = Uint8List.fromList(List.generate(32, (i) => i + 1));
-    DealSession receiverOf(int seed) {
+    // [pass]: which of the passer's passes of the positions the receiver
+    // takes: each is a new seal of the same cards.
+    DealSession receiverOf(int seed, {int pass = 1}) {
       final all = dealOut(seats, seed: seed, secrets: {1: secret});
-      final pass = all[0].passMessage(1, [0, 6, 12])!;
-      broadcast(all, 0, (x) => x.acceptPass(pass));
+      Map<String, Object?>? m;
+      for (var i = 0; i < pass; i++) {
+        m = all[0].passMessage(1, [0, 6, 12]);
+      }
+      broadcast(all, 0, (x) => x.acceptPass(m!));
       return all[1];
     }
 
+    Uint8List commitment(DealSession x) => base64Decode(x.playToken(0)!['opening'] as String).sublist(2 * pointBytes, 3 * pointBytes);
     final one = receiverOf(1);
     final two = receiverOf(2);
-    Uint8List commitment(DealSession x) => base64Decode(x.playToken(0)!['opening'] as String).sublist(2 * pointBytes, 3 * pointBytes);
     expect(one.mySecret, two.mySecret);
-    expect(commitment(one), isNot(commitment(two)));
+    expect(commitment(one), isNot(commitment(two)), reason: 'another deck');
+    // The same deck, and the same position passed again: another seal of
+    // the same card, which the same secret opens with a nonce of its own.
+    final again = receiverOf(1, pass: 2);
+    expect(again.deck, one.deck);
+    expect(commitment(again), isNot(commitment(one)), reason: 'the same card, another seal');
+  });
+
+  test('a pass whose seals share their randomness is refused: the opening of one would open them all', () {
+    final seats = [for (final k in ['a', 'b', 'c', 'd']) HumanDealSeat(k)];
+    final all = dealOut(seats);
+    final positions = [0, 6, 12];
+    final deck = all[0].deck!;
+    final pk = base64Decode(all[1].myKeys()!['pk'] as String);
+    // The passer's own seals, made by hand: one drawn from each seed.
+    Uint8List seal(int p, int seed) => d.seal(all[0].mySecret!, pk, maskedAt(deck, p), Uint8List.fromList(List.filled(32, seed)));
+    Map<String, Object?> pass(List<int> seeds) => {
+          'from': 0,
+          'to': 1,
+          'positions': positions,
+          'sealed': [for (final (i, p) in positions.indexed) base64Encode(seal(p, seeds[i]))],
+        };
+    for (final x in all) {
+      expect(x.verifyPass(pass([1, 2, 3])), isTrue, reason: 'each seal drawn of its own');
+      for (final shared in [
+        [1, 1, 3],
+        [1, 2, 1],
+        [1, 2, 2],
+        [4, 4, 4],
+      ]) {
+        expect(x.verifyPass(pass(shared)), isFalse, reason: 'seals drawn from $shared');
+      }
+    }
+    // What it is refused for. The receiver's opening of one seal is the
+    // seal's randomness taken to its key, so with one randomness for two
+    // seals it opens the other as well, and playing one card gives
+    // another away to everyone reading the log.
+    final seals = [seal(0, 7), seal(6, 7)];
+    final opening = d.revealToken(all[1].mySecret!, seals[0].sublist(0, sealedBytes), Uint8List(32)..[0] = 1);
+    final other = d.openShared(seals[1].sublist(0, sealedBytes), [opening]);
+    expect(other, d.revealToken(all[0].mySecret!, maskedAt(deck, 6), Uint8List(32)..[0] = 2).sublist(0, pointBytes),
+        reason: 'the token of the card at position 6, from the opening of the card at position 0');
   });
 
   test('a pass as it was kept before this one is read by a verifier of kept games, and by no table', () {

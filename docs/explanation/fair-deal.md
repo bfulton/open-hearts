@@ -146,8 +146,12 @@ to take the passer's word for it or the receiver's. The play carries the
 opening in place of the token (`opening` instead of `token`, 128 bytes
 like any token with its proof). Every side checks it against the
 receiver's key and the seal it kept from the pass, takes the token out,
-and opens the card with it. Nothing about the card is published before
-the play, which names it anyway.
+and opens the card with it. An honest seal publishes nothing about the
+card before the play, which names it anyway. A passer could say its own
+token in the open, as it could say the card, and cannot be stopped; but it
+cannot make one opening give away another card, which it could if two of
+its seals shared their randomness, since the opening is that randomness
+taken to the receiver's key. So every side refuses a pass whose seals do.
 
 The opening needs the receiver's secret, so the seat that plays the card
 makes it, or whoever plays for it once it has left and its secret is
@@ -252,6 +256,18 @@ the card with the passer's token whole. The two verifiers of kept games
 and the card each was played with, because games are kept for good
 (`DealSession.readsOldPasses`). A table never does: it refuses a pass
 with a field beside the seals, or with seals of any other size.
+
+Which a verifier reads is the spec's to say, not the log's. A table
+skips a message that is no pass by its rules (an event that is not taken
+stays in the log and changes nothing) and takes the seat's next, and a
+reader that took the skipped one for the pass would come to another game
+than the one played, and fail a record whose house signed for the log as
+it was. So a sealed spec names the revision of the deal's messages it is
+played by (`deal` in the spec, `dealRevision`; this is 2), which is in
+the id the start is taken by, and nobody can change it. A table plays no
+revision but its build's. A verifier reads an earlier revision the way
+it was played, and a spec that says nothing of it is the first, which
+is every game kept before.
 
 ## Cost, and keeping it off the page
 

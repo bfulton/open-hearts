@@ -22,6 +22,10 @@ class SeatConduct {
   /// up in their place.
   List<String> sealedPass(List<String> sealed, Random random) => sealed;
 
+  /// A pass this seat says before its own, given [honest], or null for
+  /// none. Whatever a table makes of it, it is signed and in the log.
+  Map<String, Object?>? passBefore(Map<String, Object?> honest) => null;
+
   /// Whether this seat says its piece of a departed person's secret.
   bool get releases => true;
 }

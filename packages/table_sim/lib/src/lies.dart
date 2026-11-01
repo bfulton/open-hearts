@@ -6,8 +6,10 @@
 /// client given a [Lie] as its [TableClient.conduct] does.
 library;
 
+import 'dart:convert';
 import 'dart:math';
 
+import 'package:deal/deal.dart' show tokenProofBytes;
 import 'package:table/table.dart';
 
 enum Lie implements SeatConduct {
@@ -22,6 +24,14 @@ enum Lie implements SeatConduct {
   /// that fails it is not taken — and the clock has its seat there.
   seal,
 
+  /// Says, before its own pass, the same pass with each seal followed by
+  /// the bytes of a proof, as passes were made before a card passed under
+  /// a seal was played with its receiver's own opening. A table of today
+  /// takes none such and goes on to the seat's own; a reader of games
+  /// played then, taking it for the pass, would find the seat's own
+  /// repeating it.
+  oldPass,
+
   /// Keeps its piece of a departed person's secret to itself: the
   /// departed hand cannot be opened, and is given up.
   withhold;
@@ -32,6 +42,16 @@ enum Lie implements SeatConduct {
   @override
   Map<String, Object?> declaration(Map<String, Object?> honest) =>
       this == declare ? {'seat': honest['seat'], 'position': -1} : honest;
+
+  @override
+  Map<String, Object?>? passBefore(Map<String, Object?> honest) {
+    final sealed = honest['sealed'];
+    if (this != oldPass || sealed is! List) return null;
+    return {
+      ...honest,
+      'sealed': [for (final s in sealed) base64.encode([...base64.decode(s as String), ...List.filled(tokenProofBytes, 0)])],
+    };
+  }
 
   /// The honest seals, each at another card's place: every one a real
   /// seal with its argument, of the size an honest one is, so nothing

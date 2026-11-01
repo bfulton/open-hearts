@@ -6,6 +6,7 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:crypto/crypto.dart' show Hmac, sha256;
+import 'package:deal/deal.dart' show dealRevision;
 import 'package:engine/engine.dart';
 
 import 'licence.dart';
@@ -77,8 +78,15 @@ class TableSpec {
       this.target = gameOverScore,
       this.timing = TableTiming.standard,
       this.house,
-      this.salt})
-      : id = idOf(_written(salt: salt, seed: seed, rated: rated, sealed: sealed, target: target, timing: timing, house: house, seats: seats));
+      this.salt,
+      int? deal})
+      : deal = _revision(sealed, deal),
+        id = idOf(_written(
+            salt: salt, seed: seed, rated: rated, sealed: sealed, deal: _revision(sealed, deal), target: target, timing: timing, house: house, seats: seats));
+
+  /// The revision a table says: this build's at a sealed table, where it
+  /// matters; the first at any other, which says nothing of it.
+  static int _revision(bool sealed, int? given) => sealed ? given ?? dealRevision : 1;
 
   /// A table kept before the referee, under the id it had then: one
   /// drawn at random, which nothing ties to the rest
@@ -92,7 +100,8 @@ class TableSpec {
       this.target = gameOverScore,
       this.timing = TableTiming.standard})
       : house = null,
-        salt = null;
+        salt = null,
+        deal = 1;
 
   /// The table's id: the first 128 bits of the SHA-256 of everything
   /// else the spec says, as it is written ([toJson]), in 32 hex digits.
@@ -113,6 +122,18 @@ class TableSpec {
   /// seats, which a pool publishes, and the options. None in a
   /// simulator's table.
   final String? salt;
+
+  /// The revision of the deal's messages the table is played by
+  /// ([dealRevision]), where its cards come from the verifiable deal.
+  /// It is in the start, and in the id the start is taken by, because
+  /// the log cannot say what a reader of it would take its messages for:
+  /// a seat can say a message that is no pass by this revision and one
+  /// by an earlier, and the table, which plays by this revision, takes
+  /// the seat's next. A reader that took the earlier would take the
+  /// first, and come to another game than the one that was played. A
+  /// spec that says nothing of it is revision 1, as every game kept
+  /// before 2 is.
+  final int deal;
 
   /// Whether the cards come from the verifiable deal (docs/explanation/fair-deal.md) rather
   /// than the seed: every hand shuffled by every seat with proofs, each
@@ -159,7 +180,7 @@ class TableSpec {
   /// what the id is the hash of.
   Map<String, Object?> toJson() => {
         'id': id,
-        ..._written(salt: salt, seed: seed, rated: rated, sealed: sealed, target: target, timing: timing, house: house, seats: seats),
+        ..._written(salt: salt, seed: seed, rated: rated, sealed: sealed, deal: deal, target: target, timing: timing, house: house, seats: seats),
       };
 
   /// Everything a spec says but its id, as it is written.
@@ -168,6 +189,7 @@ class TableSpec {
           required int seed,
           required bool rated,
           required bool sealed,
+          required int deal,
           required int target,
           required TableTiming timing,
           required PublicKey? house,
@@ -177,6 +199,7 @@ class TableSpec {
         'seed': seed,
         'rated': rated,
         'sealed': sealed,
+        if (deal != 1) 'deal': deal,
         'target': target,
         'timing': timing.toJson(),
         if (house != null) 'house': house,
@@ -224,6 +247,7 @@ class TableSpec {
           seats: seats,
           rated: m['rated'] as bool,
           sealed: m['sealed'] as bool,
+          deal: m['deal'] as int? ?? 1,
           target: m['target'] as int,
           timing: TableTiming.exactly(m['timing']) ?? (throw const FormatException('timing')),
           house: m['house'] as String?,

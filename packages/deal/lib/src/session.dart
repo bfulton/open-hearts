@@ -1347,6 +1347,14 @@ class DealSession {
       if (sealed.length != positions.length) return false;
       if (!sealed.every((s) => s.length == passSealBytes || (readsOldPasses && s.length == _oldPassSealBytes))) return false;
       if (_pks[from] == null || _pks[to] == null) return false;
+      // Each seal's first half, the point its randomness makes, is its
+      // own. With one randomness for two seals the receiver's opening of
+      // the one, that point taken to its key, opens the other as well, and
+      // playing one card would give another away.
+      if (sealed.every((s) => s.length == passSealBytes) &&
+          {for (final s in sealed) base64.encode(Uint8List.sublistView(s, 0, pointBytes))}.length != sealed.length) {
+        return false;
+      }
       // The argument each seal carries: what is sealed is the share
       // [from]'s key owes for that card. Checked by everyone, so a
       // receiver left with cards it cannot open is the table's
