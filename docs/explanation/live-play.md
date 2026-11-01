@@ -667,8 +667,9 @@ every size, language and text size with one at every seat
 
 When a game is over, each player's device sends its record to be kept
 (`record.dart`, `app/lib/net/game_records.dart`, and the service's
-[game records](service.md#game-records)). The first copy is kept, so the
-others cost nothing. A record is the table's spec and the referee's
+[game records](service.md#game-records)). The copy kept is the one that
+carries the house's result, so a copy cut short does not stand in the
+way of the game. A record is the table's spec and the referee's
 log, every entry as it came, the house's word on the end among them.
 Each seat in the spec carries its licence, so the record says whose
 each seat was.
@@ -682,7 +683,9 @@ the house signed for, and does not verify. A copy that verifies is the
 game, whoever kept it. Opening one is live play: a device with a
 subscription, its account's device in use, and not one of the game's
 own players while it is being played. Names are kept beside the record
-unsigned, shown as what each device said it was called.
+unsigned, each put there by its own seat's device, and shown as that
+device said it was called; a seat whose device has not sent shows as a
+seat with no name does.
 
 A game kept before the referee, in the record's earlier forms, still
 opens, checked as it was then (`legacy/v2_record.dart`).

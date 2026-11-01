@@ -1,10 +1,13 @@
 /// Finished games, kept to be looked at afterwards (router.dart,
 /// `/table/ID`; service/functions/records.mjs).
 ///
-/// A player's device sends its record when the game is over; the first
-/// copy is the one kept, so a table's other players sending theirs costs
-/// nothing. Whoever opens a game fetches it by the table's id and checks
-/// it themselves before showing a card of it (review_page.dart).
+/// A player's device sends its record when the game is over. The service
+/// keeps the copy that carries the house's word on how it came out, and
+/// from every copy its sender's own seat's name beside it: each device is
+/// the only one that says its own seat's name, so a table's other players
+/// sending theirs is how each seat gets a name, and costs nothing else.
+/// Whoever opens a game fetches it by the table's id and checks it
+/// themselves before showing a card of it (review_page.dart).
 ///
 /// Looking at a game is live play, which is a subscription's: the
 /// service shows a record only to an account's device in use, and not
@@ -24,7 +27,9 @@ import 'remote_config.dart' show waits;
 import 'seat_store.dart';
 
 /// Sends [record] to be kept, signed by [signer] for its table. True
-/// once it is kept, by this device or by another of the table's.
+/// once it is kept, by this device or by another of the table's. Only
+/// this device's own seat's name is kept from it, whatever names it holds
+/// of the others'.
 Future<bool> keepGame(Signer signer, GameRecord record) async {
   final table = record.spec.id;
   final answer =

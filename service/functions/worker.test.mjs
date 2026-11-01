@@ -18,7 +18,7 @@ import { CHECKOUT_LOCALES, STRIPE_VERSION, checkout, checkoutLanguage, endRefund
 import { stripe as stripeDefinition } from '../../infra/stripe.mjs';
 import { STATED, withPrice } from './stripe.fixtures.mjs';
 import { mint, serversOf } from './turn.mjs';
-import { eventIdOf } from './records.mjs';
+import { eventIdOf, logHashes } from './records.mjs';
 import { keys } from '../do/sign.mjs';
 
 const KEY = 'ab'.repeat(32);
@@ -2139,6 +2139,74 @@ test('a game\'s record: sent by a player signed for its table, kept, and shown o
   // Nor a game the account is at.
   await worker.fetch(send('activate', await asking(ADA, 'activate', { what: `renew ${table}`, want: 'renew', seated: table })), env);
   assert.equal((await worker.fetch(send('review', await asking(ADA, 'review', { what: table, table })), env)).status, 403);
+});
+
+test('a game\'s record is kept as carrying the house\'s word where the deployment names the house that said it, and from the copy that has it', async () => {
+  const objects = new Map();
+  let etags = 0;
+  const bucket = {
+    head: async (k) => (objects.has(k) ? { key: k, etag: objects.get(k).etag, customMetadata: objects.get(k).custom } : null),
+    get: async (k) => (objects.has(k) ? { body: new Blob([objects.get(k).body]).stream(), etag: objects.get(k).etag, customMetadata: objects.get(k).custom } : null),
+    put: async (k, body, options = {}) => {
+      const { etagMatches, etagDoesNotMatch } = options.onlyIf ?? {};
+      if (etagMatches !== undefined && objects.get(k)?.etag !== etagMatches) return null;
+      if (etagDoesNotMatch !== undefined && objects.has(k)) return null;
+      objects.set(k, { body: Buffer.from(body), custom: options.customMetadata, etag: `etag-${++etags}` });
+      return { key: k };
+    },
+  };
+  const store = await household(Date.now(), ADA.public);
+  const { held, send } = serving(store);
+  // The house of the game is BIP-340's fourth pair; the deployment names it
+  // as the app's build does (OH_HOUSE_KEY, deployment.mjs).
+  const house = CY;
+  const env = { ...held, OH_RECORDS: bucket, OH_HOUSE_KEY: house.public };
+  const table = '0123456789abcdef0123456789abcdef';
+  const says = async (pair, kind, body) => {
+    const id = await eventIdOf(table, { author: pair.public, kind, body });
+    return { id, table, author: pair.public, kind, body, sig: signer.sign(pair.secret, id) };
+  };
+  const service = { signer, secret: SERVICE_SECRET, service: SERVICE_KEY };
+  const spec = {
+    id: table,
+    seed: 1,
+    house: house.public,
+    seats: [
+      { key: ADA.public, licence: await licenceFor(ADA.public, ACCT, '2027-01-01', service) },
+      { key: BAO.public, licence: await licenceFor(BAO.public, '0b'.repeat(16), '2027-01-01', service) },
+      { bot: 'Romeo' },
+      { bot: 'Juliet' },
+    ],
+  };
+  const entries = [
+    { n: 0, t: 1000, e: await says(ADA, 'start', { spec }) },
+    { n: 1, t: 1250, e: await says(ADA, 'play', { hand: 0, turn: 4, seat: 0, card: '2C' }) },
+    { n: 2, t: 2000, e: await says(BAO, 'play', { hand: 0, turn: 5, seat: 1, card: '3C' }) },
+  ];
+  const word = { n: 3, t: 2100, e: await says(house, 'result', { n: 3, hash: (await logHashes(entries))[3], state: 'finished', totals: [1, 2, 3, 4] }) };
+  const recordOf = (log) => JSON.stringify({ v: 3, spec, log, names: { 0: 'Ada', 1: 'Bao' } });
+  await worker.fetch(send('activate', await asking(ADA, 'activate', { what: 'open ', want: 'open' })), env);
+
+  const sendRecord = async (text, e = env) => {
+    const res = await worker.fetch(send('record', await asking(ADA, 'record', { what: table, table, record: text })), e);
+    return [res.status, await res.json()];
+  };
+  // A stub, cut before the house's word: first come.
+  assert.deepEqual(await sendRecord(recordOf(entries)), [200, { kept: true }]);
+  assert.equal(objects.get(`tables/${table}.json`).custom.vouched, undefined);
+  // The game, with it: kept in its place, marked.
+  assert.deepEqual(await sendRecord(recordOf([...entries, word])), [200, { kept: true }]);
+  assert.equal(objects.get(`tables/${table}.json`).custom.vouched, '1');
+  assert.deepEqual(await sendRecord(recordOf(entries)), [200, { kept: true, already: true }]);
+  assert.equal(objects.get(`tables/${table}.json`).custom.vouched, '1');
+
+  // Where the deployment names no house, or another, the word is nobody's
+  // here: the first copy is kept, as it was.
+  for (const named of [{}, { OH_HOUSE_KEY: 'ab'.repeat(32) }]) {
+    objects.clear();
+    assert.deepEqual(await sendRecord(recordOf([...entries, word]), { ...env, OH_HOUSE_KEY: undefined, ...named }), [200, { kept: true }]);
+    assert.equal(objects.get(`tables/${table}.json`).custom.vouched, undefined);
+  }
 });
 
 // ---- one device at a time ------------------------------------------------

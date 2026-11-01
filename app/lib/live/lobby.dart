@@ -744,9 +744,11 @@ class Lobby extends ChangeNotifier {
     });
     // The game, kept for anyone to look at afterwards by its address
     // (net/game_records.dart): every player's device sends it, and the
-    // first is kept. Once the house's word on how it came out is in the
-    // log, which a kept game is checked against (packages/table,
-    // record.dart); a game that failed has none, and is kept as it ends.
+    // service keeps the copy with the house's word in it, with each
+    // device's own name beside its seat. Once the house's word on how it
+    // came out is in the log, which a kept game is checked against
+    // (packages/table, record.dart); a game that failed has none, and is
+    // kept as it ends.
     var kept = false;
     controller.addListener(() {
       final c = controller.client;

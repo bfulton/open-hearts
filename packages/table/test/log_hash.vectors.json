@@ -1,0 +1,126 @@
+{
+  "about": "Cases for the log's running hash (packages/table/lib/src/log.dart, LogHash): each case is a log, and the hash after none of its entries and after each in turn. Read by packages/table/test/log_hash_test.dart, which folds them with Dart's LogHash, and by service/functions/records.test.mjs, which folds them with logHashes in service/functions/records.mjs, so that the two cannot drift. Made with Dart's LogHash and BIP-340's published keys.",
+  "start": "6c16d9206d88b19a662bc9cc1ca7423e3e95fadeb97dcc6aa046c95bb1d327a2",
+  "cases": [
+    {
+      "name": "no entry at all",
+      "log": [],
+      "hashes": [
+        "6c16d9206d88b19a662bc9cc1ca7423e3e95fadeb97dcc6aa046c95bb1d327a2"
+      ]
+    },
+    {
+      "name": "a tick",
+      "log": [
+        {
+          "n": 0,
+          "t": 0
+        }
+      ],
+      "hashes": [
+        "6c16d9206d88b19a662bc9cc1ca7423e3e95fadeb97dcc6aa046c95bb1d327a2",
+        "ed07a5e68b2f347b51f8faf49ee3e25abe8f47699544adb1d7fa93773721efe4"
+      ]
+    },
+    {
+      "name": "every kind of entry, in the order a table has them",
+      "log": [
+        {
+          "n": 0,
+          "t": 60,
+          "e": {
+            "id": "629f2c02f1553118312fcc0112a331d7d0b81736a9b5320af2217ec7311d4233",
+            "table": "0123456789abcdef0123456789abcdef",
+            "author": "dff1d77f2a671c5f36183726db2341be58feae1da2deced843240f7b502ba659",
+            "kind": "play",
+            "body": {
+              "hand": 0,
+              "turn": 4,
+              "seat": 0,
+              "card": "2C"
+            },
+            "sig": "c4abe33ca1ffaa90bcad0df7e32f4a18f6e1898e77ee043b5c1f63932b4dcee6a4ae4be8915fa3eed369efeba048c125f22ee7b2553bb7d7b935834203b938c3"
+          }
+        },
+        {
+          "n": 1,
+          "t": 250
+        },
+        {
+          "n": 2,
+          "t": 250,
+          "up": "dd308afec5777e13121fa72b9cc1b7cc0139715309b086c960e18fd969774eb8"
+        },
+        {
+          "n": 3,
+          "t": 1700000000123,
+          "down": "dff1d77f2a671c5f36183726db2341be58feae1da2deced843240f7b502ba659"
+        },
+        {
+          "n": 4,
+          "t": 1700000000123,
+          "e": {
+            "id": "7ff5e0cc8a4d03dd258c78a8fb903b5ef0cd6d9e76bfccf917cc2078a3afdfb8",
+            "table": "0123456789abcdef0123456789abcdef",
+            "author": "dd308afec5777e13121fa72b9cc1b7cc0139715309b086c960e18fd969774eb8",
+            "kind": "pass",
+            "body": {
+              "hand": 0,
+              "turn": 1,
+              "seat": 1,
+              "cards": [
+                "AS",
+                "KH",
+                "QD"
+              ]
+            },
+            "sig": "1d24b7269598d03c2dfad0c4268262b81f3fabad8795a04f5f188874d26b1bb5675c3aed612b93135dc4be6674af302892f781347ede45ada5b1c5df9b275d9b"
+          }
+        },
+        {
+          "n": 5,
+          "t": 1700000000999,
+          "e": {
+            "id": "a6c59eef2f64ebc2e340526d15f352de405123245ded698a028ac61199bb47eb",
+            "table": "0123456789abcdef0123456789abcdef",
+            "author": "dff1d77f2a671c5f36183726db2341be58feae1da2deced843240f7b502ba659",
+            "kind": "wave",
+            "body": {
+              "at": 1
+            },
+            "sig": "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+          }
+        },
+        {
+          "n": 6,
+          "t": 1700000001000,
+          "e": {
+            "id": "11fab9281a14e64ad481665982eb7c72e30d80ac6110d66fc05714a2e6ea3523",
+            "table": "0123456789abcdef0123456789abcdef",
+            "author": "dff1d77f2a671c5f36183726db2341be58feae1da2deced843240f7b502ba659",
+            "kind": "leave",
+            "body": {
+              "seat": 0
+            },
+            "sig": "6109a4944ca3b2081a50a87ea97d7db628d04f0fe15a782cbeadc44124aa639b82bb7a041899b82024ecdc4e6f3bb0b3a5a81b8689bd637225c49372e525e574"
+          }
+        },
+        {
+          "n": 7,
+          "t": 1700000001000
+        }
+      ],
+      "hashes": [
+        "6c16d9206d88b19a662bc9cc1ca7423e3e95fadeb97dcc6aa046c95bb1d327a2",
+        "33a0570c9cb8be18f1c9e1cc9d5eba947c0703013c8dd5bab6b6d8040e4093ed",
+        "cc662037b4828f7b62a313d31a147f585dacc768450f473ead846a974f6862ef",
+        "65b51d6824275e6376239241c8baf03fcd1bb98f9bedcbd6c9a9d4e7e221fb31",
+        "100e5bd97f24e91394aca991be86becb401df79331e641d20641e1304d7295f4",
+        "6d81ead80818878758fd4f2a0c36df688f46591150b56cc865370e8093fe1f93",
+        "2bf0a26204a79125ae6f42fb181b67f199a684a414e8f6835ee0ac74c0f3a5db",
+        "f41d225ce4e3be4ff8b624ab47ec651874abfe22c02152a1c08921197e1c1fb0",
+        "1ec410f3e49693ac5c42308486fa9dd079324732ef198adec3b6b0e394bbb49c"
+      ]
+    }
+  ]
+}

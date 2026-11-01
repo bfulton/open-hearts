@@ -242,7 +242,13 @@ frame (`service/do/ws.test.mjs`).
   that is seated at the table and has signed events of its own in the
   record, within an hourly allowance (`recordsPerHour`), and are
   size-capped (`service/functions/records.mjs`). They are verified by
-  whoever views them, not by the worker.
+  whoever views them, not by the worker. What the worker decides is which
+  copy is kept: a player can send a copy cut short, before the game is
+  over, which nobody can open, so the copy that carries the house's
+  checked result (its `result`, signed by the house, names the log by its
+  hash) replaces one that does not, and is never replaced. A name beside a
+  record is unsigned, so it is kept from nobody but the device of the
+  seat it names.
 
 ## The site
 

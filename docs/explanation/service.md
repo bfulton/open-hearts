@@ -669,16 +669,36 @@ address ([multiplayer](multiplayer.md)).
 
 ## Game records
 
-A player at a finished table can send its record to be kept. The first
-copy is kept, gzipped, in R2 (`OH_RECORDS`). Who may send one, and how
-many an hour, is in the
+A player at a finished table can send its record to be kept, gzipped, in
+R2 (`OH_RECORDS`). Who may send one, and how many an hour, is in the
 [service reference](../reference/service-api.md#handlers). Looking at one
 is live play: `review` serves it only to a device with a subscription
 that is its account's device in use, and not while the account sits at
 that table. The worker keeps only seats the app would show: each
 person's carries the service's licence for its key, as every seating
-does, which is what ties a name beside the record to an account. It
-vouches for nothing else. Every viewer replays the record through the
+does, which is what ties a name beside the record to an account.
+
+Which copy is kept is the one that carries the house's checked result.
+Any player at the table can send a copy before the game is over, which
+nobody could open, so the first copy is kept only while none carries
+that result. A copy does when its log is the one the house signed for:
+the house's `result` names the log by its length and hash
+(`LogHash`; `logHashes` in `service/functions/records.mjs`, held to the
+app's by a file of cases both read), every event in it reads, with an id
+that is the hash of what it says and a signature that checks, and the
+record has nothing in it the app does not write. The copy kept is marked
+`vouched` beside it in R2. A copy that carries the result replaces one
+kept that does not, on the etag it read, so that two devices sending at
+once cannot put one over the other unseen, and nothing replaces one that
+does. A game that failed has no result, and a log that holds an event no
+side reads is not checked this far: those stay first come.
+
+A name beside a record is unsigned, and is kept from no one but its own
+seat. Each copy brings its sender's seat's name, and the names of the
+other seats in it are dropped; each other seat's device puts its own
+beside the copy kept when it sends (a write on the etag read, like
+a replacement), and until it has, the game shows that seat as it shows
+any seat with no name. Every viewer replays the record through the
 verifier before showing a card
 ([game records](live-play.md#game-records)).
 

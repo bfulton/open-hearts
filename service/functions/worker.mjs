@@ -211,6 +211,9 @@ async function recordRoute(request, env) {
   const { status, body } = await keepRecord(env.OH_RECORDS, key, sent.table, sent.record, {
     verify: (k, d, s) => signer.verify(k, d, s),
     service: serviceKeys(env)?.service,
+    // The house a game's result is the house's by: this deployment's
+    // (deployment.mjs, configEnv), as the app's build names it.
+    house: env.OH_HOUSE_KEY,
   });
   return json(request, status, body);
 }
