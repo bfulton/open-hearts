@@ -802,6 +802,8 @@ test('the webhook route: a checkout its turn could not bind yet is sent again; o
   assert.equal((await hook({ paid: busy })).status, 503, 'over the allowance: Stripe sends it again');
   assert.deepEqual(asked, [['sub:sub_turned', 'paid']], 'bound in the subscription\'s turn, and nothing mailed');
   assert.equal((await hook({ paid: { status: 500, body: {} } })).status, 503);
+  // A relay deployed before this site, which does not know the op yet.
+  assert.equal((await hook({ paid: { status: 400, body: { error: 'not a household operation' } } })).status, 503, 'an older relay: sent again');
   assert.equal((await hook({ paid: bound, made: busy })).status, 503, 'the codes not made yet: sent again');
   asked.length = 0;
   assert.equal((await hook({ paid: bound, made: { status: 200, body: { made_at: 'x', emailed: true } } })).status, 200);

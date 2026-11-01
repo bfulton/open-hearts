@@ -450,10 +450,12 @@ async function stripeRoute(request, env, ctx) {
 }
 
 /// Whether an account's turn answering [status] is worth Stripe sending
-/// the event again: over the hour's allowance, or the turn failing. A
-/// refusal that would come out the same, such as a full account, is
-/// taken as the answer. Every step of a delivery can run twice.
-const triedAgain = (status) => status === 429 || status >= 500;
+/// the event again: over the hour's allowance, the turn failing, or a
+/// relay deployed before this site that does not know the op yet (400,
+/// which the ops asked here never answer otherwise). A refusal that would
+/// come out the same, such as a full account, is taken as the answer.
+/// Every step of a delivery can run twice.
+const triedAgain = (status) => status === 400 || status === 429 || status >= 500;
 
 async function licenceRoute(request, env, ctx) {
   const pre = preflight(request, 'POST');

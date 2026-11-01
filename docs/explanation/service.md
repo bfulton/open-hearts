@@ -860,11 +860,12 @@ change to what an account's turn can be asked deploys the relay first,
 then the site ([deploy](../how-to/deploy.md)). The other way round, the
 new handler asks an object that does not know the question yet, which
 answers 400, and the app asks again later. Stripe's webhook does not ask
-again: it binds a paid checkout in the subscription's turn (`paid`), and
-answers Stripe 503, so that Stripe sends the event again, only when the
-turn is over its allowance or failing (429 or 5xx). A 400 is taken as
-the answer, so a site deployed before a relay that knows `paid` leaves
-that purchase's device unbound.
+again by itself: it binds a paid checkout in the subscription's turn
+(`paid`), and answers Stripe 503, so that Stripe sends the event again,
+when the turn answers 400, is over its allowance (429) or fails (5xx).
+So a site deployed before a relay that knows `paid` has the purchase
+sent again until the relay knows it, for as long as Stripe tries, which
+is up to three days.
 
 Secrets are set by hand and checked only by name. Everything else that
 is not secret is in `config/openhearts.json`, committed: the service's
