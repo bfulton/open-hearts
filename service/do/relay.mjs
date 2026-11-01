@@ -1050,15 +1050,18 @@ function namingContent(event) {
 }
 
 /// The names [event] shows the others: its content's `name` (waiting),
-/// each of its seats' (a table started or seated) and a watched table's
-/// `names`.
+/// each of its seats' (a table started or seated), its `names`, and a
+/// watched table's, which a seated player says as `{"view": {"names":
+/// [...]}}` (packages/table, watch.dart).
 export function namesIn(event) {
   const said = namingContent(event);
   if (!said) return [];
   const names = [];
   if (typeof said.name === 'string') names.push(said.name);
   for (const seat of Array.isArray(said.seats) ? said.seats : []) if (typeof seat?.name === 'string') names.push(seat.name);
-  for (const name of Array.isArray(said.names) ? said.names : []) if (typeof name === 'string') names.push(name);
+  for (const list of [said.names, said.view?.names]) {
+    for (const name of Array.isArray(list) ? list : []) if (typeof name === 'string') names.push(name);
+  }
   return names;
 }
 

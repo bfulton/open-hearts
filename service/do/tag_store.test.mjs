@@ -105,7 +105,8 @@ test('nothing that shows the others a name the filter refuses is carried, wherev
   const room = refusalFor('ABCD');
   const table = refusalFor('a'.repeat(32));
   const said = (kind, content) => ({ kind, tags: [['t', 'ABCD']], content: JSON.stringify(content) });
-  const watched = (names) => ({ kind: 24247, tags: [['t', 'a'.repeat(32)]], content: JSON.stringify({ phase: 'play', names }) });
+  // A view as a seated player says it (packages/table, watch.dart).
+  const watched = (names) => ({ kind: 24247, tags: [['t', 'a'.repeat(32)]], content: JSON.stringify({ view: { table: 'a'.repeat(32), phase: 'playing', names } }) });
   // Waiting in a room or a pool, a table started or seated, a table watched.
   assert.equal(room(said(24245, { kind: 'here', name: 'Ada' })), null);
   assert.equal(room(said(24245, { kind: 'here', name: 'Sh1t Head' })), NAME_REFUSED_WHY);
@@ -114,12 +115,14 @@ test('nothing that shows the others a name the filter refuses is carried, wherev
   assert.equal(room(said(lobbyKind, { kind: 'start', seats: [{ key: 'k', name: 'Ada' }, { key: 'j', name: 'Fuckface' }] })), NAME_REFUSED_WHY);
   assert.equal(table(watched(['Ada', 'Bao', 'Sam', 'Cy'])), null);
   assert.equal(table(watched(['Ada', 'Bao', 'nazi', 'Cy'])), NAME_REFUSED_WHY);
+  assert.equal(table(watched(['Ada', 'Bao', 'Аdmin', 'Cy'])), NAME_REFUSED_WHY, 'with a Cyrillic А');
   // A kind that names nobody is not read for names: a table's own events.
   assert.equal(room(said(24242, { name: 'fuck' })), null);
   // Content that is not JSON, or names nobody, is carried as before.
   assert.equal(room({ kind: 24245, tags: [['t', 'ABCD']], content: 'not json' }), null);
   assert.deepEqual(namesIn(said(lobbyKind, { kind: 'picture', jpeg: 'AAAA' })), []);
   assert.deepEqual(namesIn(said(lobbyKind, { name: 7, seats: [null, { name: 'Ada' }], names: ['Bao', 3] })), ['Ada', 'Bao']);
+  assert.deepEqual(namesIn(said(24247, { view: { names: 'Cy' } })), []);
 });
 
 test('a picture travels only as its own event: one inside an avatar, its own or a seat\'s, is not carried', () => {

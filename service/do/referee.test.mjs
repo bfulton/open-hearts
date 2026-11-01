@@ -16,7 +16,7 @@ import { test } from 'node:test';
 import { gunzipSync } from 'node:zlib';
 
 import { wasmPath } from './host.mjs';
-import { RESULT_NOT_HOUSE_WHY, VIEW_NOT_SEATED_WHY, lobbyKind, objectRelay, resultsTag, schnorrVerifier, serviceGate, tableLimits, watchKind } from './relay.mjs';
+import { NAME_REFUSED_WHY, RESULT_NOT_HOUSE_WHY, VIEW_NOT_SEATED_WHY, lobbyKind, objectRelay, resultsTag, schnorrVerifier, serviceGate, tableLimits, watchKind } from './relay.mjs';
 import { eventIdOf } from '../functions/records.mjs';
 import { authorMost, logKind, specIdOf, startRefusal, tableReferee, tickGapMs, wakeEveryMs, wakeLimiter, writersOf } from './referee.mjs';
 import { keys, signing } from './sign.mjs';
@@ -306,6 +306,9 @@ test('a view of the table is carried only from one of its people, once its start
   const watching = await said(stranger, { watching: true });
   await say(relay, a, watching);
   assert.equal(ok(a)[2], true, ok(a)[3]);
+  // A seated player's naming somebody as the filter refuses: not carried.
+  await say(relay, a, await said(bao, { view: { ...view, seq: 121, names: ['Ada', 'Admin', 'Ruth', 'Otto'] } }));
+  assert.deepEqual(ok(a).slice(2), [false, NAME_REFUSED_WHY]);
   assert.deepEqual(watcher.of('EVENT').map((m) => m[2].id), [players.id, watching.id]);
 });
 
