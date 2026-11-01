@@ -524,8 +524,8 @@ class DealSession {
         if (shareCustody.length != custodianKeys.length || shareCustody.any((c) => c.length != scalarBytes)) return false;
       }
       return pk.length == pointBytes && proof.length == keyProofBytes && crypto.verifyKey(pk, _name(seat), proof);
-    } catch (_) {
-      return false;
+    } catch (e) {
+      return _refuse('keys', e, false);
     }
   }
 
@@ -575,8 +575,8 @@ class DealSession {
       }
       _afterKeys();
       return true;
-    } catch (_) {
-      return false;
+    } catch (e) {
+      return _refuse('keys', e, false);
     }
   }
 
@@ -704,8 +704,8 @@ class DealSession {
       final next = _unb64(m['deck']);
       final proof = _unb64(m['proof']);
       return next.length == deckBytes && crypto.verifyShuffle(_joint!, _decks.last, next, proof);
-    } catch (_) {
-      return false;
+    } catch (e) {
+      return _refuse('a shuffle', e, false);
     }
   }
 
@@ -723,8 +723,8 @@ class DealSession {
       _shuffleProofs[seat] = proof;
       _computeWhatCan();
       return true;
-    } catch (_) {
-      return false;
+    } catch (e) {
+      return _refuse('a shuffle', e, false);
     }
   }
 
@@ -906,8 +906,8 @@ class DealSession {
       final checked = <int, Uint8List>{};
       _spread(checked, owed, batch);
       return checked;
-    } catch (_) {
-      return null;
+    } catch (e) {
+      return _refuse('tokens', e, null);
     }
   }
 
@@ -942,8 +942,8 @@ class DealSession {
       }
       _openWhatCan();
       return true;
-    } catch (_) {
-      return false;
+    } catch (e) {
+      return _refuse('tokens', e, false);
     }
   }
 
@@ -1019,8 +1019,8 @@ class DealSession {
       if (p < 0) return true;
       if (p ~/ _handSize != seat) return false;
       return _openWith(seat, p, _unb64(m['token'])) == leadCard;
-    } catch (_) {
-      return false;
+    } catch (e) {
+      return _refuse('a lead declaration', e, false);
     }
   }
 
@@ -1078,8 +1078,8 @@ class DealSession {
       _openWhatCan();
       _declared[seat] = p;
       return true;
-    } catch (_) {
-      return false;
+    } catch (e) {
+      return _refuse('a lead declaration', e, false);
     }
   }
 
@@ -1120,8 +1120,8 @@ class DealSession {
       final p = m['position'] as int;
       if (p < 0 || p >= deckSize || _holderOf[p] != seat || deck == null) return null;
       return _openWith(p ~/ _handSize, p, _unb64(m['token']));
-    } catch (_) {
-      return null;
+    } catch (e) {
+      return _refuse('a play', e, null);
     }
   }
 
@@ -1141,8 +1141,8 @@ class DealSession {
       final card = _cards[p];
       if (card != null) _holderOf[p] = -1; // played
       return card;
-    } catch (_) {
-      return null;
+    } catch (e) {
+      return _refuse('a play', e, null);
     }
   }
 
@@ -1231,8 +1231,8 @@ class DealSession {
         if (!crypto.verifySeal(_pks[from]!, _pks[to]!, _masked(positions[i]), sealed[i])) return false;
       }
       return true;
-    } catch (_) {
-      return false;
+    } catch (e) {
+      return _refuse('a pass', e, false);
     }
   }
 
@@ -1276,8 +1276,8 @@ class DealSession {
       }
       _openWhatCan();
       return true;
-    } catch (_) {
-      return false;
+    } catch (e) {
+      return _refuse('a pass', e, false);
     }
   }
 
@@ -1428,8 +1428,8 @@ class DealSession {
       final secret = _rebuild(about, here, fresh: fresh ? holder : null);
       if (secret != null) _learnSecret(about, secret);
       return true;
-    } catch (_) {
-      return false;
+    } catch (e) {
+      return _refuse('a release', e, false);
     }
   }
 
@@ -1517,6 +1517,14 @@ class DealSession {
     _computeWhatCan();
   }
 
+  /// [no], with why [what] was refused said to [log]: a message that
+  /// throws on reading is refused like one that reads and does not
+  /// hold, and the trace says which it was.
+  T _refuse<T>(String what, Object e, T no) {
+    log?.call('$what refused: $e');
+    return no;
+  }
+
   bool _same(Uint8List a, Uint8List b) {
     if (a.length != b.length) return false;
     for (var i = 0; i < a.length; i++) {
@@ -1568,8 +1576,8 @@ class DealSession {
         }
       }
       return true;
-    } catch (_) {
-      return false;
+    } catch (e) {
+      return _refuse('an audit', e, false);
     }
   }
 
@@ -1600,8 +1608,8 @@ class DealSession {
         }
       }
       return true;
-    } catch (_) {
-      return false;
+    } catch (e) {
+      return _refuse('an audit', e, false);
     }
   }
 

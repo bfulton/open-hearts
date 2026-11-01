@@ -656,4 +656,13 @@ void main() {
     };
     expect(make(seats, 1, custodians: ['house']).acceptKeys(otherKey), isFalse, reason: "shares whose keys do not add to the seat's");
   });
+
+  test('a message that does not read is refused, and the trace says why', () {
+    final seats = [const HumanDealSeat('a'), const HumanDealSeat('b'), const BotDealSeat(), const BotDealSeat()];
+    final lines = <String>[];
+    final b = make(seats, 1)..log = lines.add;
+    expect(b.verifyKeys({'seat': '0'}), isFalse);
+    expect(b.acceptPass({'from': 0, 'to': 1, 'positions': 'all of them'}), isFalse);
+    expect(lines, [startsWith('keys refused: '), startsWith('a pass refused: ')]);
+  });
 }
