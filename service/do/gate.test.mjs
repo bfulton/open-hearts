@@ -121,7 +121,7 @@ test('before its answer, a socket\'s messages are held up to a count and a size,
   assert.equal(a.of('EOSE').length, 32, 'what was held, and only that, is answered');
 });
 
-test('a challenge is answered once: an answer again is refused without its signatures checked', async () => {
+test('a challenge is answered once, and only an answer that names it has its signatures checked', async () => {
   let checks = 0;
   const counted = (...args) => (checks++, verify(...args));
   const relay = createRelay({ verify: counted, now, gate: serviceGate({ service: SERVICE.public, verify: counted, now }) });
@@ -138,10 +138,17 @@ test('a challenge is answered once: an answer again is refused without its signa
   // new socket, which has a challenge of its own.
   await relay.message(a, JSON.stringify(['AUTH', await showing(ADA, a, await activation(ADA))]));
   assert.deepEqual(a.of('OK').at(-1).slice(2), [false, 'auth-required: not an answer to this relay\'s challenge']);
+  assert.equal(checks, 2);
+  // An answer to another challenge, such as one the object asked before
+  // it was evicted, is refused unchecked, and leaves this one to answer.
   const b = socket();
   relay.open(b);
+  const elsewhere = await sign.event(ADA, { kind: authKind, content: '', tags: [['challenge', 'ff'.repeat(16)], ['activation', JSON.stringify(await activation(ADA))]], created_at: T });
+  await relay.message(b, JSON.stringify(['AUTH', elsewhere]));
+  assert.equal(b.of('OK')[0][2], false);
+  assert.equal(checks, 2);
   await relay.message(b, JSON.stringify(['AUTH', await showing(ADA, b, await activation(ADA))]));
-  assert.equal(b.of('OK')[0][2], true);
+  assert.equal(b.of('OK')[1][2], true);
 });
 
 test('no activation, another key\'s, one run out or another challenge\'s answer: nothing carried, and told why', async () => {

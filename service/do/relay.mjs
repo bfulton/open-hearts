@@ -534,20 +534,21 @@ export function createRelay({ verify, store = memoryStore(), refuse = null, log 
     }
   }
 
-  /// [socket]'s answer to its challenge. A challenge is answered once,
-  /// taken or not: an answer is the one message a socket can send that
-  /// has its signatures checked before anything has let it in, so a
-  /// socket that answers again is told no without them.
+  /// [socket]'s answer to its challenge. An answer is the one message a
+  /// socket can send that has its signatures checked before anything has
+  /// let it in, so only one that names the socket's challenge is
+  /// checked, and the challenge is answered once, taken or not: a socket
+  /// that answers it again is told no without a signature checked.
   async function authenticate(socket, json) {
     const a = auths.get(socket);
     if (!gate || !a) return send(socket, ['NOTICE', 'this relay asks nobody who they are']);
-    const asked = a.challenge;
-    a.challenge = null;
-    const event = asked ? await checkEvent(json, verify) : null;
+    const answering = !!a.challenge && Array.isArray(json?.tags) && json.tags.some((t) => Array.isArray(t) && t[0] === 'challenge' && t[1] === a.challenge);
+    if (answering) a.challenge = null;
+    const event = answering ? await checkEvent(json, verify) : null;
     const id = event?.id ?? (json && typeof json === 'object' && typeof json.id === 'string' ? json.id : '');
     let who = null;
     let why = null;
-    if (!event || event.kind !== authKind || !event.tags.some((t) => t[0] === 'challenge' && t[1] === asked)) {
+    if (!event || event.kind !== authKind) {
       why = 'auth-required: not an answer to this relay\'s challenge';
     } else if (Math.abs(nowS() - event.created_at) > answerFreshS) {
       why = 'auth-required: an old answer';
