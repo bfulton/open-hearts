@@ -343,10 +343,15 @@ export function serviceGate({ service, verify, house = null, seen = null, now = 
   };
 }
 
-/// How many messages a socket may say before its answer to the
-/// challenge is in: a client sends its subscriptions at once, and maybe
-/// an event; past this it is not a client waiting for an answer.
+/// How many messages, and how many characters of them, a socket may say
+/// before its answer to the challenge is in: a client sends its
+/// subscriptions at once, and maybe the few events it has said that it
+/// has not yet seen taken (packages/table, relay_line.dart, `_opened`);
+/// past this it is not a client waiting for an answer. The characters
+/// bound what a socket that never answers makes the object hold: two of
+/// a table's longest messages.
 const heldMost = 32;
+const heldMostChars = 256 * 1024;
 
 /// How old a device's answer to the challenge may be, in seconds.
 const answerFreshS = 600;
@@ -514,15 +519,20 @@ export function createRelay({ verify, store = memoryStore(), refuse = null, log 
     }
   }
 
-  /// [socket]'s answer to its challenge.
+  /// [socket]'s answer to its challenge. A challenge is answered once,
+  /// taken or not: an answer is the one message a socket can send that
+  /// has its signatures checked before anything has let it in, so a
+  /// socket that answers again is told no without them.
   async function authenticate(socket, json) {
     const a = auths.get(socket);
     if (!gate || !a) return send(socket, ['NOTICE', 'this relay asks nobody who they are']);
-    const event = await checkEvent(json, verify);
+    const asked = a.challenge;
+    a.challenge = null;
+    const event = asked ? await checkEvent(json, verify) : null;
     const id = event?.id ?? (json && typeof json === 'object' && typeof json.id === 'string' ? json.id : '');
     let who = null;
     let why = null;
-    if (!event || event.kind !== authKind || !a.challenge || !event.tags.some((t) => t[0] === 'challenge' && t[1] === a.challenge)) {
+    if (!event || event.kind !== authKind || !event.tags.some((t) => t[0] === 'challenge' && t[1] === asked)) {
       why = 'auth-required: not an answer to this relay\'s challenge';
     } else if (Math.abs(nowS() - event.created_at) > answerFreshS) {
       why = 'auth-required: an old answer';
@@ -545,7 +555,6 @@ export function createRelay({ verify, store = memoryStore(), refuse = null, log 
     }
     if (who.account) supersede(who.account, who.epoch);
     a.who = who;
-    a.challenge = null;
     a.refused = null;
     send(socket, ['OK', id, true, '']);
     for (const raw of held) await handle(socket, raw);
@@ -560,7 +569,8 @@ export function createRelay({ verify, store = memoryStore(), refuse = null, log 
     // the activation it has been given since.
     if (a?.who) a = challenge(socket);
     if (a && !a.refused) {
-      if (a.held.length >= heldMost) return send(socket, ['NOTICE', 'auth-required: answer the challenge first']), true;
+      const chars = a.held.reduce((n, r) => n + r.length, raw.length);
+      if (a.held.length >= heldMost || chars > heldMostChars) return send(socket, ['NOTICE', 'auth-required: answer the challenge first']), true;
       a.held.push(raw);
       return true;
     }
@@ -574,9 +584,9 @@ export function createRelay({ verify, store = memoryStore(), refuse = null, log 
     return true;
   }
 
-  /// Whether [socket] may publish one more event now, taking it if so.
-  /// The bucket refills with time; a socket that went quiet has its
-  /// whole burst back.
+  /// Whether [socket] may publish one more event, or ask for a table's
+  /// log once more, now, taking it if so. The bucket refills with time;
+  /// a socket that went quiet has its whole burst back.
   function spend(socket) {
     if (!limits) return true;
     const t = now();
@@ -749,6 +759,12 @@ export function createRelay({ verify, store = memoryStore(), refuse = null, log 
           return send(socket, ['NOTICE', 'LOG takes an id and the first entry wanted']);
         }
         if (!table) return send(socket, ['CLOSED', message[1], 'blocked: only a table\'s tag keeps a log']);
+        // The log from where it is asked for is the most a short message
+        // makes the relay send, so asking costs what publishing does.
+        if (!spend(socket)) {
+          count?.('rateLimited');
+          return send(socket, ['CLOSED', message[1], 'rate-limited: slow down']);
+        }
         return table.follow(socket, message[1], message[2], auths.get(socket)?.who?.key ?? null);
       case 'TICK':
         if (!table) return send(socket, ['NOTICE', 'blocked: only a table\'s tag keeps a log']);

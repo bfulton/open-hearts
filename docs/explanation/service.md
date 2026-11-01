@@ -368,11 +368,11 @@ subscription is paid to.
 
 **The relay enforces it, rather than asking.** A device told to stop
 could be a modified one that does not. So the relay asks every socket
-who it is (NIP-42: a challenge, answered by an event the device's key
-signs, carrying its activation), holds whatever the socket sends until
-the answer is in, and carries nothing for a socket without a current
-one (`serviceGate` in `service/do/relay.mjs`). Three things keep a
-superseded device off it:
+who it is (NIP-42: a challenge, answered once by an event the device's
+key signs, carrying its activation), holds what the socket sends until
+the answer is in, up to a bound, and carries nothing for a socket
+without a current one (`serviceGate` in `service/do/relay.mjs`). Three
+things keep a superseded device off it:
 
 - Each relay object keeps the newest epoch it has seen of each account,
   so showing a later activation closes every socket of that account's

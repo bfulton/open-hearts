@@ -16,7 +16,7 @@ import { test } from 'node:test';
 import { gunzipSync } from 'node:zlib';
 
 import { wasmPath } from './host.mjs';
-import { RESULT_NOT_HOUSE_WHY, VIEW_NOT_SEATED_WHY, lobbyKind, objectRelay, resultsTag, schnorrVerifier, serviceGate, watchKind } from './relay.mjs';
+import { RESULT_NOT_HOUSE_WHY, VIEW_NOT_SEATED_WHY, lobbyKind, objectRelay, resultsTag, schnorrVerifier, serviceGate, tableLimits, watchKind } from './relay.mjs';
 import { eventIdOf } from '../functions/records.mjs';
 import { authorMost, logKind, specIdOf, startRefusal, tableReferee, tickGapMs, wakeEveryMs, wakeLimiter, writersOf } from './referee.mjs';
 import { keys, signing } from './sign.mjs';
@@ -474,6 +474,17 @@ test('the log from any entry, then its end, then every entry as it comes', async
   await relay.message(late, JSON.stringify(['LOG', 'mine', -1]));
   await relay.message(late, JSON.stringify(['LOG', 'mine']));
   assert.equal(late.of('NOTICE').length, 2);
+});
+
+test('asking for the log counts against the socket\'s rate, as publishing does', async () => {
+  const { relay } = referee();
+  const a = socket();
+  relay.open(a);
+  await say(relay, a, await wrapped(await startOf(ada)));
+  // The clock stands still: what the socket spends does not come back.
+  for (let i = 0; i < tableLimits.burst; i++) await relay.message(a, JSON.stringify(['LOG', 'log', 0]));
+  assert.equal(a.of('LOGEND').length, tableLimits.burst - 1, 'the start took one');
+  assert.deepEqual(a.said.at(-1), ['CLOSED', 'log', 'rate-limited: slow down']);
 });
 
 test('a tick when asked, once the table has begun, no oftener than the gap', async () => {

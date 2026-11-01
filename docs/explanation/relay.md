@@ -23,7 +23,8 @@ anything else sees it. Sockets hibernate, carrying their subscriptions
 through eviction, so an idle connection costs nothing.
 
 Each socket is held to limits on message size, request size and
-publishing rate. A table's limits are looser than presence's: a deal
+publishing rate, and asking for a table's log counts against the rate as
+publishing does. A table's limits are looser than presence's: a deal
 sends its steps in bursts of tens of kilobytes, while presence is a
 small message every few seconds from every device online.
 

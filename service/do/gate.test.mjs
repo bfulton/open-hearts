@@ -117,6 +117,44 @@ test('what the relay took is told to its host with who said it: the account the 
   assert.deepEqual(heard, [[said.id, { account: ACCOUNT, key: ADA.public, epoch: 1, until: T + 3600 }]]);
 });
 
+test('before its answer, a socket\'s messages are held up to a count and a size, and past either it is told to answer first', async () => {
+  const relay = gated();
+  const a = socket();
+  relay.open(a);
+  // Two messages near a table's longest are held, and a third is not.
+  const big = (i) => JSON.stringify(['REQ', `big${i}`, { kinds: [24246], pad: 'x'.repeat(100_000) }]);
+  for (let i = 0; i < 3; i++) await relay.message(a, big(i));
+  assert.deepEqual(a.of('NOTICE'), [['NOTICE', 'auth-required: answer the challenge first']]);
+  // Small ones are held up to the count.
+  for (let i = 0; i < 31; i++) await relay.message(a, JSON.stringify(['REQ', `small${i}`, { kinds: [24246] }]));
+  assert.equal(a.of('NOTICE').length, 2);
+  await relay.message(a, JSON.stringify(['AUTH', await showing(ADA, a, await activation(ADA))]));
+  assert.equal(a.of('EOSE').length, 32, 'what was held, and only that, is answered');
+});
+
+test('a challenge is answered once: an answer again is refused without its signatures checked', async () => {
+  let checks = 0;
+  const counted = (...args) => (checks++, verify(...args));
+  const relay = createRelay({ verify: counted, now, gate: serviceGate({ service: SERVICE.public, verify: counted, now }) });
+  const a = socket();
+  relay.open(a);
+  // Ada's activation shown by Bao: his answer's signature and her
+  // activation's are checked, and he is refused.
+  const wrong = await showing(BAO, a, await activation(ADA));
+  await relay.message(a, JSON.stringify(['AUTH', wrong]));
+  assert.equal(checks, 2);
+  for (let i = 0; i < 10; i++) await relay.message(a, JSON.stringify(['AUTH', wrong]));
+  assert.equal(checks, 2, 'nothing checked again');
+  // Not even a good answer: a device that is refused tries again on a
+  // new socket, which has a challenge of its own.
+  await relay.message(a, JSON.stringify(['AUTH', await showing(ADA, a, await activation(ADA))]));
+  assert.deepEqual(a.of('OK').at(-1).slice(2), [false, 'auth-required: not an answer to this relay\'s challenge']);
+  const b = socket();
+  relay.open(b);
+  await relay.message(b, JSON.stringify(['AUTH', await showing(ADA, b, await activation(ADA))]));
+  assert.equal(b.of('OK')[0][2], true);
+});
+
 test('no activation, another key\'s, one run out or another challenge\'s answer: nothing carried, and told why', async () => {
   const relay = gated();
   const adas = await activation(ADA);
