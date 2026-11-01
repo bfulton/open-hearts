@@ -188,6 +188,19 @@ void main() {
       expect(t.clients.first.rules.removals, isEmpty);
     });
 
+    test('a worker that dies over the device\'s own step of the deal: the device cannot deal, and leaves at once', () {
+      final t = SimTable(humans: 2, crypto: crypto, workers: true);
+      // Dead once it has made the hand's first deck, so the first job to
+      // fail is this device's own shuffle, not a check of anybody else's.
+      final mine = t.clients[0].dealWorker! as SimDealWorker;
+      t.clients[0].changes.listen((_) => mine.dead = mine.made >= 1);
+      t.start();
+      expect(t.clock.runUntil(() => t.clients[1].rules.removals.containsKey(0), limitMs: 10 * 60 * 1000), isTrue);
+      expect(t.clients[0].cannotDeal, isNotNull);
+      expect(t.clients[1].rules.removals[0]!.exit, Exit.left, reason: 'not booted when the deal\'s clock runs out');
+      t.close();
+    });
+
     test('three people, one going: the other two and the house play it out', () {
       final t = SimTable(humans: 3, seed: 45, crypto: crypto);
       t.people[1]

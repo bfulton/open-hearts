@@ -298,6 +298,16 @@ class TableRules {
   String? get cannotDeal => _cannotDeal;
   String? _cannotDeal;
 
+  /// This side's deal worker failed for good, [why], at one of its jobs:
+  /// one of these rules' own, or one for this side's own step of the deal
+  /// (client.dart). Every job fails from then on (work.dart), so this
+  /// side can deal no more.
+  void workerFailed(Object why) {
+    _cannotDeal = '$why';
+    trace?.call('cannot deal: $why');
+    onChange?.call();
+  }
+
   late final PreparedDeal? _prepared = worker == null || crypto == null ? null : PreparedDeal(crypto!);
 
   /// Takes the entries in order, as they come: an entry out of order is
@@ -362,11 +372,7 @@ class TableRules {
         _deal?.resume();
         _settledSince = true;
         _pump();
-      }, failed: (why) {
-        _cannotDeal = '$why';
-        trace?.call('cannot deal: $why');
-        onChange?.call();
-      });
+      }, failed: workerFailed);
     }
     return all;
   }

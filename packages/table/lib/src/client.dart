@@ -474,11 +474,14 @@ class TableClient {
       if (c.has(job)) continue;
       all = false;
       if (!_working.add(job.key)) continue;
+      // A failed job's key stays in [_working]. A dead worker fails a
+      // job at once, so a house seat, which never leaves, would ask
+      // again from inside the failure, without end.
       w.run(job, done: (answer) {
         _working.remove(job.key);
         c.put(job, answer);
         _act();
-      }, failed: (why) => _trace('cannot make a step of the deal: $why'));
+      }, failed: rules.workerFailed);
     }
     return all;
   }
