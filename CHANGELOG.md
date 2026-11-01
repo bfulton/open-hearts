@@ -743,6 +743,28 @@ squashed from a pull request, the pull request's number.
   does not verify, which leaves those cards shut to the receiver: that
   was so before, and nobody can check it without opening the seal.
   (2026-11-01, #47)
+- A passer can no longer leave a receiver holding cards it cannot
+  play. A pass carried a proof of each passed token after its seal, which
+  nobody but the receiver could check, so a passer could send a proof
+  that did not verify beside a good seal: every seat took the pass, and
+  the receiver could not open those cards. A pass now carries nothing
+  but each seal and the argument about it, every byte of which every
+  seat checks, and refuses seals that share their randomness. The
+  receiver plays a passed card with its own opening of the seal, made
+  with its key, which every seat checks and takes the token out of, so no
+  proof of the passer's has to travel at all. A pass made by the last
+  build is refused at a live table; games already kept still verify as
+  they did. (2026-11-01, #50)
+- A seated player can no longer make the record of a game fail to
+  verify. A table skips a message that is no pass by its rules and takes
+  the seat's next, but the verifier of kept games read every pass format
+  there had been, took the skipped one, and then refused the seat's own:
+  a game the house had signed for did not check. A sealed table's spec
+  now says the revision of the deal's messages it is played by (`deal`,
+  which is in the table's id), a table plays only its own build's, and
+  the verifier reads each game by the revision its spec says. A spec
+  that says nothing is the first revision, as every game kept before.
+  (2026-11-01, #50)
 - A game's record is kept from the copy that carries the house's word
   on how it came out, not from whichever copy arrived first. A copy cut
   short, which any player at the table could send before the game was

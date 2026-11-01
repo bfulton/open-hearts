@@ -391,6 +391,11 @@ class TableClient {
       if (m == null) return;
       final sealed = m['sealed'];
       if (sealed is List<String>) m['sealed'] = conduct.sealedPass(sealed, _random);
+      // Sent and not made: a seat's own event is taken as it is made, so
+      // that this one goes only where a modified client would send it,
+      // to the log, and the seat plays on as honest.
+      final before = conduct.passBefore(m);
+      if (before != null) line.send(TableEvent.sign(signer, table: tableId, kind: EventKind.pass, body: {...body, ...before}));
       body.addAll(m);
     } else {
       body['cards'] = [for (final c in cards) c.code];

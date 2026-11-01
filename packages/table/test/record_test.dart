@@ -85,6 +85,27 @@ void main() {
     });
   });
 
+  test('a pass said before a seat\'s own that only a reader of older games would take changes nothing a record checks', () {
+    // The table skips it (an event that is not taken stays in the log and
+    // changes nothing), the seat's own is taken, and the game goes on.
+    final t = SimTable(humans: 2, seed: 103, crypto: crypto, conducts: {0: Lie.oldPass});
+    t.start();
+    expect(t.run(), isTrue, reason: 'the table plays on to the end');
+    final kept = GameRecord.of(t.clients.first);
+    t.close();
+    final passes = [
+      for (final e in kept.log)
+        if (e.event?.kind == EventKind.pass && e.event!.body['seat'] == 0 && e.event!.body['hand'] == 0) e.event!,
+    ];
+    expect(passes, hasLength(2), reason: 'the seat said two passes at its first turn to pass');
+    expect(passes.first.body['sealed'], isNot(passes.last.body['sealed']));
+    // The record checks as the table played it: the first is no pass
+    // here either, and the seat's own is the one that was taken.
+    final v = verifyRecord(kept, crypto: crypto, house: t.houseSigner.publicKey);
+    expect(v.ok, isTrue, reason: v.reason);
+    expect(v.vouched, isTrue);
+  });
+
   test('an unsealed game has no house to vouch for it, and checks as played', () {
     final t = SimTable(humans: 2, seed: 102);
     t.start();

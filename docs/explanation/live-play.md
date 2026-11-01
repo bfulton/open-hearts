@@ -104,7 +104,9 @@ does. Choosing it tells the operator, so that someone can come and play
 
 **A table's id is its spec's.** A seating says everything the seats must
 agree on: the seats with their licences, the target score, whether it
-is rated, the table's clocks and the house. The table's id is the first
+is rated, the table's clocks, the house and, at a sealed table, the
+revision of the deal's messages it is played by
+([fair-deal](fair-deal.md#verification)). The table's id is the first
 128 bits of the SHA-256 of all of it, as it is written, with 128 bits of
 salt from the house so that nobody who saw the seats can work the id out
 (`TableSpec.id` in `spec.dart`). The salt is a keyed hash of the rest

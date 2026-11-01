@@ -37,9 +37,9 @@ functions over bytes in `crypto/deal`.
 - **Declaring the lead.** The holder of the 2♣ declares it with the
   token that opens it for everyone.
 - **Pass.** Moving three positions to another seat is public. The tokens
-  that open them, and the proofs they will be played with, are sealed to
-  the receiver (below).
-- **Play.** A play is the token that opens a position for everyone. The
+  that open them are sealed to the receiver (below).
+- **Play.** A play is the token that opens a position for everyone, or,
+  for a card that was passed, the receiver's opening of its seal. The
   card it opens must be the card named, so nobody can play a card they
   do not hold. The rules are checked as far as they can be without the
   hand, and the rest is checked at the audit.
@@ -113,36 +113,52 @@ and every side checks it before it takes the pass. A pass that fails
 the check is taken by nobody, and the passer's clock runs out at its
 own turn. The receiver never has to complain about the token.
 
-**The proof that goes with the token.** What the receiver opens is the
-32-byte token. The Chaum–Pedersen proof that makes it whole (96 bytes,
-as for any token that travels alone) is the passer's to make, and the
-receiver needs it later: when it plays the card, the play carries the
-passer's token with its proof, and every side checks that against the
-passer's key. So the proof has to reach the receiver, and it cannot
-travel in the clear. A proof is also a test for the token it belongs
-to. The other three seats' tokens for the passer's positions are public,
-and the 52 cards are fixed points, so there are 52 candidates for the
-passer's token (the masked card's second half, less those three
-tokens, less the card), and the proof verifies for exactly one of them.
-With the proof in the log, anyone reading it could find every card
-that was passed.
+**Playing a card that was passed.** The passer's token for the card is the
+receiver's to open, but playing the card means telling the table that
+token, and the table has to be able to check it. A token that travels
+alone carries a proof that it was made with the passer's key (96 bytes,
+as for any token), and only the passer can make that. A pass that carried
+it would have a problem on each side. In the clear it names the card:
+the other three seats' tokens for the passer's positions are public, and
+the 52 cards are fixed points, so there are 52 candidates for the
+passer's token (the masked card's second half, less those three tokens,
+less the card), and the proof verifies for exactly one of them. Hidden
+inside the seal, nobody but the receiver could check it, so a passer could
+hide a proof that does not verify beside a good seal, and every seat would
+take the pass while the receiver could not open those cards. (An earlier
+build did that.)
 
-It travels inside what is sealed to the receiver instead: in the same
-field of the pass, after the seal and its argument, 96 bytes XORed with
-a pad. The pad is HMAC-SHA-256 keyed by the secret that the passer's and
-the receiver's deal keys share (`shared_secret`, the same from either
-side), over the table, hand, seats and position, so no two positions
-share one. Only a holder of one of those two secrets can make it: the
-receiver, or everyone once the passer or the receiver has left and its
-secret is rebuilt, when that seat's cards are open to the table anyway.
-There is no tag. The receiver checks the whole token against the
-passer's key when it opens the seal, as any token is checked when it
-arrives.
+So the pass carries no proof of the token at all, only each seal and its
+argument, every byte of which every side checks. When the receiver plays
+the card it makes its own: the seal is a ciphertext of the same shape as
+a masked card, so what a reveal token over it proves is that the
+receiver's key opens it to a point. That is the token's `opening`:
 
-The argument is about the token, so it cannot say anything about a proof
-that nobody else can see. A passer that hides a proof which does not
-verify is not caught: every side takes the pass, and the receiver cannot
-open those positions.
+```text
+    pk_to = x·G                  the receiver's key, already public
+    opening = x·c1               made over the seal's first half
+    token = c2 − opening         the seal's second half, less the opening
+```
+
+With the seal's argument (`c2 = sk·C1 + r·pk_to`, `c1 = r·G`), that
+leaves `sk·C1`, which is the passer's token for the card, and nobody had
+to take the passer's word for it or the receiver's. The play carries the
+opening in place of the token (`opening` instead of `token`, 128 bytes
+like any token with its proof). Every side checks it against the
+receiver's key and the seal it kept from the pass, takes the token out,
+and opens the card with it. An honest seal publishes nothing about the
+card before the play, which names it anyway. A passer could say its own
+token in the open, as it could say the card, and cannot be stopped; but it
+cannot make one opening give away another card, which it could if two of
+its seals shared their randomness, since the opening is that randomness
+taken to the receiver's key. So every side refuses a pass whose seals do.
+
+The opening needs the receiver's secret, so the seat that plays the card
+makes it, or whoever plays for it once it has left and its secret is
+rebuilt; the seed is drawn from the secret, so the same opening comes out
+wherever it is made. A card passed in the clear, to a seat whose secret
+was already public, is played with the passer's token whole, as every
+card a seat plays from the hand it was dealt.
 
 ### The one fault no proof catches
 
@@ -232,11 +248,26 @@ its released pieces stand in for its audit. A record that does not reach
 the end of the game, or whose end the house did not sign for, is
 rejected ([game records](live-play.md#game-records)).
 
-A game kept before passes hid their proofs has each proof in the clear
-beside its seal. The two verifiers of kept games (`verifyRecord` and the
-frozen `legacy/v2_record.dart`) still read a pass that way, because
-games are kept for good (`DealSession.readsOldPasses`). A table never
-does.
+Passes were made two other ways before this one. The first had each
+token's proof in the clear beside its seal. The second hid it after the
+seal, under a pad only the passer and the receiver could make, and played
+the card with the passer's token whole. The two verifiers of kept games
+(`verifyRecord` and the frozen `legacy/v2_record.dart`) still read both,
+and the card each was played with, because games are kept for good
+(`DealSession.readsOldPasses`). A table never does: it refuses a pass
+with a field beside the seals, or with seals of any other size.
+
+Which a verifier reads is the spec's to say, not the log's. A table
+skips a message that is no pass by its rules (an event that is not taken
+stays in the log and changes nothing) and takes the seat's next, and a
+reader that took the skipped one for the pass would come to another game
+than the one played, and fail a record whose house signed for the log as
+it was. So a sealed spec names the revision of the deal's messages it is
+played by (`deal` in the spec, `dealRevision`; this is 2), which is in
+the id the start is taken by, and nobody can change it. A table plays no
+revision but its build's. A verifier reads an earlier revision the way
+it was played, and a spec that says nothing of it is the first, which
+is every game kept before.
 
 ## Cost, and keeping it off the page
 
