@@ -3,9 +3,9 @@
 /// fit to show before anything draws one.
 library;
 
-/// The longest name, in characters: what the profile keeps
-/// (service/functions/profile.mjs, a test holding them equal), and the
-/// most of a name another device sends that is kept.
+/// The longest name, in characters. The profile keeps names this long
+/// (service/functions/profile.mjs; a test holds the two equal), and
+/// [cleanName] cuts a received name to it by default.
 const longestName = 60;
 
 /// Control characters (C0, DEL and C1), the line and paragraph

@@ -1,5 +1,5 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- Everything live is on the network: the relays, TURN, the
+    <!-- Everything live is on the network: the relay and the
          licence. The debug and profile manifests have INTERNET for the
          Flutter tool, but a release build reads only this one. The
          network's state was read by WebRTC's network monitor, which the

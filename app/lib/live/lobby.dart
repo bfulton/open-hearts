@@ -471,7 +471,6 @@ class Lobby extends ChangeNotifier {
         return null;
       }
       transport = RelayTransport(relays: relays, signer: signer, table: tag, log: _relayLog, pinned: pinnedRelays(relays));
-      unawaited(_refusalSub?.cancel());
       _refusalSub = transport.refusals.listen((r) {
         if (_disposed) return;
         _relayNote = r == null ? null : words().noRelayTakesEvents(r);
@@ -633,11 +632,10 @@ class Lobby extends ChangeNotifier {
   /// whose game left early is waited out (left_early.dart).
   void _toTable(TableSpec spec, Map<int, String> names, Map<int, Avatar> seatAvatars,
       {TableJournal? journal, VoidCallback? again, bool strangers = false}) {
-    // Every name trimmed and cut as this device keeps its own
-    // (identity.dart): the others' come as their devices sent them, and
-    // a modified build can send one of any length, or with control
-    // characters in it.
-    final seatNames = {for (final MapEntry(:key, :value) in names.entries) key: Identity.nameOf(value)};
+    // Cleaned again here, whatever path the names came by (a room, a
+    // seating, a restored table), since a modified build can send any
+    // length or any characters (cleanName, packages/table names.dart).
+    final seatNames = {for (final MapEntry(:key, :value) in names.entries) key: cleanName(value)};
     final signer = _signer!;
     final relays = _relays;
     final line = RelayLine(relays: relays, signer: signer, table: spec.id, log: _debugging ? (l) => debugPrint('line: $l') : null);

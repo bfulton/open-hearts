@@ -290,14 +290,13 @@ class _LivePageState extends State<LivePage> {
   }
 
   Widget _screen(BuildContext context) {
-    // This device, not the game: its worker for the deal failed for
-    // good, and it left the table rather than hold it up. The others
-    // play on, a bot in this seat. Before the seat that is no longer
-    // this player's, below: the leave lands at once, and what that
-    // screen says — the table could not hear from you — is not what
-    // happened.
     final l10n = context.l10n;
     void close() => Navigator.of(context).pop();
+    // This device could not deal: its deal worker failed for good, so it
+    // left the table rather than hold it up, and the others play on with
+    // a bot in this seat. Checked before the lost-seat screen below,
+    // because that screen says the table could not hear from you, which
+    // is not what happened.
     final cannotDeal = _c.client.cannotDeal;
     if (cannotDeal != null) {
       return _FeltScreen(
