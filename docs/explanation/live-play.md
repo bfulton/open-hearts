@@ -107,12 +107,15 @@ agree on: the seats with their licences, the target score, whether it
 is rated, the table's clocks and the house. The table's id is the first
 128 bits of the SHA-256 of all of it, as it is written, with 128 bits of
 salt from the house so that nobody who saw the seats can work the id out
-(`TableSpec.id` in `spec.dart`). The id is the table's address: the tag
-its object on the relay is named by. A device seated works the id out
-again from the seating, and sits only at one whose id is its own. The
-referee takes the log's start only as the spec its table's id names
-([the referee](#the-referee)), so one person at a table cannot start it
-as anything but the table everybody was seated at.
+(`TableSpec.id` in `spec.dart`). The salt is a keyed hash of the rest
+under the house's own secret (`seatingSalt`), so the house knows a
+table it seated from the table alone ([ratings](#ratings)). The id is
+the table's address: the tag its object on the relay is named by. A
+device seated works the id out again from the seating, and sits only at
+one whose id is its own. The referee takes the log's start only as the
+spec its table's id names ([the referee](#the-referee)), so one person
+at a table cannot start it as anything but the table everybody was
+seated at.
 
 **Each player is seated once.** Whoever a seating names leaves the
 pool as it is said. The house hears nothing from them for
@@ -247,7 +250,18 @@ the totals, who was there from the deal and who left. Each person's
 line names the account and carries the licence that says the key it
 sat with is one of the account's devices, so anyone folding results can
 check whose it is. A result stands when it is the house's, the house
-this build was made with. Results from before the referee stood when a
+this build was made with.
+
+Any one of a table's people writes its start, so the house rates only
+what it seated. It serves a rated table only when the salt is its own:
+a start that says it is rated, naming people whose licences anyone can
+read, would otherwise be played out without them and rate them as having
+left. A friends' table is never rated, and the house publishes no result
+for one where a person seated there never said anything in the log:
+whoever started it chose who sat there, and nobody gets a game they
+never saw on their record.
+
+Results from before the referee stood when a
 majority of the accounts that sat down published the same one; they
 are folded as they always were, and no more are taken.
 

@@ -23,6 +23,7 @@ library;
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
+import 'dart:typed_data';
 
 import 'package:engine/engine.dart';
 
@@ -521,6 +522,7 @@ class PoolHost {
     required this.relay,
     required this.pool,
     required this.bots,
+    required this.secret,
     this.target = gameOverScore,
     this.timing = TableTiming.standard,
     this.roundMs = poolRoundMs,
@@ -550,6 +552,11 @@ class PoolHost {
 
   final RelayTransport relay;
   final String pool;
+
+  /// The house's own secret (house.dart, House.secret): every table this
+  /// pool seats is salted with it ([seatingSalt]), which is how the
+  /// house knows a rated table for one it seated.
+  final Uint8List secret;
 
   /// The score the games this pool seats run to.
   final int target;
@@ -665,24 +672,25 @@ class PoolHost {
     if (p.tables.isEmpty) return;
     log?.call('$pool round $round: ${all.length} waiting, ${p.tables.length} table(s)');
     for (final humans in p.tables) {
-      final salt = newSalt(_random);
       final seed = _random.nextInt(1 << 31);
       final mean = humans.map((w) => w.rating).reduce((a, b) => a + b) ~/ humans.length;
       final wanted = seatCount - humans.length;
       final picked = bots(mean, wanted, Random(seed));
-      final table = TableSpec(
-        seed: seed,
-        seats: [
-          for (var s = 0; s < seatCount; s++)
-            s < humans.length ? HumanSeat(humans[s].key, licence: humans[s].licence) : BotSeat(picked[s - humans.length]),
-        ],
-        rated: pool == 'rated',
-        sealed: true,
-        target: target,
-        timing: timing,
-        house: house,
-        salt: salt,
-      );
+      TableSpec spec({String? salt}) => TableSpec(
+            seed: seed,
+            seats: [
+              for (var s = 0; s < seatCount; s++)
+                s < humans.length ? HumanSeat(humans[s].key, licence: humans[s].licence) : BotSeat(picked[s - humans.length]),
+            ],
+            rated: pool == 'rated',
+            sealed: true,
+            target: target,
+            timing: timing,
+            house: house,
+            salt: salt,
+          );
+      final salt = seatingSalt(secret, spec());
+      final table = spec(salt: salt);
       relay.announce({
         'kind': 'match',
         'round': round,

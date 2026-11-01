@@ -64,7 +64,7 @@ class LiveHarness {
     SimDealWorker? worker() => workers && crypto != null ? SimDealWorker(crypto, clock) : null;
     final signers = [for (var s = 0; s < engine.seatCount; s++) FakeSigner('seat$s')];
     keys = [for (final s in signers) s.publicKey];
-    spec = TableSpec(
+    TableSpec specWith(String? salt) => TableSpec(
         seed: seed,
         seats: [
           for (var s = 0; s < engine.seatCount; s++)
@@ -74,7 +74,10 @@ class LiveHarness {
         rated: rated,
         target: target,
         timing: timing,
-        house: houseSigner.publicKey);
+        house: houseSigner.publicKey,
+        salt: salt);
+    // A rated table is one a pool seats, with the house's own salt.
+    spec = specWith(rated ? seatingSalt(_houseSecret(seed), specWith(null)) : null);
     // The house at every table, as at the relay: it plays a sealed
     // table's bots, and says how any game came out, which is what a
     // rating is folded from.
@@ -146,9 +149,11 @@ class LiveHarness {
     return controller = _seated(line, Random(spec.seed * 10 + _me + 7919));
   }
 
+  static Uint8List _houseSecret(int seed) => Uint8List.fromList(List.generate(32, (i) => i + seed));
+
   House _newHouse(int seed) => House(
         signer: houseSigner,
-        secret: Uint8List.fromList(List.generate(32, (i) => i + seed)),
+        secret: _houseSecret(seed),
         lineFor: (_) => referee.line(houseSigner.publicKey),
         clock: clock,
         crypto: _crypto,

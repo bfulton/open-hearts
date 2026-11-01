@@ -4,6 +4,7 @@ library;
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
+import 'dart:typed_data';
 
 import 'package:engine/engine.dart';
 import 'package:service/service.dart';
@@ -68,6 +69,7 @@ void main() {
   group('over the relay', () {
     late Relay relay;
     final house = SchnorrSigner.generate();
+    final houseSecret = Uint8List.fromList(List.generate(32, (i) => i));
     setUp(() async {
       relay = Relay(house: house.publicKey);
       await relay.serve();
@@ -92,6 +94,7 @@ void main() {
       final host = PoolHost(
           relay: t,
           pool: pool,
+          secret: houseSecret,
           target: target,
           bots: botsNear(Ledger(prior: botPrior)),
           timing: timing,
@@ -156,6 +159,7 @@ void main() {
       final specs = await Future.wait([a.$3, b.$3].map((f) => f.timeout(const Duration(seconds: 15))));
       expect(specs.map((s) => s.id).toSet().length, 1, reason: 'one table, the two of them and two bots');
       expect(specs.first.seats.whereType<HumanSeat>().length, 2);
+      expect(specs.first.salt, seatingSalt(houseSecret, specs.first), reason: 'salted with the house\'s secret, as a table it seated');
       closeAll([a, b, (h.$1, h.$2, null)]);
     });
 
