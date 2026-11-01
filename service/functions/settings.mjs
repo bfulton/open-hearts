@@ -60,7 +60,8 @@ export const SERVICE_DEFAULTS = Object.freeze({
   // What one account's devices may ask of the account's turn in an hour
   // to be the one in use, or the relay on their behalf: an opening, a
   // renewal every twenty minutes, a word at each table sat at, and the
-  // relay asking at every socket a device opens.
+  // relay asking at every socket a device opens (not counted when the
+  // activation it asks about is no longer the one in use).
   activationsPerHour: 600,
   // How often one account's profile may be written in an hour: the app
   // writes it once each time the profile page is left changed, so this

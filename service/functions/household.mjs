@@ -116,14 +116,22 @@ const profileVersion = async (store, account) => (await store.get(`ACCOUNT#${acc
 /// devices is in use.
 export async function seenAt(op, active) {
   const was = await active.get(op.account);
-  if (was?.suspended) return { status: 409, body: { error: SUSPENDED_WHY } };
-  if (!was || was.key !== op.key || was.epoch !== op.epoch) {
-    return { status: 409, body: { error: 'superseded: another device of this account is in use' } };
-  }
+  const refused = seenRefused(op, was);
+  if (refused) return refused;
   if (typeof op.tag === 'string' && op.tag && !(was.tags ?? []).includes(op.tag)) {
     await active.put(op.account, { ...was, tags: [...(was.tags ?? []), op.tag].slice(-MOST_TAGS) });
   }
   return { status: 200, body: { ok: true } };
+}
+
+/// Why [seenAt] says no to [op], given [was], the account's device in
+/// use: null when [op]'s activation is still the one in use.
+function seenRefused(op, was) {
+  if (was?.suspended) return { status: 409, body: { error: SUSPENDED_WHY } };
+  if (!was || was.key !== op.key || was.epoch !== op.epoch) {
+    return { status: 409, body: { error: 'superseded: another device of this account is in use' } };
+  }
+  return null;
 }
 
 /// Whether [op.key] is the account's device in use, and not seated at
@@ -187,12 +195,15 @@ export async function dropDevice(key, device, store, { now = Date.now(), active 
 
 /// One household's queue and its hour: everything asked of it runs in
 /// order, and what is over the hour's allowance is refused before it
-/// touches the store.
+/// touches the store. [free], where given, runs first in the turn, and
+/// an answer from it is given counted against nothing ([answeredFree]).
 export function sequencer({ now = Date.now } = {}) {
   let queue = Promise.resolve();
   const done = { change: [], read: [] };
-  return (kind, work) => {
+  return (kind, work, free = null) => {
     const run = queue.then(async () => {
+      const refused = await free?.();
+      if (refused) return refused;
       const t = now();
       const recent = (done[kind] = (done[kind] ?? []).filter((at) => t - at < 3600000));
       // An operator's order (suspension.mjs) is never held back by what
@@ -322,6 +333,13 @@ function kindOf(op) {
   if (op.op === 'list' || (op.op === 'backups' && op.rotate !== true)) return 'read';
   return 'change';
 }
+
+/// What a turn answers without counting it against an allowance: the
+/// relay's 'seen' for an activation that is not the one in use. The
+/// relay asks at every socket a device opens, and a device the account
+/// no longer holds (superseded, or dropped) must not spend what the
+/// device in use renews from. Its answer reads only [active].
+const answeredFree = (op, active) => (op.op === 'seen' ? async () => seenRefused(op, await active.get(op.account)) : null);
 
 /// Tells the relay's object for each of [tags] that [account]'s device
 /// in use is now the one of [epoch], so it closes the sockets of any
@@ -511,7 +529,11 @@ export class Household {
     const store = storeOf(this.env);
     if (!store) return Response.json({ status: 503, body: notConfigured('OH_STORE') });
     return Response.json(
-      await this.next(kindOf(op), () => householdOp(op, store, { mail: mailerOf(this.env), active: this.active, revoke: revokerOf(this.env), pictures: this.pictures })),
+      await this.next(
+        kindOf(op),
+        () => householdOp(op, store, { mail: mailerOf(this.env), active: this.active, revoke: revokerOf(this.env), pictures: this.pictures }),
+        answeredFree(op, this.active),
+      ),
     );
   }
 }
@@ -531,7 +553,7 @@ export async function inHousehold(env, name, op) {
   const store = storeOf(env);
   if (!store) return { status: 503, body: notConfigured('OH_STORE') };
   if (!households.has(name)) households.set(name, sequencer());
-  return households.get(name)(kindOf(op), () => householdOp(op, store, { mail: mailerOf(env) }));
+  return households.get(name)(kindOf(op), () => householdOp(op, store, { mail: mailerOf(env) }), answeredFree(op, activeInStore(store)));
 }
 
 /// [op] in [subscription]'s own turn: where its account is found, or

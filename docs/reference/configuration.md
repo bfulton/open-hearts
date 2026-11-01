@@ -248,7 +248,7 @@ Defaults and bounds: `SERVICE_DEFAULTS` and `SERVICE_BOUNDS` in `service/functio
 | `webhookToleranceS` | How old a Stripe webhook's timestamp may be, in seconds. |
 | `householdChangesPerHour` | An account's changes in an hour: everything asked of its queue that is not counted below, such as codes, drops, backup-code rotations and sign-in links. Apple's unlinks have a separate allowance of the same size, and so do devices coming in (a code, a backup code or a sign-in claimed). |
 | `householdReadsPerHour` | An account's reads in an hour: device lists, profile reads, and backup codes shown or emailed. Also how much a device may ask of an account in an hour on a licence that the store where it asks doesn't back ([signed requests](service-api.md#signed-requests)). |
-| `activationsPerHour` | An account's activations in an hour, counting the relay's checks for it and `review`'s. |
+| `activationsPerHour` | An account's activations in an hour, counting the relay's checks for it and `review`'s. A relay's check of an activation that is no longer the one in use is refused without being counted. |
 | `profileWritesPerHour` | Writes of an account's profile in an hour. |
 | `recordsPerHour` | Game records an account may send to be kept in an hour. |
 

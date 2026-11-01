@@ -189,6 +189,25 @@ test("an account's turn acts only for its own devices, not for one the store has
   assert.equal((await inHousehold(env, account, { op: 'list', key: KEY, account })).status, 200);
 });
 
+test("the relay asking after a superseded device's activation spends nothing the device in use renews from", async () => {
+  forgetHouseholds();
+  const store = await household(2);
+  const account = await accountOf(store);
+  const env = { OH_STORE: kvOf(store) };
+  env.HOUSEHOLD = householdNamespace({ OH_STORE: env.OH_STORE });
+  const before = '1'.repeat(64);
+  assert.equal((await inHousehold(env, account, { op: 'activate', key: before, account, want: 'open' })).body.epoch, 1);
+  assert.equal((await inHousehold(env, account, { op: 'activate', key: KEY, account, want: 'take' })).body.epoch, 2);
+  // The device before opens socket after socket with its old activation.
+  const said = new Set();
+  for (let i = 0; i < SERVICE_DEFAULTS.activationsPerHour + 5; i++) {
+    said.add((await inHousehold(env, account, { op: 'seen', key: before, account, epoch: 1, tag: `t${i}` })).status);
+  }
+  assert.deepEqual([...said], [409], 'each refused, none over the allowance');
+  assert.equal((await inHousehold(env, account, { op: 'activate', key: KEY, account, want: 'renew' })).status, 200);
+  assert.equal((await inHousehold(env, account, { op: 'seen', key: KEY, account, epoch: 2, tag: 'online' })).status, 200);
+});
+
 test('asking for a code again is a read: the one outstanding, while it has time', async () => {
   const store = await household(1);
   const counts = { put: 0, list: 0 };
