@@ -426,7 +426,6 @@ class _ProfilePageState extends State<ProfilePage> {
   );
 }
 
-/// A quiet label over a section.
 /// How long you take over a card, and what it does.
 ///
 /// Measured by this device from its own turns and kept on it: it is the

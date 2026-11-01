@@ -23,10 +23,13 @@ class TableScale extends InheritedWidget {
   static const phoneCard = 76.0;
   static const mostCard = 108.0;
 
+  /// How wide a felt's cards may be, as a share of its shortest side.
+  static const feltShare = 0.17;
+
   /// The scale of a table whose felt is [felt]: how much bigger than a
-  /// phone's its cards may be. A felt's cards may be seventeen
-  /// hundredths of its shortest side, between the two above.
-  static double forFelt(Size felt) => (felt.shortestSide * 0.17).clamp(phoneCard, mostCard) / phoneCard;
+  /// phone's its cards may be. A felt's cards may be [feltShare] of its
+  /// shortest side, between the two above.
+  static double forFelt(Size felt) => (felt.shortestSide * feltShare).clamp(phoneCard, mostCard) / phoneCard;
 
   /// The scale the table below [context] is drawn at, or null outside
   /// one.
