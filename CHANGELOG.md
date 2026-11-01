@@ -757,6 +757,17 @@ squashed from a pull request, the pull request's number.
   longer be sent again with somebody else's sign-in in its place. A
   build from before this change cannot sign in until it is updated.
   (2026-11-01, #47)
+- The web app carries a Content-Security-Policy that lets only its own
+  scripts, WebAssembly, New Relic's browser agent and Apple's sign-in
+  script run, and workers only from its own files or the blob the deal's
+  worker starts from. No inline script, no eval and no other origin can
+  run in the page where the device's key is kept. The browser tests
+  serve the app with the same headers as production, and a new suite
+  loads the real build under the policy with nothing refused and checks
+  that what the policy exists for is refused. Opening Apple's sign-in in
+  a popup of our own, which would take Apple's script and origin out of
+  the page and the policy, is not done: it needs one real Apple sign-in on
+  the web observed first. (2026-11-01, #47)
 - `oh account delete` ends a web subscription that is still running in
   Stripe before it deletes anything, as the app's own deletion does, with
   nothing refunded, and so no longer keeps that subscription's notes of
