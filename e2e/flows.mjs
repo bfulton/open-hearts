@@ -344,7 +344,10 @@ stillFlow('a game alone, and the record it leaves', async ({ open, relay }) => {
 stillFlow('the about page', async ({ open }) => {
   const page = await open();
   await click(page, /^Play solo$/);
-  await waitFor(page, /^Menu$/, { what: 'the table' });
+  // The table by what only the table says: the front door has a Menu
+  // too, and on a frame that comes late that is the one clicked, its
+  // menu then covered by the table.
+  await waitFor(page, /^Choose 3 more to pass$/, { what: 'the table' });
   await click(page, /^Menu$/);
   await waitFor(page, /^About$/, { what: 'the menu' });
   await click(page, /^About$/);
