@@ -155,9 +155,10 @@ object runs on one thread shared by everyone on that tag.
   sign as another key, and nobody can silence a table by saying its
   events first, since a duplicate id can only be the same signed event.
 - A table's log takes at most `authorMost` characters of each person's
-  events, as much as a whole kept game may be, so one seat cannot grow
-  its table's object until it fails, or make every reconnecting side
-  read without end. The house is the operator's and is not held to it.
+  events, as much as a whole kept game may be, so one seat's events
+  cannot grow its table's object until it fails, or make every
+  reconnecting side read without end. The house is the operator's and
+  is not held to it.
 - Each socket is bounded: message size, REQ size (so a socket's
   subscriptions always fit in the attachment a hibernating socket
   carries), a few subscriptions (`maxSubscriptions`), and a

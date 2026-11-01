@@ -24,8 +24,9 @@
 // LogEntry.unread).
 //
 // Each person's events may fill only so much of the log ([authorMost]),
-// so one seat cannot grow the table's object until it fails for
-// everybody, nor make every side that reads the log read without end.
+// so one seat's events cannot grow the table's object until it fails
+// for everybody, nor make every side that reads the log read without
+// end.
 //
 // But for the start, which every side has to read as the same table
 // for anything after it to mean anything: a log that began with one
