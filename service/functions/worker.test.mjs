@@ -647,7 +647,7 @@ test('only a checkout this service made, and paid for, binds a device', async ()
   assert.equal(store.rows.size, 0);
   // And the delayed money, when it comes.
   const bound = await record({ type: 'checkout.session.async_payment_succeeded', data: { object: { mode: 'subscription', payment_status: 'paid', subscription: 'sub_9', metadata: { key: KEY } } } }, store);
-  assert.deepEqual(bound, { bound: KEY, subscription: 'sub_9', account: await accountOfSub(store, 'sub_9') });
+  assert.deepEqual(bound, { bound: KEY, subscription: 'sub_9', account: await accountOfSub(store, 'sub_9'), status: 200 });
 });
 
 test('the webhook route: unsigned is refused, signed is recorded and acknowledged', async () => {
@@ -731,6 +731,84 @@ test('the webhook route: a checkout paid for makes the backup codes and emails t
   assert.equal(got.length, 2);
   assert.equal(got[1].subject, 'Your Open Hearts subscription');
   assert.match(got[1].text, /You paid \$5\.99 USD for a year of it\./);
+});
+
+/// [kv], with each call taking a few milliseconds, as KV's calls are
+/// real I/O: what two requests at once can interleave on.
+const slowly = (kv) =>
+  Object.fromEntries(
+    Object.entries(kv).map(([name, call]) => [name, async (...args) => (await new Promise((done) => setTimeout(done, 2)), call(...args))]),
+  );
+
+/// A paid checkout of sub_race by [KEY], as Stripe delivers it.
+const paidCheckout = (subscription = 'sub_race') =>
+  JSON.stringify({
+    type: 'checkout.session.completed',
+    data: {
+      object: {
+        mode: 'subscription',
+        payment_status: 'paid',
+        subscription,
+        customer: 'cus_1',
+        customer_details: { email: 'payer@example.com' },
+        metadata: { key: KEY },
+      },
+    },
+  });
+
+test('the webhook route: one checkout delivered twice at once makes one account, and one email', async () => {
+  const store = memoryStore();
+  const got = [];
+  const shop = {
+    ...env,
+    OH_STRIPE_WEBHOOK_SECRET: SIGNING,
+    OH_STORE: slowly(kvOf(store)),
+    EMAIL: { send: async (m) => got.push(m) },
+    OH_MAIL_FROM: 'noreply@openhearts.game',
+  };
+  const raw = paidCheckout();
+  const hook = async () =>
+    worker.fetch(new Request('https://dev.open-hearts.pages.dev/api/stripe', { method: 'POST', headers: { 'stripe-signature': await signHook(raw) }, body: raw }), shop);
+  const answers = await Promise.all([hook(), hook()]);
+  assert.deepEqual(answers.map((a) => a.status), [200, 200]);
+  const made = [...store.rows.keys()].filter((k) => /^ACCOUNT#[0-9a-f]{32}\|META$/.test(k));
+  assert.equal(made.length, 1, 'one account for one subscription');
+  assert.equal(made[0], `ACCOUNT#${await accountOfSub(store, 'sub_race')}|META`);
+  assert.equal(got.length, 1, 'one set of backup codes mailed');
+});
+
+test('the webhook route: a checkout its turn could not bind yet is sent again; one it never will is taken', async () => {
+  const store = memoryStore();
+  const raw = paidCheckout('sub_turned');
+  const asked = [];
+  // The accounts' turns, answering each op as [answers] says.
+  const turns = (answers) => ({
+    idFromName: (name) => name,
+    get: (name) => ({
+      fetch: async (_, init) => {
+        const op = JSON.parse(init.body);
+        asked.push([name, op.op]);
+        return Response.json(answers[op.op]);
+      },
+    }),
+  });
+  const hook = async (answers) =>
+    worker.fetch(
+      new Request('https://dev.open-hearts.pages.dev/api/stripe', { method: 'POST', headers: { 'stripe-signature': await signHook(raw) }, body: raw }),
+      { ...env, OH_STRIPE_WEBHOOK_SECRET: SIGNING, OH_STORE: kvOf(store), HOUSEHOLD: turns(answers) },
+    );
+  const busy = { status: 429, body: { error: 'too many at once: try again in a while' } };
+  const bound = { status: 200, body: { account: ACCT, entitlement: {} } };
+  assert.equal((await hook({ paid: busy })).status, 503, 'over the allowance: Stripe sends it again');
+  assert.deepEqual(asked, [['sub:sub_turned', 'paid']], 'bound in the subscription\'s turn, and nothing mailed');
+  assert.equal((await hook({ paid: { status: 500, body: {} } })).status, 503);
+  assert.equal((await hook({ paid: bound, made: busy })).status, 503, 'the codes not made yet: sent again');
+  asked.length = 0;
+  assert.equal((await hook({ paid: bound, made: { status: 200, body: { made_at: 'x', emailed: true } } })).status, 200);
+  assert.deepEqual(asked, [['sub:sub_turned', 'paid'], [ACCT, 'made']]);
+  // A full account turns the buyer away however often it is asked.
+  const full = { status: 409, body: { error: 'the account has all the devices it can take', devices: 5, most: 5 } };
+  assert.equal((await hook({ paid: full })).status, 200);
 });
 
 test('the checkout route: the key, and somewhere on this site to come back to', async () => {

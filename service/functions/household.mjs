@@ -12,6 +12,7 @@ import {
   devicesOn,
   entitlementOf,
   joinAccount,
+  paidFor,
   redeemBackup,
   ticketFor,
 } from './accounts.mjs';
@@ -244,6 +245,9 @@ export async function householdOp(op, store, { now = Date.now(), mail = null, ac
       });
     case 'bind':
       return bindPurchase(op, store, { now });
+    case 'paid':
+      // A Stripe checkout paid for, in its subscription's turn.
+      return paidFor(store, op.subscription, op.key, { now });
     case 'drop':
       return dropDevice(op.key, op.device, store, { now, active, revoke });
     case 'list': {

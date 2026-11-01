@@ -407,7 +407,10 @@ async function stripeRoute(request, env, ctx) {
     const ended = await endRefunded(event.data?.object, store, env);
     return json(request, ended.status, ended.status === 200 ? { ok: true } : ended.body);
   }
-  const done = await record(event, store);
+  // A paid checkout is bound in its subscription's own turn, where its
+  // account is found or made once, however many deliveries overlap.
+  const done = await record(event, store, { bind: (subscription, key) => inSubscription(env, subscription, { op: 'paid', subscription, key }) });
+  if (done?.bound && triedAgain(done.status)) return json(request, 503, { error: 'not bound yet' });
   if (done?.bound) await after(ctx, alertSubscribed(env, store, { subscription: done.subscription, source: 'stripe', key: done.bound }));
   // A subscription just paid for: its account's backup codes, sent to
   // the email the checkout was paid with, with what it paid. Not kept:
@@ -416,12 +419,19 @@ async function stripeRoute(request, env, ctx) {
     const paid = event.data?.object;
     const email = paid?.customer_details?.email ?? null;
     const charge = Number.isSafeInteger(paid?.amount_total) && typeof paid?.currency === 'string' ? { amount: paid.amount_total, currency: paid.currency } : null;
-    await inHousehold(env, done.account, { op: 'made', account: done.account, subscription: done.subscription, email, charge });
+    const made = await inHousehold(env, done.account, { op: 'made', account: done.account, subscription: done.subscription, email, charge });
+    if (triedAgain(made.status)) return json(request, 503, { error: 'backup codes not made yet' });
   }
   // Anything not ours is still a delivery taken: a webhook that gets an
   // error back is a webhook Stripe keeps sending.
   return json(request, 200, { ok: true });
 }
+
+/// Whether an account's turn answering [status] is worth Stripe sending
+/// the event again: over the hour's allowance, or the turn failing. A
+/// refusal that would come out the same, such as a full account, is
+/// taken as the answer. Every step of a delivery can run twice.
+const triedAgain = (status) => status === 429 || status >= 500;
 
 async function licenceRoute(request, env, ctx) {
   const pre = preflight(request, 'POST');

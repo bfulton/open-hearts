@@ -182,7 +182,8 @@ automatic renewal law asks for all of it. A Managed Payments checkout
 takes no custom text, so the box's words are Stripe's, and it takes the
 box only while Checkout's Legal policies setting is on; Stripe refuses
 a checkout otherwise, which `./oh verify` shows. The webhook binds the device once the
-session is paid, and the subscription's own events carry its dates.
+session is paid, in the subscription's own turn ([one account at a
+time](#accounts)), and the subscription's own events carry its dates.
 `stripePrice` in `config/openhearts.json` names the Stripe price, by id
 or lookup key. A checkout sells it only when it is the price the terms
 state, a year at `price` (`shopPrice` in `service/functions/stripe.mjs`);
@@ -849,7 +850,12 @@ The `Household` object is the relay worker's, built from
 change to what an account's turn can be asked deploys the relay first,
 then the site ([deploy](../how-to/deploy.md)). The other way round, the
 new handler asks an object that does not know the question yet, which
-answers 400, and the app asks again later.
+answers 400, and the app asks again later. Stripe's webhook does not ask
+again: it binds a paid checkout in the subscription's turn (`paid`), and
+answers Stripe 503, so that Stripe sends the event again, only when the
+turn is over its allowance or failing (429 or 5xx). A 400 is taken as
+the answer, so a site deployed before a relay that knows `paid` leaves
+that purchase's device unbound.
 
 Secrets are set by hand and checked only by name. Everything else that
 is not secret is in `config/openhearts.json`, committed: the service's

@@ -266,7 +266,13 @@ export async function webhookSigned(header, raw, secret, { now = Date.now() } = 
 /// What a Stripe event means here, written down. Returns what was
 /// recorded, or null when the event is not one of ours — a webhook
 /// carries everything the account does, and most of it is not this.
-export async function record(event, store, { now = Date.now() } = {}) {
+/// [bind] puts a paid checkout's device into the subscription's account
+/// and answers {status, body} as [paidFor] does. The webhook passes one
+/// that runs in the subscription's own turn (household.mjs,
+/// inSubscription), so that two deliveries of one checkout at once make
+/// one account; the default runs here, for the tests that bind through
+/// this.
+export async function record(event, store, { now = Date.now(), bind = (subscription, key) => paidFor(store, subscription, key, { now }) } = {}) {
   const object = event?.data?.object ?? {};
   const today = dayOf(now);
   // A checkout this service made, and paid for. Made here: only a
@@ -285,8 +291,8 @@ export async function record(event, store, { now = Date.now() } = {}) {
     // The date is the subscription's to say, and its own event may not
     // have arrived yet: bound now, dated on the first ask after it has.
     await keepCustomer(store, subscription, object.customer);
-    const paid = await paidFor(store, subscription, key, { now });
-    return { bound: key, subscription, account: paid.body?.account ?? null };
+    const paid = await bind(subscription, key);
+    return { bound: key, subscription, account: paid.body?.account ?? null, status: paid.status };
   }
   if (event?.type?.startsWith('customer.subscription.')) {
     const subscription = object.id;
