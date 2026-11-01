@@ -26,7 +26,7 @@ import { MOST_BODY, MOST_EVENT, cors, json, preflight, signedFor, textOf } from 
 import { ACTIVATION_S, accountAsking, activationFor, heldAccount, licence, serviceKeys } from './licence.mjs';
 import { loginRow } from './logins.mjs';
 import { measure } from './metrics.mjs';
-import { carryOutNotice, noticesOf } from './notices.mjs';
+import { carryOutNotice, noticesOf, toldVersions } from './notices.mjs';
 import { MOST_PROFILE_BODY } from './profile.mjs';
 import { anonymizeGames, keepRecord, keptGames, markForgotten, recordMost, recordResponse, tableIdShape } from './records.mjs';
 import { isAccount, storeOf } from './rows.mjs';
@@ -548,7 +548,9 @@ async function deleteRoute(request, env) {
       await alertUnwritten(env, { account, keys: unwritten });
     }
   }
-  const { status, body } = await inHousehold(env, account, { op: 'delete', key: asked.key, account });
+  // With the changes a subscription may have been told of, from the
+  // ledger this deploy published, which the account's turn has not.
+  const { status, body } = await inHousehold(env, account, { op: 'delete', key: asked.key, account, notices: toldVersions(env.OH_LEDGER) });
   return json(request, status, body);
 }
 

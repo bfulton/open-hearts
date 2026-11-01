@@ -7,6 +7,7 @@
 
 import { accountOfKey, backupRow } from './accounts.mjs';
 import { Held, holdOf, holdRow } from './holds.mjs';
+import { noticeRow } from './notices.mjs';
 import { dayOf, isAccount } from './rows.mjs';
 
 /// What a deleted account's device in use is told as the relay closes
@@ -23,7 +24,9 @@ export const DELETED_WHY = 'deleted: this account was deleted';
 /// own, and is kept as long as one replaced ([pictures],
 /// profile_pictures.mjs). Under a legal hold (holds.mjs), nothing goes:
 /// the asking is noted, for when the hold is released, and the answer
-/// is the same. {status, body}.
+/// is the same. [op.notices] are the changes to the terms and the
+/// privacy policy a subscription may have been told of ([forgetAccount]).
+/// {status, body}.
 export async function deleteAccount(op, store, active, { now = Date.now(), revoke = null, pictures = null } = {}) {
   const account = await accountOfKey(store, op.key);
   if (!account || !(await store.get(`ACCOUNT#${account}`, `DEVICE#${op.key}`))) return { status: 404, body: { error: 'no account' } };
@@ -35,7 +38,7 @@ export async function deleteAccount(op, store, active, { now = Date.now(), revok
   // Its pictures no longer its own before its rows go, so that a
   // deletion that stops part way leaves none that is, and is done again.
   await pictures?.set({ account, picture: null });
-  await forgetAccount(store, account);
+  await forgetAccount(store, account, { notices: op.notices });
   const was = await active.get(account);
   if (was) {
     const epoch = (was.epoch ?? 0) + 1;
@@ -48,14 +51,18 @@ export async function deleteAccount(op, store, active, { now = Date.now(), revok
 /// Deletes [account]'s rows: the account's own (its devices, its code,
 /// backup codes, sign-in, device in use and profile), each of its
 /// devices' entitlements, the rows its codes and its sign-in are found
-/// by, and those of every subscription it has had. Returns the rows, as
-/// `PK|SK`. With [dry], deletes nothing and says what it would. [keys]
-/// lists the store's keys under a prefix, as accountsNamed takes it:
-/// without it, the subscriptions found are the ones the account's META
-/// names, now and before (accountFor).
+/// by, and those of every subscription it has had, the notes that it was
+/// told of a change to the terms or the privacy policy among them
+/// (notices.mjs). Returns the rows, as `PK|SK`. With [dry], deletes
+/// nothing and says what it would. [keys] lists the store's keys under a
+/// prefix, as accountsNamed takes it: without it, the subscriptions
+/// found are the ones the account's META names, now and before
+/// (accountFor), and the notes those of [notices], the changes
+/// subscribers are told of, as [document, version] (notices.mjs,
+/// toldVersions).
 /// Throws [Held], deleting nothing, while the account is under a legal
 /// hold (holds.mjs).
-export async function forgetAccount(store, account, { dry = false, keys = null } = {}) {
+export async function forgetAccount(store, account, { dry = false, keys = null, notices = [] } = {}) {
   if (!isAccount(account)) return [];
   const held = await holdOf(store, account);
   if (held) throw new Held(held);
@@ -87,8 +94,14 @@ export async function forgetAccount(store, account, { dry = false, keys = null }
     const sub = /^SUB#(.+)\|ACCOUNT$/.exec(key)?.[1];
     if (sub) subscriptions.add(sub);
   }
+  const noted = keys ? (await keys('NOTICE#')).map((k) => k.split('|')) : null;
+  const versions = Array.isArray(notices) ? notices.filter((n) => Array.isArray(n) && typeof n[0] === 'string' && typeof n[1] === 'string') : [];
   for (const sub of subscriptions) {
     if ((await store.get(`SUB#${sub}`, 'ACCOUNT'))?.account !== account) continue;
+    // Its notes first: a run that stops part way finds the subscription
+    // again by its own rows.
+    const notes = noted ? noted.filter(([, sk]) => sk === `SUB#${sub}`) : versions.map(([document, version]) => noticeRow(document, version, sub));
+    for (const [npk, nsk] of notes) if (await store.get(npk, nsk)) await del(npk, nsk);
     for (const sk of await store.under(`SUB#${sub}`, '')) await del(`SUB#${sub}`, sk);
   }
   for (const sk of await store.under(pk, '')) await del(pk, sk);

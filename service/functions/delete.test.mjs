@@ -10,6 +10,7 @@ import { test } from 'node:test';
 import { DELETED_WHY, deleteAccount } from './deletion.mjs';
 import { Household } from './household.mjs';
 import { signerOn } from './licence.mjs';
+import { noticeRow } from './notices.mjs';
 import { forgottenKey } from './records.mjs';
 import { memoryStore } from './rows.mjs';
 import { record } from './stripe.mjs';
@@ -139,6 +140,18 @@ test('a device deletes its account: the web subscription ends in Stripe, its nam
   await record({ type: 'customer.subscription.deleted', data: { object: { id: 'sub_9', customer: 'cus_9', status: 'canceled' } } }, store);
   assert.deepEqual([...store.rows.keys()].filter((k) => k.startsWith('SUB#')), ['SUB#sub_9|META']);
   assert.equal((await store.get('SUB#sub_9', 'META')).final, true);
+});
+
+test("a device deletes its account, and the notes that its subscription was told of changes to the terms go with it", async (t) => {
+  const { store, env } = await subscribed();
+  stripeAt(t);
+  const ledger = { terms: [{ date: '2026-10-19', change: 'material' }, { date: '2026-10-23', change: 'material' }, { date: '2026-10-23', revision: 2, change: 'editorial' }], privacy: [{ date: '2026-10-23', change: 'material' }] };
+  await store.put(...noticeRow('terms', '2026-10-23', 'sub_9'), { at: '2026-10-24T00:00:00Z', lang: 'de' });
+  await store.put(...noticeRow('terms', '2026-10-19', 'sub_9'), { at: '2026-10-24T00:00:00Z', lang: 'de', by: '2026-10-23' });
+  await store.put(...noticeRow('privacy', '2026-10-23', 'sub_9'), { at: '2026-10-24T00:00:00Z', lang: 'de' });
+  await store.put(...noticeRow('terms', '2026-10-23', 'sub_other'), { at: '2026-10-24T00:00:00Z', lang: 'en' });
+  assert.equal((await ask(ada, { ...env, OH_LEDGER: ledger })).status, 200);
+  assert.deepEqual([...store.rows.keys()].filter((k) => k.startsWith('NOTICE#')), ['NOTICE#terms@2026-10-23|SUB#sub_other'], "another subscription's note stays");
 });
 
 test('a subscription already ended in Stripe is not ended again, and only a device on the account may delete it', async (t) => {

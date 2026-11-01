@@ -72,6 +72,11 @@ export function applyingRenewal(end, anchor, now) {
 /// Whether [entry] is a change subscribers are told of.
 const told = (entry) => entry?.change === 'material' || entry?.change === 'price';
 
+/// Every change in [ledger] subscribers are told of, as [document,
+/// version]: each one a subscription can have a note of ([noticeRow]),
+/// which goes with its account (deletion.mjs, forgetAccount).
+export const toldVersions = (ledger) => DOCUMENTS.flatMap((document) => (ledger?.[document] ?? []).filter(told).map((entry) => [document, versionOf(entry)]));
+
 /// What a device is shown at the front door on [now], from [ledger]:
 /// each document's newest change subscribers are told of, for the
 /// [NOTICE_DAYS] days from the day it was published — [{document, date,

@@ -206,12 +206,16 @@ test('every subscription an account has had goes with it, and nobody else\'s', a
     await store.put(`SUB#${sub}`, 'META', { source: 'stripe', renews_at: '2026-01-01', cancelled_at: null });
     await store.put(`SUB#${sub}`, 'CUSTOMER', { customer: `cus_${sub}` });
   }
+  // Each was told of a change to the terms.
+  for (const sub of ['sub_old', 'sub_bao']) await store.put(`NOTICE#terms@2026-10-23`, `SUB#${sub}`, { at: '2026-10-24T00:00:00Z', lang: 'en' });
   const would = await forgetAccount(store, ADA, { dry: true, keys: keysOf(store) });
-  for (const row of ['SUB#sub_old|ACCOUNT', 'SUB#sub_old|META', 'SUB#sub_old|CUSTOMER', 'SUB#sub_new|ACCOUNT']) assert.ok(would.includes(row), row);
+  for (const row of ['SUB#sub_old|ACCOUNT', 'SUB#sub_old|META', 'SUB#sub_old|CUSTOMER', 'SUB#sub_new|ACCOUNT', 'NOTICE#terms@2026-10-23|SUB#sub_old']) assert.ok(would.includes(row), row);
+  assert.equal(would.includes('NOTICE#terms@2026-10-23|SUB#sub_bao'), false);
   assert.equal(new Set(would).size, would.length, 'each row once');
   assert.equal(store.rows.has('SUB#sub_old|ACCOUNT'), true, 'a dry run deletes nothing');
   await forgetAccount(store, ADA, { keys: keysOf(store) });
   assert.deepEqual([...store.rows.keys()].filter((k) => k.startsWith('SUB#')).sort(), ['SUB#sub_bao|ACCOUNT', 'SUB#sub_bao|CUSTOMER', 'SUB#sub_bao|META']);
+  assert.deepEqual([...store.rows.keys()].filter((k) => k.startsWith('NOTICE#')), ['NOTICE#terms@2026-10-23|SUB#sub_bao']);
   // The address the old subscription was paid with finds nobody now.
   const stripe = async (path) => (path.startsWith('/customers/search') ? { data: [{ id: 'cus_1', email: 'ada@example.com' }] } : { data: [{ id: 'sub_old' }] });
   assert.deepEqual(await accountsPaidBy(store, stripe, 'ada@example.com'), []);

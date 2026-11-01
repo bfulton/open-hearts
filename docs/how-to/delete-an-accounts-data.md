@@ -4,7 +4,7 @@ Use this guide when a person asks for their account's data to be deleted, as the
 
 Most people don't need to ask: **Delete account**, at the foot of the app's subscription page, deletes the account from any of its devices at once, and the operator does nothing ([how it works](../explanation/service.md#deleting-an-accounts-data)). Point a person who asks to it. Use the command below when they can't, for example when they no longer have any of their devices.
 
-`./oh account delete` forgets the account ([the oh command](../reference/oh.md)). It takes the account's name off every kept game it played (`anonymizeGames` in `service/functions/records.mjs`), and deletes every row the service keeps for it in `OH_STORE` (`forgetAccount` in `service/functions/deletion.mjs`): its devices and their entitlements, its codes and backup codes, its sign-in, its device in use, its profile, any suspension or name and picture held, and the rows of every subscription it has had. Its results stay on the relay, under its account number, which nothing left in the service ties to the person.
+`./oh account delete` forgets the account ([the oh command](../reference/oh.md)). It takes the account's name off every kept game it played (`anonymizeGames` in `service/functions/records.mjs`), and deletes every row the service keeps for it in `OH_STORE` (`forgetAccount` in `service/functions/deletion.mjs`): its devices and their entitlements, its codes and backup codes, its sign-in, its device in use, its profile, any suspension or name and picture held, and the rows of every subscription it has had, the notes that it was told of changes to the terms or the privacy policy among them. Its results stay on the relay, under its account number, which nothing left in the service ties to the person.
 
 ## Before you begin
 
@@ -29,6 +29,9 @@ Most people don't need to ask: **Delete account**, at the foot of the app's subs
    ```
 
 1. Make sure the subscription is cancelled. The command refuses an account whose subscription is still paid up and has no cancellation, since its next renewal would find nothing to renew. A web subscription the person hasn't cancelled can be ended with `./oh account refund "$account" --apply`, which refunds the unused part of its year ([how](end-an-account.md#refund-a-web-subscription)). A store subscription is cancelled by the person, in their store.
+
+   A web subscription that is cancelled but still runs to the end of its year is still one in Stripe. Once its account is forgotten, its notes of changes to the terms and the privacy policy go too, so until the subscription ends, `./oh terms notify` counts it as not told of a change of the last 60 days, and `--apply` writes to its subscriber about that change again.
+
 1. See what would change. Without `--apply`, the command only reads:
 
    ```bash

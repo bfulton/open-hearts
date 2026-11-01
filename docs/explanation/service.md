@@ -541,7 +541,10 @@ use, profile, and any suspension or name and picture held), each
 device's `ENTITLEMENT`, the rows its codes and sign-in are found by, and
 the `SUB#` rows of every subscription it has had, which its `META` row
 names, the one before a lapsed subscriber paid again among them
-(`before`).
+(`before`), with the notes that each was told of a change to the terms
+or the privacy policy (`NOTICE#`). From the app, the account's turn is
+told which changes those can be, from the ledger the site was deployed
+with.
 
 From the app (`deleteRoute` in `service/functions/worker.mjs`), the
 service first ends in Stripe each web subscription of the account still
