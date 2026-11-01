@@ -48,7 +48,7 @@ class RelayPresence {
       auth: relayAuthFor(signer),
       urls: this.relays,
       subscriptions: {
-        'online': [const Filter(kinds: [TableKinds.presence]).toJson()..['#t'] = [topic]],
+        'online': [const Filter(kinds: [TableKinds.presence], tags: {'t': [topic]}).toJson()],
       },
       onEvent: _onEvent,
       log: log,

@@ -27,7 +27,7 @@ class RelayTransport implements ReactionLane {
       : relays = Relays.turnedBy(relaysForTag(relays, table), table, pinned: pinned) {
     // The watch lane, and the players' reactions beside it: both are for
     // anyone looking at the table, watching it or seated at it.
-    final watch = const Filter(kinds: [TableKinds.watch, TableKinds.react]).toJson()..['#t'] = [table];
+    final watch = Filter(kinds: const [TableKinds.watch, TableKinds.react], tags: {'t': [table]}).toJson();
     _group = RelayGroup(
       urls: this.relays,
       refusalMs: refusalMs,
@@ -38,11 +38,8 @@ class RelayTransport implements ReactionLane {
       subscriptions: watchOnly ? {'watch': [watch]} : {
         'table': [
           watch,
-          Filter(kinds: const [TableKinds.signal], tags: {
-            'p': [signer.publicKey]
-          }).toJson()
-            ..['#t'] = [table],
-          Filter(kinds: const [TableKinds.lobby, TableKinds.waiting], since: _lobbySince(table)).toJson()..['#t'] = [table],
+          Filter(kinds: const [TableKinds.signal], tags: {'p': [signer.publicKey], 't': [table]}).toJson(),
+          Filter(kinds: const [TableKinds.lobby, TableKinds.waiting], since: _lobbySince(table), tags: {'t': [table]}).toJson(),
         ],
       },
       onEvent: _onEvent,
