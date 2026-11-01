@@ -181,8 +181,10 @@ object runs on one thread shared by everyone on that tag.
 - Each socket is bounded: message size, REQ size (so a socket's
   subscriptions always fit in the attachment a hibernating socket
   carries), a few subscriptions (`maxSubscriptions`), and a
-  burst-then-rate limit on publishing, and on asking for a table's log,
-  that refuses floods before checking signatures. An event is serialised
+  burst-then-rate limit on publishing, subscribing and asking for a
+  table's log, that refuses floods before checking signatures. A stored
+  event is at most `storedMost` characters, so a lobby's object holds
+  its newest `storedKeep` in a bounded amount of memory. An event is serialised
   once for all listeners. Presence uses the tighter `objectLimits`,
   tables use `tableLimits`.
 - A socket that has not answered the challenge has what it says held

@@ -63,7 +63,7 @@ The reason in a refusal starts with one of these words:
 
 | Prefix | Meaning |
 |---|---|
-| `rate-limited:` | The socket published, or asked for a table's log, more than its burst and rate allow. Checked before the signature. |
+| `rate-limited:` | The socket published, subscribed, or asked for a table's log, more than its burst and rate allow. Checked before the signature. |
 | `invalid:` | A bad ID or signature, a table event whose ID is not the hash of what it says, or a reaction of the wrong size or shape. |
 | `blocked:` | This tag's object does not carry this kind, a reaction is on the wrong tag, or a person's events have filled their share of a table's log (`authorMost` in `service/do/referee.mjs`). |
 | `duplicate:` | The relay already has this event. The `OK` is `true`. |
@@ -72,7 +72,7 @@ The reason in a refusal starts with one of these words:
 | `superseded:` | Another device of this account is in use. The relay closes the socket. |
 | `suspended:` | This account is suspended from live play. The relay closes the socket. |
 | `deleted:` | This account was deleted, from one of its devices. The relay closes the socket. |
-| `too big:` | A `NOTICE`: a message or `REQ` over its limit. |
+| `too big:` | A message or `REQ` over its limit, in a `NOTICE`; or an event to be stored longer than `storedMost`. |
 
 ## Limits
 
@@ -82,7 +82,7 @@ Each deployed tag's object holds every socket to these limits. `service/do/host.
 |---|---|---|
 | Longest message, in characters | `objectLimits.message` | `tableLimits.message` |
 | Longest `REQ`, in characters | `objectLimits.request` | `tableLimits.request` |
-| Events a socket may publish, and table logs it may ask for, at once | `objectLimits.burst` | `tableLimits.burst` |
+| Events a socket may publish, subscriptions it may make, and table logs it may ask for, at once | `objectLimits.burst` | `tableLimits.burst` |
 | The same each second, after the burst | `objectLimits.perSecond` | `tableLimits.perSecond` |
 | Subscriptions per socket; the oldest goes when a new one arrives | `maxSubscriptions` | `maxSubscriptions` |
 | Messages held while the challenge is unanswered | `heldMost` | `heldMost` |
@@ -103,7 +103,7 @@ All are in `service/do/relay.mjs`. The operator can change the `online` limits w
 | Kind 4244 on the results tag (`GameResult.tag`) | For good | `resultsTag` in `service/do/relay.mjs`; `tagStore` in `service/do/tag_store.mjs` |
 | Any other kind that is not ephemeral | Refused | `refusalFor` |
 
-A stored event survives the object being evicted. The object holds the newest `storedKeep(tag)` stored events in memory, and sends those that match to each new subscription before `EOSE`. A client reads a pool's seatings back only for `RelayTransport.poolHistorySeconds` (`packages/table/lib/src/relay_transport.dart`).
+A stored event survives the object being evicted. It is at most `storedMost` characters, as JSON, which a picture fits in. The object holds the newest `storedKeep(tag)` stored events in memory, and sends those that match to each new subscription before `EOSE`. A client reads a pool's seatings back only for `RelayTransport.poolHistorySeconds` (`packages/table/lib/src/relay_transport.dart`).
 
 A pool's object wakes the house, at most once every `wakeEveryMs` (`wakeLimiter` in `service/do/referee.mjs`), when somebody's device says it is waiting there (24245) and no socket on the pool answered the challenge as the house. It stops wanting the house `poolWantsMs` after the last device said so (`poolWatch` in `service/do/pool.mjs`).
 

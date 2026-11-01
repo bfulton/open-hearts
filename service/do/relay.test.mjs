@@ -13,6 +13,7 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 
 import {
+  STORED_TOO_BIG_WHY,
   createRelay,
   limitsFrom,
   maxSubscriptions,
@@ -26,12 +27,14 @@ import {
   reactionRefusal,
   schnorrVerifier,
   socketLine,
+  storedMost,
   tableLimits,
   tagLabel,
   tagOf,
 } from './relay.mjs';
 import { wasmPath } from './host.mjs';
 import { keys, signing } from './sign.mjs';
+import { PROFILE_PICTURE_MOST } from '../functions/profile.mjs';
 
 const wasm = readFileSync(wasmPath);
 const verify = await schnorrVerifier(wasm);
@@ -407,6 +410,39 @@ test('the object holds a socket to a burst of events, and then a few a second', 
   relay.open(b);
   await relay.message(b, JSON.stringify(['EVENT', await beat(keys[1], 3001)]));
   assert.equal(b.of('OK')[0][2], true);
+});
+
+test("subscribing counts against the socket's rate, from the bucket publishing takes from", async () => {
+  // The clock stands still: what the socket spends does not come back.
+  const relay = objectRelay(verify, { now: () => 1_000_000 });
+  const a = socket();
+  relay.open(a);
+  const { burst } = objectLimits;
+  for (let i = 0; i <= burst; i++) await relay.message(a, JSON.stringify(['REQ', 's', { kinds: [24246] }]));
+  assert.equal(a.of('EOSE').length, burst);
+  assert.deepEqual(a.said.at(-1), ['CLOSED', 's', 'rate-limited: slow down']);
+  await relay.message(a, JSON.stringify(['EVENT', await beat(keys[0])]));
+  assert.match(a.of('OK').at(-1)[3], /^rate-limited: /);
+});
+
+test('a lobby keeps no event longer than a picture needs, and carries a longer one it does not keep', async () => {
+  const relay = objectRelay(verify, { tag: 'ROOM42' });
+  const a = socket();
+  relay.open(a);
+  const lobby = (kind, content) => sign.event(keys[0], { kind, content, tags: [['t', 'ROOM42']], created_at: 1000 });
+  // The longest a device stores: a picture as long as a picture may be.
+  const picture = await lobby(4244, JSON.stringify({ kind: 'picture', jpeg: 'A'.repeat(Math.ceil(PROFILE_PICTURE_MOST / 3) * 4) }));
+  await relay.message(a, JSON.stringify(['EVENT', picture]));
+  assert.deepEqual(a.of('OK').at(-1), ['OK', picture.id, true, '']);
+  const long = await lobby(4244, 'x'.repeat(storedMost));
+  await relay.message(a, JSON.stringify(['EVENT', long]));
+  assert.deepEqual(a.of('OK').at(-1), ['OK', long.id, false, STORED_TOO_BIG_WHY]);
+  assert.equal(relay.stored, 1, 'the picture alone');
+  // Somebody waiting is forwarded and forgotten, so held to the
+  // message limit alone.
+  const waiting = await lobby(24245, 'x'.repeat(storedMost));
+  await relay.message(a, JSON.stringify(['EVENT', waiting]));
+  assert.deepEqual(a.of('OK').at(-1), ['OK', waiting.id, true, '']);
 });
 
 test('what a socket carries through hibernation stays under what an attachment may hold', async () => {

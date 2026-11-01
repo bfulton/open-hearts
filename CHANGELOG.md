@@ -721,8 +721,11 @@ squashed from a pull request, the pull request's number.
 - The relay carries a view of a watched table only from one of its
   people, so a stranger can no longer show watchers a game of their
   own. A socket that has not answered the relay's challenge can hold
-  only a bounded amount, LOG requests count against a socket's rate,
-  and only an answer to the socket's own challenge is checked. The
+  only a bounded amount, subscribing and LOG requests count against a
+  socket's rate, and only an answer to the socket's own challenge is
+  checked. An event a room or a pool keeps is at most 24 KiB, which a
+  picture fits in, so one subscriber can no longer fill a lobby past
+  what its object can hold, and have it fail each time it wakes. The
   service reads no request body past its bound, and quotes a report's
   note in the operator's email so that it cannot pass for instructions.
   (2026-11-01, #47)

@@ -600,8 +600,8 @@ export function createRelay({ verify, store = memoryStore(), refuse = null, log 
     return true;
   }
 
-  /// Whether [socket] may publish one more event, or ask for a table's
-  /// log once more, now, taking it if so. The bucket refills with time;
+  /// Whether [socket] may publish one more event, subscribe once more,
+  /// or ask for a table's log once more, now, taking it if so. The bucket refills with time;
   /// a socket that went quiet has its whole burst back.
   function spend(socket) {
     if (!limits) return true;
@@ -757,6 +757,12 @@ export function createRelay({ verify, store = memoryStore(), refuse = null, log 
         if (limits && raw.length > limits.request) {
           count?.('tooBig');
           return send(socket, ['NOTICE', 'too big: a subscription is carried through hibernation']);
+        }
+        // A subscription is answered with what the tag holds, so asking
+        // costs what publishing does, as LOG does.
+        if (!spend(socket)) {
+          count?.('rateLimited');
+          return send(socket, ['CLOSED', message[1], 'rate-limited: slow down']);
         }
         count?.('subscriptions');
         return request(socket, message);
@@ -989,6 +995,16 @@ export const resultsTag = 'standings';
 /// folded by the service rather than by every device.
 export const storedKeep = (tag) => (tag === resultsTag ? 20000 : 2000);
 
+/// The longest an event a tag stores may be, as JSON, in characters.
+/// The longest a device stores is a picture, PROFILE_PICTURE_MOST bytes
+/// in base64 (some 16,000 characters); a seating of four is a few
+/// thousand, and a result less. So a room's or a pool's object holds
+/// its [storedKeep] in some 50 MB at the most, inside the 128 MB an
+/// object has. Held only to [tableLimits]' message, one subscriber's
+/// 2,000 events would be twice that, and the object would fail each
+/// time it woke and read them back.
+export const storedMost = 24 * 1024;
+
 /// A player's quick reaction at a live table (packages/table,
 /// reactions.dart): 👍, 😬 and the rest, as a short code and the moment
 /// it was said at, `{"react":"nice","hand":2,"turn":17}`. Ephemeral, so
@@ -1086,6 +1102,9 @@ export const RESULT_NOT_HOUSE_WHY = 'blocked: a result is the house\'s word';
 /// (service/functions/names.mjs): the app never sends one.
 export const NAME_REFUSED_WHY = 'blocked: a name that is not allowed';
 
+/// An event to be stored that is longer than [storedMost].
+export const STORED_TOO_BIG_WHY = `too big: a stored event is at most ${storedMost} characters`;
+
 /// Why a view of a table said by a key that holds no seat at it is not
 /// carried.
 export const VIEW_NOT_SEATED_WHY = 'blocked: a view of the table is one of its people\'s to say';
@@ -1095,7 +1114,8 @@ export const VIEW_NOT_SEATED_WHY = 'blocked: a view of the table is one of its p
 /// and the lobby kind tagged for this very tag — an object stores what
 /// belongs to it, and nobody writes into one tag's store through
 /// another's. A reaction anywhere but a table's own tag, or in any
-/// shape but a reaction's ([reactionRefusal]). And anything that shows
+/// shape but a reaction's ([reactionRefusal]). An event to be stored
+/// longer than [storedMost]. And anything that shows
 /// the others a name the filter refuses ([namesIn]), or a picture
 /// anywhere but in a picture of its own ([pictureInAvatar]).
 ///
@@ -1113,6 +1133,7 @@ export function refusalFor(tag, { house = null } = {}) {
         ? 'blocked: presence carries ephemeral kinds only'
         : `blocked: this tag stores only kind ${lobbyKind}, tagged ${tag}`;
     }
+    if (!ephemeral(event.kind) && JSON.stringify(event).length > storedMost) return STORED_TOO_BIG_WHY;
     if (pictureInAvatar(event)) return PICTURE_IN_AVATAR_WHY;
     return namesIn(event).some(nameRefused) ? NAME_REFUSED_WHY : null;
   };
