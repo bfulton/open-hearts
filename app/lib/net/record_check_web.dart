@@ -21,13 +21,22 @@ extension type _Message._(JSObject _) implements JSObject {
 }
 
 /// In a worker of its own (worker/review_worker.dart), beside the app;
-/// gone when the page stops listening, and when the verdict is in.
+/// gone when the page stops listening, and when the verdict is in. A
+/// check the worker could not make ends in an error, which the page
+/// reports (review_page.dart), as a check that throws does off the web.
 Stream<RecordCheck> checkRecord(KeptGame game) {
   late final StreamController<RecordCheck> out;
   _Worker? worker;
   void end(RecordCheck last) {
     if (out.isClosed) return;
     out.add(last);
+    out.close();
+    worker?.terminate();
+  }
+
+  void fail(Object why) {
+    if (out.isClosed) return;
+    out.addError(StateError('record check: $why'));
     out.close();
     worker?.terminate();
   }
@@ -47,18 +56,18 @@ Stream<RecordCheck> checkRecord(KeptGame game) {
               winners: [for (final s in done['winners'] as List? ?? const []) s as int],
             ));
           } else {
-            end(const RecordChecked(ok: false));
+            fail(m['error'] ?? 'an answer it does not read');
           }
         }).toJS;
-        // The worker's script not served, or broken: not checked here.
-        w.onerror = ((JSAny? _) => end(const RecordChecked(ok: false))).toJS;
+        // The worker's script not served, or broken.
+        w.onerror = ((JSAny? _) => fail('review_worker.js did not run')).toJS;
         // The record as it came, for the worker to read — not read here
         // and written out again — with the service whose word makes each
         // seat an account's, and the house this build plays with: the
         // worker is a program of its own, and checks the game by them.
         w.postMessage({'record': game.text, 'service': licenceService, 'house': houseKey}.jsify());
-      } catch (_) {
-        end(const RecordChecked(ok: false));
+      } catch (e) {
+        fail(e);
       }
     },
     onCancel: () => worker?.terminate(),
