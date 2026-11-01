@@ -11,13 +11,10 @@
 #                (the worker routes by host, docs/explanation/service.md)
 #
 # Publishing is for looking at, not for keeping: every upload is a
-# deployment Cloudflare keeps for ever, and a few dozen of them make
-# the project's own list useless. So publish when there is something to
-# look at, and sweep up after:
-#
-#   ./deploy.sh --prune [keep]   deletes the older previews, keeping the
-#                                newest [keep] (5) and anything live
-#   ./deploy.sh --prune -n       says what it would delete and stops
+# deployment Cloudflare keeps for ever. So publish when there is
+# something to look at; ./oh deploy site sweeps up the old ones after
+# each production deploy, and ./oh deploy prune whenever it is asked
+# (ops/release.mjs, sweep).
 #
 # Usage:  ./deploy.sh [branch-label], or better, ./oh deploy site
 # (docs/reference/oh.md), which says first what stands in the way.
@@ -45,81 +42,11 @@ branch_of_git() {
   git rev-parse --abbrev-ref HEAD 2>/dev/null || echo dev
 }
 
-# ---- sweeping up old deployments ---------------------------------------
-# The alias — dev.open-hearts.pages.dev — always points at the newest
-# deployment of its branch, so deleting older previews takes nothing
-# down. Production keeps the live deployment and the two before it.
-prune() {
-  local keep=${1:-5} dry=${2:-}
-  local api="https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects/$PROJECT/deployments"
-  local page=1 skip=$keep pskip=3 ids all=""
-  # A page at a time, newest first, until a page comes back empty: the
-  # newest [keep] are left alone and everything after them goes.
-  while :; do
-    ids=$(curl -sS "$api?per_page=25&page=$page" -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" |
-      python3 -c "
-import json, sys
-page = json.load(sys.stdin)
-if not page.get('success'):
-    sys.exit('cloudflare said no: ' + json.dumps(page.get('errors')))
-found = page['result']
-print('#', len(found))
-previews = [x for x in found if x['environment'] != 'production'][$skip:]
-# Production keeps the live one and the two before it, to roll back to.
-production = [x for x in found if x['environment'] == 'production'][$pskip:]
-for d in previews + [x for x in production if not x.get('aliases')]:
-    print(d['id'], d['created_on'][:19], (d.get('deployment_trigger') or {}).get('metadata', {}).get('branch', '?'))
-")
-    [ "$(echo "$ids" | head -1 | cut -d' ' -f2)" = 0 ] && break
-    all="$all
-$(echo "$ids" | tail -n +2)"
-    page=$((page + 1))
-    skip=0
-    pskip=0
-    [ "$page" -gt 20 ] && break
-  done
-  all=$(echo "$all" | sed '/^$/d')
-  if [ -z "$all" ]; then
-    echo "nothing to sweep: $keep or fewer previews, 3 or fewer production"
-    return
-  fi
-  # Every one is tried; the sweep fails if any of them was not deleted.
-  local failed=0 said
-  while read -r id made branch; do
-    if [ -n "$dry" ]; then
-      echo "would delete $id  $made  $branch"
-    else
-      # Said deleted only when Cloudflare says so.
-      said=$(curl -sS -X DELETE "$api/$id" -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" || true)
-      if echo "$said" | python3 -c 'import json, sys; sys.exit(0 if json.load(sys.stdin).get("success") else 1)' 2> /dev/null; then
-        echo "deleted $id  $made  $branch"
-      else
-        echo "not deleted $id  $made  $branch: ${said:-no answer}" >&2
-        failed=$((failed + 1))
-      fi
-    fi
-  done <<<"$all"
-  if [ "$failed" -gt 0 ]; then
-    echo "$failed not deleted" >&2
-    return 1
-  fi
-}
-
-if [ "${1:-}" = --prune ]; then
-  shift
-  DRY=
-  KEEP=5
-  for arg in "$@"; do
-    case "$arg" in
-      -n) DRY=1 ;;
-      *) KEEP=$arg ;;
-    esac
-  done
-  prune "$KEEP" "$DRY"
-  exit
-fi
-
 LABEL=${1:-}
+case "$LABEL" in
+  # Not a branch: the sweep this took once (--prune) is ./oh deploy prune.
+  -*) echo "deploy: $LABEL is not a label; old deployments are swept by ./oh deploy prune" >&2; exit 2 ;;
+esac
 if [ -z "$LABEL" ]; then
   LABEL=$([ "$(branch_of_git)" = main ] && echo main || echo dev)
 fi

@@ -15,6 +15,7 @@ import { root } from './env.mjs';
 import { releaseProblems } from './gate.mjs';
 import { commandOf, main, markdown, parse } from './oh.mjs';
 import { INVITED_DAYS, withHouseKey, withPreviewKey } from './preview.mjs';
+import { PREVIEWS_KEPT, sweepable } from './release.mjs';
 import { rejected, reshaped } from './setup.mjs';
 import { KNOWN_ROW } from '../service/do/checkers.mjs';
 import { configOf } from '../service/functions/config.mjs';
@@ -159,6 +160,236 @@ test('production is released only from main as it was reviewed', async () => {
   const preview = fake({ capture: git({ ...clean, 'rev-parse HEAD': 'def5678\n' }) });
   assert.equal(await main(['deploy', 'site', '--label', 'my-change', '--apply'], preview), 0);
   assert.deepEqual(preview.started.map((s) => s.args), [['my-change']]);
+});
+
+/// A deployment of the site as Cloudflare lists one: made [minute]
+/// minutes into a day, live when it has [aliases].
+const deployment = (id, environment, minute, aliases = null) => ({
+  id,
+  environment,
+  created_on: new Date(Date.UTC(2026, 9, 31, 0, minute)).toISOString().replace('Z', '000Z'),
+  aliases,
+  deployment_trigger: { metadata: { branch: environment === 'production' ? 'main' : 'dev' } },
+});
+
+/// The Pages project's deployments API, holding [deployments] newest
+/// first: a page of 25 at a time, every page after the first moved down
+/// a place by one made meanwhile when [shifted]; refusing to delete the
+/// ids in [refused], and answering [listing] instead of a list when it
+/// is given. What it was asked is in [asked], what it deleted in
+/// [deleted].
+function pagesApi(deployments, { shifted = false, refused = [], listing = null } = {}) {
+  const held = [...deployments];
+  const api = { asked: [], deleted: [] };
+  api.fetch = async (url, init = {}) => {
+    const u = new URL(String(url));
+    const method = init.method ?? 'GET';
+    api.asked.push(`${method} ${u.pathname.replace('/client/v4/accounts/acct/pages/projects/open-hearts/deployments', '')}${u.search}`);
+    assert.equal(u.origin, 'https://api.cloudflare.com');
+    assert.match(u.pathname, /^\/client\/v4\/accounts\/acct\/pages\/projects\/open-hearts\/deployments/);
+    assert.equal(init.headers?.Authorization, 'Bearer tok');
+    if (method === 'GET') {
+      if (listing) return listing();
+      const page = Number(u.searchParams.get('page'));
+      const per = Number(u.searchParams.get('per_page'));
+      const from = (page - 1) * per - (shifted && page > 1 ? 1 : 0);
+      return Response.json({ success: true, errors: [], result: held.slice(from, from + per) });
+    }
+    const id = decodeURIComponent(u.pathname.split('/').at(-1));
+    if (refused.includes(id)) return Response.json({ success: false, errors: [{ code: 8000034, message: 'not now' }] }, { status: 400 });
+    api.deleted.push(id);
+    return Response.json({ success: true, errors: [], result: null });
+  };
+  return api;
+}
+
+const cloudflareEnv = { CLOUDFLARE_API_TOKEN: 'tok', CLOUDFLARE_ACCOUNT_ID: 'acct' };
+
+test('a sweep deletes the previews past the newest few and production past its newest three, and never one that is live', () => {
+  const ids = (list) => list.map((d) => d.id);
+  const listed = [
+    deployment('p5', 'production', 50, ['https://openhearts.game', 'https://play.openhearts.game']),
+    deployment('v8', 'preview', 48, ['https://dev.open-hearts.pages.dev']),
+    deployment('p4', 'production', 45),
+    deployment('v7', 'preview', 44),
+    deployment('v6', 'preview', 43),
+    deployment('v5', 'preview', 42),
+    deployment('v4', 'preview', 41),
+    deployment('p3', 'production', 40),
+    deployment('v3', 'preview', 30),
+    // The newest of a branch nobody has deployed to since: still on its
+    // branch's address.
+    deployment('v2', 'preview', 20, ['https://pr38.open-hearts.pages.dev']),
+    deployment('p2', 'production', 15),
+    deployment('p1', 'production', 10),
+    deployment('v1', 'preview', 5),
+  ];
+  assert.equal(PREVIEWS_KEPT, 5);
+  assert.deepEqual(ids(sweepable(listed)), ['v3', 'p2', 'p1', 'v1']);
+  assert.deepEqual(ids(sweepable([...listed].reverse())), ['v3', 'p2', 'p1', 'v1'], 'by when each was made, not as listed');
+  assert.deepEqual(ids(sweepable(listed, 0)), ['v7', 'v6', 'v5', 'v4', 'v3', 'p2', 'p1', 'v1'], 'none kept but the live ones');
+  assert.deepEqual(ids(sweepable(listed, 7)), ['p2', 'p1', 'v1']);
+  assert.deepEqual(ids(sweepable(listed.filter((d) => d.environment === 'production'))), ['p2', 'p1']);
+
+  // Rolled back: the live one is older than three that are not, and stays.
+  const rolledBack = [
+    deployment('p4', 'production', 40),
+    deployment('p3', 'production', 30),
+    deployment('p2', 'production', 20),
+    deployment('p1', 'production', 10, ['https://openhearts.game']),
+    deployment('p0', 'production', 5),
+  ];
+  assert.deepEqual(ids(sweepable(rolledBack)), ['p0']);
+  // Anything not production's is a preview's.
+  assert.deepEqual(ids(sweepable([deployment('x2', 'staging', 20), deployment('x1', 'staging', 10)], 1)), ['x1']);
+  // One with no date is taken as the newest, and kept.
+  assert.deepEqual(ids(sweepable([{ id: 'undated', environment: 'production' }, ...rolledBack.slice(0, 3)])), ['p2']);
+  assert.deepEqual(sweepable([]), []);
+});
+
+test('oh deploy prune says what would go, reading every page once, and with --apply deletes it, every one tried', async () => {
+  // Fifty: production's newest three, then previews, the newest of them
+  // live; listed in two full pages and the one a deployment made
+  // meanwhile pushes over.
+  const fifty = [
+    deployment('p3', 'production', 600, ['https://openhearts.game']),
+    deployment('p2', 'production', 590),
+    deployment('p1', 'production', 580),
+    ...Array.from({ length: 47 }, (_, i) => deployment(`v${String(47 - i).padStart(2, '0')}`, 'preview', 500 - i, i === 0 ? ['https://dev.open-hearts.pages.dev'] : null)),
+  ];
+  const doomedIds = fifty.slice(8).map((d) => d.id);
+
+  const dry = pagesApi(fifty, { shifted: true });
+  const looked = fake({ env: cloudflareEnv, fetch: dry.fetch });
+  assert.equal(await main(['deploy', 'prune'], looked), 0);
+  assert.deepEqual(dry.asked, ['GET ?per_page=25&page=1', 'GET ?per_page=25&page=2', 'GET ?per_page=25&page=3']);
+  assert.deepEqual(dry.deleted, []);
+  const would = looked.said.filter((l) => l.startsWith('would delete'));
+  assert.deepEqual(would.map((l) => l.split(' ')[2]), doomedIds.map((id) => id.slice(0, 8)), 'each once, though one was listed twice');
+  assert.equal(would[0], 'would delete v42  2026-10-31 08:15  dev (preview)');
+  assert.match(looked.said.at(-1), /^42 of 50 deployment\(s\) would go, keeping the newest 5 preview\(s\), production's newest 3 and every one that is live; --apply deletes them$/);
+
+  const real = pagesApi(fifty);
+  const swept = fake({ env: cloudflareEnv, fetch: real.fetch });
+  assert.equal(await main(['deploy', 'prune', '--apply'], swept), 0);
+  assert.deepEqual(real.deleted, doomedIds);
+  assert.ok(real.asked.filter((a) => a.startsWith('DELETE')).every((a, i) => a === `DELETE /${doomedIds[i]}`));
+  assert.match(swept.said.at(-1), /^swept 42 of 50 deployment\(s\)/);
+
+  const fewer = pagesApi(fifty);
+  assert.equal(await main(['deploy', 'prune', '--keep', '40', '--apply'], fake({ env: cloudflareEnv, fetch: fewer.fetch })), 0);
+  assert.deepEqual(fewer.deleted, doomedIds.slice(35));
+
+  // Cloudflare refuses one: the rest are deleted all the same, and the
+  // sweep fails saying so.
+  const refusing = pagesApi(fifty, { refused: ['v30'] });
+  const partly = fake({ env: cloudflareEnv, fetch: refusing.fetch });
+  assert.equal(await main(['deploy', 'prune', '--apply'], partly), 1);
+  assert.deepEqual(refusing.deleted, doomedIds.filter((id) => id !== 'v30'));
+  assert.ok(partly.said.some((l) => /^not deleted v30 .*Cloudflare said 400 to DELETE deployments\/v30: .*not now/.test(l)));
+  assert.match(partly.warned.join('\n'), /swept 41 of 42: 1 not deleted \(above\)/);
+
+  // Nothing to sweep.
+  const tidy = fake({ env: cloudflareEnv, fetch: pagesApi(fifty.slice(0, 8)).fetch });
+  assert.equal(await main(['deploy', 'prune', '--apply'], tidy), 0);
+  assert.deepEqual(tidy.said, ['nothing to sweep: 8 deployment(s), all of them the newest 5 preview(s), production\'s newest 3 and every one that is live']);
+
+  // Asked wrongly, or unable to list: nothing is deleted.
+  assert.equal(await main(['deploy', 'prune', '--keep', 'many', '--apply'], fake({ env: cloudflareEnv, fetch: real.fetch })), 2);
+  const bare = fake({ fetch: real.fetch });
+  assert.equal(await main(['deploy', 'prune', '--apply'], bare), 1);
+  assert.match(bare.warned.join('\n'), /needs CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID/);
+  const denied = fake({ env: cloudflareEnv, fetch: pagesApi(fifty, { listing: () => Response.json({ success: false, errors: [{ code: 10000, message: 'Authentication error' }] }, { status: 403 }) }).fetch });
+  assert.equal(await main(['deploy', 'prune', '--apply'], denied), 1);
+  assert.match(denied.warned.join('\n'), /Cloudflare said 403 to GET deployments\?per_page=25&page=1: .*Authentication error/);
+  const proxied = fake({ env: cloudflareEnv, fetch: pagesApi(fifty, { listing: () => new Response('<html>a proxy said no</html>', { status: 200 }) }).fetch });
+  assert.equal(await main(['deploy', 'prune'], proxied), 1, 'an answer that is not Cloudflare\'s is no list');
+  assert.match(proxied.warned.join('\n'), /Cloudflare said 200 to GET deployments\?per_page=25&page=1: not JSON$/);
+  const unreachable = fake({ env: cloudflareEnv, fetch: async () => { throw new TypeError('fetch failed'); } });
+  assert.equal(await main(['deploy', 'prune'], unreachable), 1);
+  assert.match(unreachable.warned.join('\n'), /Cloudflare did not answer GET deployments\?per_page=25&page=1: fetch failed/);
+  assert.equal(real.deleted.length, doomedIds.length, 'none of those deleted anything');
+});
+
+test("production's site deploy sweeps up after publishing, and stands if the sweep fails; a preview's sweeps nothing", async () => {
+  const git = (answers) => async (command, args) => ({ code: 0, out: answers[args.join(' ')] ?? '' });
+  const onMain = git({ 'rev-parse HEAD': 'abc1234\n', 'rev-parse origin/main': 'abc1234\n', 'rev-parse --abbrev-ref HEAD': 'main\n' });
+  const listed = [
+    deployment('p5', 'production', 50, ['https://openhearts.game']),
+    deployment('p4', 'production', 40),
+    deployment('p3', 'production', 30),
+    deployment('p2', 'production', 20),
+    deployment('v1', 'preview', 10),
+  ];
+  /// A deploy of the site where deploy.sh exits [published], against
+  /// [api]: what happened, in order. With [relay], deploy all's relay
+  /// before it, with no PhotoDNA module to fetch and its folder a
+  /// throwaway one.
+  const deploy = async (argv, api, { published = 0, capture = onMain, relay = false } = {}) => {
+    const site = settled();
+    const order = [];
+    const ctx = fake({
+      ...site,
+      ...(relay ? { moduleDir: join(mkdtempSync(join(tmpdir(), 'relay-')), 'private', 'photodna'), config: { ...site.config, photodna: { ...site.config.photodna, module: undefined } } } : {}),
+      env: cloudflareEnv,
+      capture,
+      fetch: async (url, init) => {
+        if (!String(url).startsWith('https://api.cloudflare.com/')) return site.fetch(url, init);
+        order.push(`${init?.method ?? 'GET'} cloudflare`);
+        return api.fetch(url, init);
+      },
+    });
+    ctx.run = async (command, args) => {
+      order.push(`${command.split('/').at(-1)} ${args.join(' ')}`);
+      return published;
+    };
+    const code = await main(argv, ctx);
+    return { code, order, said: ctx.said.join('\n'), warned: ctx.warned.join('\n') };
+  };
+
+  const api = pagesApi(listed);
+  const done = await deploy(['deploy', 'site', '--apply'], api);
+  assert.equal(done.code, 0, done.warned);
+  assert.deepEqual(done.order, ['deploy.sh main', 'GET cloudflare', 'DELETE cloudflare']);
+  assert.deepEqual(api.deleted, ['p2']);
+  assert.match(done.said, /deleted p2 .* main \(production\)\nswept 1 of 5 deployment\(s\)/);
+  assert.equal(done.warned, '');
+
+  // The same from deploy all, whose site is production's.
+  const viaAll = await deploy(['deploy', 'all', '--apply'], pagesApi(listed), { relay: true });
+  assert.equal(viaAll.code, 0, viaAll.warned);
+  assert.deepEqual(viaAll.order.slice(-3), ['deploy.sh main', 'GET cloudflare', 'DELETE cloudflare']);
+  assert.ok(viaAll.order.slice(0, -3).every((o) => o.startsWith('npx ')), viaAll.order.join(', '));
+
+  // Not published: nothing swept.
+  const unpublished = await deploy(['deploy', 'site', '--apply'], pagesApi(listed), { published: 1 });
+  assert.equal(unpublished.code, 1);
+  assert.deepEqual(unpublished.order, ['deploy.sh main']);
+
+  // The sweep fails: said, and the deploy stands.
+  const down = pagesApi(listed, { listing: () => Response.json({ success: false, errors: [{ code: 7003, message: 'no route' }] }, { status: 500 }) });
+  const failedSweep = await deploy(['deploy', 'site', '--apply'], down);
+  assert.equal(failedSweep.code, 0);
+  assert.match(failedSweep.warned, /^published, but the sweep of old deployments: Cloudflare said 500 to GET deployments\?per_page=25&page=1: .*no route.*; \.\/oh deploy prune --apply tries again$/);
+  const garbled = await deploy(['deploy', 'site', '--apply'], pagesApi(listed, { listing: () => Response.json({ success: true, result: { not: 'a list' } }) }));
+  assert.equal(garbled.code, 0, 'nor by an answer the sweep cannot read');
+  assert.match(garbled.warned, /^published, but the sweep of old deployments: .*not iterable; /);
+  const refused = pagesApi(listed, { refused: ['p2'] });
+  const partSweep = await deploy(['deploy', 'site', '--apply'], refused);
+  assert.equal(partSweep.code, 0);
+  assert.match(partSweep.warned, /^published, but the sweep of old deployments: swept 0 of 1: 1 not deleted \(above\); /);
+
+  // A dry run says it will sweep, and asks Cloudflare nothing.
+  const dry = await deploy(['deploy', 'site'], pagesApi(listed));
+  assert.equal(dry.code, 0);
+  assert.deepEqual(dry.order, []);
+  assert.match(dry.said, /then sweeps up old deployments, keeping the newest 5 previews, production's newest 3 and every one that is live \(oh deploy prune says which would go\)/);
+
+  // A preview's deploy publishes, and sweeps nothing.
+  const preview = await deploy(['deploy', 'site', '--label', 'my-change', '--apply'], pagesApi(listed), { capture: git({ 'rev-parse --abbrev-ref HEAD': 'my-change\n' }) });
+  assert.equal(preview.code, 0);
+  assert.deepEqual(preview.order, ['deploy.sh my-change']);
+  assert.doesNotMatch(preview.said, /sweep/);
 });
 
 test('a relay deploy says what it lacks before it starts', async () => {

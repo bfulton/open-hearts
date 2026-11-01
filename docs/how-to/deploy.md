@@ -9,7 +9,7 @@ Use this guide to publish the site, the web app and the service's handlers to Cl
 - Production is built from `main` as it was reviewed: `HEAD` must be `origin/main`, with nothing uncommitted. `deploy.sh` and the relay's build step check this themselves (`ops/gate.mjs`), so it holds whether or not you deploy through `oh`. A preview, and the preview relay, can be deployed from any branch.
 - A production deploy of the site also holds the terms and the privacy policy to `site/ledger.json`. It emails nobody: after publishing a change that matters to subscribers, [tell them](change-the-terms.md#tell-subscribers) yourself. See [Change the terms](change-the-terms.md#publish-it).
 - Make sure the commit passes CI, or run `./check.sh full`.
-- Install Node, git, Python 3 (for pruning) and Flutter. CI pins the Flutter version in `.github/workflows/ci.yml`. The web build needs no Rust: the wasm is committed.
+- Install Node, git and Flutter. CI pins the Flutter version in `.github/workflows/ci.yml`. The web build needs no Rust: the wasm is committed.
 - To deploy the relay, you also need a linux/amd64 machine with Dart, Cargo (CI pins the Rust version in `.github/workflows/ci.yml`) and Docker running. Wrangler builds the house's image from `service/bench/Dockerfile` with binaries built on your machine (`service/bench/build.sh`). Run `dart pub get` in `service/` once. `./oh deploy relay` says which of these is missing.
 - Export `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`. For what else the scripts read, see [environment variables](../reference/configuration.md#deploying-and-operating).
 - For production, `serviceKey` must be set in `config/openhearts.json`: `deploy.sh` refuses a production deploy without it. To set it up, see [Mint or rotate the service key](rotate-the-service-key.md).
@@ -39,7 +39,7 @@ Use this guide to publish the site, the web app and the service's handlers to Cl
    ./oh deploy all --apply
    ```
 
-   The relay goes first because the `Household` object runs in the relay worker. A new site whose handlers ask the object something it does not know yet gets a 400 (`not a household operation`) until the relay is deployed. To deploy only one, use `./oh deploy relay --apply` or `./oh deploy site --apply`.
+   The relay goes first because the `Household` object runs in the relay worker. A new site whose handlers ask the object something it does not know yet gets a 400 (`not a household operation`) until the relay is deployed. To deploy only one, use `./oh deploy relay --apply` or `./oh deploy site --apply`. Once the site is published, it [sweeps up old deployments](#sweep-up-old-deployments).
 
    For the relay, `oh` first runs `wrangler deploy --dry-run`, which runs `service/bench/build.sh` (it builds the deal and Schnorr libraries and compiles the house) and builds the house's image, but uploads nothing. A real deploy uploads the worker, live at once, before it builds the image, so an image that failed to build there would leave the new worker beside the old house. Only once the dry run has built both does `oh` deploy: the build again, the worker, and the house's image built and pushed.
 
@@ -104,9 +104,11 @@ It makes an account on the previews' store and prints one of its backup codes. N
 
 Give each person their own invitation, since an account plays on one device at a time. The account's other four codes are shown on any of its devices, to bring another device of the same person in.
 
-## Sweep up old previews
+## Sweep up old deployments
 
-Every upload is a deployment Cloudflare keeps for ever. See what would go first:
+Every upload is a deployment Cloudflare keeps for ever. A production deploy of the site sweeps up after itself: once it has published, it deletes the previews past the newest five and production's deployments past the newest three (the live one and the two before it, to roll back to). It never deletes a deployment that is live: production's on its domains, or the newest of a preview's branch, on its branch's address. If the sweep fails, the deploy says so and still stands. A preview's deploy sweeps nothing.
+
+To sweep without deploying, see what would go first:
 
 ```bash
 ./oh deploy prune
@@ -117,8 +119,6 @@ Then delete them, keeping the newest five previews (or the number you give with 
 ```bash
 ./oh deploy prune --apply
 ```
-
-Production always keeps its live deployment and the two before it.
 
 ## Check it worked
 

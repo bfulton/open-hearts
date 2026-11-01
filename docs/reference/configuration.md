@@ -146,7 +146,7 @@ Its schedule (`triggers.crons`) runs once a day at 13:00 UTC. With a checker's c
 
 What each script does with the Cloudflare API token, which is what the token needs to allow:
 
-- `deploy.sh` publishes to the Pages project and, with `--prune`, lists and deletes its deployments.
+- `deploy.sh` publishes to the Pages project. `./oh deploy site`, after a production deploy, and `./oh deploy prune` list and delete its deployments.
 - `./oh account delete` reads and deletes rows in `OH_STORE` (Workers KV Storage: Edit), and reads and rewrites kept games in `OH_RECORDS` (Workers R2 Storage: Edit).
 - The other `./oh account` acts read rows and write orders in `OH_STORE` (Workers KV Storage: Edit), and, to take a name off, read and rewrite kept games in `OH_RECORDS` (Workers R2 Storage: Edit). `./oh account find` reads the notes of which accounts set a picture in `OH_PICTURES`, and `./oh account hold` and `./oh account release` copy pictures from it into `OH_RECORDS` and delete them there (Workers R2 Storage: Edit). `./oh config` and `./oh picture` read and write rows in `OH_STORE`.
 - `./oh photodna put` and `./oh photodna get` write and read the PhotoDNA module in `open-hearts-private` (Workers R2 Storage: Edit).
