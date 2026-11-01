@@ -504,6 +504,38 @@ test('a tick when asked, once the table has begun, no oftener than the gap', asy
   assert.deepEqual(relay.entries.slice(1), [{ n: 1, t: 1_000_000 + tickGapMs }]);
 });
 
+test('a tick only for the table\'s people and its house, and none once the house has said how the game came out', async () => {
+  const now = clock();
+  const { relay, kept } = referee({ now, gate: gateOn(now) });
+  const [a, h, s] = [socket(), socket(), socket()];
+  for (const [x, key] of [[a, ada], [h, house], [s, stranger]]) {
+    relay.open(x);
+    await answerAs(relay, x, key, now);
+  }
+  await say(relay, a, await wrapped(await startOf(ada)));
+  const tick = async (x) => {
+    now.at += tickGapMs;
+    const before = relay.entries.length;
+    await relay.message(x, JSON.stringify(['TICK']));
+    return relay.entries.length - before;
+  };
+  assert.equal(await tick(s), 0, 'somebody not at the table');
+  assert.equal(await tick(a), 1);
+  assert.equal(await tick(h), 1);
+  await say(relay, h, await wrapped(await tableEvent(house, 'result', { n: 3, hash: 'x', state: 'finished', totals: [0, 0, 0, 0] })));
+  assert.equal(await tick(a), 0, 'the game is over');
+  assert.equal(await tick(h), 0);
+
+  // The same for an object woken from the log as it was written down.
+  const again = referee({ now, gate: gateOn(now), entries: structuredClone(kept) });
+  const b = socket();
+  again.relay.open(b);
+  await answerAs(again.relay, b, ada, now);
+  now.at += tickGapMs;
+  await again.relay.message(b, JSON.stringify(['TICK']));
+  assert.equal(again.relay.entries.length, kept.length);
+});
+
 test('the clock never runs back in the log', async () => {
   const now = clock();
   const { relay } = referee({ now });

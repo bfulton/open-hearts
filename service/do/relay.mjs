@@ -781,7 +781,7 @@ export function createRelay({ verify, store = memoryStore(), refuse = null, log 
         return table.follow(socket, message[1], message[2], auths.get(socket)?.who?.key ?? null);
       case 'TICK':
         if (!table) return send(socket, ['NOTICE', 'blocked: only a table\'s tag keeps a log']);
-        table.tick();
+        table.tick(auths.get(socket)?.who?.key ?? null);
         return;
       default:
         return send(socket, ['NOTICE', `unknown message ${message[0]}`]);

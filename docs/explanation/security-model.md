@@ -158,7 +158,10 @@ object runs on one thread shared by everyone on that tag.
   events, as much as a whole kept game may be, so one seat's events
   cannot grow its table's object until it fails, or make every
   reconnecting side read without end. The house is the operator's and
-  is not held to it.
+  is not held to it. A tick (`TICK`) is taken only from the table's
+  people and its house, at most one every `tickGapMs`, and none after
+  the house's word on the game, so nobody else can lengthen the log
+  with ticks, and nobody can once the game is over.
 - Each socket is bounded: message size, REQ size (so a socket's
   subscriptions always fit in the attachment a hibernating socket
   carries), a few subscriptions (`maxSubscriptions`), and a

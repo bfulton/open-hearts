@@ -26,7 +26,10 @@
 // Each person's events may fill only so much of the log ([authorMost]),
 // so one seat's events cannot grow the table's object until it fails
 // for everybody, nor make every side that reads the log read without
-// end.
+// end. A tick is taken only from the table's people and its house, and
+// none after the house's word on the game: nobody else can lengthen the
+// log with ticks, and nobody can once the game is over. While it is on,
+// the log takes one at most every [tickGapMs].
 //
 // But for the start, which every side has to read as the same table
 // for anything after it to mean anything: a log that began with one
@@ -351,9 +354,14 @@ export function tableReferee({ table, verify, house = null, now = Date.now, entr
       return listeners.get(socket)?.sub ?? null;
     },
 
-    /// A tick, if the log has begun and its last entry is [tickGapMs] old.
-    tick() {
-      if (!entries.length || now() - lastAt() < tickGapMs) return null;
+    /// A tick asked for by a socket that answered the relay's challenge
+    /// as [key] (null where nobody answers one), if the log has begun,
+    /// [key] is one of the table's people or its house, the house's word
+    /// on the game is not in, and the last entry is [tickGapMs] old.
+    /// Only the sides at the table wait on its deadlines, and none once
+    /// the game is over.
+    tick(key = null) {
+      if (!entries.length || (key !== null && !spec?.writers.has(key)) || said || now() - lastAt() < tickGapMs) return null;
       return append({});
     },
   };

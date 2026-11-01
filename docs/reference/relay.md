@@ -54,7 +54,7 @@ The relay speaks a subset of NIP-01, plus NIP-42's `AUTH` (`createRelay` in `ser
 
 | From | Message |
 |---|---|
-| Client | `EVENT`, `REQ`, `CLOSE`, `AUTH`; and on a table's tag `LOG` (the log, from an entry on, under a subscription id; asked again by a line that has heard nothing for five seconds, so that its answer shows the line still carries) and `TICK` (an entry with the referee's time in it, when a deadline is due) |
+| Client | `EVENT`, `REQ`, `CLOSE`, `AUTH`; and on a table's tag `LOG` (the log, from an entry on, under a subscription id; asked again by a line that has heard nothing for five seconds, so that its answer shows the line still carries) and `TICK` (an entry with the referee's time in it, when a deadline is due; taken only from the table's people and its house, until the house's result is in) |
 | Relay | `AUTH` (a challenge, as each socket opens), `OK`, `EVENT`, `EOSE`, `CLOSED`, `NOTICE`; and on a table's tag `LOG` (one entry of the log) and `LOGEND` (the end of the log as it stands, after which each entry comes as it is added) |
 
 A deployed relay object holds every socket's `EVENT`, `REQ`, `CLOSE`, `LOG` and `TICK` until the socket answers the challenge (`serviceGate`), up to `heldMost` messages and `heldMostChars` characters, and takes one answer to each challenge. It carries a socket only for a device with a current activation, which is the device in use of an account with a subscription, or for the house. While a socket's answer has run out, the relay holds what it says and sends it no entry of a table's log, and asks it again.
