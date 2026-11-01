@@ -318,101 +318,6 @@ void main() {
     expect(all[0].acceptAudit(all[1].myAudit()!), isTrue, reason: 'the true one again is fine');
   });
 
-  test('a departed seat\'s hand opens from its key\'s two shares, and the key is never rebuilt', () {
-    final seats = [for (final k in ['a', 'b', 'c', 'd']) HumanDealSeat(k)];
-    final juror = make(seats, null, key: 'juror');
-    final all = dealOut(seats, custodians: ['juror', 'other-juror'], extra: [juror]);
-
-    // Seat 3 goes. Nobody releases a piece of its secret here: the
-    // people hold one share of its key and the jury the other, and
-    // what crosses is each share's tokens for the positions that are
-    // still shut (docs/explanation/fair-deal.md).
-    for (final x in [...all, juror]) {
-      x.seatLeft(3);
-    }
-    expect(all[0].awaitsSecret(3), isTrue, reason: 'one share opens nothing on its own');
-    expect(juror.awaitsSecret(3), isTrue);
-
-    final fromSeat = all[0].releaseShareTokens(3)!;
-    final fromJuror = juror.releaseShareTokens(3)!;
-    expect(fromSeat['share'], 0, reason: "a person holds the people's share");
-    expect(fromJuror['share'], 1, reason: "a juror holds the jury's");
-    expect(all[0].releaseShareTokens(2), isNull, reason: 'seat 2 is still here');
-    // Thirteen positions of its own, and no more: the seat published
-    // its tokens for the other seats' before it went.
-    expect((fromSeat['tokens'] as Map).length, 13);
-    expect((fromSeat['tokens'] as Map).keys.map((k) => int.parse(k as String) ~/ 13).toSet(), {3});
-
-    // A person already holds half, so the juror's half finishes it.
-    expect(all[1].acceptShareTokens(fromJuror), isTrue);
-    expect(all[1].handOf(3), all[3].handOf(3), reason: "its own share's tokens and the juror's");
-    expect(all[1].awaitsSecret(3), isFalse);
-    expect(all[1].knowsSecret(3), isFalse, reason: 'and the key was never put back together');
-
-    // A bystander holding no share of it needs both halves, and one
-    // alone tells it nothing.
-    final watcher = make(seats, null, key: 'watcher');
-    final byMessage = dealOut(seats, custodians: ['juror', 'other-juror'], extra: [watcher]);
-    final theirJuror = make(seats, null, key: 'juror');
-    for (final x in [...byMessage, theirJuror]) {
-      x.seatLeft(3);
-    }
-    expect(watcher.acceptShareTokens(byMessage[0].releaseShareTokens(3)!), isTrue);
-    expect(watcher.handOf(3), isNull, reason: "one share's tokens open nothing");
-    expect(watcher.awaitsSecret(3), isTrue);
-
-    // A share's token is proved against that share's key and no other,
-    // so the halves cannot be swapped or made up.
-    final swapped = Map<String, Object?>.from(byMessage[0].releaseShareTokens(3)!)..['share'] = 1;
-    expect(watcher.acceptShareTokens(swapped), isTrue, reason: 'taken in');
-    expect(watcher.handOf(3), isNull, reason: 'but not a token of that share, so nothing is kept');
-    expect(watcher.acceptShareTokens({'about': 3, 'holder': 'x', 'share': 9, 'tokens': const {}}), isFalse);
-    expect(watcher.acceptShareTokens({'about': 2, 'holder': 'x', 'share': 0, 'tokens': const {}}), isFalse,
-        reason: 'nothing is released for a seat still here');
-
-    expect(watcher.handOf(3), isNull, reason: 'still shut after all that');
-  });
-
-  test('a pass sealed to a seat that then leaves opens from that seat\'s two shares', () {
-    final seats = [for (final k in ['a', 'b', 'c', 'd']) HumanDealSeat(k)];
-    final juror = make(seats, null, key: 'juror');
-    final all = dealOut(seats, custodians: ['juror', 'other-juror'], extra: [juror]);
-
-    // Seat 0 passes three cards to seat 1, sealed to seat 1's key.
-    final positions = [0, 5, 12];
-    final passed = [for (final p in positions) all[0].openedCardAt(p)!];
-    final pass = all[0].passMessage(1, positions)!;
-    broadcast(all, 0, (x) => x.acceptPass(pass));
-    all[0].acceptPass(pass);
-
-    // Then seat 1 goes. That seal is a ciphertext only its key opens,
-    // and its key is nobody's, so the parts come from the two shares —
-    // a token over the seal itself (docs/explanation/fair-deal.md).
-    for (final x in [...all, juror]) {
-      x.seatLeft(1);
-    }
-    expect(all[2].awaitsSecret(1), isTrue);
-    expect(all[2].handOf(1), isNull);
-
-    final fromJuror = juror.releaseShareTokens(1)!;
-    expect([for (final k in (fromJuror['seals'] as Map).keys) int.parse(k as String)]..sort(), positions,
-        reason: 'a part for each seal made out to the seat');
-    expect(all[2].acceptShareTokens(fromJuror), isTrue);
-
-    expect(all[2].handOf(1), isNotNull, reason: "its own share's parts and the juror's open the seal");
-    expect(all[2].awaitsSecret(1), isFalse);
-    expect(all[2].knowsSecret(1), isFalse, reason: 'and the key was never put back together');
-    for (final c in passed) {
-      expect(all[2].handOf(1), contains(c), reason: 'the passed cards are in the hand it left behind');
-    }
-    expect(all[2].handOf(1)!.length, 16);
-
-    // A holder that has served itself can still serve a peer behind
-    // it: the seal is not thrown away with the opening.
-    final again = all[2].releaseShareTokens(1)!;
-    expect((again['seals'] as Map), isNotEmpty);
-  });
-
   test('a bot seat a juror holds escrows to the jury alone: any two jurors open it, a player and a juror cannot', () {
     // Three people and a bot seat held by the first juror. Its key is
     // drawn like a person's rather than hashed from what everyone
@@ -654,83 +559,6 @@ void main() {
     expect(make(seats, 1).acceptKeys(forged), isFalse);
   });
 
-  test('a juror brought on mid-hand is given a share, and is a custodian like any other', () {
-    // Four jurors hold a bot seat's secret; a fifth is brought on.
-    final jury = ['juror0', 'juror1', 'juror2', 'juror3'];
-    const newcomer = 'juror4';
-    final seats = [
-      const HumanDealSeat('a'),
-      const HumanDealSeat('b'),
-      const HumanDealSeat('c'),
-      BotDealSeat(key: jury.first),
-    ];
-    final holder = make(seats, 3, key: jury.first, custodians: jury);
-    final keys = holder.myKeys()!;
-
-    final all = [for (final k in [...jury, newcomer]) make(seats, null, key: k, custodians: jury)];
-    final watcher = make(seats, 0, custodians: jury);
-    for (final x in [...all, watcher]) {
-      expect(x.acceptKeys(keys), isTrue);
-    }
-    final jurors = all.sublist(0, 4);
-    final fresh = all[4];
-    expect(fresh.holdsPieceOf(3), isFalse, reason: 'a newcomer holds nothing yet');
-
-    // Everyone learns the jury grew; the newcomer's index is its
-    // place in the list, which only ever appends.
-    for (final x in [...all, watcher]) {
-      x.extendCustodians(3, [newcomer]);
-    }
-    const at = 5;
-
-    // Two holders make the fifth share between them. Neither of them
-    // rebuilds the secret to do it.
-    final have = [1, 3];
-    final parts = [for (final i in have) jurors[i - 1].topUpPart(3, at: at, have: have)!];
-    for (final part in parts) {
-      // A part is sealed to the newcomer: nobody else opens it.
-      expect(watcher.acceptTopUpPart(part), isFalse, reason: 'a part is not for a bystander');
-    }
-    expect(fresh.acceptTopUpPart(parts[0]), isTrue);
-    expect(fresh.holdsPieceOf(3), isFalse, reason: 'one part of two is not a share');
-    expect(fresh.acceptTopUpPart(parts[1]), isTrue);
-    expect(fresh.holdsPieceOf(3), isTrue, reason: 'the set is complete, so the share is made');
-
-    // And it is a share like any other: with any one of the
-    // originals it opens the seat, and on its own it does not.
-    for (final other in [0, 1, 2, 3]) {
-      // From a juror's seat, since a bot seat's pieces are sealed to
-      // the custodians and nobody else can read one. The juror holds
-      // one piece of its own, which is nothing on its own; the share
-      // the newcomer was given answers beside it like any original.
-      final side = make(seats, null, key: jury[other], custodians: jury);
-      expect(side.acceptKeys(keys), isTrue);
-      side.extendCustodians(3, [newcomer]);
-      for (final x in [...all, side]) {
-        x.seatLeft(3);
-      }
-      expect(side.knowsSecret(3), isFalse, reason: 'juror $other alone is one piece');
-      expect(side.acceptRelease(fresh.releaseShare(3)!), isTrue);
-      expect(side.knowsSecret(3), isTrue, reason: 'the newcomer answers beside juror $other');
-    }
-
-    // A part weighed against one set does not go with a part weighed
-    // against another: the newcomer sums a set only once it has all
-    // of it.
-    final other = make(seats, null, key: newcomer, custodians: jury)..acceptKeys(keys);
-    other.extendCustodians(3, [newcomer]);
-    expect(other.acceptTopUpPart(jurors[0].topUpPart(3, at: at, have: [1, 3])!), isTrue);
-    expect(other.acceptTopUpPart(jurors[1].topUpPart(3, at: at, have: [2, 4])!), isTrue);
-    expect(other.holdsPieceOf(3), isFalse, reason: 'two parts, two different sets, no share');
-
-    // And the guards: a set this side is not in, a set with the
-    // newcomer in it, a set too small to be one.
-    expect(jurors[0].topUpPart(3, at: at, have: [2, 3]), isNull);
-    expect(jurors[0].topUpPart(3, at: at, have: [1, at]), isNull);
-    expect(jurors[0].topUpPart(3, at: at, have: [1]), isNull);
-    expect(jurors[0].topUpPart(3, at: 9, have: [1, 3]), isNull, reason: 'an index nobody holds');
-  });
-
   test('a token or a key proof of the wrong size is refused, whatever follows it in memory', () {
     final seats = [for (final k in ['a', 'b', 'c', 'd']) HumanDealSeat(k)];
     final all = dealOut(seats);
@@ -800,5 +628,32 @@ void main() {
     expect(batchCommitment(one), isNot(batchCommitment(two)));
     expect(playCommitment(one), isNot(playCommitment(two)));
     expect(batchCommitment(one), batchCommitment(dealtWith(1)), reason: 'and the same deck still gives the same proof');
+  });
+
+  test('a keys message carries no shares of the key, and one from a build that made them is still read', () {
+    final seats = [const HumanDealSeat('a'), const HumanDealSeat('b'), const BotDealSeat(key: 'house'), const BotDealSeat(key: 'house')];
+    final a = make(seats, 0, custodians: ['house']);
+    final keys = a.myKeys()!;
+    // Each share went under the same pad as the piece of the secret
+    // beside it, so the log alone gave part of the secret away.
+    expect(keys['shares'], isEmpty);
+    expect(keys['shareCustody'], isEmpty);
+    expect(keys['shareKeys'], isEmpty);
+    expect(make(seats, 1, custodians: ['house']).acceptKeys(keys), isTrue);
+
+    final split = d.split(a.mySecret!, Uint8List(32));
+    final shareKeys = [for (var i = 0; i < 2; i++) d.shareKey(Uint8List.sublistView(split, i * scalarBytes, (i + 1) * scalarBytes))];
+    final older = {
+      ...keys,
+      'shares': {'1': base64Encode(Uint8List(scalarBytes))},
+      'shareCustody': [base64Encode(Uint8List(scalarBytes))],
+      'shareKeys': [for (final k in shareKeys) base64Encode(k)],
+    };
+    expect(make(seats, 1, custodians: ['house']).acceptKeys(older), isTrue);
+    final otherKey = {
+      ...older,
+      'shareKeys': [base64Encode(shareKeys[1]), base64Encode(shareKeys[1])],
+    };
+    expect(make(seats, 1, custodians: ['house']).acceptKeys(otherKey), isFalse, reason: "shares whose keys do not add to the seat's");
   });
 }

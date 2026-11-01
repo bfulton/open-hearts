@@ -174,15 +174,16 @@ A hand still not open after the fixed clock (`fixedMs`) is given up,
 unscored ([the abandoned hand](table-states.md#the-abandoned-hand)).
 
 **Open.** Rebuilding a departed seat's secret opens that seat's whole
-hand to the table. `crypto/deal` and `DealSession` also implement the
-alternative. A seat's key is split into two shares, one for the other
-people and one for the house, whose public keys must add to the seat's
-own. In play a holder then releases *share tokens* for exactly the
-positions still missing (`split`, `shareKey`, `shareToken`,
-`openShared`, `releaseShareTokens`). Survivors learn only the positions
-they open, and the key is never reconstructed. Keys messages already
-carry the shares and are checked against them, but the table releases
-the secret's pieces.
+hand to the table. `crypto/deal` also has the primitives for an
+alternative that opens only the positions still missing: a seat's key
+split into two shares whose public keys add to the seat's own, and a
+token from each share for each position (`split`, `shareKey`,
+`shareToken`, `openShared`). Nothing uses them. Keys messages from
+earlier builds carry such shares, each wrapped under the same pad as
+the secret's piece beside it, which let anyone reading the log work out
+a few bits of the secret. Every side still checks that their keys add
+to the seat's, and nothing reads the shares. A keys message now leaves
+the three fields empty.
 
 ## Verification
 

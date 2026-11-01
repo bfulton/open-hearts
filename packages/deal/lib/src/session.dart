@@ -32,9 +32,9 @@
 /// **A v2 game's jury.** A game kept before the referee escrowed to a
 /// jury of several custodians, bot seats too: a bot seat's secret in
 /// shares any [escrowThreshold] of them rebuild, its pieces released
-/// sealed among them, and shares made for a juror brought on later.
-/// Those games are still read (packages/table, legacy/v2_record.dart),
-/// so all of it stays; a refereed table uses none of it.
+/// sealed among them. Those games are still read (packages/table,
+/// legacy/v2_record.dart), which rebuilds such a seat from the pieces
+/// its record released; a refereed table uses none of it.
 ///
 /// Messages are maps of plain values (bytes as base64) for the table
 /// to carry in its events; every one is checked on arrival.
@@ -141,9 +141,8 @@ class DealSession {
   final Uint8List Function(String otherKey)? wrap;
 
   /// Table keys of the custodians this seat escrows to: the house's,
-  /// at a refereed table. Settable until the keys message is made,
-  /// since a v2 game's jury could carry on after the hand opened.
-  List<String> custodians;
+  /// at a refereed table.
+  final List<String> custodians;
 
   final Random _random;
   final Map<int, Uint8List> _secrets = {};
@@ -167,45 +166,12 @@ class DealSession {
   /// Which seat holds each position now (passes move them; -1 played).
   late final List<int> _holderOf = [for (var p = 0; p < deckSize; p++) p ~/ _handSize];
 
-  /// Which seat played each position, once played.
-  final Map<int, int> _playedBy = {};
-
-  /// The cards [seat] has played, in the order it played them — every
-  /// one open, since a play opens its card for all. With [handOf], a
-  /// view running behind the table rebuilds the hand as it stood
-  /// before the plays it has yet to show.
-  List<int> playedCardsOf(int seat) => [for (final e in _playedBy.entries) if (e.value == seat) _cards[e.key]!];
-
   /// The position each person declared the lead card at, or -1 for
   /// "not held".
   final Map<int, int> _declared = {};
 
   /// Pieces of other seats' secrets this side holds, by seat.
   final Map<int, Uint8List> _myPieceOf = {};
-
-  /// This side's share of a seat's key, when it holds one: the
-  /// people's share at a seat, the custodians' at a custodian. A share is not
-  /// released — its tokens are.
-  final Map<int, Uint8List> _myShareOf = {};
-
-  /// A seat's two share keys, the people's then the custodians', as its
-  /// keys message gave them. They add to the seat's own key, which is
-  /// checked before the message is kept.
-  final Map<int, List<Uint8List>> _shareKeysOf = {};
-
-  /// Share tokens heard for a departed seat, by share index then
-  /// position. Both shares' tokens for a position open it, beside the
-  /// living seats', and the seat's key is never rebuilt.
-  final Map<int, Map<int, Map<int, Uint8List>>> _shareTokens = {};
-
-  /// Which of the two shares this side holds of a seat's key: 0 at a
-  /// person, 1 at a custodian.
-  final Map<int, int> _myShareIndexOf = {};
-
-  /// Parts of opening a seal made out to a departed seat, by share
-  /// index then position: the point halves of tokens made over the
-  /// seal itself.
-  final Map<int, Map<int, Map<int, Uint8List>>> _sealParts = {};
 
   /// Pieces released for a departed seat, by the key that held them.
   final Map<int, Map<String, Uint8List>> _released = {};
@@ -256,73 +222,8 @@ class DealSession {
   /// a departed seat's rebuilt, or anyone's after the audit.
   bool knowsSecret(int seat) => _secrets.containsKey(seat);
 
-  /// A departed person this side still cannot answer for. Its secret
-  /// rebuilt answers everything; so does holding both shares' tokens
-  /// for every position still shut, which opens those positions and
-  /// nothing else and leaves the key where it was (docs/explanation/fair-deal.md).
-  bool awaitsSecret(int seat) =>
-      _gone.contains(seat) && !_secrets.containsKey(seat) && !_coveredByShares(seat);
-
-  /// Everything this side will ever be able to open of [seat] is to
-  /// hand: both shares' tokens for every position it owes one for, and
-  /// both parts of every seal made out to it.
-  ///
-  /// Nothing of a departed seat opens until this holds. The table
-  /// expects a seat to open all at once, as it does when its secret
-  /// arrives, while the shares open it in stages — hand first, a seal
-  /// whenever its parts arrive. Opening on the last of them keeps the
-  /// moment whole, so a client acting on it never finds the rest
-  /// missing.
-  bool _wholeForShares(int seat) {
-    if (deck == null || _shareKeysOf[seat] == null) return false;
-    final parts = _shareTokens[seat];
-    if (parts == null) return false;
-    for (var p = 0; p < deckSize; p++) {
-      if (_tokens[seat]?[p] != null) continue;
-      if (parts[0]?[p] == null || parts[1]?[p] == null) return false;
-    }
-    final sealed = _sealedTo[seat];
-    if (sealed != null) {
-      final sp = _sealParts[seat];
-      for (final p in sealed.keys) {
-        if (sp?[0]?[p] == null || sp?[1]?[p] == null) return false;
-      }
-    }
-    return true;
-  }
-
-  /// The seat's hand is open here, and every position of its that is
-  /// still shut has both of its shares' tokens.
-  ///
-  /// Holding both halves is not the same as the cards being open: a
-  /// position needs the other three seats' tokens too. Saying
-  /// "covered" on the halves alone stops the table waiting before
-  /// there is anything to act on, and the release that would have
-  /// opened the hand then arrives with nothing left to announce.
-  bool _coveredByShares(int seat) {
-    if (deck == null || _shareKeysOf[seat] == null) return false;
-    final parts = _shareTokens[seat];
-    if (parts == null || handOf(seat) == null) return false;
-    for (var p = 0; p < deckSize; p++) {
-      if (_cards.containsKey(p) || _tokens[seat]?[p] != null) continue;
-      if (parts[0]?[p] == null || parts[1]?[p] == null) return false;
-    }
-    // A card behind a seal made out to this seat needs that seal's
-    // parts, which are not its share tokens: the seal holds another
-    // seat's token, and no amount of this seat's tokens opens it. A
-    // pass heard after the last release is exactly the case the
-    // release has to be sent again for, so staying uncovered here is
-    // what asks for it (docs/explanation/fair-deal.md).
-    final sealed = _sealedTo[seat];
-    if (sealed != null) {
-      final sp = _sealParts[seat];
-      for (final p in sealed.keys) {
-        if (_cards.containsKey(p)) continue;
-        if (sp?[0]?[p] == null || sp?[1]?[p] == null) return false;
-      }
-    }
-    return true;
-  }
+  /// A departed seat whose secret this side does not know yet.
+  bool awaitsSecret(int seat) => _gone.contains(seat) && !_secrets.containsKey(seat);
 
   bool get _allTokensIn {
     for (var s = 0; s < _seats; s++) {
@@ -476,9 +377,6 @@ class DealSession {
     final others = _human(me) ? [for (var s = 0; s < _seats; s++) if (s != me && _human(s)) s] : const <int>[];
     final pieces = <String, String>{};
     final custody = <String>[];
-    final shares = <String, String>{};
-    final shareCustody = <String>[];
-    final shareKeys = <String>[];
     if (custodians.isNotEmpty) {
       // One piece to each of the two sides the seat escrows across:
       // the other people and the custodians for a person's seat, the
@@ -492,11 +390,8 @@ class DealSession {
         // counted from one, which is what the coefficients need.
         final shares = crypto.shareBytes(secret, n: custodians.length, t: escrowThreshold, seed: _seed('escrow', me));
         // The seat's own holder is one of the custodians, and keeps the
-        // share made out to its place as each of the others keeps
-        // theirs from these keys. It holds the whole secret besides,
-        // which is no use to a newcomer: a newcomer's share is made from
-        // the shares of whichever custodians are first still heard, and
-        // one of them holding no share would leave that set short.
+        // share made out to its place, as each of the others keeps
+        // theirs from these keys.
         final mine = myKey == null ? -1 : custodians.indexOf(myKey!);
         for (var i = 0; i < custodians.length; i++) {
           final share = Uint8List.sublistView(shares, i * secret.length, (i + 1) * secret.length);
@@ -517,23 +412,6 @@ class DealSession {
           // side it is on, so opening one is the same either way.
           custody.add(_b64(_wrapFor(j, sideA.contains(j) ? first : second, me)));
         }
-      }
-      // And the key itself in two shares, to the same holders. The
-      // secret's pieces answer before the deck is dealt, where a
-      // shuffle is still owed, and at the audit; in play it is the
-      // shares' tokens that open a departed seat's positions, one at a
-      // time, with the key never anywhere (docs/explanation/fair-deal.md).
-      // Seeded from the secret, not drawn: an extra draw here would
-      // move every draw after it and deal a different hand.
-      final split = crypto.split(secret, _seed('shares', me), shares: 2);
-      final ours = Uint8List.sublistView(split, 0, scalarBytes);
-      final theirs = Uint8List.sublistView(split, scalarBytes);
-      shareKeys.addAll([_b64(crypto.shareKey(ours)), _b64(crypto.shareKey(theirs))]);
-      for (final s in others) {
-        shares['$s'] = _b64(_wrapFor(_keyOf(s), ours, me));
-      }
-      for (final j in custodians) {
-        shareCustody.add(_b64(_wrapFor(j, theirs, me)));
       }
     } else {
       // Distinct pieces to the people; all of them make the secret.
@@ -556,9 +434,14 @@ class DealSession {
       'pieces': pieces,
       'custodians': custodians,
       'custody': custody,
-      'shares': shares,
-      'shareCustody': shareCustody,
-      'shareKeys': shareKeys,
+      // The key's shares went here once, each wrapped under the same
+      // pad as the piece beside it, which let anyone reading the log
+      // work out five bits of the secret; nothing read the shares. The
+      // fields stay, empty, so the message keeps the shape every build
+      // reads.
+      'shares': const <String, String>{},
+      'shareCustody': const <String>[],
+      'shareKeys': const <String>[],
     };
     _afterKeys();
     return made;
@@ -624,10 +507,10 @@ class DealSession {
         final to = int.parse(e.key);
         if (to < 0 || to >= _seats || to == seat || _unb64(e.value).length != 32) return false;
       }
-      // The key's shares, when the seat escrowed to custodians. Their keys
-      // must add to the seat's own: that is what says they are shares
-      // of this key and not of some other, and everyone checks it, not
-      // only the two holders.
+      // The key's shares, in a keys message from an older build that
+      // made them ([myKeys]). Their keys must add to the seat's own,
+      // which every side checks, as every side did; nothing reads the
+      // shares themselves.
       final shareKeys = [for (final k in (m['shareKeys'] as List? ?? const [])) _unb64(k)];
       if (shareKeys.isNotEmpty) {
         if (shareKeys.length != 2 || shareKeys.any((k) => k.length != pointBytes)) return false;
@@ -663,8 +546,6 @@ class DealSession {
           _keysIn.add(seat);
           _keyProofs[seat] ??= _unb64(m['proof']);
           _custodiansOf[seat] = [for (final k in m['custodians'] as List) k as String];
-          final shareKeys = [for (final k in (m['shareKeys'] as List? ?? const [])) _unb64(k)];
-          if (shareKeys.length == 2) _shareKeysOf[seat] = shareKeys;
         }
         _afterKeys();
         return true;
@@ -679,10 +560,6 @@ class DealSession {
       _keysIn.add(seat);
       _keyProofs[seat] = proof;
       _custodiansOf[seat] = custodianKeys;
-      final shareKeys = [for (final k in (m['shareKeys'] as List? ?? const [])) _unb64(k)];
-      if (shareKeys.length == 2) _shareKeysOf[seat] = shareKeys;
-      final shares = Map<String, Object?>.from(m['shares'] as Map? ?? const {});
-      final shareCustody = [for (final c in (m['shareCustody'] as List? ?? const [])) _unb64(c)];
       final w = wrap;
       if (w != null) {
         final me = mySeat;
@@ -690,19 +567,10 @@ class DealSession {
         if (mine != null) {
           _myPieceOf[seat] = _xor(_unb64(mine), _pad(w(_keyOf(seat)), 'escrow|$tableId|$hand|$seat'));
         }
-        final myShare = me == null ? null : shares['$me'];
-        if (myShare != null) {
-          _myShareOf[seat] = _xor(_unb64(myShare), _pad(w(_keyOf(seat)), 'escrow|$tableId|$hand|$seat'));
-          _myShareIndexOf[seat] = 0; // the people's share
-        }
         final k = myKey;
         final at = k == null ? -1 : custodianKeys.indexOf(k);
         if (at >= 0) {
           _myPieceOf[seat] = _xor(custody[at], _pad(w(_keyOf(seat)), 'escrow|$tableId|$hand|$seat'));
-          if (at < shareCustody.length) {
-            _myShareOf[seat] = _xor(shareCustody[at], _pad(w(_keyOf(seat)), 'escrow|$tableId|$hand|$seat'));
-            _myShareIndexOf[seat] = 1; // the custodians' share
-          }
         }
       }
       _afterKeys();
@@ -1086,9 +954,7 @@ class DealSession {
     if (d == null) return;
     for (final e in List.of(_sealedTo.entries)) {
       final secret = _secrets[e.key];
-      final parts = _sealParts[e.key];
-      if (secret == null && !_wholeForShares(e.key)) continue;
-      var every = true;
+      if (secret == null) continue;
       for (final s in e.value.entries) {
         final p = s.key;
         final owner = p ~/ _handSize;
@@ -1096,28 +962,11 @@ class DealSession {
         // A seal that yields no token leaves its position shut, and
         // only that position: opening one is arithmetic that the
         // primitives refuse on a point that is not one, and a throw
-        // from here would take the whole session with it. Nothing
-        // settled gets this far —
-        // every seal is checked before its pass is taken
-        // ([verifyPass]) — so this is the belt to that brace.
+        // from here would take the whole session with it. Every seal
+        // is checked before its pass is taken ([verifyPass]), so
+        // nothing settled gets this far.
         try {
-          final sealed = Uint8List.sublistView(s.value, 0, sealedBytes);
-          final Uint8List point;
-          if (secret != null) {
-            point = crypto.open(secret, sealed);
-          } else {
-            // A seal is a ciphertext of a card's shape, so a share's
-            // part of opening one is a token over the seal itself
-            // (docs/explanation/fair-deal.md). Both parts, and the token the
-            // departed key would have opened comes out.
-            final a = parts![0]?[p];
-            final b = parts[1]?[p];
-            if (a == null || b == null) {
-              every = false;
-              continue;
-            }
-            point = crypto.openShared(sealed, [a, b]);
-          }
+          final point = crypto.open(secret, Uint8List.sublistView(s.value, 0, sealedBytes));
           final token = Uint8List.fromList([...point, ...Uint8List.sublistView(s.value, sealedBytes + sealProofBytes)]);
           if (crypto.verifyToken(_pks[owner]!, _masked(p), token)) {
             _tokens.putIfAbsent(owner, () => {})[p] = DealCrypto.tokenOf(token);
@@ -1127,41 +976,18 @@ class DealSession {
           log?.call('position $p: a seal that opens nothing: $e');
         }
       }
-      // A seal whose parts have not arrived is kept: the release that
-      // carries them may go out before a peer has heard the pass. A
-      // departed seat's are kept whatever happens — this side makes
-      // the parts other peers open them with, and a holder that threw
-      // the seal away once it had served itself could never serve
-      // anybody behind it again.
-      if (every && !_gone.contains(e.key)) _sealedTo.remove(e.key);
+      _sealedTo.remove(e.key);
     }
+    final pks = [for (var s = 0; s < _seats; s++) _pks[s]!];
     for (var p = 0; p < deckSize; p++) {
       if (_cards.containsKey(p)) continue;
       final tokens = <Uint8List>[];
-      final pks = <Uint8List>[];
-      var whole = true;
       for (var s = 0; s < _seats; s++) {
         final t = _tokens[s]?[p];
-        if (t != null) {
-          tokens.add(t);
-          pks.add(_pks[s]!);
-          continue;
-        }
-        // A departed seat answers in two: its key's shares go in as two
-        // tokens beside the other seats' — five keys where there were
-        // four — and the card comes out with the key never rebuilt.
-        final parts = _shareTokens[s];
-        final keys = _shareKeysOf[s];
-        final a = parts?[0]?[p];
-        final b = parts?[1]?[p];
-        if (keys == null || a == null || b == null || !_wholeForShares(s)) {
-          whole = false;
-          break;
-        }
-        tokens.addAll([DealCrypto.tokenOf(a), DealCrypto.tokenOf(b)]);
-        pks.addAll([keys[0], keys[1]]);
+        if (t == null) break;
+        tokens.add(t);
       }
-      if (!whole) continue;
+      if (tokens.length < _seats) continue;
       final c = crypto.unmask(pks, tokens, maskedAt(d, p));
       if (c != null) _cards[p] = c;
     }
@@ -1313,10 +1139,7 @@ class DealSession {
       _keepChecked(owner, p, t);
       _openWhatCan();
       final card = _cards[p];
-      if (card != null) {
-        _holderOf[p] = -1; // played
-        _playedBy[p] = seat;
-      }
+      if (card != null) _holderOf[p] = -1; // played
       return card;
     } catch (_) {
       return null;
@@ -1328,7 +1151,6 @@ class DealSession {
   bool playOpen(int seat, int position) {
     if (_holderOf[position] != seat || _cards[position] == null) return false;
     _holderOf[position] = -1;
-    _playedBy[position] = seat;
     return true;
   }
 
@@ -1517,9 +1339,8 @@ class DealSession {
 
   /// A piece sealed to one custodian, with the secret the two table
   /// keys share. A label of its own, not [_wrapFor]'s: the same two
-  /// keys wrap the seat's first share and every top-up part under
-  /// that one, and a pad used twice over different plaintexts gives
-  /// both of them away.
+  /// keys wrap the seat's piece under that one, and a pad used twice
+  /// over different plaintexts gives both of them away.
   Uint8List _sealRelease(String to, Uint8List piece, int seat) => _xor(piece, _pad(wrap!(to), 'release|$tableId|$hand|$seat'));
 
   /// The piece a release carries, as this side can read it: in the
@@ -1536,7 +1357,7 @@ class DealSession {
     final k = myKey ?? (mySeat == null ? null : _keyOf(mySeat!));
     final w = wrap;
     if (sealed is! Map || k == null || w == null) return null;
-    final at = custodianIndexOf(about);
+    final at = _custodianIndexOf(about);
     final mine = at < 1 ? null : sealed['$at'];
     if (mine is! String) return null;
     final got = _unb64(mine);
@@ -1544,17 +1365,8 @@ class DealSession {
     return _xor(got, _pad(w(holder), 'release|$tableId|$hand|$about'));
   }
 
-  // ---- topping a v2 game's jury up --------------------------------------
-  //
-  // A jury only shrinks over a hand unless somebody is brought on, and
-  // a newcomer holds nothing of a bot seat's secret until a share is
-  // made for it. Two holders make one between them: each sends what
-  // its own share is worth towards the newcomer's index, and the
-  // newcomer sums them. Neither ever holds the secret, and what each
-  // sends is worth nothing by itself. A refereed table has one
-  // custodian, the house, and never tops it up.
-
-  /// Custodians added to [seat] after its keys went out. The index of
+  /// Custodians added to [seat] after its keys went out: a v2 game's
+  /// jury could grow over a hand, and its record says so. The index of
   /// a custodian is its place in the list counted from one, so this
   /// only ever appends — a newcomer inserted among the others would
   /// move every share after it onto the wrong index.
@@ -1566,100 +1378,13 @@ class DealSession {
     }
   }
 
-  /// This side's part of the share for the custodian at [at], made
-  /// with the set [have] — indices, this side's among them — and
-  /// sealed to the newcomer. Null when this side holds no piece of the
-  /// seat, the seat is not escrowed as a threshold, or [have] is not a
-  /// set this side is in.
-  ///
-  /// [have] travels with the part because it is what the part was
-  /// weighed against: two holders that picked different sets make
-  /// parts that do not go together, and the newcomer sums a set only
-  /// once it has all of it.
-  Map<String, Object?>? topUpPart(int seat, {required int at, required List<int> have}) {
-    final piece = _myPieceOf[seat];
-    final k = myKey ?? (mySeat == null ? null : _keyOf(mySeat!));
-    final custodianKeys = _custodiansOf[seat];
-    if (piece == null || k == null || custodianKeys == null || !_thresholdEscrow(seat, custodianKeys)) return null;
-    final mine = custodianKeys.indexOf(k) + 1;
-    if (mine < 1 || !have.contains(mine) || have.length < escrowThreshold) return null;
-    if (at < 1 || at > custodianKeys.length || have.contains(at)) return null;
-    final to = custodianKeys[at - 1];
-    final part = crypto.bytesScale(piece, crypto.bytesLagrange(have, mine, at: at));
-    // Sealed to the newcomer with the secret those two table keys
-    // share, which is what [holder] is for: the sender wraps with the
-    // recipient's key and the recipient unwraps with the sender's,
-    // and they are the same secret.
-    return {'about': seat, 'at': at, 'have': have, 'from': mine, 'holder': k, 'part': _b64(_wrapFor(to, part, seat))};
-  }
-
-  /// A part of this side's own new share. Kept by the set it was made
-  /// with; once a set is complete the parts sum into the share this
-  /// side holds from then on, and it is a custodian like any other.
-  /// True once the part is kept.
-  bool acceptTopUpPart(Map<String, Object?> m) {
-    try {
-      final about = m['about'] as int;
-      final at = m['at'] as int;
-      final from = m['from'] as int;
-      final have = [for (final i in m['have'] as List) i as int];
-      final custodianKeys = _custodiansOf[about];
-      final k = myKey ?? (mySeat == null ? null : _keyOf(mySeat!));
-      final w = wrap;
-      if (custodianKeys == null || k == null || w == null) return false;
-      if (at < 1 || at > custodianKeys.length || custodianKeys[at - 1] != k) return false;
-      if (_myPieceOf[about] != null) return true;
-      if (!have.contains(from) || have.contains(at) || have.length < escrowThreshold) return false;
-      if (have.toSet().length != have.length) return false;
-      if (have.any((i) => i < 1 || i > custodianKeys.length)) return false;
-      // The sender's own key, and it has to be the custodian it says
-      // it is: a part from anywhere else is not one of this set.
-      final holder = m['holder'] as String;
-      if (from < 1 || from > custodianKeys.length || custodianKeys[from - 1] != holder) return false;
-      final part = _xor(_unb64(m['part']), _pad(w(holder), 'escrow|$tableId|$hand|$about'));
-      final key = '$at|${have.join(',')}';
-      final into = _topUp.putIfAbsent(about, () => {}).putIfAbsent(key, () => {});
-      into[from] = part;
-      if (!have.every(into.containsKey)) return true;
-      _myPieceOf[about] = crypto.bytesSum([for (final i in have) into[i]!]);
-      _topUp.remove(about);
-      return true;
-    } catch (_) {
-      return false;
-    }
-  }
-
-  /// Parts of a new share, by the seat and the set they were weighed
-  /// against.
-  final Map<int, Map<String, Map<int, Uint8List>>> _topUp = {};
-
-  /// How many custodians this side knows [seat] escrowed to: zero
-  /// until its keys have been read here, and more as a v2 game's juries are drawn
-  /// and [extendCustodians] is told. A part made out to an index
-  /// beyond it is not a part for somebody else — it is one for a
-  /// custodian this side has not heard of yet.
-  int custodianCount(int seat) => _custodiansOf[seat]?.length ?? 0;
-
-  /// The custodians of [seat]'s escrow, in their order: those its keys
-  /// named, and for a seat [extendCustodians] grows, whoever it has
-  /// been told of since. Null until its keys have been read here.
-  List<String>? custodiansOf(int seat) {
-    final list = _custodiansOf[seat];
-    return list == null ? null : List.unmodifiable(list);
-  }
-
-  /// This side's index among [seat]'s custodians, or zero: for a
-  /// trace, and for a caller that wants to know whether it is one.
-  int custodianIndexOf(int seat) {
+  /// This side's index among [seat]'s custodians, or zero.
+  int _custodianIndexOf(int seat) {
     final k = myKey ?? (mySeat == null ? null : _keyOf(mySeat!));
     final have = _custodiansOf[seat];
     if (k == null || have == null) return 0;
     return have.indexOf(k) + 1;
   }
-
-  /// Whether this side holds a piece of [seat]'s secret — what says
-  /// whether a top-up is owed to it.
-  bool holdsPieceOf(int seat) => _myPieceOf[seat] != null;
 
   /// A released piece, by the table key that held it. Once a person's
   /// and a custodian's — or, escrowed to no custodian, every other person's —
@@ -1786,153 +1511,6 @@ class DealSession {
   /// holder.
   final Map<int, Map<String, Uint8List>> _releasedOpen = {};
 
-
-  /// This side's share of a departed seat's key, spent on the
-  /// positions that seat's token is still missing from: one
-  /// [DealCrypto.shareToken] each, proved against this side's share
-  /// key and against nothing else. Null when this side holds no share
-  /// of it, the seat is still here, the deck is not dealt, or nothing
-  /// is missing.
-  ///
-  /// The share itself never goes anywhere. A share that crossed would
-  /// hand the other side every position; a token crosses for one
-  /// position and says nothing about the next (docs/explanation/fair-deal.md).
-  Map<String, Object?>? releaseShareTokens(int seat) {
-    final k = myKey ?? (mySeat == null ? null : _keyOf(mySeat!));
-    if (k == null || deck == null || !_gone.contains(seat)) return null;
-    final at = _mineIn(seat);
-    if (at == null) return null;
-    _mineSealsIn(seat);
-    final mine = _shareTokens[seat]![at]!;
-    final want = [for (var p = 0; p < deckSize; p++) if (mine[p] != null) p];
-    final seals = _mySealParts(seat, at);
-    if (want.isEmpty && seals.isEmpty) return null;
-    return {
-      'about': seat,
-      'holder': k,
-      'share': at,
-      'tokens': {for (final p in want) '$p': _b64(mine[p]!)},
-      'seals': seals,
-    };
-  }
-
-  /// Files this side's own parts of the seals made out to [seat], for
-  /// the same reason its own tokens are filed: each side holds one
-  /// half, and they have to meet somewhere.
-  void _mineSealsIn(int seat) {
-    final at = _myShareIndexOf[seat];
-    final share = _myShareOf[seat];
-    final sealed = _sealedTo[seat];
-    if (at == null || share == null || sealed == null) return;
-    final into = _sealParts.putIfAbsent(seat, () => {}).putIfAbsent(at, () => {});
-    for (final e in sealed.entries) {
-      if (into.containsKey(e.key)) continue;
-      final body = Uint8List.sublistView(e.value, 0, sealedBytes);
-      final token = crypto.shareToken(share, body, _shareSeed('seal part ${e.key}', seat, share));
-      into[e.key] = Uint8List.sublistView(token, 0, pointBytes);
-    }
-  }
-
-  /// Makes this side's own share tokens for [seat], if it holds a
-  /// share and has not made them, and returns which share they are of.
-  /// Both sides must file their own as well as the other's, or each
-  /// holds one half and neither opens anything.
-  int? _mineIn(int seat) {
-    final share = _myShareOf[seat];
-    final at = _myShareIndexOf[seat];
-    if (share == null || at == null || deck == null) return null;
-    final into = _shareTokens.putIfAbsent(seat, () => {}).putIfAbsent(at, () => {});
-    // What a release carries cannot depend on what this side happens
-    // to hold. A holder that already has the seat's token for a
-    // position would leave it out, a peer that has not would never get
-    // it, and once the holders stop awaiting the seat they stop
-    // re-sending — so the gap never closes. The seat's own positions
-    // are the ones it never publishes a token for, so they are always
-    // needed; if it went before its tokens, every position is.
-    final every = !hasTokens(seat);
-    for (var p = 0; p < deckSize; p++) {
-      if (!every && p ~/ _handSize != seat) continue;
-      if (into.containsKey(p)) continue;
-      into[p] = crypto.shareToken(share, _masked(p), _shareSeed('share token $p', seat, share));
-    }
-    return at;
-  }
-
-  /// This side's parts of opening the seals made out to [seat]: a
-  /// token over each seal itself, whole so that it can be checked,
-  /// though only its point half does the opening. Recomputed each
-  /// time, since a pass heard after the last release adds one — which
-  /// is why a release goes out again whenever the seat is still
-  /// awaited.
-  Map<String, String> _mySealParts(int seat, int at) {
-    final share = _myShareOf[seat];
-    final sealed = _sealedTo[seat];
-    if (share == null || sealed == null) return const {};
-    final out = <String, String>{};
-    for (final e in sealed.entries) {
-      final body = Uint8List.sublistView(e.value, 0, sealedBytes);
-      out['${e.key}'] = _b64(crypto.shareToken(share, body, _shareSeed('seal part ${e.key}', seat, share)));
-    }
-    return out;
-  }
-
-  /// Seeded from the share, which only its holders know: a re-sent
-  /// release is then the same message, and no draw is spent — an extra
-  /// draw moves every draw after it and deals a different hand.
-  Uint8List _shareSeed(String step, int seat, Uint8List share) => Uint8List.fromList(
-      sha256.convert([...utf8.encode('$step|$tableId|$hand|$seat|'), ...share]).bytes);
-
-  /// A share's tokens for a departed seat, from the holder that made
-  /// them. Each is checked against the share key it claims, so a
-  /// holder cannot pass off another share's part as its own, nor a
-  /// token for one position as a token for another. True once kept.
-  bool acceptShareTokens(Map<String, Object?> m) {
-    try {
-      final about = m['about'] as int;
-      if (!_keyed(about) || !_gone.contains(about) || deck == null) return false;
-      final keys = _shareKeysOf[about];
-      if (keys == null) return false;
-      final at = m['share'] as int;
-      if (at < 0 || at >= keys.length) return false;
-      if (_secrets.containsKey(about)) return true;
-      final tokens = Map<String, Object?>.from(m['tokens'] as Map);
-      final into = _shareTokens.putIfAbsent(about, () => {}).putIfAbsent(at, () => {});
-      var kept = false;
-      for (final e in tokens.entries) {
-        final p = int.parse(e.key);
-        if (p < 0 || p >= deckSize || into.containsKey(p)) continue;
-        final token = _unb64(e.value);
-        if (token.length != tokenBytes) continue;
-        if (!crypto.verifyToken(keys[at], _masked(p), token)) continue;
-        into[p] = token;
-        kept = true;
-      }
-      // The parts of opening the seals made out to it, checked the
-      // same way: a token over the seal itself, against the share key
-      // it claims.
-      final seals = Map<String, Object?>.from(m['seals'] as Map? ?? const {});
-      final sealsInto = _sealParts.putIfAbsent(about, () => {}).putIfAbsent(at, () => {});
-      final sealed = _sealedTo[about];
-      for (final e in seals.entries) {
-        final p = int.parse(e.key);
-        final blob = sealed?[p];
-        if (blob == null || sealsInto.containsKey(p)) continue;
-        final token = _unb64(e.value);
-        if (token.length != tokenBytes) continue;
-        final body = Uint8List.sublistView(blob, 0, sealedBytes);
-        if (!crypto.verifyToken(keys[at], body, token)) continue;
-        sealsInto[p] = Uint8List.sublistView(token, 0, pointBytes);
-        kept = true;
-      }
-      // This side's own half, so that the two meet somewhere.
-      _mineIn(about);
-      _mineSealsIn(about);
-      if (kept) _openWhatCan();
-      return true;
-    } catch (_) {
-      return false;
-    }
-  }
 
   void _learnSecret(int seat, Uint8List secret) {
     _secrets[seat] = secret;

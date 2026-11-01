@@ -375,8 +375,9 @@ fn seal_challenge(
 
 /// A secret two seats share and nobody else can compute: the hash of
 /// the point [pk] times this seat's key. Both sides get the same 32
-/// bytes; what a seat keeps for another — a share of its deal secret,
-/// held against its leaving — is encrypted with it (packages/deal).
+/// bytes. The escrow in packages/deal does not use it: its pieces are
+/// wrapped in the secret the two seats' table keys share
+/// (Signer.sharedSecretWith).
 pub fn shared_secret(secret: &[u8], pk: &[u8], out: &mut [u8]) -> Option<usize> {
     use blake2::{Blake2s256 as Blake2s, Digest};
     let (_, sk) = keys(secret)?;
