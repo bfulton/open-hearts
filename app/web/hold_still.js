@@ -4,12 +4,8 @@
 // that much lower, so every tap lands above the finger. Put back at the
 // top whenever it moves or the screen changes shape.
 (function () {
-  window.ohSettled = 0;
   function settle() {
-    if (window.scrollX !== 0 || window.scrollY !== 0) {
-      window.scrollTo(0, 0);
-      window.ohSettled++;
-    }
+    if (window.scrollX !== 0 || window.scrollY !== 0) window.scrollTo(0, 0);
   }
   // Once now, and again once a turn has finished moving things.
   function soon() {
