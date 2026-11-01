@@ -328,7 +328,8 @@ test('an event is taken under the id its bytes hash to and no other, so nobody c
 
 test('every event of a real game, as the table made it, is taken as it came', async () => {
   // Four people and the rig's house to the end of a game to fifty
-  // (packages/table, tool/game_fixture.dart).
+  // (packages/table, tool/game_fixture.dart): nothing an honest build
+  // says nests too deep for the referee, or fills a person's share.
   const fixture = new URL('../../packages/table/test/fixtures/refereed_four.json.gz', import.meta.url);
   const game = JSON.parse(gunzipSync(readFileSync(fixture)).toString());
   const events = game.log.filter((entry) => entry.e).map((entry) => entry.e);
@@ -414,18 +415,6 @@ test('an event nested deeper than a table event goes is refused, and the log goe
   await relay.message(later, JSON.stringify(['LOG', 'l', 0]));
   assert.equal(later.entries.length, 2);
   assert.deepEqual(later.of('LOGEND').at(-1), ['LOGEND', 'l', 2]);
-});
-
-test('every event of a game played at a refereed table is taken', async () => {
-  // A real game, with real keys and licences (packages/table,
-  // tool/game_fixture.dart): nothing an honest build says nests too deep.
-  const real = JSON.parse(gunzipSync(readFileSync(new URL('../../packages/table/test/fixtures/refereed_four.json.gz', import.meta.url))).toString());
-  const r = tableReferee({ table: real.spec.id, verify, house: real.spec.house });
-  const events = real.log.filter((entry) => entry.e).map((entry) => entry.e);
-  for (const e of events) {
-    assert.deepEqual(await r.take({ pubkey: e.author, content: JSON.stringify(e) }), { ok: true, why: '' }, `${e.kind} ${e.id}`);
-  }
-  assert.equal(r.entries.length, events.length);
 });
 
 test('a key\'s last socket on the log closing is noted, and its first opening again', async () => {
