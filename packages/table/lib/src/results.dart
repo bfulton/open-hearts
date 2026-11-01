@@ -327,15 +327,7 @@ class Ledger {
     for (final s in staked) {
       final outcomes = <Outcome>[
         for (final o in staked)
-          if (o != s)
-            (
-              opponent: before[idOf(o)]!,
-              score: totalOf(s) < totalOf(o)
-                  ? 1.0
-                  : totalOf(s) == totalOf(o)
-                      ? 0.5
-                      : 0.0,
-            ),
+          if (o != s) (opponent: before[idOf(o)]!, score: pairwise(totalOf(s), [totalOf(o)]).single),
       ];
       _ratings[idOf(s)] = rate(before[idOf(s)]!, outcomes);
       _games[idOf(s)] = gamesOf(idOf(s)) + 1;
