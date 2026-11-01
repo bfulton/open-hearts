@@ -38,7 +38,7 @@ Each suite is a `suite_<name>` function in `check.sh`, run from the repository's
 | `ops` | `node --test ops/*.test.mjs`: [the oh command](oh.md), its reference against its table, and each command against fakes of the store, Stripe and the programs it starts |
 | `workers` | `node --test` on `e2e/deal_worker.test.mjs`, `e2e/deal_golden.test.mjs`, `e2e/offline_worker.test.mjs`, `e2e/carry.test.mjs` and `crypto/schnorr_wasm/vectors.test.mjs`: the page's workers, against the committed wasm |
 | `crypto` | `cargo clippy` with warnings as errors, and `cargo test`, in `crypto/deal` and `crypto/schnorr`; `cargo test` in `crypto/vendor`; `cargo clippy` for the wasm target in `crypto/schnorr_wasm` |
-| `scripts` | `bash -n` on `check.sh`, `deploy.sh`, `build_phone.sh`, `oh`, `e2e/*.sh`, `crypto/*.sh`, `app/ios/*.sh` and `service/bench/build.sh`; `node --check` on `e2e/*.mjs` and `app/tool/*.mjs`; `CHECK_PLAN=1 ./check.sh full`, which fails if a suite is in none of its lanes; and, when Python has `yaml`, a parse of `.github/workflows/*.yml` |
+| `scripts` | `bash -n` on `check.sh`, `deploy.sh`, `build_phone.sh`, `oh`, `ops/wrangler/wrangler`, `e2e/*.sh`, `crypto/*.sh`, `app/ios/*.sh` and `service/bench/build.sh`; `node --check` on `e2e/*.mjs` and `app/tool/*.mjs`; `CHECK_PLAN=1 ./check.sh full`, which fails if a suite is in none of its lanes; and, when Python has `yaml`, a parse of `.github/workflows/*.yml` |
 | `docs` | `node --test docs/links.test.mjs`, then `node docs/links.mjs` |
 | `app_analyze` | `flutter analyze` in `app` |
 | `app` | `flutter test -j <cores>` in `app`, then `flutter test --platform chrome test/web`. Chrome is `CHROME_EXECUTABLE`, else one on the `PATH`, else one in macOS's Applications, else Playwright's Chromium. |
@@ -153,7 +153,7 @@ Runs on pull requests and on pushes to `main`. A newer push to the same pull req
 | `service` | Builds the Rust libraries, then the `service` tests and `node --test service/do/*.test.mjs` | `service`, `relay_js` |
 | `wasm` | `cargo clippy` on `crypto/deal`, `crypto/schnorr` and `crypto/schnorr_wasm`; builds both wasm files with `crypto/deal/build.sh` and `crypto/schnorr_wasm/build.sh`; fails if `app/web/deal.wasm` or `app/web/schnorr.wasm` differ from what was committed | The clippy part of `crypto` |
 | `node` | The handlers', site's, infrastructure's and page workers' node tests, `./check.sh scripts` and `./check.sh docs` | `functions`, `site`, `infra`, `workers`, `scripts`, `docs` |
-| `e2e` | Three runners: `flows`; `run`; and `escrow`, `offline`, `move` and `site`. Each installs coturn and Playwright, builds with `./e2e/build.sh` (cached by its sources), and runs `node e2e/<suite>.mjs` for each suite. | `e2e_build` and the browser suites |
+| `e2e` | Three runners: `flows`; `run`; and `house`, `offline`, `move` and `site`. Each installs Playwright, builds the Rust libraries the house loads, builds with `./e2e/build.sh` (cached by its sources), and runs `node e2e/<suite>.mjs` for each suite. | `e2e_build` and the browser suites |
 
 The `workers` step of the `node` job leaves out `crypto/schnorr_wasm/vectors.test.mjs`, which `crypto/schnorr_wasm/build.sh` runs in the `wasm` job.
 

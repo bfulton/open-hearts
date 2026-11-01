@@ -220,10 +220,15 @@ the same carry-over and the same handlers as production.
   `e2e/build.sh` compiles the app against BIP-340's published test key
   pair, so the suites exercise the real handlers, signatures and
   licence check.
-- **One device at a time.** The suites' relay is the local Dart one,
-  which asks nobody who they are, so there one device at a time is seen
-  by presence. The relay's own refusal is proved in `service/do`'s
-  tests.
+- **One device at a time.** The browser suites' relay is the one the
+  Cloudflare object runs, with its gate on (`service/do/host.mjs
+  --object --gate` with the rig's service key, `startRelay` in
+  `e2e/drive.mjs`). Every socket answers the challenge with the
+  activation local mode gave it, as in production, so a later device of
+  an account cuts the earlier one off at the relay. The flow "one device
+  at a time" in `e2e/flows.mjs` drives this through the app;
+  `service/test/one_device_over_relay_test.dart` and `service/do`'s
+  tests prove the relay's refusal itself.
 - **TURN.** With `OH_TURN_LOCAL` set as well, `turn` hands out a local
   TURN server with fixed credentials. The rig sets none now: no part of
   the game uses TURN, which stays for voice and video chat.

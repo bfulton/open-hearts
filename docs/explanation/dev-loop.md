@@ -42,11 +42,12 @@ machine rather than at Cloudflare.
 
 The build's identity is compiled in, as the defines `OH_BUILD_TAG` (the
 short commit hash) and `OH_BUILD_DATE` (the UTC date) that
-`app/lib/build_info.dart` reads. `deploy.sh` passes both to the web
-build, with `OH_UPDATE_CHECK` to turn the update check on, and writes
-`play/build-info.json` with the same hash. `build_phone.sh` and the
-`ios` workflow get both from `app/tool/defines.mjs`. A build without
-them, such as a local run, a test or CI, says `dev`.
+`app/lib/build_info.dart` reads. `app/tool/defines.mjs` writes both,
+with `OH_UPDATE_CHECK` to turn the update check on, for every deployed
+build: the web build `deploy.sh` makes, and the phone builds of
+`build_phone.sh` and the `ios` workflow. `deploy.sh` also writes
+`play/build-info.json` with the same hash. A build without them, such
+as a local run or a test, says `dev`.
 
 - The About page shows the hash and the date.
 - The remote config's `update` notice compares the date, so it reaches
@@ -54,8 +55,10 @@ them, such as a local run, a test or CI, says `dev`.
   was built, before store review, not the day the store published it.
 - A deployed web build fetches `build-info.json` at launch and whenever
   it returns to the foreground. If the published hash differs from its
-  own, it shows a tap-to-reload pill. Local runs, tests and CI build
-  without `OH_UPDATE_CHECK`, so the pill never appears there.
+  own, it shows a tap-to-reload pill. A phone build has the check on
+  too, but no `build-info.json` to fetch, so the pill never shows there.
+  Local runs and tests build without `OH_UPDATE_CHECK`, so it never
+  appears there either.
 - `site/public/_headers` marks the entry points `no-store`, so a cached
   bootstrap cannot load an old build.
 - A hash ending in `+` was deployed from a tree with uncommitted

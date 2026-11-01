@@ -11,7 +11,7 @@
 // the short commit, with "+" for a tree with uncommitted changes, and
 // the UTC date. OH_UPDATE_CHECK turns on the "new build is up" pill,
 // which only a deployed build has; on a phone it never shows, since a
-// phone has no build-info.json to compare with. Local runs, tests and CI
+// phone has no build-info.json to compare with. Local runs and tests
 // don't use this file, so they keep the defaults: "dev", no date, no
 // pill.
 import { execFileSync } from 'node:child_process';

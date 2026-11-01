@@ -48,7 +48,7 @@ Run the Dart tools from `service` as `dart run bin/<name>.dart` or `dart run too
 
 | File | What it does | Main flags |
 |---|---|---|
-| `deploy.sh` | Builds the site, the app and the handlers, and uploads them to the Pages project as one deployment. Run by `./oh deploy site`, which deletes old deployments before a production deploy (as `./oh deploy prune` does). Refuses production without `serviceKey` and `houseKey` in `config/openhearts.json`, or when `ops/gate.mjs` finds anything in the way. A preview's app is built with the previews' keys (`preview.serviceKey`, `preview.houseKey`) and the preview relay. Needs `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`. | `[label]`: the Pages branch, which defaults to `main` on `main` and `dev` elsewhere. |
+| `deploy.sh` | Builds the site, the app and the handlers, and uploads them to the Pages project as one deployment. Run by `./oh deploy site`, which deletes old deployments before a production deploy (as `./oh deploy prune` does). Refuses production without `serviceKey`, `houseKey` or `appOrigin` in `config/openhearts.json`, or when `ops/gate.mjs` finds anything in the way. A preview's app is built with the previews' keys (`preview.serviceKey`, `preview.houseKey`) and the preview relay. Needs `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`. | `[label]`: the Pages branch, which defaults to `main` on `main` and `dev` elsewhere. |
 | `build_phone.sh` | Builds the native libraries, then a store release compiled with what `config/openhearts.json` names. Run by `./oh phone`. Refuses when `ops/gate.mjs` finds anything in the way: a store release is built from `main` as it was reviewed. | `ios` or `android`; further arguments go to `flutter build`. |
 | `crypto/deal/build.sh` | Builds the deal library for the Dart VM, and the wasm, copied to `app/web/deal.wasm`. | None |
 | `crypto/schnorr/build.sh` | Builds the Schnorr library for the Dart VM. | None |
@@ -75,7 +75,7 @@ For the environment variables both read, see [Environment variables](configurati
 | File | What it does | Main flags |
 |---|---|---|
 | `app/tool/affected_tests.mjs` | Prints the app's test files whose imports reach a changed file, or `all`. `./check.sh quick` runs it. | The changed paths, from the repository's root. |
-| `app/tool/defines.mjs` | Writes the phone build's `--dart-define-from-file` from `config/openhearts.json` (`appDefines`), with the build's commit and date (`OH_BUILD_TAG`, `OH_BUILD_DATE`). Refuses a file with no `serviceKey`, `houseKey` or `appOrigin`. `build_phone.sh` and the `ios` workflow run it. | `<out.json>` |
+| `app/tool/defines.mjs` | Writes every deployed build's `--dart-define-from-file` from `config/openhearts.json` (`appDefines`), with the build's commit and date (`OH_BUILD_TAG`, `OH_BUILD_DATE`) and `OH_UPDATE_CHECK`, which turns the "new build" pill on. Only the web shows the pill, since a phone has no `build-info.json` to compare with. `build_phone.sh`, the `ios` workflow and `deploy.sh` on `main` write production's, which is refused for a file with no `serviceKey`, `houseKey` or `appOrigin`. `deploy.sh` with any other label writes a preview's, with the previews' keys and the preview relay. | `<out.json>`; `preview` for a preview's |
 | `app/tool/icons.mjs` | Draws every icon and launch image the app and the site ship from `app/tool/icon.svg`. Run it from `app`. | None |
 
 ## Docs tools
