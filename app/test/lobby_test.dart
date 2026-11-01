@@ -1,7 +1,8 @@
 /// The way from the front door to a live table (live/lobby.dart), over a
 /// relay on this machine: one way in at a time, a room this device will
-/// not sit in let go with everything it opened, and a game left before
-/// its end still counted in the player's pace.
+/// not sit in, or that fills without it, let go with everything it
+/// opened, and a game left before its end still counted in the player's
+/// pace.
 ///
 /// Plain tests rather than widget tests: the relay is a real socket, and
 /// the lobby is no widget.
@@ -12,7 +13,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:deal/deal.dart';
-import 'package:engine/engine.dart' show Persona;
+import 'package:engine/engine.dart' show Persona, botPolicyVersion;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:open_hearts/avatar.dart';
 import 'package:open_hearts/crypto/deal.dart';
@@ -30,26 +31,36 @@ import 'package:open_hearts/pace_store.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:table/table.dart';
 
-/// A relay on this machine that answers every subscription at once and
-/// refuses every event, with [refusal], or takes it where that is null.
+/// A relay on this machine that answers every subscription at once,
+/// with the events [stored] under its address, and refuses every event,
+/// with [refusal], or takes it where that is null.
 class _Relay {
-  _Relay._(this._server, this.refusal) {
+  _Relay._(this._server, this.refusal, this.stored) {
     _server.listen((request) async {
       final path = request.uri.path;
       final ws = await WebSocketTransformer.upgrade(request);
       open.update(path, (n) => n + 1, ifAbsent: () => 1);
       ws.listen((raw) {
         final m = jsonDecode(raw as String) as List;
-        if (m[0] == 'REQ') ws.add(jsonEncode(['EOSE', m[1]]));
+        if (m[0] == 'REQ') {
+          for (final e in stored[path] ?? const []) {
+            ws.add(jsonEncode(['EVENT', m[1], e.toJson()]));
+          }
+          ws.add(jsonEncode(['EOSE', m[1]]));
+        }
         if (m[0] == 'EVENT') ws.add(jsonEncode(['OK', (m[1] as Map)['id'], refusal == null, refusal ?? '']));
       }, onDone: () => open.update(path, (n) => n - 1));
     });
   }
 
-  static Future<_Relay> start({String? refusal}) async => _Relay._(await HttpServer.bind(InternetAddress.loopbackIPv4, 0), refusal);
+  static Future<_Relay> start({String? refusal, Map<String, List<NostrEvent>> stored = const {}}) async =>
+      _Relay._(await HttpServer.bind(InternetAddress.loopbackIPv4, 0), refusal, stored);
 
   final HttpServer _server;
   final String? refusal;
+
+  /// The events held, by the address they are held under.
+  final Map<String, List<NostrEvent>> stored;
 
   /// The sockets open now, by the tag in their address.
   final Map<String, int> open = {};
@@ -84,8 +95,8 @@ void main() {
   late _Relay relay;
   final keptHandlerAt = handlerAt;
 
-  Future<void> standUp({String? refusal}) async {
-    relay = await _Relay.start(refusal: refusal);
+  Future<void> standUp({String? refusal, Map<String, List<NostrEvent>> stored = const {}}) async {
+    relay = await _Relay.start(refusal: refusal, stored: stored);
     // The relay here and nowhere else, and no service to ask.
     RemoteSettings.current = RemoteSettings()..adopt(RemoteConfig(relays: [relay.url]));
     handlerAt = (_) => null;
@@ -167,6 +178,45 @@ void main() {
     await _until(() => relay.open['/$code'] == 0, within: const Duration(seconds: 2));
     expect(relay.open['/$code'], 0, reason: 'nothing left open under the room\'s code');
     expect(lobby.cutOff, isNull, reason: 'the refusal was that room\'s, not the next one\'s');
+  });
+
+  test('a room whose table started without this device is let go, its sockets with it', () async {
+    const code = 'ABCDEFGH';
+    // Four other people already started a table under the code, and
+    // its start is on the relay when this device arrives.
+    final leader = SchnorrSigner.generate();
+    final others = [leader.publicKey, for (var i = 0; i < 3; i++) SchnorrSigner.generate().publicKey];
+    final salt = newSalt();
+    final spec = TableSpec(seed: 1, seats: [for (final k in others) HumanSeat(k)], sealed: true, house: houseKey, salt: salt);
+    final start = NostrEvent.sign(leader,
+        kind: TableKinds.lobby,
+        content: jsonEncode({
+          'kind': 'start',
+          'table': spec.id,
+          'salt': salt,
+          'seed': spec.seed,
+          'seats': [for (final k in others) {'key': k, 'name': 'Bao'}],
+          'policy': botPolicyVersion,
+          'sealed': true,
+          'house': houseKey,
+          'target': spec.target,
+          'timing': spec.timing.toJson(),
+          'at': DateTime.now().millisecondsSinceEpoch,
+        }),
+        tags: [
+          ['t', code],
+        ]);
+    await standUp(stored: {
+      '/$code': [start],
+    });
+    final lobby = lobbyWith(room: code);
+    addTearDown(lobby.dispose);
+    await lobby.enter();
+    expect(relay.open['/$code'], 1);
+    await _until(() => lobby.room == null);
+    expect(lobby.error, english.tableFilledWithoutYou);
+    await _until(() => relay.open['/$code'] == 0, within: const Duration(seconds: 2));
+    expect(relay.open['/$code'], 0, reason: 'nothing left open under the room\'s code');
   });
 
   /// The lobby back at a seat kept from a moment ago, at a table still
