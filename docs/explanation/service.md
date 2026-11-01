@@ -382,7 +382,9 @@ things keep a superseded device off it:
   remembers which relay objects the device was seen at. When the account
   is taken up, it tells each of them (`/revoke`) to close the old
   device's sockets at once, wherever the old device is: presence, a
-  pool, a table or a watch.
+  pool, a table or a watch. If the account's object gives no answer,
+  the activation stands until its hour is up, and the relay logs
+  `gate: a device let in unchecked` (`householdSeen`).
 - An activation runs out within the hour, and an answer that has run
   out is asked for again.
 

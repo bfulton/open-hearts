@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 
-import { activationOf, authKind, createRelay, objectRelay, schnorrVerifier, serviceGate } from './relay.mjs';
+import { activationOf, authKind, createRelay, householdSeen, objectRelay, schnorrVerifier, serviceGate } from './relay.mjs';
 import { wasmPath } from './host.mjs';
 import { keys, signing } from './sign.mjs';
 import { DELETED_WHY } from '../functions/deletion.mjs';
@@ -221,6 +221,41 @@ test('the account\'s turn says it first: the relay closes the superseded device\
   await relay.message(late, JSON.stringify(['AUTH', await showing(ADA, late, first)]));
   assert.match(late.of('OK')[0][3], /^superseded:/);
   assert.deepEqual(asked, [1, 1], 'asked at every answer');
+});
+
+test('the account\'s turn is asked of its own object, and a device let in without its word is logged', async () => {
+  // The accounts' objects, each answering as [answer] says, or failing.
+  const households = (answer) => ({
+    asked: [],
+    idFromName: (name) => name,
+    get(id) {
+      return {
+        fetch: async (url, init) => {
+          this.asked.push([id, JSON.parse(init.body)]);
+          if (answer instanceof Error) throw answer;
+          return Response.json(answer);
+        },
+      };
+    },
+  });
+  const who = { account: ACCOUNT, key: ADA.public, epoch: 1, until: T + 3600 };
+  const asked = async (answer) => {
+    const lines = [];
+    const h = households(answer);
+    const why = await householdSeen(h, 'online', (line) => lines.push(line))(who);
+    return { why, lines, asked: h.asked };
+  };
+  const yes = await asked({ status: 200, body: { ok: true } });
+  assert.deepEqual(yes, { why: null, lines: [], asked: [[ACCOUNT, { op: 'seen', account: ACCOUNT, key: ADA.public, epoch: 1, tag: 'online' }]] });
+  assert.equal((await asked({ status: 409, body: { error: 'suspended: this account is suspended from live play' } })).why, 'suspended: this account is suspended from live play');
+  assert.match((await asked({ status: 409 })).why, /^superseded: /);
+  // Neither yes nor no: let in on the service's signature, and said so.
+  for (const answer of [{ status: 503, body: { error: 'no store' } }, { status: 429, body: { error: 'slow down' } }, new Error('unreachable')]) {
+    const { why, lines } = await asked(answer);
+    assert.equal(why, null);
+    assert.equal(lines.length, 1);
+    assert.match(lines[0], /^gate: a device let in unchecked: /);
+  }
 });
 
 test('the account\'s turn says the account is suspended: its sockets close saying so, and a device from before is turned away in the same words, for good', async () => {

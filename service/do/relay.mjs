@@ -343,6 +343,29 @@ export function serviceGate({ service, verify, house = null, seen = null, now = 
   };
 }
 
+/// [serviceGate]'s `seen` from the accounts' own objects ([household],
+/// their namespace; service/functions/household.mjs, seenAt): yes on a
+/// 200, no on a 409 with the reason it gives. Any other answer, or none
+/// at all, leaves the service's signature standing until its hour is
+/// up, and is logged with [log], since the device is then let in on the
+/// signature alone.
+export function householdSeen(household, tag, log = console.log) {
+  return async (who) => {
+    let answer;
+    try {
+      const stub = household.get(household.idFromName(who.account));
+      const op = { op: 'seen', account: who.account, key: who.key, epoch: who.epoch, tag };
+      answer = await (await stub.fetch('https://household/', { method: 'POST', body: JSON.stringify(op) })).json();
+    } catch (e) {
+      log(`gate: a device let in unchecked: ${e?.message ?? e}`);
+      return null;
+    }
+    if (answer?.status === 409) return answer.body?.error ?? supersededWhy;
+    if (answer?.status !== 200) log(`gate: a device let in unchecked: ${answer?.status} ${answer?.body?.error ?? ''}`.trim());
+    return null;
+  };
+}
+
 /// How many messages, and how many characters of them, a socket may say
 /// before its answer to the challenge is in: a client sends its
 /// subscriptions at once, and maybe the few events it has said that it
