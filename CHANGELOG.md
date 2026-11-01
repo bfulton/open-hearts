@@ -269,6 +269,15 @@ squashed from a pull request, the pull request's number.
 
 ### Changed
 
+- The privacy policy says what our relay's own log notes. It keeps
+  seven days of counts and timings that name nobody, and it also notes
+  which account backup codes were emailed for (or could not be), which
+  account's pictures were left to be checked on the next run, each by
+  its file name, a code made from the picture, and the code of a picture
+  too plain to compare or that matches a checker's own test pictures.
+  The log has always done this; the policy had not said so. It is a
+  material change: every device says so at the front door, and every web
+  subscriber is emailed when the operator sends it. (2026-11-01, #51)
 - The code is simpler throughout, after an engineering audit of every
   part of the repository: copies of the same logic made one, each
   service call and Stripe call made one way, error strings the app
