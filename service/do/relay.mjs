@@ -918,7 +918,7 @@ export function objectRelay(
   { tag = presenceTag, now = Date.now, count = null, limits = null, store = null, kept = null, also = null, gate = null, withhold = null, screen = null, forget = null, house = null, entries = null, keepEntry = null, wanted = null, log = null } = {},
 ) {
   const presence = tag === presenceTag;
-  const own = refusalFor(tag, { house, now });
+  const own = refusalFor(tag, { house });
   const lobby = !presence && tag !== resultsTag;
   const pool = isPoolTag(tag);
   return createRelay({
@@ -1092,13 +1092,6 @@ export const NAME_REFUSED_WHY = 'blocked: a name that is not allowed';
 /// carried.
 export const VIEW_NOT_SEATED_WHY = 'blocked: a view of the table is one of its people\'s to say';
 
-/// How far ahead of the relay's clock a stored event may be dated, in
-/// seconds. What is stored is kept a day from its date (tag_store.mjs),
-/// so one dated further ahead would be kept longer; a device's clock is
-/// within ten minutes of the relay's, or its answer to the challenge is
-/// refused ([answerFreshS]).
-export const datedAheadMostS = 60 * 60;
-
 /// What a tag's object refuses. Presence: anything but the ephemeral
 /// kinds. A table's or a lobby's tag: anything but the ephemeral kinds
 /// and the lobby kind tagged for this very tag — an object stores what
@@ -1111,9 +1104,8 @@ export const datedAheadMostS = 60 * 60;
 /// The results are the house's to say ([house], its key): a game's
 /// result is the house's word on a game it refereed (packages/table,
 /// results.dart), and nothing new is taken from anybody else — with no
-/// house, from nobody. Nothing is stored that is dated more than
-/// [datedAheadMostS] ahead of [now].
-export function refusalFor(tag, { house = null, now = Date.now } = {}) {
+/// house, from nobody.
+export function refusalFor(tag, { house = null } = {}) {
   return (event) => {
     if (event.kind === reactionKind) return reactionRefusal(tag, event);
     if (tag === resultsTag && event.pubkey !== house) return RESULT_NOT_HOUSE_WHY;
@@ -1123,7 +1115,6 @@ export function refusalFor(tag, { house = null, now = Date.now } = {}) {
         ? 'blocked: presence carries ephemeral kinds only'
         : `blocked: this tag stores only kind ${lobbyKind}, tagged ${tag}`;
     }
-    if (!ephemeral(event.kind) && event.created_at > now() / 1000 + datedAheadMostS) return 'invalid: dated in the future';
     if (pictureInAvatar(event)) return PICTURE_IN_AVATAR_WHY;
     return namesIn(event).some(nameRefused) ? NAME_REFUSED_WHY : null;
   };

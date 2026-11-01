@@ -15,6 +15,13 @@ import { memoryStore, presenceTag, resultsTag, storedKeep } from './relay.mjs';
 export const KEPT_MS = 24 * 60 * 60 * 1000;
 export const SWEEP_EVERY_MS = 60 * 60 * 1000;
 
+/// How far ahead of the object's clock a stored event may be dated. The
+/// date is the publisher's to choose, and an event is kept a day from
+/// it, so one dated further ahead goes at the next sweep instead. A
+/// device's clock is within ten minutes of the relay's when it is let in
+/// (relay.mjs, answerFreshS).
+export const AHEAD_MOST_MS = 60 * 60 * 1000;
+
 /// A stored event's key: by when it was made, then by id.
 export const keyOf = (event) => `ev:${String(event.created_at).padStart(12, '0')}:${event.id}`;
 
@@ -70,14 +77,16 @@ export function tagStore(storage, tag) {
     },
 
     /// What is a day old goes: stored events a day after they were made,
-    /// a table's log a day after its last entry. True when anything
-    /// went, so the relay in memory is built again; another sweep while
-    /// anything is left.
+    /// and at once if dated more than [AHEAD_MOST_MS] ahead; a table's
+    /// log a day after its last entry. True when anything went, so the
+    /// relay in memory is built again; another sweep while anything is
+    /// left.
     async sweep({ now = Date.now() } = {}) {
       if (tag === resultsTag || tag === presenceTag) return false;
       const before = keyOf({ created_at: Math.floor((now - KEPT_MS) / 1000), id: '' });
-      const old = await storage.list({ prefix: 'ev:', end: before });
-      if (old.size) await storage.delete([...old.keys()]);
+      const ahead = keyOf({ created_at: Math.floor((now + AHEAD_MOST_MS) / 1000) + 1, id: '' });
+      const gone = [...(await storage.list({ prefix: 'ev:', end: before })).keys(), ...(await storage.list({ prefix: 'ev:', start: ahead })).keys()];
+      if (gone.length) await storage.delete(gone);
       const last = [...(await storage.list({ prefix: 'log:', reverse: true, limit: 1 })).values()][0];
       let logGone = false;
       if (last && now - last.t >= KEPT_MS) {
@@ -87,7 +96,7 @@ export function tagStore(storage, tag) {
       }
       const left = (await storage.list({ prefix: 'ev:', limit: 1 })).size + (logGone || !last ? 0 : 1);
       if (left) await storage.setAlarm(now + SWEEP_EVERY_MS);
-      return old.size > 0 || logGone;
+      return gone.length > 0 || logGone;
     },
   };
 }

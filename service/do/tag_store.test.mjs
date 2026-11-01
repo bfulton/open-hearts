@@ -7,9 +7,9 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 
 import { wasmPath } from './host.mjs';
-import { NAME_REFUSED_WHY, PICTURE_IN_AVATAR_WHY, datedAheadMostS, lobbyKind, namesIn, objectRelay, pictureInAvatar, refusalFor, resultsTag, schnorrVerifier, storedKeep } from './relay.mjs';
+import { NAME_REFUSED_WHY, PICTURE_IN_AVATAR_WHY, lobbyKind, namesIn, objectRelay, pictureInAvatar, refusalFor, resultsTag, schnorrVerifier, storedKeep } from './relay.mjs';
 import { keys, signing } from './sign.mjs';
-import { KEPT_MS, SWEEP_EVERY_MS, keyOf, tagStore } from './tag_store.mjs';
+import { AHEAD_MOST_MS, KEPT_MS, SWEEP_EVERY_MS, keyOf, tagStore } from './tag_store.mjs';
 import { pictureScreen } from './withheld.mjs';
 import { pictureDigest, withholding } from '../functions/pictures.mjs';
 
@@ -36,13 +36,14 @@ function storage() {
     async delete(key) {
       for (const k of Array.isArray(key) ? key : [key]) rows.delete(k);
     },
-    /// Keys in order, or the other way with [reverse]; [limit] counts
-    /// from the first of them either way, as an object's storage does.
-    async list({ prefix = '', end = null, limit = Infinity, reverse = false } = {}) {
+    /// Keys in order, or the other way with [reverse], from [start] and
+    /// before [end]; [limit] counts from the first of them either way, as
+    /// an object's storage does.
+    async list({ prefix = '', start = null, end = null, limit = Infinity, reverse = false } = {}) {
       const out = new Map();
       for (const k of reverse ? sorted().reverse() : sorted()) {
         if (out.size >= limit) break;
-        if (!k.startsWith(prefix) || (end !== null && k >= end)) continue;
+        if (!k.startsWith(prefix) || (start !== null && k < start) || (end !== null && k >= end)) continue;
         out.set(k, rows.get(k));
       }
       this.read += out.size;
@@ -257,13 +258,21 @@ test('an object woken holds the newest of what it stored, oldest first, and read
   assert.equal(st.read, most);
 });
 
-test('a stored event dated more than an hour ahead of the relay\'s clock is not taken, since it would be kept past its day', () => {
-  const t = 1_800_000_000;
-  const room = refusalFor('ABCD', { now: () => t * 1000 });
-  const at = (created_at, kind = lobbyKind) => ({ kind, tags: [['t', 'ABCD']], content: '', created_at });
-  assert.equal(room(at(t + datedAheadMostS)), null);
-  assert.equal(room(at(t + datedAheadMostS + 1)), 'invalid: dated in the future');
-  assert.equal(room(at(t + 10 * datedAheadMostS, 24245)), null, 'one forwarded and forgotten is not kept by its date');
+test('the sweep deletes at once a stored event dated more than an hour ahead, which a day from its date would keep past its day', async () => {
+  const st = storage();
+  const kept = tagStore(st, 'ABCD');
+  const now = 10 * KEPT_MS;
+  const ahead = (now + AHEAD_MOST_MS) / 1000;
+  const near = await lobby(keys[0], 'ABCD', ahead);
+  const far = await lobby(keys[1], 'ABCD', ahead + 1);
+  const years = await lobby(keys[2], 'ABCD', ahead + 10 * 365 * 24 * 60 * 60);
+  for (const e of [near, far, years]) await kept.keep(e, null, { now: 0 });
+  assert.equal(await kept.sweep({ now }), true);
+  assert.deepEqual([...st.rows.keys()], [keyOf(near)]);
+  assert.equal(st.alarm, now + SWEEP_EVERY_MS);
+  // The one an hour ahead goes a day after its date, as any does.
+  assert.equal(await kept.sweep({ now: now + AHEAD_MOST_MS + KEPT_MS + 1000 }), true);
+  assert.equal(st.rows.size, 0);
 });
 
 test('a room\'s object lets the oldest go from storage as it lets it go from memory', async () => {

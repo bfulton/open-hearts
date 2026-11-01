@@ -64,7 +64,7 @@ The reason in a refusal starts with one of these words:
 | Prefix | Meaning |
 |---|---|
 | `rate-limited:` | The socket published, or asked for a table's log, more than its burst and rate allow. Checked before the signature. |
-| `invalid:` | A bad ID or signature, a table event whose ID is not the hash of what it says, a stored kind dated more than `datedAheadMostS` ahead of the relay's clock, or a reaction of the wrong size or shape. |
+| `invalid:` | A bad ID or signature, a table event whose ID is not the hash of what it says, or a reaction of the wrong size or shape. |
 | `blocked:` | This tag's object does not carry this kind, a reaction is on the wrong tag, or a person's events have filled their share of a table's log (`authorMost` in `service/do/referee.mjs`). |
 | `duplicate:` | The relay already has this event. The `OK` is `true`. |
 | `withheld:` | A picture the operator took down ([withheld pictures](../explanation/relay.md#withheld-pictures)). The `OK` is `true`, and the event is neither stored nor passed on. |
@@ -98,7 +98,7 @@ All are in `service/do/relay.mjs`. The operator can change the `online` limits w
 |---|---|---|
 | Ephemeral kinds, on any tag | Not stored: forwarded to matching subscriptions, then forgotten | `ephemeral` in `service/do/relay.mjs` |
 | Anything on `online` that is not ephemeral | Refused | `refusalFor` |
-| Kind 4244 on a pool, room code or table tag, tagged `t` with that same tag | A day from its date, in the object's own storage; an alarm deletes older events. One dated more than `datedAheadMostS` ahead is refused. | `KEPT_MS` and `SWEEP_EVERY_MS` in `service/do/tag_store.mjs`; `refusalFor` |
+| Kind 4244 on a pool, room code or table tag, tagged `t` with that same tag | A day from its date, in the object's own storage; an alarm deletes older events, and any dated more than `AHEAD_MOST_MS` ahead of the object's clock. | `KEPT_MS`, `SWEEP_EVERY_MS` and `AHEAD_MOST_MS` in `service/do/tag_store.mjs` |
 | A pool's seating (`match`) said by anybody but the house (`OH_HOUSE_KEY`), or by anybody with no house | Withheld: answered `OK` true with the reason, and neither stored nor sent on; one already stored is dropped as a subscription is served | `seatingHeld` in `service/do/pool.mjs` |
 | Kind 4244 on the results tag (`GameResult.tag`) | For good | `resultsTag` in `service/do/relay.mjs`; `tagStore` in `service/do/tag_store.mjs` |
 | Any other kind that is not ephemeral | Refused | `refusalFor` |
