@@ -1,8 +1,10 @@
 // Makes every icon and launch image the app and the site ship from
-// tool/icon.svg: the web app's (favicon, manifest, maskable), Android's
-// launcher icon (whole, and as the felt and heart layers of an adaptive
-// icon), iOS's app icon set, the heart both phones show while the app
-// starts, and the site's favicon. Run it after changing the SVG:
+// tool/icon.svg: the favicons of the web app and the site (favicon.ico,
+// which both link first for a tab, and favicon.png), the web app's
+// manifest and maskable icons, Android's launcher icon (whole, and as
+// the felt and heart layers of an adaptive icon), iOS's app icon set,
+// and the heart both phones show while the app starts. Run it after
+// changing the SVG:
 //
 //     node tool/icons.mjs     (from app/)
 //
@@ -120,6 +122,36 @@ for (const [path, px, source, transparent = false] of out) {
   await show(px, source);
   await writeFile(new URL(path, app), await page.screenshot({ omitBackground: transparent }));
   console.log(`${px}\t${path}`);
+}
+
+// favicon.ico, for a tab's 16 to 48 pixels: the three sizes, each a
+// PNG, in one ICO. An ICO is a six-byte header (0, type 1, the count),
+// a sixteen-byte entry for each image (width, height, no palette, one
+// plane, 32 bits, its length and where it starts), then the images.
+const sizes = [48, 32, 16];
+const pngs = [];
+for (const px of sizes) {
+  await show(px, svg);
+  pngs.push(await page.screenshot());
+}
+const head = Buffer.alloc(6 + 16 * sizes.length);
+head.writeUInt16LE(1, 2);
+head.writeUInt16LE(sizes.length, 4);
+let at = head.length;
+sizes.forEach((px, i) => {
+  const entry = 6 + 16 * i;
+  head.writeUInt8(px, entry);
+  head.writeUInt8(px, entry + 1);
+  head.writeUInt16LE(1, entry + 4);
+  head.writeUInt16LE(32, entry + 6);
+  head.writeUInt32LE(pngs[i].length, entry + 8);
+  head.writeUInt32LE(at, entry + 12);
+  at += pngs[i].length;
+});
+const ico = Buffer.concat([head, ...pngs]);
+for (const path of ['web/favicon.ico', '../site/public/favicon.ico']) {
+  await writeFile(new URL(path, app), ico);
+  console.log(`${sizes.join(',')}\t${path}`);
 }
 await browser.close();
 
