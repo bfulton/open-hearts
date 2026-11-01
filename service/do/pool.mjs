@@ -9,20 +9,16 @@
 // taken, so that the device that said it is not held out of the relay
 // for it, and carried to nobody.
 
+import { lobbyKind, waitingKind } from './kinds.mjs';
+
+export { waitingKind };
+
 /// What a pool's tag starts with (packages/table, relay_transport.dart,
 /// RelayTransport.poolPrefix).
 export const poolPrefix = 'queue:';
 
 /// Whether [tag] is a pool's.
 export const isPoolTag = (tag) => typeof tag === 'string' && tag.startsWith(poolPrefix);
-
-/// The kind somebody waiting says they are, every couple of seconds
-/// (packages/table, nostr.dart, TableKinds.waiting).
-export const waitingKind = 24245;
-
-/// The stored kind a pool's seating goes out on (relay.mjs, lobbyKind;
-/// packages/table, nostr.dart, TableKinds.lobby).
-const lobbyKind = 4244;
 
 /// Why a pool's seating from anybody but the house goes nowhere.
 export const NOT_THE_HOUSE_WHY = 'withheld: a pool is seated by its house alone';

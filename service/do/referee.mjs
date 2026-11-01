@@ -40,6 +40,7 @@
 // here.
 
 import { eventIdOf, recordMost } from '../functions/records.mjs';
+import { digestOf } from '../functions/rows.mjs';
 
 /// The kind a table event rides in: its JSON as the content, signed by
 /// its author (packages/table, nostr.dart, TableKinds.log).
@@ -120,18 +121,12 @@ export function writersOf(spec, table, house) {
   return { people, house: named, writers: new Set(named ? [...people, named] : people) };
 }
 
-/// SHA-256 of [text], in hex.
-async function sha256Hex(text) {
-  const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text)));
-  return [...digest].map((b) => b.toString(16).padStart(2, '0')).join('');
-}
-
 /// The id of the table [spec] names: the first 32 hex digits of the
 /// SHA-256 of all it says but its id, as it is written (packages/table,
 /// spec.dart, TableSpec.idOf).
 export async function specIdOf(spec) {
   const { id, ...written } = spec;
-  return (await sha256Hex(JSON.stringify(written))).slice(0, 32);
+  return (await digestOf(JSON.stringify(written))).slice(0, 32);
 }
 
 /// Why [content], a [logKind] event's text, is no start for the log of

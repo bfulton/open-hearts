@@ -5,17 +5,22 @@
 // so what the app meets on Cloudflare is what the Dart and browser
 // suites run against.
 //
-// What is imported is plain functions too — the service's name filter,
-// a table's referee (referee.mjs) and a pool's watch (pool.mjs) — with
-// no node and no Cloudflare. Signatures are checked by the wasm the
-// app already carries (app/web/schnorr.wasm, built from
-// crypto/schnorr_wasm), handed in already compiled, because a Worker
-// may not compile wasm at runtime and because BIP-340 is not worth a
-// second implementation in a third language.
+// What is imported is plain functions too — the service's name filter
+// and hashing, the kinds (kinds.mjs), a table's referee (referee.mjs)
+// and a pool's watch (pool.mjs) — with no node and no Cloudflare.
+// Signatures are checked by the wasm the app already carries
+// (app/web/schnorr.wasm, built from crypto/schnorr_wasm), handed in
+// already compiled, because a Worker may not compile wasm at runtime
+// and because BIP-340 is not worth a second implementation in a third
+// language.
 
 import { nameRefused } from '../functions/names.mjs';
+import { digestOf, hex } from '../functions/rows.mjs';
+import { lobbyKind, waitingKind, watchKind } from './kinds.mjs';
 import { logKind, tableReferee, tableTag } from './referee.mjs';
 import { isPoolTag, poolWatch, seatingHeld } from './pool.mjs';
+
+export { lobbyKind };
 
 /// Kinds 20000–29999 are ephemeral: forwarded to whoever is listening
 /// and then forgotten. Every kind presence uses is one of these, which
@@ -122,7 +127,6 @@ export function tagOf(pathname) {
 
 const hex64 = /^[0-9a-f]{64}$/;
 const hex128 = /^[0-9a-f]{128}$/;
-const encoder = new TextEncoder();
 
 /// BIP-340 verification through the wasm: `verify(pubkey, digest, sig)`
 /// over lowercase hex. Takes a compiled `WebAssembly.Module` — what a
@@ -165,9 +169,7 @@ export async function schnorrVerifier(wasm) {
 /// NIP-01's id: the SHA-256 of `[0, pubkey, created_at, kind, tags,
 /// content]` as compact JSON, in lowercase hex.
 export async function idOf(pubkey, createdAt, kind, tags, content) {
-  const canonical = encoder.encode(JSON.stringify([0, pubkey, createdAt, kind, tags, content]));
-  const digest = await crypto.subtle.digest('SHA-256', canonical);
-  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
+  return digestOf(JSON.stringify([0, pubkey, createdAt, kind, tags, content]));
 }
 
 const strings = (v) => Array.isArray(v) && v.every((s) => typeof s === 'string');
@@ -292,12 +294,6 @@ export function memoryStore(keep = 10000) {
 /// The kind of a device's answer to the relay's challenge (NIP-42).
 export const authKind = 22242;
 
-const toHex = (bytes) => [...bytes].map((b) => b.toString(16).padStart(2, '0')).join('');
-
-async function sha256Hex(text) {
-  return toHex(new Uint8Array(await crypto.subtle.digest('SHA-256', encoder.encode(text))));
-}
-
 /// The activation [raw] says, as {account, key, epoch, until}, when the
 /// service ([service], its public key) signed it and it has not run out
 /// at [nowS]; null otherwise. The statement is the service's
@@ -308,7 +304,7 @@ export async function activationOf(raw, service, verify, nowS) {
   if (typeof account !== 'string' || !/^[0-9a-f]{32}$/.test(account) || typeof key !== 'string' || !hex64.test(key)) return null;
   if (!Number.isSafeInteger(epoch) || epoch < 0 || !Number.isSafeInteger(until) || typeof sig !== 'string') return null;
   if (until <= nowS) return null;
-  const digest = await sha256Hex(`oh-active/1\n${account}\n${key}\n${epoch}\n${until}`);
+  const digest = await digestOf(`oh-active/1\n${account}\n${key}\n${epoch}\n${until}`);
   return verify(service, digest, sig) ? { account, key, epoch, until } : null;
 }
 
@@ -325,7 +321,7 @@ const houseSeconds = 24 * 60 * 60;
 /// one in use, answering a reason when it is not, or null.
 export function serviceGate({ service, verify, house = null, seen = null, now = Date.now }) {
   return {
-    challenge: () => toHex(crypto.getRandomValues(new Uint8Array(16))),
+    challenge: () => hex(crypto.getRandomValues(new Uint8Array(16))),
     async admit(event) {
       const said = (name) => event.tags.find((t) => t[0] === name)?.[1];
       if (house && event.pubkey === house) return { account: null, key: house, epoch: 0, until: Math.floor(now() / 1000) + houseSeconds };
@@ -955,8 +951,8 @@ export const presenceTag = 'online';
 export function tagLabel(tag) {
   if (tag === presenceTag) return 'presence';
   if (typeof tag !== 'string') return 'unknown';
-  if (tag.startsWith('queue:')) return 'queue';
-  if (/^[0-9a-f]{32}$/.test(tag)) return `table:${tag.slice(0, 8)}`;
+  if (isPoolTag(tag)) return 'queue';
+  if (tableTag.test(tag)) return `table:${tag.slice(0, 8)}`;
   return 'room';
 }
 
@@ -978,11 +974,6 @@ export function socketLine(what, { tag, who = null, code, clean, why, openedAt, 
     sockets,
   };
 }
-
-/// The one kind this relay stores: the lobby — a room announced, a
-/// pool's seating, a table started, a player's picture, a game's result
-/// (packages/table, nostr.dart, TableKinds.lobby; docs/explanation/relay.md).
-export const lobbyKind = 4244;
 
 /// The tag game results are written under (packages/table, results.dart,
 /// GameResult.tag): kept, since the ratings are folded from all of them.
@@ -1048,7 +1039,7 @@ export function reactionRefusal(tag, event) {
 /// The kinds whose content names players (packages/table, nostr.dart,
 /// TableKinds): the lobby, waiting in a pool or a room, and a watched
 /// table.
-const namingKinds = new Set([lobbyKind, 24245, watchKind]);
+const namingKinds = new Set([lobbyKind, waitingKind, watchKind]);
 
 /// [event]'s content as an object, for a kind that names players, or
 /// null.
