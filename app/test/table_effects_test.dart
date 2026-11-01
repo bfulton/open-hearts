@@ -23,7 +23,7 @@ import 'package:open_hearts/ui/table_view.dart';
 
 /// A table whose four seats are the engine's bots, moved a step at a
 /// time by the test, which says when the felt hears of it.
-class _Table extends ChangeNotifier implements TableModel {
+class _Table extends ChangeNotifier with TableModel {
   _Table(int seed, {this.mySeat = 0, this.people = const {}}) : game = HeartsGame(seed: seed);
 
   @override
@@ -105,33 +105,11 @@ class _Table extends ChangeNotifier implements TableModel {
   @override
   String? playCard(Card card) => 'not here';
   @override
-  Card? get pendingPlay => null;
-  @override
-  Set<Card> get inFlight => const {};
-  @override
   String iconSeedOf(int seat) => names[seat];
-  @override
-  String iconNameOf(int seat) => names[seat];
   @override
   Avatar avatarOf(int seat) => Avatar.none;
   @override
   int? clockMs(int seat) => null;
-  @override
-  Set<Card> get passed => const {};
-  @override
-  bool get autoOffered => false;
-  @override
-  bool get autoPlay => false;
-  @override
-  void setAutoPlay(bool on) {}
-  @override
-  SeatReaction? reactionAt(int seat) => null;
-  @override
-  String nameAlone(int seat) => names[seat];
-  @override
-  int positionOf(int seat) => (seat - mySeat + seatCount) % seatCount;
-  @override
-  int seatAt(int position) => (position + mySeat) % seatCount;
 }
 
 /// The felt on a phone, rebuilt whenever [table] tells it, the device

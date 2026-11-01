@@ -31,8 +31,9 @@ class PaceStore {
       (await SharedPreferences.getInstance()).setString(_key, jsonEncode(pace.toJson()));
 
   /// A game's worth of this device's own cards folded in, and the
-  /// pace that leaves. [cardMs] is what the table measured for this
-  /// seat's own plays (`TableClient.myCardMs`).
+  /// pace that leaves. [cardMs] is how long this player took over each
+  /// of their own cards, as this device timed them
+  /// (`LiveController.myCardMs`).
   static Future<Pace> fold(Iterable<int> cardMs) async {
     // A turn this device was away for is not a think: a phone in a
     // pocket during a hand would otherwise read as somebody very slow

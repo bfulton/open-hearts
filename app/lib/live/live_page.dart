@@ -6,7 +6,7 @@ library;
 
 import 'dart:async';
 
-import 'package:engine/engine.dart';
+import 'package:engine/engine.dart' show Card, seatCount;
 import 'package:flutter/material.dart' hide Card;
 import 'package:go_router/go_router.dart';
 import 'package:table/table.dart';
@@ -22,10 +22,9 @@ import '../pages.dart';
 import '../reaction_mute.dart';
 import '../report.dart';
 import '../table_model.dart' show SeatLooks, TableModelHand;
-import '../table_page.dart' show ActionBar;
+import '../table_page.dart' show ActionBar, TableHand;
 import '../theme.dart';
 import '../ui/gone.dart';
-import '../ui/hand_fan.dart';
 import '../ui/header.dart';
 import '../ui/overlays.dart';
 import '../ui/reactions.dart';
@@ -68,6 +67,9 @@ class _LivePageState extends State<LivePage> {
   void _steppedBack() {
     if (!InUse.current.shut || !mounted) return;
     InUse.current.removeListener(_steppedBack);
+    // A page, sheet or dialog opened over the table goes with it.
+    final table = ModalRoute.of(context);
+    Navigator.of(context).popUntil((route) => route == table);
     _leave();
   }
 
@@ -81,7 +83,6 @@ class _LivePageState extends State<LivePage> {
 
   void _changed() => setState(() {});
 
-
   @override
   void dispose() {
     InUse.current.removeListener(_steppedBack);
@@ -94,7 +95,7 @@ class _LivePageState extends State<LivePage> {
     if (_c.awaitingPass) return _c.toggleSelected(card);
     if (!_c.awaitingPlay) return;
     final refusal = _c.playCard(card);
-    if (refusal != null) _say(refusal);
+    if (refusal != null) sayBriefly(context, refusal);
   }
 
   /// The table's own address, for somebody to watch it from: the game
@@ -103,25 +104,15 @@ class _LivePageState extends State<LivePage> {
     final link = tableLink(_c.spec.id);
     if (await shareLink(link)) return;
     await copyText(link.toString());
-    if (mounted) _say(context.l10n.linkCopied);
+    if (mounted) sayBriefly(context, context.l10n.linkCopied);
   }
 
-  /// The reactions to send (ui/reactions.dart), and the one picked said
-  /// for this player — by this device, the account's device in use: one
-  /// the account has been taken up from has already left its seat.
+  /// Shows the reaction picker (ui/reactions.dart) and sends the chosen
+  /// reaction, unless live play is shut on this device: the account
+  /// moved to another device or was suspended (net/in_use.dart, shut).
   Future<void> _pickReaction() async {
     final picked = await pickReaction(context);
     if (picked != null && mounted && !InUse.current.shut) _c.react(picked);
-  }
-
-  void _say(String message) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(
-        content: Text(message, textAlign: TextAlign.center),
-        duration: readingTime(message),
-        width: 260,
-      ));
   }
 
   /// Holding another player's badge: what this device does with their
@@ -314,138 +305,104 @@ class _LivePageState extends State<LivePage> {
     // this player's, below: the leave lands at once, and what that
     // screen says — the table could not hear from you — is not what
     // happened.
+    final l10n = context.l10n;
+    void close() => Navigator.of(context).pop();
     final cannotDeal = _c.client.cannotDeal;
     if (cannotDeal != null) {
-      return Scaffold(
-        body: Container(
-          decoration: const BoxDecoration(gradient: Felt.gradient),
-          child: SafeArea(
-            child: _Failed(
-              title: context.l10n.cannotDealTitle,
-              label: context.l10n.cannotDealLabel,
-              why: context.l10n.cannotDealWhy(cannotDeal),
-              onHome: () => Navigator.of(context).pop(),
-            ),
-          ),
+      return _FeltScreen(
+        child: _Failed(
+          title: l10n.cannotDealTitle,
+          label: l10n.cannotDealLabel,
+          why: l10n.cannotDealWhy(cannotDeal),
+          button: l10n.home,
+          onPressed: close,
         ),
       );
     }
     // A seat that is no longer this player's — their clock ran out, or
-    // their line was down at their turn — shows no table at all: watching a bot play your cards
-    // is not a thing to look at. Just what happened, and the way back.
+    // their line was down at their turn — shows no table at all:
+    // watching a bot play your cards is not a thing to look at. Just
+    // what happened, and the way back.
     if (!_c.amSeated) {
-      return Scaffold(
-        body: Container(
-          decoration: const BoxDecoration(gradient: Felt.gradient),
-          child: SafeArea(child: _Replaced(onBack: () => Navigator.of(context).pop())),
-        ),
+      return _FeltScreen(
+        child: _Failed(title: l10n.botTookYourSeat, why: l10n.tableCouldNotHear, button: l10n.back, onPressed: close),
       );
     }
     // A game that cannot go on ends, and says why: unscored, and
     // nothing left at the table to do but go.
     if (_c.failed) {
-      return Scaffold(
-        body: Container(
-          decoration: const BoxDecoration(gradient: Felt.gradient),
-          child: SafeArea(
-            child: _Failed(
-              title: context.l10n.connectionFailure,
-              label: context.l10n.houseGone,
-              why: context.l10n.houseGoneWhy,
-              onHome: () => Navigator.of(context).pop(),
-            ),
-          ),
+      return _FeltScreen(
+        child: _Failed(
+          title: l10n.connectionFailure,
+          label: l10n.houseGone,
+          why: l10n.houseGoneWhy,
+          button: l10n.home,
+          onPressed: close,
         ),
       );
     }
     final game = _c.game;
-    // What the player has committed is already off the hand.
-    // Nothing yet while a sealed table deals.
-    final hand = game.knowsHand(_c.mySeat) ? _c.handShown : <Card>[];
-    final legal = _c.legalNow;
-    final passing = _c.awaitingPass;
     final ended = _c.handJustEnded;
 
-    return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(gradient: Felt.gradient),
-        child: SafeArea(
-          child: Stack(
-            children: [
-              TableLayout(
-                // Where there is room beside the table, what a phone
-                // has to hide goes in it (ui/gone.dart).
-                rail: (width) => Gone(played: _c.playedThisHand, width: width),
-                header: TableHeader(
-                  game: game,
-                  menu: [
-                    MenuAction(context.l10n.shareToWatch, icon: Icons.visibility_outlined, onSelected: _shareToWatch),
-                    MenuAction(context.l10n.leaveTheTable, icon: Icons.logout, onSelected: _askToLeave, danger: true),
-                    MenuAction(context.l10n.tellUsWhatsBroken, icon: Icons.feedback_outlined, onSelected: () => showFeedback(context)),
-                    MenuAction(context.l10n.about, icon: Icons.info_outline, onSelected: () {
-                      openPage<void>(context, AppPage.about);
-                    }),
-                  ],
-                ),
-                // Who is here, in the felt's corner: the felt keeps it
-                // clear of the seat across the table.
-                felt: TableView(
-                  controller: _c,
-                  onHold: _aboutPlayer,
-                  corner: _presence(context),
-                  // Beside the player's own badge, while they sit here.
-                  react: _c.canReact && !InUse.current.shut ? ReactionButton(onPressed: _pickReaction) : null,
-                ),
-                below: _debugState(),
-                action: ActionBar(controller: _c, onPass: _c.confirmPass, note: _liveNote()),
-                hand: (landscape) => HandFan(
-                  hand: hand,
-                  onTap: _tapCard,
-                  playable: passing ? hand.toSet() : legal,
-                  selected: _c.selected,
-                  dimUnplayable: _c.awaitingPlay,
-                  forced: legal.length == 1 ? legal.first : null,
-                  justReceived: game.tricksPlayed == 0 ? game.receivedBy(_c.mySeat).toSet() : const {},
-                  // Where a card the player gives up goes, and where
-                  // the ones they are given come from: the side of the
-                  // screen the other end of the pass sits on. Through
-                  // the play a card that leaves has been played, and
-                  // rises to the table instead (ui/hand_fan.dart).
-                  passTo: game.phase == Phase.passing ? passesTo(_c) : null,
-                  receivedFrom: passesFrom(_c),
-                  spread: HandFan.spreadFor(landscape: landscape),
-                ),
-              ),
-              if (ended != null && !_c.done)
-                HandOverSheet(
-                  handNumber: ended.hand,
-                  scores: ended.scores,
-                  totals: ended.totals,
-                  moonShooter: ended.moonShooter,
-                  seats: _c.looks,
-                  mySeat: _c.mySeat,
-                  action: context.l10n.onWithIt,
-                  onNext: _c.dismissHandSheet,
-                ),
-              if (_c.done && _c.gameOverDue)
-                GameOverSheet(
-                  game: game,
-                  seats: _c.looks,
-                  mySeat: _c.mySeat,
-                  rating: _c.ratingChange,
-                  // Another game the way this one began, where the front
-                  // door knows how (lobby.dart); home beside it.
-                  action: _c.canPlayAgain ? context.l10n.playAgain : context.l10n.home,
-                  onNewGame: () => Navigator.of(context).pop(_c.canPlayAgain),
-                  onHome: _c.canPlayAgain ? () => Navigator.of(context).pop(false) : null,
-                  // The game is kept as it ends (lobby.dart), and its
-                  // address is the table's: in place of this one, so back
-                  // is home either way.
-                  onSeeGame: () => context.pushReplacement(located(tablePath(_c.spec.id))),
-                ),
-            ],
+    return _FeltScreen(
+      child: Stack(
+        children: [
+          TableLayout(
+            // Where there is room beside the table, what a phone
+            // has to hide goes in it (ui/gone.dart).
+            rail: (width) => Gone(played: _c.playedThisHand, width: width),
+            header: TableHeader(
+              game: game,
+              menu: [
+                MenuAction(context.l10n.shareToWatch, icon: Icons.visibility_outlined, onSelected: _shareToWatch),
+                MenuAction(context.l10n.leaveTheTable, icon: Icons.logout, onSelected: _askToLeave, danger: true),
+                MenuAction(context.l10n.tellUsWhatsBroken, icon: Icons.feedback_outlined, onSelected: () => showFeedback(context)),
+                MenuAction(context.l10n.about, icon: Icons.info_outline, onSelected: () {
+                  openPage<void>(context, AppPage.about);
+                }),
+              ],
+            ),
+            // Who is here, in the felt's corner: the felt keeps it
+            // clear of the seat across the table.
+            felt: TableView(
+              controller: _c,
+              onHold: _aboutPlayer,
+              corner: _presence(context),
+              // Beside the player's own badge, while they sit here.
+              react: _c.canReact && !InUse.current.shut ? ReactionButton(onPressed: _pickReaction) : null,
+            ),
+            below: _debugState(),
+            action: ActionBar(controller: _c, onPass: _c.confirmPass, note: _liveNote()),
+            hand: (landscape) => TableHand(controller: _c, onTap: _tapCard, landscape: landscape),
           ),
-        ),
+          if (ended != null && !_c.done)
+            HandOverSheet(
+              handNumber: ended.hand,
+              scores: ended.scores,
+              totals: ended.totals,
+              moonShooter: ended.moonShooter,
+              seats: _c.looks,
+              mySeat: _c.mySeat,
+              action: context.l10n.onWithIt,
+              onNext: _c.dismissHandSheet,
+            ),
+          if (_c.done && _c.gameOverDue)
+            GameOverSheet(
+              game: game,
+              seats: _c.looks,
+              mySeat: _c.mySeat,
+              rating: _c.ratingChange,
+              // Another game the way this one began, where the front
+              // door knows how (lobby.dart); home beside it.
+              action: _c.canPlayAgain ? context.l10n.playAgain : context.l10n.home,
+              onNewGame: () => Navigator.of(context).pop(_c.canPlayAgain),
+              onHome: _c.canPlayAgain ? () => Navigator.of(context).pop(false) : null,
+              // The game is kept as it ends (lobby.dart), and its
+              // address is the table's: in place of this one, so back
+              // is home either way.
+              onSeeGame: () => context.pushReplacement(located(tablePath(_c.spec.id))),
+            ),
+        ],
       ),
     );
   }
@@ -492,16 +449,32 @@ Future<bool> askToLeave(BuildContext context, LiveController c) async {
   }
 }
 
-/// The table went on without you.
-/// A game this device can go no further in — a connection failure, or
-/// a deal it can no longer run: what, why, and the way home.
+/// A screen of the live page on the felt.
+class _FeltScreen extends StatelessWidget {
+  const _FeltScreen({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+        body: Container(
+          decoration: const BoxDecoration(gradient: Felt.gradient),
+          child: SafeArea(child: child),
+        ),
+      );
+}
+
+/// A table this device can go no further at — a connection failure, a
+/// deal it can no longer run, or a seat a bot took: what happened, why,
+/// and the way out.
 class _Failed extends StatelessWidget {
-  const _Failed({required this.title, required this.label, required this.why, required this.onHome});
+  const _Failed({required this.title, this.label, required this.why, required this.button, required this.onPressed});
 
   final String title;
-  final String label;
+  final String? label;
   final String why;
-  final VoidCallback onHome;
+  final String button;
+  final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) {
@@ -519,53 +492,18 @@ class _Failed extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(title, style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w700, color: Palette.danger)),
-            const SizedBox(height: 4),
-            Text(label, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Palette.chrome)),
-            const SizedBox(height: 8),
+            if (label case final label?) ...[
+              const SizedBox(height: 4),
+              Text(label, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Palette.chrome)),
+              const SizedBox(height: 8),
+            ] else
+              const SizedBox(height: 6),
             Text(why, textAlign: TextAlign.center, style: const TextStyle(fontSize: 13, color: Palette.chromeDim)),
             const SizedBox(height: 16),
             FilledButton(
-              onPressed: onHome,
+              onPressed: onPressed,
               style: FilledButton.styleFrom(backgroundColor: Palette.gold, foregroundColor: Felt.dark),
-              child: Text(context.l10n.home),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _Replaced extends StatelessWidget {
-  const _Replaced({required this.onBack});
-
-  final VoidCallback onBack;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Container(
-        margin: const EdgeInsets.all(22),
-        padding: const EdgeInsets.all(22),
-        constraints: const BoxConstraints(maxWidth: 380),
-        decoration: BoxDecoration(
-          color: Felt.mid,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Palette.danger.withValues(alpha: 0.45)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(context.l10n.botTookYourSeat,
-                style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w700, color: Palette.danger)),
-            const SizedBox(height: 6),
-            Text(context.l10n.tableCouldNotHear,
-                textAlign: TextAlign.center, style: const TextStyle(fontSize: 13, color: Palette.chromeDim)),
-            const SizedBox(height: 16),
-            FilledButton(
-              onPressed: onBack,
-              style: FilledButton.styleFrom(backgroundColor: Palette.gold, foregroundColor: Felt.dark),
-              child: Text(context.l10n.back),
+              child: Text(button),
             ),
           ],
         ),

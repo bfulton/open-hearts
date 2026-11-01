@@ -40,7 +40,7 @@ class SeatLook {
   final bool bot;
 }
 
-abstract class TableModel implements Listenable {
+abstract mixin class TableModel implements Listenable {
   HeartsGame get game;
 
   /// The names around the table, seat order.

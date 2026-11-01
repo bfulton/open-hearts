@@ -19,7 +19,7 @@ import 'pacing.dart';
 import 'record_store.dart';
 import 'table_model.dart';
 
-class GameController extends ChangeNotifier implements TableModel {
+class GameController extends ChangeNotifier with TableModel {
   GameController({
     this.seed,
     this.paced = true,
@@ -105,12 +105,6 @@ class GameController extends ChangeNotifier implements TableModel {
 
   @override
   int get mySeat => humanSeat;
-
-  @override
-  int positionOf(int seat) => (seat - mySeat + seatCount) % seatCount;
-
-  @override
-  int seatAt(int position) => (position + mySeat) % seatCount;
 
   /// The words the table speaks in: the page sets them from the app's
   /// language (l10n/l10n.dart), and they are English until it does.
@@ -241,12 +235,6 @@ class GameController extends ChangeNotifier implements TableModel {
   }
 
   @override
-  Card? get pendingPlay => null;
-
-  @override
-  Set<Card> get inFlight => const {};
-
-  @override
   String iconSeedOf(int seat) => seat == humanSeat ? (mySeed.isEmpty ? 'you' : mySeed) : _bots[seat]!.persona.name;
 
   @override
@@ -268,14 +256,6 @@ class GameController extends ChangeNotifier implements TableModel {
   /// No clock at a solo table: the bots wait for you.
   @override
   int? clockMs(int seat) => null;
-
-  /// No reactions at a solo table: bots do not react, and there is
-  /// nobody else to react to.
-  @override
-  SeatReaction? reactionAt(int seat) => null;
-
-  @override
-  String nameAlone(int seat) => names[seat];
 
   @override
   Set<Card> get passed =>

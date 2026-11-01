@@ -16,9 +16,11 @@ import 'package:engine/engine.dart' as engine;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:open_hearts/about_page.dart';
 import 'package:open_hearts/avatar.dart';
 import 'package:open_hearts/live/live_controller.dart';
 import 'package:open_hearts/live/live_page.dart';
+import 'package:open_hearts/net/in_use.dart';
 import 'package:open_hearts/net/remote_config.dart';
 import 'package:open_hearts/net/report_error.dart' show noticed;
 import 'package:open_hearts/pacing.dart' show Pacing;
@@ -903,6 +905,9 @@ void main() {
     if (mine != null) {
       expect(live.controller.game.handOf(_me).length, mine, reason: 'not one of my cards was played for me');
     }
+    // Nor is what the table goes on to do kept for a screen that will
+    // never show it.
+    expect(live.controller.behind, contains('; 0 frames to show;'));
     expect(tester.takeException(), isNull);
   });
 
@@ -1111,6 +1116,24 @@ void main() {
       expect(live.controller.left, isTrue, reason: 'said, not left for the table to give up on');
       expect(live.controller.leftEarly, isTrue);
       expect(closed, 1);
+      await tester.pump(LiveController.leaveBeat);
+    });
+
+    testWidgets('stepping back for another device closes what is open over the table, and the table with it', (tester) async {
+      addTearDown(() => InUse.current = InUse());
+      final live = LiveHarness();
+      final open = await openThroughApp(tester, live);
+      await tester.tap(find.bySemanticsLabel('Menu'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('About'));
+      await tester.pumpAndSettle();
+      expect(find.byType(AboutPage), findsOneWidget);
+      InUse.current.stepBack();
+      await tester.pumpAndSettle();
+      expect(find.byType(AboutPage), findsNothing);
+      expect(find.byType(LivePage), findsNothing, reason: 'back at the door, not at a table with a bot in the seat');
+      expect(live.controller.left, isTrue);
+      expect(await open.closed, isNull);
       await tester.pump(LiveController.leaveBeat);
     });
 

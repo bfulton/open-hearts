@@ -119,7 +119,6 @@ class _TablePageState extends State<TablePage> {
 
   void _onGameChanged() => setState(() {});
 
-
   @override
   void dispose() {
     _tutorial
@@ -141,7 +140,7 @@ class _TablePageState extends State<TablePage> {
     }
     if (!controller.awaitingPlay) return;
     final refusal = controller.playCard(card);
-    if (refusal != null) _say(refusal);
+    if (refusal != null) sayBriefly(context, refusal);
   }
 
   /// The note up now, where this is the hand a new player is taught on:
@@ -156,25 +155,12 @@ class _TablePageState extends State<TablePage> {
 
   Future<void> _copyRecord() async {
     await copyText(_controller.recordText);
-    if (mounted) _say(context.l10n.recordCopied);
-  }
-
-  void _say(String message) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(
-        content: Text(message, textAlign: TextAlign.center),
-        duration: readingTime(message),
-        width: 260,
-      ));
+    if (mounted) sayBriefly(context, context.l10n.recordCopied);
   }
 
   @override
   Widget build(BuildContext context) {
     final game = _controller.game;
-    final hand = _controller.handShown;
-    final legal = _controller.legalNow;
-    final passing = _controller.awaitingPass;
 
     return Scaffold(
       body: Container(
@@ -208,27 +194,7 @@ class _TablePageState extends State<TablePage> {
                   controller: _controller,
                   onPass: _controller.confirmPass,
                 ),
-                hand: (landscape) => HandFan(
-                  hand: hand,
-                  onTap: _tapCard,
-                  playable: passing
-                      ? hand.toSet()
-                      : legal,
-                  selected: _controller.selected,
-                  dimUnplayable: _controller.awaitingPlay,
-                  forced: legal.length == 1 ? legal.first : null,
-                  justReceived: game.tricksPlayed == 0
-                      ? game.receivedBy(_controller.mySeat).toSet()
-                      : const {},
-                  // Where a card the player gives up goes, and where
-                  // the ones they are given come from: the side of the
-                  // screen the other end of the pass sits on. Through
-                  // the play a card that leaves has been played, and
-                  // rises to the table instead (ui/hand_fan.dart).
-                  passTo: game.phase == Phase.passing ? passesTo(_controller) : null,
-                  receivedFrom: passesFrom(_controller),
-                  spread: HandFan.spreadFor(landscape: landscape),
-                ),
+                hand: (landscape) => TableHand(controller: _controller, onTap: _tapCard, landscape: landscape),
               ),
 
               if (game.phase == Phase.handOver && _controller.sheetDue)
@@ -257,6 +223,42 @@ class _TablePageState extends State<TablePage> {
   }
 }
 
+/// The player's hand along the bottom of the table, alone or live: what
+/// may be picked or played now, the cards just received, and where
+/// passed cards go and come from. Empty while a sealed table deals,
+/// before this device can open its hand.
+class TableHand extends StatelessWidget {
+  const TableHand({super.key, required this.controller, required this.onTap, required this.landscape});
+
+  final TableModel controller;
+  final ValueChanged<Card> onTap;
+  final bool landscape;
+
+  @override
+  Widget build(BuildContext context) {
+    final game = controller.game;
+    // What the player has committed is already off the hand.
+    final hand = game.knowsHand(controller.mySeat) ? controller.handShown : <Card>[];
+    final legal = controller.legalNow;
+    return HandFan(
+      hand: hand,
+      onTap: onTap,
+      playable: controller.awaitingPass ? hand.toSet() : legal,
+      selected: controller.selected,
+      dimUnplayable: controller.awaitingPlay,
+      forced: legal.length == 1 ? legal.first : null,
+      justReceived: game.tricksPlayed == 0 ? game.receivedBy(controller.mySeat).toSet() : const {},
+      // Where a card the player gives up goes, and where the ones they
+      // are given come from: the side of the screen the other end of
+      // the pass sits on. Through the play a card that leaves has been
+      // played, and rises to the table instead (ui/hand_fan.dart).
+      passTo: game.phase == Phase.passing ? passesTo(controller) : null,
+      receivedFrom: passesFrom(controller),
+      spread: HandFan.spreadFor(landscape: landscape),
+    );
+  }
+}
+
 /// The line between the felt and your hand: what the game wants from you,
 /// and the Pass button when it wants three cards.
 ///
@@ -273,9 +275,10 @@ class ActionBar extends StatelessWidget {
   final TableModel controller;
   final VoidCallback onPass;
 
-  /// A line that takes the place of the default note when there is
-  /// something more pressing to say — a live table's pause, or a boot
-  /// clock.
+  /// A line that takes the place of the default note when a live table
+  /// has something more pressing to say (live/live_page.dart): a relay
+  /// refusal, a lost connection, a departed player's hand being opened,
+  /// someone reconnecting, or the deal in progress.
   final Widget? note;
 
   static const _padding = EdgeInsets.fromLTRB(14, 4, 14, 2);
