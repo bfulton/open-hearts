@@ -5,6 +5,7 @@ library;
 
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:service/service.dart';
 import 'package:table/table.dart';
@@ -70,6 +71,24 @@ void main() {
     final signal = tb.signals.first.timeout(const Duration(seconds: 5));
     ta.signal(b.publicKey, Signal(from: a.publicKey, type: 'offer', payload: const {'sdp': 'x'}));
     expect((await signal).type, 'offer');
+    ta.close();
+    tb.close();
+  });
+
+  test('a signal nobody listens for is not opened', () async {
+    final a = SchnorrSigner.generate();
+    final b = _Counting(SchnorrSigner.generate());
+    final ta = RelayTransport(relays: [r1.url], signer: a, table: 'unheard');
+    final tb = RelayTransport(relays: [r1.url], signer: b, table: 'unheard');
+    await Future.wait([ta.allReady, tb.allReady]).timeout(const Duration(seconds: 5));
+    final offer = Signal(from: a.publicKey, type: 'offer', payload: const {'sdp': 'x'});
+    ta.signal(b.publicKey, offer);
+    await Future<void>.delayed(const Duration(milliseconds: 300));
+    expect(b.exchanges, 0, reason: 'opening a signal costs a key exchange with whoever sent it');
+    final heard = tb.signals.first.timeout(const Duration(seconds: 5));
+    ta.signal(b.publicKey, offer);
+    expect((await heard).type, 'offer');
+    expect(b.exchanges, 1);
     ta.close();
     tb.close();
   });
@@ -200,4 +219,27 @@ void main() {
     pa.close();
     pb.close();
   });
+}
+
+/// [inner], counting the key exchanges a signal is opened with.
+class _Counting implements Signer {
+  _Counting(this.inner);
+
+  final Signer inner;
+  int exchanges = 0;
+
+  @override
+  PublicKey get publicKey => inner.publicKey;
+
+  @override
+  String sign(String digestHex) => inner.sign(digestHex);
+
+  @override
+  Uint8List sharedSecretWith(PublicKey other) => inner.sharedSecretWith(other);
+
+  @override
+  Uint8List sharedXWith(PublicKey other) {
+    exchanges++;
+    return inner.sharedXWith(other);
+  }
 }

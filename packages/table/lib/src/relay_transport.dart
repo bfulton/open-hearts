@@ -187,8 +187,10 @@ class RelayTransport implements ReactionLane {
   /// real event under it still gets in.
   bool _onEvent(Map<String, Object?> raw) {
     // A reaction nobody here shows — the house's client, say — is not
-    // worth its signature.
+    // worth its signature, nor a signal nobody here reads the key
+    // exchange that opens it.
     if (raw['kind'] == TableKinds.react && !_reactions.hasListener) return true;
+    if (raw['kind'] == TableKinds.signal && !_signals.hasListener) return true;
     final e = NostrEvent.parse(raw);
     if (e == null || e.tag('t') != table) return false;
     if (e.kind == TableKinds.lobby || e.kind == TableKinds.waiting) {
