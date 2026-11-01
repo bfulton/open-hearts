@@ -749,4 +749,35 @@ void main() {
       a.dispose();
     });
   });
+
+  test('a field of the wrong type in a stored start, a beat or a start is taken as left out, and the room still opens', () {
+    fakeAsync((async) {
+      final bus = Bus();
+      int now() => async.elapsed.inMilliseconds;
+      final ghost = FakeSigner('ghost');
+      void said(Map<String, Object?> content, {bool stored = false}) =>
+          bus.publish(NostrEvent.sign(ghost, kind: stored ? 4244 : 24245, content: jsonEncode(content), tags: const [['t', 'ROOM']]),
+              ephemeral: !stored);
+      // Kept by the relay, read inside the room's constructor.
+      bus.stored.add(NostrEvent.sign(ghost, kind: 4244, content: jsonEncode({'kind': 'start', 'at': 'soon', 'seats': 'all'}),
+          tags: const [['t', 'ROOM']]));
+      final a = Room(house: _house, canDeal: true, channel: bus.attach(FakeSigner('a')), code: 'ROOM', myName: 'Ada', nowMs: now);
+      expect(a.members.map((m) => m.name), ['Ada']);
+
+      said({'kind': 'here', 'name': 5, 'since': 'then', 'policy': 'p', 'seed': 'x'});
+      async.elapse(const Duration(seconds: 1));
+      expect(a.members.map((m) => m.name), unorderedEquals(['Ada', 'Someone']), reason: 'in the room, under no name');
+
+      said({
+        ..._inFull, 'kind': 'start', 'seed': 'x', 'policy': botPolicyVersion, 'sealed': true, 'at': now(), 'target': 'all',
+        'seats': [
+          {'key': a.me, 'name': 'Ada'}, {'key': ghost.publicKey, 'name': 'Ghost'}, {'bot': 'Romeo'}, {'bot': 'Juliet'},
+        ],
+      });
+      async.elapse(const Duration(seconds: 1));
+      expect(a.spec, isNull, reason: 'no seed is no table');
+      expect(a.refusal, isNull);
+      a.dispose();
+    });
+  });
 }

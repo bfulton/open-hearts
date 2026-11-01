@@ -369,18 +369,20 @@ class Room extends ChangeNotifier {
         if (!licenceFits(licence, e.pubkey, at: DateTime.fromMillisecondsSinceEpoch(now))) return;
         if (licence != null && licence.account == this.licence?.account) return;
         final p = _others[e.pubkey];
-        final member = RoomMember(e.pubkey, c['name'] as String? ?? 'Someone',
-            since: c['since'] as int? ?? now, avatar: Avatar.fromJson(c['avatar'], withPicture: false), licence: licence);
+        final member = RoomMember(e.pubkey, _orNull<String>(c['name']) ?? 'Someone',
+            since: _orNull<int>(c['since']) ?? now, avatar: Avatar.fromJson(c['avatar'], withPicture: false), licence: licence);
+        final policy = _orNull<int>(c['policy']);
+        final theirSeed = _orNull<int>(c['seed']);
         if (p == null || now - p.lastHeard > staleMs) {
           // New, or back after going quiet: an arrival either way, and
           // the countdown starts over.
-          _others[e.pubkey] = _Present(member, c['policy'] as int?, c['seed'] as int? ?? 0)..lastHeard = now;
+          _others[e.pubkey] = _Present(member, policy, theirSeed ?? 0)..lastHeard = now;
           _lastArrival = now;
         } else {
           p
             ..member = member
-            ..policy = c['policy'] as int?
-            ..seed = c['seed'] as int? ?? p.seed
+            ..policy = policy
+            ..seed = theirSeed ?? p.seed
             ..lastHeard = now;
         }
         final held = _heldStart;
@@ -392,7 +394,7 @@ class Room extends ChangeNotifier {
         if (spec != null) return;
         // Recent, or not this room's: the relay keeps starts, and a
         // code long finished with gets reused.
-        final at = c['at'] as int?;
+        final at = _orNull<int>(c['at']);
         if (at == null || (now - at).abs() > 120000) return;
         // One that seats this device has to be one this device could
         // be at: from someone here — heard within the stale window, as
@@ -407,7 +409,7 @@ class Room extends ChangeNotifier {
         // any beat of the leader's comes round — and none will, since
         // everyone else is at the table and has stopped beating — so
         // holding it would leave the fourth in a room the table has left.
-        final seats = c['seats'] as List? ?? const [];
+        final seats = _orNull<List<Object?>>(c['seats']) ?? const [];
         bool holds(PublicKey? key) => seats.any((raw) => raw is Map && raw['key'] == key);
         final itsOwn = holds(e.pubkey) && at >= since - _skewMs;
         if (holds(me) && !_present(e.pubkey) && !itsOwn) {
@@ -499,7 +501,8 @@ class Room extends ChangeNotifier {
   }
 
   void _applyStart(Map<String, Object?> c) {
-    final seed = c['seed'] as int;
+    final seed = _orNull<int>(c['seed']);
+    if (seed == null) return;
     final seats = <SeatHolder>[];
     final names = <int, String>{};
     final avatars = <int, Avatar>{};
@@ -571,7 +574,7 @@ class Room extends ChangeNotifier {
       sealed: c['sealed'] == true,
       // The leader's game, not this device's: a start event from a
       // build that had no say says fifty.
-      target: c['target'] as int? ?? gameOverScore,
+      target: _orNull<int>(c['target']) ?? gameOverScore,
       timing: timing,
       house: house,
       salt: salt,
@@ -603,3 +606,8 @@ class Room extends ChangeNotifier {
     super.dispose();
   }
 }
+
+/// [value] when it is a [T], and null when it is not: what comes over the
+/// relay is whatever its sender wrote, so a field of the wrong type is
+/// taken as one left out.
+T? _orNull<T>(Object? value) => value is T ? value : null;
