@@ -90,8 +90,8 @@ const watched = [];
 /// or this machine is answered by the first of [stubs] whose pattern
 /// (by URL) it matches, as a function of the route, and otherwise
 /// refused.
-async function open(browser, { origin, stubs = {} }) {
-  const context = await browser.newContext({ viewport: phone, locale: 'en-US', hasTouch: true, isMobile: true });
+async function open(browser, { origin, stubs = {}, serviceWorkers = 'allow' }) {
+  const context = await browser.newContext({ viewport: phone, locale: 'en-US', hasTouch: true, isMobile: true, serviceWorkers });
   await agreedToTerms(context);
   const refused = [];
   watched.push(refused);
@@ -269,15 +269,20 @@ const flows = [
   {
     name: 'what the policy is there to refuse, it refuses',
     async run({ app, browser }) {
-      const { context, page, refused } = await open(browser, { origin: app.url });
+      // No service worker: the app's own would answer the probe's request
+      // itself, and a route does not see what a service worker answers
+      // (not in Playwright 1.56, the one CI installs).
+      const { context, page, refused } = await open(browser, { origin: app.url, serviceWorkers: 'block' });
       // A script of the app's own origin that does what the address asks
       // of it (?run=). The page's own scripts are allowed, and are what
       // eval is looked for from: code the tool that drives the browser
       // hands it is exempt from the policy, and would show nothing.
       await context.route(`${app.url}/csp-probe.js*`, (route) =>
         route.fulfill({ status: 200, contentType: 'text/javascript', body: new URL(route.request().url()).searchParams.get('run') }));
+      // The probe says it ran before it tries, so that a refusal that never
+      // came can be told from a probe that never ran.
       const probe = (run) =>
-        `const s = document.createElement('script'); s.src = '/csp-probe.js?run=' + encodeURIComponent(${JSON.stringify(run)}); document.head.append(s)`;
+        `const s = document.createElement('script'); s.src = '/csp-probe.js?run=' + encodeURIComponent('window.ohProbeRan = true; ' + ${JSON.stringify(run)}); document.head.append(s)`;
       await page.goto(app.at('/?e2e=1'));
       await licensed(page);
       noRefusals(refused);
@@ -296,9 +301,11 @@ const flows = [
       ];
       for (const [what, code, expected] of tries) {
         refused.length = 0;
+        await page.evaluate('window.ohProbeRan = false');
         await page.evaluate(code);
-        await until(`${what} to be refused`, () => refused.some((r) => r.startsWith('event: ') && expected.test(r)), { timeout: 5000 }).catch(() => {
-          throw new Error(`${what} was not refused (saw ${refused.join(' ; ') || 'nothing'})`);
+        await until(`${what} to be refused`, () => refused.some((r) => r.startsWith('event: ') && expected.test(r)), { timeout: 5000 }).catch(async () => {
+          const probed = code.includes('csp-probe') ? ((await page.evaluate('window.ohProbeRan === true')) ? ', and its probe ran' : ', and its probe never ran') : '';
+          throw new Error(`${what} was not refused (saw ${refused.join(' ; ') || 'nothing'}${probed})`);
         });
       }
       await sleep(300);
