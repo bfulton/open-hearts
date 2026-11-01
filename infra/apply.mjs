@@ -14,7 +14,7 @@
 // those are checked to exist and not compared). A dry run only reads.
 //
 // What it says comes in four kinds: `would …` is a change --apply makes;
-// `by hand:` is a difference only the operator (or a wrangler deploy) can
+// `by hand:` is a difference only the operator (or a deploy) can
 // fix — a secret this has no value for, a setting the API will not
 // take; `unread:` is something the credentials could not read, with
 // Cloudflare's or Stripe's own words; `ok` is a part that matches. No
@@ -38,6 +38,7 @@ import {
   portalPlan,
   pricePlan,
   recordLine,
+  relayDeploy,
   relayProblems,
   rulesPlan,
   settingsPlan,
@@ -184,12 +185,12 @@ async function applyPages() {
 
 async function applyStores() {
   const namespaces = await all(`${acct}/storage/kv/namespaces`);
-  for (const title of kv) {
-    if (namespaces.some((n) => n.title === title)) continue;
+  const missing = kv.filter((title) => !namespaces.some((n) => n.title === title));
+  for (const title of missing) {
     say(`create KV namespace ${title}`);
     if (write) await cf('POST', `${acct}/storage/kv/namespaces`, { title });
   }
-  ok(`KV namespaces ${kv.join(', ')}`);
+  if (!missing.length) ok(`KV namespaces ${kv.join(', ')}`);
 
   for (const b of r2) {
     const base = `${acct}/r2/buckets/${b.name}`;
@@ -226,7 +227,7 @@ async function applyStores() {
       say(`remove R2 bucket ${b.name}'s CORS rules`);
       if (write) await cf('DELETE', `${base}/cors`);
     }
-    if (counts.change + counts.owner === before) ok(`R2 bucket ${b.name}: ${bucket.location}, ${bucket.storage_class}, no public address, no custom domain, no CORS`);
+    if (counts.change + counts.owner === before) ok(`R2 bucket ${b.name}: ${bucket.location}, ${bucket.storage_class}, ${b.publicDevUrl ? 'its' : 'no'} r2.dev address, ${b.customDomains.length ? `served at ${b.customDomains.join(', ')}` : 'no custom domain'}, no CORS`);
   }
 
   const keys = await get(`${acct}/calls/turn_keys`);
@@ -257,8 +258,7 @@ async function applyRelay() {
       if (toml.containers?.length) live.containers = await get(`${acct}/containers/applications`);
     }
     const problems = relayProblems(toml, def, live);
-    const deploy = def.env ? `./oh deploy relay --${def.env} --apply` : 'deploy with wrangler from service/do';
-    for (const line of problems) owner(`relay ${name}: ${line} (${deploy})`);
+    for (const line of problems) owner(`relay ${name}: ${line} (${relayDeploy(def)})`);
     if (!problems.length) {
       const routes = (toml.routes ?? []).map((r) => r.pattern).join(', ');
       const secrets = [...def.secrets, ...(def.ownSecrets ?? [])];
@@ -510,10 +510,13 @@ async function cloudflare() {
 
 // ---- Stripe -------------------------------------------------------------------
 
+/// Stripe's API, read and written in the version the service's webhook
+/// is read in, as the service calls it, not whichever the account
+/// defaults to.
 async function st(method, path, body) {
   const res = await fetch(`https://api.stripe.com/v1${path}`, {
     method,
-    headers: { Authorization: `Bearer ${process.env.STRIPE_API_KEY}`, 'content-type': 'application/x-www-form-urlencoded' },
+    headers: { Authorization: `Bearer ${process.env.STRIPE_API_KEY}`, 'stripe-version': stripe.webhooks[0].apiVersion, 'content-type': 'application/x-www-form-urlencoded' },
     body: body === undefined ? undefined : formBody(body),
   });
   const out = await res.json().catch(() => null);

@@ -14,10 +14,11 @@
 //   ./e2e/build.sh && node e2e/site_shots.mjs
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { languages as siteLanguages } from '../site/build.mjs';
 import { chromium } from './browser.mjs';
 import { click, has, labelOf, log, root, serveApp, waitFor } from './drive.mjs';
 
-const languages = ['en', 'es', 'pt', 'de', 'fr'];
+const languages = siteLanguages.map((l) => l.code);
 const words = (code) => JSON.parse(readFileSync(join(root, 'app', 'lib', 'l10n', `app_${code}.arb`), 'utf8'));
 const exactly = (text) => new RegExp(`^${text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`);
 const out = (name) => join(root, 'site', 'public', 'img', name);

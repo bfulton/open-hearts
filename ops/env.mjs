@@ -49,13 +49,21 @@ export async function readConfig() {
   return JSON.parse(await readFile(join(root, 'config/openhearts.json'), 'utf8'));
 }
 
-/// The one Wrangler version everything is deployed with, where deploy.sh
-/// pins it.
+/// Wrangler, as everything here runs it: the version
+/// ops/wrangler/package.json names, its whole dependency tree locked
+/// (ops/wrangler/wrangler).
+export const WRANGLER = join(root, 'ops/wrangler/wrangler');
+
+/// The one Wrangler version everything is deployed with.
 export async function wranglerVersion() {
-  const script = await readFile(join(root, 'deploy.sh'), 'utf8');
-  const version = /^WRANGLER_VERSION=(\S+)$/m.exec(script)?.[1];
-  if (!version) throw new Failed('no WRANGLER_VERSION in deploy.sh');
-  return version;
+  return JSON.parse(await readFile(join(root, 'ops/wrangler/package.json'), 'utf8')).dependencies.wrangler;
+}
+
+/// [env] without the credentials Wrangler and a deploy's build have no
+/// use for: every one of [CREDENTIALS] but Cloudflare's. A deploy runs
+/// code from npm, and a preview's runs the branch's own.
+export function cloudflareOnly(env) {
+  return Object.fromEntries(Object.entries(env).filter(([name]) => !(name in CREDENTIALS) || name.startsWith('CLOUDFLARE_')));
 }
 
 /// The relay worker's wrangler.toml, as wrangler deploys it for

@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# Wrangler, as every deploy and every secret is run with: the version
+# package.json here names, with its whole dependency tree as
+# package-lock.json locks it, rather than resolved afresh as npx would.
+# Installed here with npm ci the first time, and again whenever the
+# lockfile changes.
+#
+#   ops/wrangler/wrangler <what wrangler takes>
+set -euo pipefail
+here="$(cd "$(dirname "$0")" && pwd)"
+if ! cmp -s "$here/package-lock.json" "$here/node_modules/.installed-lock.json"; then
+  npm ci --prefix "$here" --no-audit --no-fund --loglevel=error < /dev/null >&2
+  cp "$here/package-lock.json" "$here/node_modules/.installed-lock.json"
+fi
+exec "$here/node_modules/.bin/wrangler" "$@"

@@ -155,13 +155,15 @@ export async function main(argv, ctx = context()) {
       ctx.log(c ? helpOf(c) : overview());
       return 0;
     }
-    const words = argv.filter((a) => !a.startsWith('--'));
-    const c = commandOf(words);
+    // The command's words come first: a flag among them is not dropped
+    // but refused, since a dropped --preview or --full would change what
+    // is done.
+    const c = commandOf(argv);
     if (!c) {
       const near = COMMANDS.filter((x) => x.words[0] === argv[0]).map((x) => ['oh', ...x.words].join(' '));
       throw new Usage(`no command ${argv.join(' ')}${near.length ? `; did you mean ${near.join(', ')}?` : '; oh help lists them'}`);
     }
-    const after = argv.slice(argv.indexOf(c.words.at(-1)) + 1);
+    const after = argv.slice(c.words.length);
     if (after.includes('--help') && !(c.rest && after.indexOf('--') >= 0 && after.indexOf('--') < after.indexOf('--help'))) {
       ctx.log(helpOf(c));
       return 0;

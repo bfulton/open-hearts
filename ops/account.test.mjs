@@ -12,6 +12,8 @@ import { proRata, refundFor } from './billing.mjs';
 import { main } from './oh.mjs';
 import { pictureDigest } from '../service/functions/pictures.mjs';
 import { memoryStore } from '../service/functions/rows.mjs';
+import { STRIPE_VERSION } from '../service/functions/stripe.mjs';
+import { findAccounts } from '../service/tool/find.mjs';
 
 const account = '0123456789abcdef0123456789abcdef';
 const day = 86400000;
@@ -321,4 +323,15 @@ test('found by a picture: by its SHA-256 or its copy\'s address, each account th
   const named = context(store, fakeStripe());
   named.pictures = async () => assert.fail('the pictures read for a name');
   assert.equal(await main(['account', 'find', 'Ada'], named), 0);
+});
+
+test("an account is looked for by email in the webhook's Stripe API version, as the service asks Stripe", async () => {
+  const asked = [];
+  const fetchImpl = async (url, init) => {
+    asked.push(init.headers);
+    return Response.json({ data: [], has_more: false });
+  };
+  const store = Object.assign(memoryStore(), { list: async () => [] });
+  await findAccounts(store, 'ada@example.com', { stripeKey: 'rk_live_x', fetchImpl });
+  assert.deepEqual(asked, [{ authorization: 'Bearer rk_live_x', 'stripe-version': STRIPE_VERSION }]);
 });

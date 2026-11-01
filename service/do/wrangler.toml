@@ -1,6 +1,6 @@
-# The per-tag relay (worker.mjs, docs/explanation/service.md).
-#
-#   cd service/do && npx wrangler@4.130.0 deploy
+# The per-tag relay (worker.mjs, docs/explanation/service.md), deployed
+# by ./oh deploy relay (ops/release.mjs), which runs Wrangler as
+# ops/wrangler locks it, with the PhotoDNA module in place.
 #
 # The signature wasm is the app's own copy, imported from where it
 # already lives rather than duplicated here, so there is one file to

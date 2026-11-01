@@ -71,7 +71,7 @@ suite_crypto() {
 # The scripts that are not anybody's suite: that each still parses.
 suite_scripts() {
   local f ok=0
-  for f in check.sh deploy.sh build_phone.sh oh e2e/*.sh crypto/*.sh app/ios/*.sh service/bench/build.sh; do bash -n "$f" || ok=1; done
+  for f in check.sh deploy.sh build_phone.sh oh ops/wrangler/wrangler e2e/*.sh crypto/*.sh app/ios/*.sh service/bench/build.sh; do bash -n "$f" || ok=1; done
   for f in e2e/*.mjs app/tool/*.mjs; do node --check "$f" || ok=1; done
   # Nothing licensed to Open Hearts as confidential is committed
   # (ops/no_private.mjs).
@@ -259,6 +259,8 @@ quick() {
       site/*) add site e2e_site ops ;;
       config/*) add site functions infra ops ;;
       infra/*) add infra ops ;;
+      # The New Relic definition: infra's suite loads its script.
+      observability/*) add infra ops ;;
       ops/*|oh) add ops ;;
       e2e/*.test.mjs) add workers ;;
       e2e/*|*.sh|.github/*) add scripts ;;

@@ -8,7 +8,8 @@ Use this guide to build a signed store release of the app for iOS or Android.
 
 - Install Node, Flutter and Rust. CI pins both versions in `.github/workflows/ci.yml`. Run `flutter pub get` in `app/` once.
 - Check that `config/openhearts.json` has `serviceKey` and `appOrigin`. `app/tool/defines.mjs` refuses to write the build's defines without them. For the fields, see [`config/openhearts.json`](../reference/configuration.md#configopenheartsjson).
-- Set the release's version in `app/pubspec.yaml` (`version:`, the name before the `+` and the build number after it). Each store upload needs a higher build number than the last.
+- A store release is production, so it is built from `main` as it was reviewed: `HEAD` must be `origin/main`, with nothing uncommitted and no untracked file. `build_phone.sh` checks this itself (`ops/gate.mjs`) before it builds anything.
+- Set the release's version in `app/pubspec.yaml` (`version:`, the name before the `+` and the build number after it), and merge that change to `main` before you build. Each store upload needs a higher build number than the last.
 - For iOS: a Mac with Xcode, set up with the team that signs the app. The app's App ID needs the **Declared Age Range** capability (Xcode: the Runner target, Signing & Capabilities). `app/ios/Runner/Runner.entitlements` asks for it, but automatic signing drops an entitlement the App ID lacks, and the store then gives the app no age to go by ([live play](../explanation/live-play.md#getting-to-a-table)).
 - If this release is a significant change under the app store laws (a change to what the app collects or shares, its age rating, how it makes money, or what it is for, for instance), tell the stores before it goes out, as each store's console asks. Google Play then asks a supervised player's parent to approve it, and the app holds live play closed for that player until they do. The app does not yet show Apple's own sheet for such a change (`showSignificantUpdateAcknowledgment`, iOS 26.4); what a change needs on the App Store is a question for counsel.
 - For Android: the Android SDK with the NDK that Flutter builds with. `crypto/build_android.sh` finds it through `ANDROID_NDK_HOME`, or under `ndk/` in `ANDROID_HOME`, `ANDROID_SDK_ROOT` or the SDK's usual place.
@@ -52,7 +53,7 @@ Use this guide to build a signed store release of the app for iOS or Android.
 
 ## Check it worked
 
-1. The build finished. A release is refused when it lacks the service key (by `app/ios/release_check.sh` in Xcode, and by Gradle), when the native libraries are missing (Xcode cannot find the XCFrameworks, or Gradle finds no `libdeal.so` for an ABI), or when `app/android/key.properties` is missing. `crypto/build_android.sh` refuses a 64-bit library that isn't aligned to 16 KB, which Google Play turns away.
+1. The build finished. A release is refused when `HEAD` is not `origin/main` or the checkout holds anything uncommitted, when it lacks the service key (by `app/ios/release_check.sh` in Xcode, and by Gradle), when the native libraries are missing (Xcode cannot find the XCFrameworks, or Gradle finds no `libdeal.so` for an ABI), or when `app/android/key.properties` is missing. `crypto/build_android.sh` refuses a 64-bit library that isn't aligned to 16 KB, which Google Play turns away.
 1. Check that the release was compiled with the key in the config:
 
    ```bash

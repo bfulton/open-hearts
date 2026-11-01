@@ -5,12 +5,15 @@
 // none of them production's, since a preview runs whatever branch was
 // deployed to it. Nobody buys anything on a preview: the operator
 // invites the people who play there.
+//
+// And `oh house key` and `oh key mint`, which make production's two key
+// pairs the same way, their secrets shown to nobody.
 
 import { randomBytes } from 'node:crypto';
 import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
-import { Failed, relayWrangler, root, wranglerVersion } from './env.mjs';
+import { Failed, WRANGLER, cloudflareOnly, relayWrangler, root } from './env.mjs';
 import { pages } from '../infra/cloudflare.mjs';
 import { accountFor, makeBackups } from '../service/functions/accounts.mjs';
 import { dayAfter } from '../service/functions/rows.mjs';
@@ -41,20 +44,20 @@ export function withPreviewKey(text, key, field = 'serviceKey') {
   return `${text.slice(0, end)}${line[1]}"preview": ${member({ [field]: key })},\n${text.slice(end)}`;
 }
 
-/// [text], config/openhearts.json, with production's houseKey made
-/// [key], where it is or beside serviceKey, and everything else in it as
-/// it was written.
-export function withHouseKey(text, key) {
-  const had = /^( *)"houseKey": (?:"[0-9a-f]*"|null),\n/m.exec(text);
-  if (had) return `${text.slice(0, had.index)}${had[1]}"houseKey": ${JSON.stringify(key)},\n${text.slice(had.index + had[0].length)}`;
+/// [text], config/openhearts.json, with production's [field] — its
+/// houseKey, or its serviceKey — made [key], where it is or beside
+/// serviceKey, and everything else in it as it was written.
+export function withProductionKey(text, key, field = 'houseKey') {
+  const had = new RegExp(`^( *)"${field}": (?:"[0-9a-f]*"|null),\\n`, 'm').exec(text);
+  if (had) return `${text.slice(0, had.index)}${had[1]}"${field}": ${JSON.stringify(key)},\n${text.slice(had.index + had[0].length)}`;
   const line = /^( *)"serviceKey": "[0-9a-f]*",\n/m.exec(text);
-  if (!line) throw new Failed('config/openhearts.json has no "serviceKey" to put the house\'s beside');
+  if (!line) throw new Failed(`config/openhearts.json has no "serviceKey" line to put ${field} in or beside`);
   const end = line.index + line[0].length;
-  return `${text.slice(0, end)}${line[1]}"houseKey": ${JSON.stringify(key)},\n${text.slice(end)}`;
+  return `${text.slice(0, end)}${line[1]}"${field}": ${JSON.stringify(key)},\n${text.slice(end)}`;
 }
 
-/// The pair service_key.dart --json said, {key, secret}, or null. What it
-/// says holds the secret: it is read here and said to nobody.
+/// The pair service_key.dart said, {key, secret}, or null. What it says
+/// holds the secret: it is read here and said to nobody.
 function pairIn(out) {
   for (const line of out.split('\n').reverse()) {
     try {
@@ -70,7 +73,7 @@ function pairIn(out) {
 /// A new key pair, made by service_key.dart and said to nobody: {key,
 /// secret}. Failed when none was made.
 async function mintPair(ctx) {
-  const made = await ctx.capture('dart', ['run', 'bin/service_key.dart', '--json'], { cwd: join(root, 'service') });
+  const made = await ctx.capture('dart', ['run', 'bin/service_key.dart'], { cwd: join(root, 'service') });
   const pair = made.code === 0 ? pairIn(made.out) : null;
   if (!pair) throw new Failed(`bin/service_key.dart made no key pair (it exited ${made.code}; it needs Dart, and dart pub get in service/)`);
   return pair;
@@ -79,8 +82,7 @@ async function mintPair(ctx) {
 /// [value] put as a wrangler secret with [args], from [cwd], on stdin:
 /// said to nobody.
 async function putSecret(ctx, args, cwd, value, what) {
-  const version = await wranglerVersion();
-  const code = await ctx.run('npx', ['--yes', `wrangler@${version}`, ...args], { cwd, input: value });
+  const code = await ctx.run(WRANGLER, args, { cwd, env: cloudflareOnly(ctx.env), input: value });
   if (code !== 0) throw new Failed(`wrangler said ${code} setting ${what}`);
   ctx.log(`set ${what}`);
 }
@@ -90,7 +92,9 @@ async function putSecret(ctx, args, cwd, value, what) {
 /// its secret set on the Pages project's preview environment as
 /// OH_SERVICE_SECRET, its public half written to config/openhearts.json
 /// as preview.serviceKey, to commit, since every preview build and the
-/// preview relay are made with it. And the previews' house: its secret
+/// preview relay are made with it. The key sign-ins are stored under on
+/// previews, OH_ID_HMAC, beside it: with a new one, every sign-in linked
+/// on a preview has to be linked again. And the previews' house: its secret
 /// set on the preview relay as OH_HOUSE_SECRET, its public half written
 /// as preview.houseKey, the house every preview's sealed table names.
 export async function secrets(ctx, { flags }) {
@@ -98,6 +102,7 @@ export async function secrets(ctx, { flags }) {
   const project = pages.project;
   ctx.log('would make new secrets for previews, none of them production\'s, and show them to nobody:');
   ctx.log(`  a service key pair: its secret as OH_SERVICE_SECRET on ${project}'s preview environment, its public half in config/openhearts.json as preview.serviceKey`);
+  ctx.log(`  the key sign-ins are stored under, as OH_ID_HMAC on ${project}'s preview environment: a sign-in linked on a preview before has to be linked again`);
   ctx.log(`  the house's key pair: its secret as OH_HOUSE_SECRET on ${relay}, its public half in config/openhearts.json as preview.houseKey`);
   ctx.log('a preview built before keeps the keys it was built with: deploy the preview relay and each preview again afterwards');
   if (!flags.apply) {
@@ -107,6 +112,7 @@ export async function secrets(ctx, { flags }) {
   const service = await mintPair(ctx);
   const house = await mintPair(ctx);
   await putSecret(ctx, ['pages', 'secret', 'put', 'OH_SERVICE_SECRET', '--project-name', project, '--env', 'preview'], root, service.secret, `OH_SERVICE_SECRET on ${project} (preview)`);
+  await putSecret(ctx, ['pages', 'secret', 'put', 'OH_ID_HMAC', '--project-name', project, '--env', 'preview'], root, randomBytes(32).toString('hex'), `OH_ID_HMAC on ${project} (preview)`);
   const path = configFile(ctx);
   await writeFile(path, withPreviewKey(await readFile(path, 'utf8'), service.key));
   ctx.log(`config/openhearts.json: preview.serviceKey is ${service.key}; commit it`);
@@ -136,8 +142,31 @@ export async function houseKey(ctx, { flags }) {
   const pair = await mintPair(ctx);
   await putSecret(ctx, ['secret', 'put', 'OH_HOUSE_SECRET'], join(root, 'service/do'), pair.secret, 'OH_HOUSE_SECRET on the relay worker');
   const path = configFile(ctx);
-  await writeFile(path, withHouseKey(await readFile(path, 'utf8'), pair.key));
+  await writeFile(path, withProductionKey(await readFile(path, 'utf8'), pair.key));
   ctx.log(`config/openhearts.json: houseKey is ${pair.key}; commit it, then deploy the relay and the site from it`);
+}
+
+/// `oh key mint`: the service's key pair for production, made new and
+/// its secret shown to nobody: set on the Pages project's production
+/// environment as OH_SERVICE_SECRET, and its public half written to
+/// config/openhearts.json as serviceKey, to commit. A Pages secret
+/// reaches only the deployments made after it is set, so the live one
+/// goes on signing with the old pair until the site is next deployed;
+/// the old secret is kept nowhere, so that deploy has to be of the
+/// commit with the new key (docs/how-to/rotate-the-service-key.md).
+export async function keyMint(ctx, { flags }) {
+  ctx.log('would make the service a new key pair and show its secret to nobody:');
+  ctx.log(`  its secret as OH_SERVICE_SECRET on ${pages.project}'s production environment, its public half in config/openhearts.json as serviceKey`);
+  ctx.log('the old secret is kept nowhere: the next deploy of the site signs with the new pair, so deploy only from the commit that has its key');
+  if (!flags.apply) {
+    ctx.log('nothing changed; --apply makes it');
+    return;
+  }
+  const pair = await mintPair(ctx);
+  await putSecret(ctx, ['pages', 'secret', 'put', 'OH_SERVICE_SECRET', '--project-name', pages.project], root, pair.secret, `OH_SERVICE_SECRET on ${pages.project} (production)`);
+  const path = configFile(ctx);
+  await writeFile(path, withProductionKey(await readFile(path, 'utf8'), pair.key, 'serviceKey'));
+  ctx.log(`config/openhearts.json: serviceKey is ${pair.key}; commit it, then go on as docs/how-to/rotate-the-service-key.md says`);
 }
 
 /// How long an invitation lasts: a year, after which its account plays

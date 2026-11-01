@@ -36,8 +36,3 @@
   Cache-Control: no-store
 /play/build-info.json
   Cache-Control: no-store
-
-# Benchmarks: the wasm is rebuilt with the deploy, so never let a phone
-# time a stale one.
-/measure/*
-  Cache-Control: no-store

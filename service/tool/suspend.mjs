@@ -72,28 +72,30 @@ export function wouldDo(act, stands, { name = false, picture = false } = {}) {
 export const carry = (store, account, act, options, asking = {}) => placeOrder(store, orderOf(account, act, { ...options, now: asking.now ?? Date.now() }), asking);
 
 /// [order] written into the store, with KV's expiry, and the service
-/// asked to carry it out until it has (POST /api/order). {status, body}
-/// as the service last answered, or the error the asking ended on.
-/// [tries] asks, [wait] apart: a 404 or an unreachable service is asked
-/// again, since KV takes a while to show a new row everywhere; anything
-/// else is the answer.
-export async function placeOrder(store, order, { origin, fetchImpl = fetch, tries = 24, wait = 5000, sleep = (ms) => new Promise((r) => setTimeout(r, ms)) } = {}) {
+/// asked to carry it out until it has (POST /api/order): {status, body}
+/// as [askUntilSeen] last had it.
+export async function placeOrder(store, order, { origin, ...asking } = {}) {
   const id = hex(crypto.getRandomValues(new Uint8Array(16)));
   await store.put(...orderRow(id), order, { ttl: ORDER_KEPT_S });
+  return askUntilSeen(`${origin}/api/order`, { order: id }, asking);
+}
+
+/// [body] POSTed as JSON to [url], about a row just written, until the
+/// answer is something other than [unseen] (a 404, unless it says), an
+/// unreachable service or a failed one (5xx): KV takes a while to show
+/// a new row everywhere. [tries] asks, [wait] apart. {status, body} as
+/// it last answered, or the error the asking ended on as status 0.
+export async function askUntilSeen(url, body, { fetchImpl = fetch, tries = 24, wait = 5000, sleep = (ms) => new Promise((r) => setTimeout(r, ms)), unseen = (r) => r.status === 404 } = {}) {
   let last = null;
   for (let i = 0; i < tries; i++) {
     if (i) await sleep(wait);
     try {
-      const res = await fetchImpl(`${origin}/api/order`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ order: id }),
-      });
+      const res = await fetchImpl(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
       last = { status: res.status, body: await res.json().catch(() => null) };
     } catch (e) {
       last = { status: 0, body: { error: `${e?.message ?? e}` } };
     }
-    if (last.status !== 404 && last.status !== 0 && last.status < 500) return last;
+    if (!unseen(last) && last.status !== 0 && last.status < 500) return last;
   }
   return last;
 }

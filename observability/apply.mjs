@@ -24,17 +24,16 @@ import { createHash } from 'node:crypto';
 
 import { readFile, writeFile } from 'node:fs/promises';
 
-import { alerts, app, browser, synthetics } from './monitoring.mjs';
+import { alerts, app, browser, newRelicEndpoint, synthetics } from './monitoring.mjs';
 
 const write = process.argv.includes('--apply');
 const key = process.env.NEW_RELIC_API_KEY;
 const account = Number(process.env.NEW_RELIC_ACCOUNT_ID);
-const region = (process.env.NEW_RELIC_REGION ?? 'US').toUpperCase();
 if (!key || !account) {
   console.error('apply: needs NEW_RELIC_API_KEY and NEW_RELIC_ACCOUNT_ID');
   process.exit(2);
 }
-const endpoint = region === 'EU' ? 'https://api.eu.newrelic.com/graphql' : 'https://api.newrelic.com/graphql';
+const endpoint = newRelicEndpoint(process.env.NEW_RELIC_REGION);
 
 const prefix = `${app.name}: `;
 const managed = [

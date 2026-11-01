@@ -10,7 +10,7 @@
 
 import { createHash } from 'node:crypto';
 import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 
 import { Failed, Usage, root } from './env.mjs';
 
@@ -117,8 +117,12 @@ export async function fetchModule(ctx, dir) {
 }
 
 /// `oh photodna get <dir>`: the pinned module, into [dir], to change it.
+/// Never into this checkout, where one `git add` would put it in the
+/// public repository.
 export async function get(ctx, { args }) {
   if (!args.dir) throw new Usage('name the folder to put the module in');
+  const rel = relative(root, resolve(args.dir));
+  if (!(rel === '..' || rel.startsWith(`..${sep}`) || isAbsolute(rel))) throw new Usage(`${args.dir} is in this repository: name a folder outside it`);
   const pins = await fetchModule(ctx, args.dir);
   if (!pins) throw new Failed('config/openhearts.json pins no PhotoDNA module (photodna.module)');
   for (const [name, sha256] of Object.entries(pins)) ctx.log(`${name}: ${sha256}`);

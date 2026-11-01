@@ -26,8 +26,9 @@
 import { readFileSync } from 'node:fs';
 
 /// The price the terms state (config/openhearts.json), which the price
-/// below is made at and the service sells at and no other.
-const { price } = JSON.parse(readFileSync(new URL('../config/openhearts.json', import.meta.url), 'utf8'));
+/// below is made at and the service sells at and no other; and the
+/// lookup key the service finds it by (stripePrice, OH_STRIPE_PRICE).
+const { price, stripePrice } = JSON.parse(readFileSync(new URL('../config/openhearts.json', import.meta.url), 'utf8'));
 
 export const stripe = {
   /// Which mode this describes. apply.mjs refuses a key of the other.
@@ -42,7 +43,7 @@ export const stripe = {
   /// edited, so a change to it is a new price
   /// (docs/how-to/change-the-terms.md, "Change the price").
   price: {
-    lookupKey: 'openhearts_annual',
+    lookupKey: stripePrice,
     currency: price.currency,
     unitAmount: price.amount,
     interval: 'year',

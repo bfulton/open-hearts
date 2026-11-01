@@ -12,6 +12,7 @@ import { HOW_MOST, REPORT_KEPT_S, reportRow } from '../service/do/known.mjs';
 import { PICTURES_ROW, allowedOf, allowing, pictureNamed, withheldOf, withholding } from '../service/functions/pictures.mjs';
 import { hex, isAccount } from '../service/functions/rows.mjs';
 import { accountsWith } from '../service/tool/find.mjs';
+import { askUntilSeen } from '../service/tool/suspend.mjs';
 
 /// The picture [args] names, the row of what is withheld and allowed,
 /// and how the picture stands in it, said.
@@ -70,20 +71,10 @@ export async function report(ctx, { args, flags }) {
   const id = hex(crypto.getRandomValues(new Uint8Array(16)));
   await store.put(...reportRow(id), { digest, accounts, how: how?.trim() ?? null }, { ttl: REPORT_KEPT_S });
   const origin = await ctx.relay();
-  const { tries = 24, wait = 5000, sleep = (ms) => new Promise((r) => setTimeout(r, ms)) } = ctx.carryOptions ?? {};
-  let last = null;
-  for (let i = 0; i < tries; i++) {
-    if (i) await sleep(wait);
-    try {
-      const res = await ctx.fetch(`${origin}/known`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ report: id }) });
-      last = { status: res.status, body: await res.json().catch(() => null) };
-    } catch (e) {
-      last = { status: 0, body: { error: `${e?.message ?? e}` } };
-    }
-    // KV takes a while to show the row everywhere: asked again.
-    const unseen = last.status === 404 && last.body?.error === 'no such report';
-    if (!unseen && last.status !== 0 && last.status < 500) break;
-  }
+  // The relay's other 404, that no copy of the picture is kept, is its
+  // answer, and is not asked again.
+  const unseen = (r) => r.status === 404 && r.body?.error === 'no such report';
+  const last = await askUntilSeen(`${origin}/known`, { report: id }, { fetchImpl: ctx.fetch, ...ctx.carryOptions, unseen });
   if (last?.status !== 200) throw new Failed(`the relay said ${last?.status ?? 'nothing'}: ${last?.body?.error ?? ''}`);
   ctx.log(`done: the relay is acting on it for ${last.body.accounts.length} account(s), and emails you what it did`);
 }

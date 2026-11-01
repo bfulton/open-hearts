@@ -5,16 +5,17 @@
 //   node --test ops/*.test.mjs
 
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 
 import { ARGUMENTS, COMMANDS } from './commands.mjs';
-import { Failed, root } from './env.mjs';
+import { Failed, WRANGLER, root } from './env.mjs';
 import { releaseProblems } from './gate.mjs';
 import { commandOf, main, markdown, parse } from './oh.mjs';
-import { INVITED_DAYS, withHouseKey, withPreviewKey } from './preview.mjs';
+import { INVITED_DAYS, withPreviewKey, withProductionKey } from './preview.mjs';
 import { PREVIEWS_KEPT, sweepable } from './release.mjs';
 import { rejected, reshaped } from './setup.mjs';
 import { KNOWN_ROW } from '../service/do/checkers.mjs';
@@ -110,6 +111,13 @@ test('asked wrongly, oh says how and exits 2; asked for help, it helps; nothing 
   assert.equal(await main(['account', 'suspend', account, '--aply'], ctx), 2, 'a misspelt --apply is not a dry run but a mistake');
   assert.equal(await main(['account', 'suspend', account, 'extra'], ctx), 2);
   assert.equal(await main(['deploy', 'site', '--label'], ctx), 2, '--label without its value');
+  // A flag among the command's words is refused, not dropped: dropped,
+  // it would turn a preview deploy into production's, a full refund into
+  // a partial one, and an act into a dry run.
+  for (const argv of [['deploy', '--preview', 'relay', '--apply'], ['account', '--full', 'refund', account, '--apply'], ['picture', '--apply', 'allow', 'f'.repeat(64)], ['--apply', 'deploy', 'site']]) {
+    assert.equal(await main(argv, ctx), 2, argv.join(' '));
+  }
+  assert.match(ctx.warned.join('\n'), /no command deploy --preview relay --apply; did you mean oh deploy relay/);
   assert.match(ctx.warned.join('\n'), /no command acount/);
   assert.equal(await main(['help', 'account', 'suspend'], ctx), 0);
   assert.equal(await main(['account', 'suspend', '--help'], ctx), 0);
@@ -144,13 +152,37 @@ test('an act on an account says what it would do and changes nothing without --a
 });
 
 test('production is released only from main as it was reviewed', async () => {
-  const git = (answers) => async (command, args) => ({ code: 0, out: answers[args.join(' ')] ?? '' });
-  const clean = { 'rev-parse HEAD': 'abc1234\n', 'rev-parse origin/main': 'abc1234\n', 'status --porcelain --untracked-files=no': '' };
+  /// git answering each command in [answers], by its arguments: what it
+  /// prints, or {code, out}; anything else succeeds saying nothing.
+  const git = (answers) => async (command, args) => {
+    const answer = answers[args.join(' ')] ?? '';
+    return typeof answer === 'string' ? { code: 0, out: answer } : answer;
+  };
+  const clean = { 'rev-parse HEAD': 'abc1234\n', 'rev-parse origin/main': 'abc1234\n', 'status --porcelain': '' };
   assert.deepEqual(await releaseProblems(fake({ capture: git(clean), ...settled() }), 'site'), []);
   const ahead = await releaseProblems(fake({ capture: git({ ...clean, 'rev-parse HEAD': 'def5678\n' }) }), 'relay');
   assert.match(ahead.join('\n'), /HEAD \(def5678\) is not origin\/main \(abc1234\)/);
-  const dirty = await releaseProblems(fake({ capture: git({ ...clean, 'status --porcelain --untracked-files=no': ' M deploy.sh\n M oh\n' }), ...settled() }), 'site');
+  const dirty = await releaseProblems(fake({ capture: git({ ...clean, 'status --porcelain': ' M deploy.sh\n M oh\n' }), ...settled() }), 'site');
   assert.deepEqual(dirty, ['uncommitted changes: 2 file(s)']);
+  // A file git does not track is published as much as a changed one.
+  const untracked = await releaseProblems(fake({ capture: git({ ...clean, 'status --porcelain': '?? site/pages/draft.html\n' }) }), 'relay');
+  assert.deepEqual(untracked, ['uncommitted changes: 1 file(s)']);
+  // So is one git ignores, where the site is published from whole; the
+  // relay's build takes only what its code imports.
+  const published = 'status --porcelain --ignored --untracked-files=all -- site/pages site/public app/web service/functions';
+  const ignored = { ...clean, [published]: '!! site/public/.DS_Store\n!! app/web/notes.txt\n' };
+  assert.deepEqual(await releaseProblems(fake({ capture: git(ignored), ...settled() }), 'site'), ['files git ignores would be published: site/public/.DS_Store, app/web/notes.txt']);
+  assert.deepEqual(await releaseProblems(fake({ capture: git(ignored) }), 'relay'), []);
+  // Main as it is now: a fetch that failed leaves this clone's main as
+  // it last saw it, which may be older.
+  const offline = await releaseProblems(fake({ capture: git({ ...clean, 'fetch -q origin main': { code: 128, out: "fatal: unable to access 'https://github.com/x/y/': Could not resolve host: github.com\n" } }) }), 'relay');
+  assert.deepEqual(offline, ["origin/main could not be fetched: fatal: unable to access 'https://github.com/x/y/': Could not resolve host: github.com"]);
+  const unread = await releaseProblems(fake({ capture: git({ ...clean, 'rev-parse origin/main': { code: 128, out: "fatal: ambiguous argument 'origin/main': unknown revision\n" } }) }), 'relay');
+  assert.deepEqual(unread, ["origin/main could not be read: fatal: ambiguous argument 'origin/main': unknown revision"]);
+  // A store build is held to main too, though not to the terms.
+  assert.deepEqual(await releaseProblems(fake({ capture: git(clean) }), 'phone'), []);
+  assert.match((await releaseProblems(fake({ capture: git({ ...clean, 'rev-parse HEAD': 'def5678\n' }) }), 'phone')).join('\n'), /HEAD \(def5678\) is not origin\/main/);
+  await assert.rejects(releaseProblems(fake({ capture: git(clean) }), 'everything'), /no release target everything/);
 
   // oh deploy says so and, asked to deploy, starts nothing.
   const ctx = fake({ capture: git({ ...clean, 'rev-parse HEAD': 'def5678\n', 'rev-parse --abbrev-ref HEAD': 'main\n' }), ...settled() });
@@ -160,6 +192,27 @@ test('production is released only from main as it was reviewed', async () => {
   const preview = fake({ capture: git({ ...clean, 'rev-parse HEAD': 'def5678\n' }) });
   assert.equal(await main(['deploy', 'site', '--label', 'my-change', '--apply'], preview), 0);
   assert.deepEqual(preview.started.map((s) => s.args), [['my-change']]);
+});
+
+/// [script] run by bash with [args] and [env], with node, cargo, dart
+/// and flutter stood in for by programs that note how they were run and
+/// fail: {code, ran}, each line of ran one program's arguments.
+function runStoodIn(script, args, env = {}) {
+  const bin = mkdtempSync(join(tmpdir(), 'bin-'));
+  const ran = join(bin, 'ran');
+  for (const name of ['node', 'cargo', 'dart', 'flutter']) writeFileSync(join(bin, name), `#!/bin/sh\necho "${name} $*" >> "${ran}"\nexit 1\n`, { mode: 0o755 });
+  const done = spawnSync('bash', [join(root, script), ...args], { env: { ...env, PATH: `${bin}:${process.env.PATH}` }, encoding: 'utf8' });
+  return { code: done.status, ran: existsSync(ran) ? readFileSync(ran, 'utf8').trim().split('\n') : [] };
+}
+
+test('a store build and a relay build ask the gate themselves before they build anything, whatever the environment holds', () => {
+  const phone = runStoodIn('build_phone.sh', ['android']);
+  assert.equal(phone.code, 1);
+  assert.deepEqual(phone.ran, ['node ops/gate.mjs phone']);
+  assert.equal(runStoodIn('build_phone.sh', ['windows']).ran.length, 0, 'asked wrongly, it asks nothing');
+  const relay = runStoodIn('service/bench/build.sh', [], { OH_RELAY_DRY_RUN: '1' });
+  assert.equal(relay.code, 1);
+  assert.deepEqual(relay.ran, [`node ${root}/ops/gate.mjs relay`]);
 });
 
 /// A deployment of the site as Cloudflare lists one, made [minute]
@@ -407,7 +460,7 @@ test("production's site deploy deletes old deployments first and deploys even if
   const viaAll = await deploy(['deploy', 'all', '--apply'], pagesApi(listed), { relay: true });
   assert.equal(viaAll.code, 0, viaAll.warned);
   assert.deepEqual(viaAll.order.slice(-5), ['GET cloudflare', 'DELETE cloudflare', 'DELETE cloudflare', 'DELETE cloudflare', 'deploy.sh main']);
-  assert.ok(viaAll.order.slice(0, -5).every((o) => o.startsWith('npx ')), viaAll.order.join(', '));
+  assert.ok(viaAll.order.slice(0, -5).every((o) => o.startsWith('wrangler ')), viaAll.order.join(', '));
 
   // Old deployments are deleted even if the publish then fails: they
   // are the ones oh deploy prune would delete anyway.
@@ -486,7 +539,7 @@ test('a relay deploy is built before anything is uploaded, and what served is pu
       return deployed;
     };
     const code = await main(['deploy', 'relay', '--apply'], ctx);
-    return { code, ran: ctx.started.map((s) => s.args.slice(2)), warned: ctx.warned.join('\n') };
+    return { code, ran: ctx.started.map((s) => s.args), warned: ctx.warned.join('\n') };
   };
 
   // Its build or its image fails: nothing is uploaded.
@@ -560,33 +613,30 @@ test('the checker of known images in use is the run-time row known, written wher
 });
 
 test('a secret is set wherever its definition says it lives, from what is typed', async () => {
-  const ctx = fake({ readSecret: async () => 's3cret' });
-  assert.equal(await main(['secret', 'set', 'OH_ID_HMAC', '--apply'], ctx), 0);
-  assert.deepEqual(
-    ctx.started.map((s) => s.args.slice(2)),
-    [
-      ['pages', 'secret', 'put', 'OH_ID_HMAC', '--project-name', 'open-hearts'],
-      ['pages', 'secret', 'put', 'OH_ID_HMAC', '--project-name', 'open-hearts', '--env', 'preview'],
-    ],
-  );
-  assert.ok(ctx.started.every((s) => s.input === 's3cret'));
-  assert.ok(!ctx.said.join('\n').includes('s3cret'), 'never said back');
-  // The service's secret is production's alone: previews have their own
-  // (oh preview secrets), and production's is never put on one.
-  const service = fake({ readSecret: async () => 'x' });
-  assert.equal(await main(['secret', 'set', 'OH_SERVICE_SECRET', '--apply'], service), 0);
-  assert.deepEqual(service.started.map((s) => s.args.slice(2)), [['pages', 'secret', 'put', 'OH_SERVICE_SECRET', '--project-name', 'open-hearts']]);
-  // The house's is never typed in: oh house key makes it, with the key
-  // that goes into the config beside it.
-  const house = fake({ readSecret: async () => 'x' });
-  assert.equal(await main(['secret', 'set', 'OH_HOUSE_SECRET', '--apply'], house), 2);
-  assert.equal(house.started.length, 0);
+  // Production's, and production's alone: previews keep their own (oh
+  // preview secrets), since a preview runs whatever branch was deployed
+  // to it.
+  for (const name of ['OH_ID_HMAC', 'OH_TURN_API_TOKEN']) {
+    const ctx = fake({ readSecret: async () => 's3cret' });
+    assert.equal(await main(['secret', 'set', name, '--apply'], ctx), 0);
+    assert.deepEqual(ctx.started.map((s) => s.args), [['pages', 'secret', 'put', name, '--project-name', 'open-hearts']]);
+    assert.ok(ctx.started.every((s) => s.input === 's3cret'));
+    assert.ok(!ctx.said.join('\n').includes('s3cret'), 'never said back');
+  }
+  // The service's and the house's are never typed in: oh key mint and oh
+  // house key make them, with the key that goes into the config beside.
+  for (const [name, by] of [['OH_SERVICE_SECRET', 'oh key mint'], ['OH_HOUSE_SECRET', 'oh house key']]) {
+    const made = fake({ readSecret: async () => 'x' });
+    assert.equal(await main(['secret', 'set', name, '--apply'], made), 2, name);
+    assert.equal(made.started.length, 0);
+    assert.match(made.warned.join('\n'), new RegExp(`${name} is not typed in: \\./${by} --apply makes it`));
+  }
   // One set only once it is issued, as a checker's credentials are: the
   // relay's too, and only the relay's.
   for (const name of ['OH_ARACHNID_USERNAME', 'OH_ARACHNID_PASSWORD', 'OH_PHOTODNA_KEY', 'OH_NCMEC_USERNAME', 'OH_NCMEC_PASSWORD']) {
     const optional = fake({ readSecret: async () => 'x' });
     assert.equal(await main(['secret', 'set', name, '--apply'], optional), 0, name);
-    assert.deepEqual(optional.started.map((s) => [s.args.slice(2), s.cwd.endsWith('service/do')]), [[['secret', 'put', name], true]], name);
+    assert.deepEqual(optional.started.map((s) => [s.args, s.cwd.endsWith('service/do')]), [[['secret', 'put', name], true]], name);
   }
   assert.equal(await main(['secret', 'set', 'OH_NOT_A_SECRET', '--apply'], fake()), 2);
 });
@@ -618,7 +668,7 @@ test("the previews' key goes beside production's, and nothing else in the file c
   assert.equal(outsidePreview(again), before);
 });
 
-/// A capture that answers `dart run bin/service_key.dart --json` with a
+/// A capture that answers `dart run bin/service_key.dart` with a
 /// new pair each time, as the tool does: the pairs it made, in order.
 function minting() {
   const made = [];
@@ -643,20 +693,24 @@ test("previews' own secrets are made new, set where they live, and shown to nobo
   const ctx = fake({ capture, configFile });
   assert.equal(await main(['preview', 'secrets', '--apply'], ctx), 0);
   const [service, house] = made;
-  const [onPages, onRelay] = ctx.started;
-  assert.deepEqual(onPages.args.slice(2), ['pages', 'secret', 'put', 'OH_SERVICE_SECRET', '--project-name', 'open-hearts', '--env', 'preview']);
+  const [onPages, hmac, onRelay] = ctx.started;
+  assert.deepEqual(onPages.args, ['pages', 'secret', 'put', 'OH_SERVICE_SECRET', '--project-name', 'open-hearts', '--env', 'preview']);
   assert.equal(onPages.input, service.secret);
-  assert.deepEqual(onRelay.args.slice(2), ['secret', 'put', 'OH_HOUSE_SECRET', '--env', 'preview']);
+  // The key sign-ins are stored under on previews: new, and none of the pairs'.
+  assert.deepEqual(hmac.args, ['pages', 'secret', 'put', 'OH_ID_HMAC', '--project-name', 'open-hearts', '--env', 'preview']);
+  assert.match(hmac.input, /^[0-9a-f]{64}$/);
+  assert.ok(![service.secret, house.secret].includes(hmac.input));
+  assert.deepEqual(onRelay.args, ['secret', 'put', 'OH_HOUSE_SECRET', '--env', 'preview']);
   assert.ok(onRelay.cwd.endsWith('service/do'));
   assert.equal(onRelay.input, house.secret, 'a pair of its own, not the service\'s');
-  assert.equal(ctx.started.length, 2);
+  assert.equal(ctx.started.length, 3);
   // The public halves are written, beside production's, and the rest kept.
   const written = readFileSync(configFile, 'utf8');
   assert.deepEqual(JSON.parse(written).preview, { serviceKey: service.key, houseKey: house.key });
   assert.equal(outsidePreview(written), outsidePreview(text));
-  // Neither secret is said; the keys are.
+  // No secret is said; the keys are.
   const said = [...ctx.said, ...ctx.warned].join('\n');
-  assert.ok(!said.includes(service.secret) && !said.includes(house.secret));
+  assert.ok(!said.includes(service.secret) && !said.includes(house.secret) && !said.includes(hmac.input));
   assert.ok(said.includes(service.key) && said.includes(house.key));
 });
 
@@ -671,7 +725,7 @@ test("the house's key is made new, its secret set on the relay and shown to nobo
   const ctx = fake({ capture, configFile });
   assert.equal(await main(['house', 'key', '--apply'], ctx), 0);
   const [pair] = made;
-  assert.deepEqual(ctx.started.map((s) => [s.args.slice(2), s.input, s.cwd.endsWith('service/do')]), [[['secret', 'put', 'OH_HOUSE_SECRET'], pair.secret, true]]);
+  assert.deepEqual(ctx.started.map((s) => [s.args, s.input, s.cwd.endsWith('service/do')]), [[['secret', 'put', 'OH_HOUSE_SECRET'], pair.secret, true]]);
   const written = readFileSync(configFile, 'utf8');
   assert.equal(JSON.parse(written).houseKey, pair.key);
   assert.deepEqual({ ...JSON.parse(written), houseKey: undefined }, { ...JSON.parse(text), houseKey: undefined }, 'nothing else changed');
@@ -681,10 +735,30 @@ test("the house's key is made new, its secret set on the relay and shown to nobo
   assert.ok(said.includes(pair.key));
   // Made again, it is replaced where it is: production's, and not the
   // previews' beside it.
-  const again = withHouseKey(written, 'e'.repeat(64));
+  const again = withProductionKey(written, 'e'.repeat(64));
   assert.equal(JSON.parse(again).houseKey, 'e'.repeat(64));
   assert.equal(again.match(/^ *"houseKey": /gm).length, 1);
   assert.deepEqual(JSON.parse(again).preview, JSON.parse(text).preview, "the previews' keys as they were");
+});
+
+test("the service's key is made new, its secret set on production's Pages environment and shown to nobody, and its key written where it was", async () => {
+  const { text, configFile } = configCopy();
+  const dry = fake({ capture: minting().capture, configFile });
+  assert.equal(await main(['key', 'mint'], dry), 0);
+  assert.equal(dry.started.length, 0);
+  assert.equal(readFileSync(configFile, 'utf8'), text, 'nothing written without --apply');
+
+  const { made, capture } = minting();
+  const ctx = fake({ capture, configFile });
+  assert.equal(await main(['key', 'mint', '--apply'], ctx), 0);
+  const [pair] = made;
+  assert.deepEqual(ctx.started.map((s) => [s.args, s.input]), [[['pages', 'secret', 'put', 'OH_SERVICE_SECRET', '--project-name', 'open-hearts'], pair.secret]]);
+  const written = readFileSync(configFile, 'utf8');
+  assert.deepEqual(JSON.parse(written), { ...JSON.parse(text), serviceKey: pair.key }, 'production\'s serviceKey, and nothing else');
+  assert.equal(written.replace(pair.key, JSON.parse(text).serviceKey), text, 'written where it was');
+  const said = [...ctx.said, ...ctx.warned].join('\n');
+  assert.ok(!said.includes(pair.secret));
+  assert.ok(said.includes(pair.key));
 });
 
 test("previews' secrets: without a key pair nothing is set, and what was said is not repeated", async () => {
@@ -736,10 +810,25 @@ test('the preview relay is deployed from what is checked out, without the PhotoD
   assert.equal(houseless.started.length, 0);
   const ctx = fake({ capture, config: { preview: { serviceKey: 'b'.repeat(64), houseKey: 'c'.repeat(64) } } });
   assert.equal(await main(['deploy', 'relay', '--preview', '--apply'], ctx), 0);
-  assert.deepEqual(ctx.started.map((s) => s.args.slice(2)), [['deploy', '--dry-run', '--env', 'preview'], ['deploy', '--env', 'preview']]);
+  assert.deepEqual(ctx.started.map((s) => s.args), [['deploy', '--dry-run', '--env', 'preview'], ['deploy', '--env', 'preview']]);
   assert.ok(ctx.started.every((s) => s.cwd.endsWith('service/do')));
   // And production's is still held to main.
   const production = fake({ capture, config: { preview: { serviceKey: 'b'.repeat(64) } } });
   assert.equal(await main(['deploy', 'relay', '--apply'], production), 1);
   assert.equal(production.started.length, 0);
+});
+
+test("what a deploy or a secret runs is the locked Wrangler, or deploy.sh, given Cloudflare's credentials and none of the others", async () => {
+  const shell = { PATH: '/usr/bin', HTTPS_PROXY: 'http://proxy:3128', CLOUDFLARE_API_TOKEN: 'cf', CLOUDFLARE_ACCOUNT_ID: 'acct', STRIPE_API_KEY: 'rk_live_x', NEW_RELIC_API_KEY: 'nr', NEW_RELIC_ACCOUNT_ID: '1', NEW_RELIC_REGION: 'US' };
+  const kept = { PATH: '/usr/bin', HTTPS_PROXY: 'http://proxy:3128', CLOUDFLARE_API_TOKEN: 'cf', CLOUDFLARE_ACCOUNT_ID: 'acct' };
+  const capture = async (command, args) => ({ code: 0, out: args.includes('HEAD') ? 'def5678\n' : '' });
+  const keys = { preview: { serviceKey: 'b'.repeat(64), houseKey: 'c'.repeat(64) } };
+  const runs = [];
+  for (const argv of [['deploy', 'relay', '--preview', '--apply'], ['deploy', 'site', '--label', 'my-change', '--apply'], ['secret', 'set', 'OH_ID_HMAC', '--apply'], ['preview', 'secrets', '--apply']]) {
+    const ctx = fake({ env: shell, capture: argv[0] === 'preview' ? minting().capture : capture, config: keys, readSecret: async () => 's3cret', configFile: configCopy().configFile });
+    assert.equal(await main(argv, ctx), 0, argv.join(' '));
+    runs.push(...ctx.started);
+  }
+  assert.deepEqual([...new Set(runs.map((s) => s.command))], [WRANGLER, join(root, 'deploy.sh')]);
+  for (const s of runs) assert.deepEqual(s.env, kept, `${s.command} ${s.args.join(' ')}`);
 });

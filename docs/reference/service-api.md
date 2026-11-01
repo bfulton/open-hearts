@@ -6,7 +6,7 @@ For why the service works this way, see [the service](../explanation/service.md)
 
 ## What one deployment holds
 
-`deploy.sh` uploads one directory to the Pages project `open-hearts` (`PROJECT` in `deploy.sh`, `pages.project` in `infra/cloudflare.mjs`).
+`deploy.sh` uploads one directory to the Pages project `open-hearts` (`pages.project` in `infra/cloudflare.mjs`).
 
 | Path in the upload | What | Made by |
 |---|---|---|

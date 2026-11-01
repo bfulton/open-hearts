@@ -86,7 +86,8 @@ export async function liveVersions(ctx, ledger) {
 /// privacy policy to production, and what it would publish:
 /// {problems, publishing: [{document, entry}]}. The ledger has to be
 /// whole and the text what its newest entry says; the newest version
-/// to go live is dated today, which "Last updated" shows; and a
+/// to go live is dated today, which "Last updated" shows (in UTC, or
+/// yesterday, for time zones west of it); and a
 /// material change goes out only once the stores were told of it, while
 /// the apps are in them. Subscribers are told of it after it is
 /// published, by `oh terms notify`: the terms apply it to a subscription

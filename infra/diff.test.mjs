@@ -24,6 +24,7 @@ import {
   parseToml,
   portalPlan,
   pricePlan,
+  relayDeploy,
   relayProblems,
   rulesPlan,
   settingsPlan,
@@ -210,10 +211,10 @@ test('Pages: production as it is matches', () => {
 });
 
 /// A preview as it is: its own store and bucket, the preview relay's
-/// households, a service secret of its own, and the word that it is one.
+/// households, secrets of its own, and the word that it is one.
 const livePreview = () => {
   const have = liveProduction();
-  for (const k of ['OH_STRIPE_SECRET', 'OH_STRIPE_WEBHOOK_SECRET', ...playSecrets]) delete have.env_vars[k];
+  for (const k of ['OH_STRIPE_SECRET', 'OH_STRIPE_WEBHOOK_SECRET', 'OH_TURN_API_TOKEN', ...playSecrets]) delete have.env_vars[k];
   have.env_vars.OH_DEPLOYMENT = plain('preview');
   have.kv_namespaces.OH_STORE.namespace_id = 'ab41';
   have.r2_buckets.OH_RECORDS.name = 'open-hearts-records-preview';
@@ -247,6 +248,18 @@ test("Pages: a preview has its own store, the preview relay's households and a s
   assert.deepEqual(pagesEnvPlan(pages.environments.preview, unset, ids).owner, ['secret OH_SERVICE_SECRET is not set: `./oh preview secrets --apply`']);
   assert.ok(!pages.environments.preview.secrets.includes('OH_SERVICE_SECRET'));
   assert.ok(pages.environments.production.secrets.includes('OH_SERVICE_SECRET'));
+  // A preview runs whatever branch was deployed to it, so it shares no
+  // secret with production: the key sign-ins are stored under is its
+  // own, and production's TURN token, left on one, is taken off.
+  const shared = pages.environments.preview.secrets.filter((name) => pages.environments.production.secrets.includes(name));
+  assert.deepEqual(shared, []);
+  const unlinked = livePreview();
+  delete unlinked.env_vars.OH_ID_HMAC;
+  assert.deepEqual(pagesEnvPlan(pages.environments.preview, unlinked, ids).owner, ['secret OH_ID_HMAC is not set: `./oh preview secrets --apply`']);
+  const turn = livePreview();
+  turn.env_vars.OH_TURN_API_TOKEN = secret;
+  const plan = pagesEnvPlan(pages.environments.preview, turn, ids);
+  assert.deepEqual([plan.lines, plan.patch], [['remove secret OH_TURN_API_TOKEN, which is not defined'], { env_vars: { OH_TURN_API_TOKEN: null } }]);
 });
 
 // Production holds no plain variables (config/openhearts.json); the
@@ -280,10 +293,10 @@ test('Pages: a missing secret is put right with oh, which sets it in every envir
   delete production.env_vars.OH_ID_HMAC;
   const [prod] = pagesEnvPlan(pages.environments.production, production, ids).owner;
   assert.match(prod, /`\.\/oh secret set OH_ID_HMAC --apply`$/);
-  const preview = liveProduction();
-  delete preview.env_vars.OH_ID_HMAC;
-  const [prev] = pagesEnvPlan(pages.environments.production, preview, ids).owner;
-  assert.match(prev, /`\.\/oh secret set OH_ID_HMAC --apply`$/);
+  // The service's secret is not typed in: it is made with its key.
+  const keyless = liveProduction();
+  delete keyless.env_vars.OH_SERVICE_SECRET;
+  assert.deepEqual(pagesEnvPlan(pages.environments.production, keyless, ids).owner, ['secret OH_SERVICE_SECRET is not set: `./oh key mint --apply`']);
 });
 
 test("Pages: production wants Play's service account when the config names Play, as the worker does", () => {
@@ -582,6 +595,11 @@ const livePreviewRelay = () => ({
   containers: [{ name: 'open-hearts-relay-bench-preview', max_instances: 1 }],
 });
 
+test("a relay that differs is put right by oh's deploy, production's with its PhotoDNA module, not by wrangler alone", () => {
+  assert.equal(relayDeploy(relay), './oh deploy relay --apply');
+  assert.equal(relayDeploy(relay.preview), './oh deploy relay --preview --apply');
+});
+
 test('the preview relay: as deployed it matches, and its secret is its own', () => {
   assert.deepEqual(relayProblems(preview, relay.preview, livePreviewRelay()), []);
   const unset = livePreviewRelay();
@@ -712,6 +730,15 @@ const livePrice = () => ({
   tax_behavior: 'exclusive',
   type: 'recurring',
   unit_amount: 599,
+});
+
+test('price: the one kept is the one the service sells, found by the lookup key the config gives it', () => {
+  const config = JSON.parse(readFileSync(new URL('../config/openhearts.json', import.meta.url), 'utf8'));
+  assert.equal(stripe.price.lookupKey, config.stripePrice);
+  // stripePrice may also be a price's id (service/functions/stripe.mjs,
+  // priceLookup), which no price holds as its lookup key: infra would
+  // make a second price under it.
+  assert.ok(!config.stripePrice.startsWith('price_'), 'config/openhearts.json: stripePrice is the lookup key infra keeps the price under, not a price id');
 });
 
 test('price: as it is; another amount is a new price', () => {

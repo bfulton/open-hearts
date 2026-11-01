@@ -248,12 +248,16 @@ needs `wasm-unsafe-eval`, and the policy has to be tested against it.
 ## Secrets
 
 The service key, Stripe keys, the TURN token, the HMAC key and the
-house's secret are Cloudflare secrets, set by hand and checked
-only by name (`infra/apply.mjs`). The service key is minted with a
-CSPRNG by `service/bin/service_key.dart`, which prints it once and
-writes it nowhere. `deploy.sh` reads only environment
-variables and pins `wrangler`. The Android release key's properties
-file is never checked in. Every key in the repository is a published
+house's secret are Cloudflare secrets, checked only by name
+(`infra/apply.mjs`). The service key is minted with a CSPRNG by
+`service/bin/service_key.dart`, and `oh key mint` sets its secret on
+the Pages project without showing it, as `oh house key` does the
+house's: neither secret is written anywhere else. The rest are typed
+into `oh secret set`, which does not show them either. `deploy.sh`
+reads only environment variables. Every deploy runs Wrangler with its
+whole dependency tree locked (`ops/wrangler`), and `oh` gives it, and
+`deploy.sh`, only Cloudflare's credentials. The Android release key's
+properties file is never checked in. Every key in the repository is a published
 test vector: BIP-340's test pair (used by the e2e rig and the relay's
 self-check) and NIP-44's vectors.
 
@@ -261,11 +265,26 @@ self-check) and NIP-44's vectors.
 branch was deployed to it, reviewed or not, so the secrets it signs
 with are its own ([previews](service.md#previews)): a service key pair
 of its own, whose public half every preview build and the preview relay
-name, and a house key pair of its own, whose secret only the preview
-relay holds. `oh preview
+name, an HMAC key of its own for the sign-ins it stores, and a house
+key pair of its own, whose secret only the preview relay holds. It has
+no TURN token, since no part of the game uses TURN. `oh preview
 secrets` makes them and sets them without showing them, and `oh secret
 set` puts production's on production alone. Nothing a preview signs is
 good in production, and a preview takes nothing production signed: its
 relay admits only activations its own key signed. Who plays on a
 preview is the operator's say: there is nothing to buy, and an account
 there is an invitation (`oh preview invite`).
+
+**Deploying a preview runs the branch's own code with the operator's
+Cloudflare token.** What a preview serves holds none of production's
+keys, but what deploys it is the branch's: its `oh`, `deploy.sh` and
+`site/build.mjs`, the Flutter, Cargo and Dart builds they start, and
+the `[env.preview]` of its `service/do/wrangler.toml`, all run on the
+operator's machine with `CLOUDFLARE_API_TOKEN`. That token is the
+account's, so it can also deploy production and write production's
+store. `oh` gives what it runs no credential but Cloudflare's, and only
+an honest branch's `oh` does that. So a preview is deployed only from a
+branch the operator has read, as before running any of its code,
+`./check.sh` included. Open: previews in a Cloudflare account of their
+own, deployed with that account's token, would let a preview be
+deployed from a branch nobody has read.

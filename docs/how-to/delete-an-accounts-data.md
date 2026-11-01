@@ -64,8 +64,8 @@ An email with the subject **Open Hearts: a deleted account's name is still on a 
 Look at each one, and delete it from the bucket if it holds the name:
 
 ```bash
-npx wrangler r2 object get "open-hearts-records/tables/<table>.json" --remote --pipe | gunzip
-npx wrangler r2 object delete "open-hearts-records/tables/<table>.json" --remote
+ops/wrangler/wrangler r2 object get "open-hearts-records/tables/<table>.json" --remote --pipe | gunzip
+ops/wrangler/wrangler r2 object delete "open-hearts-records/tables/<table>.json" --remote
 ```
 
 Its players can no longer look at the game afterwards; their own devices keep their copies.

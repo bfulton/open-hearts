@@ -13,7 +13,7 @@ These four addresses are left out of the rate limit on `/api/` (`infra/cloudflar
 
 ## Before you begin
 
-- Install Node, export `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`, and set `WRANGLER_VERSION` as [Deploy the site, app and service](deploy.md#before-you-begin) shows.
+- Install Node, and export `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`, as [Deploy the site, app and service](deploy.md#before-you-begin) shows.
 - Make sure the identifiers each handler needs are in `config/openhearts.json` and deployed: `apple` for the two Apple handlers, and `google` for Google Play. Without them, the Apple handlers answer 503, and the Play handler turns every push away with 401. For the fields, see [`config/openhearts.json`](../reference/configuration.md#configopenheartsjson).
 - For Sign in with Apple, make sure the Pages secret `OH_ID_HMAC` is set. For Google Play, `OH_PLAY_SERVICE_ACCOUNT` must be set, so that the service can ask Play about a purchase. See [Pages project secrets](../reference/configuration.md#pages-project-secrets).
 - Run the commands from the repository root.

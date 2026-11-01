@@ -163,6 +163,17 @@ test('get fetches exactly the pinned files, each checked against its pin', async
   const none = context();
   assert.equal(await main(['photodna', 'get', join(temp('out'), 'm')], none), 1);
   assert.match(none.warned.join('\n'), /pins no PhotoDNA module/);
+
+  // Never into this checkout, however the folder is named; anywhere
+  // else is fine.
+  for (const inside of [join(root, 'photodna'), join(root, '..module'), root, join(root, 'service', '..', 'm')]) {
+    const asked = context({ config: configText(pins), bucket: privateBucket(kept) });
+    assert.equal(await main(['photodna', 'get', inside], asked), 2, inside);
+    assert.match(asked.warned.join('\n'), /is in this repository: name a folder outside it/);
+    assert.ok(!existsSync(join(inside, 'edge.mjs')), `nothing written in ${inside}`);
+  }
+  const beside = join(temp('out'), 'm');
+  assert.equal(await main(['photodna', 'get', beside], context({ config: configText(pins), bucket: privateBucket(kept) })), 0);
 });
 
 test('the relay is deployed with the pinned module in the stand-in\'s place, fetched only for the build and gone after', async () => {
@@ -184,7 +195,7 @@ test('the relay is deployed with the pinned module in the stand-in\'s place, fet
   assert.equal(ctx.started.length, 0);
 
   assert.equal(await main(['deploy', 'relay', '--apply'], ctx), 0);
-  assert.deepEqual(ctx.started.map((s) => s.args.slice(2)), [['deploy', '--dry-run', '--alias', MODULE_ALIAS], ['deploy', '--alias', MODULE_ALIAS]], 'built first, then deployed, the module in both');
+  assert.deepEqual(ctx.started.map((s) => s.args), [['deploy', '--dry-run', '--alias', MODULE_ALIAS], ['deploy', '--alias', MODULE_ALIAS]], 'built first, then deployed, the module in both');
   assert.ok(ctx.started.every((s) => /service\/do$/.test(s.cwd)));
   assert.deepEqual(seen, [true, true, false, true, true, false], 'the pinned files there as it builds, both times, and nothing else');
   assert.ok(!existsSync(moduleDir), 'gone after');

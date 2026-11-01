@@ -6,10 +6,11 @@ Use this guide to publish the site, the web app and the service's handlers to Cl
 
 ## Before you begin
 
-- Production is built from `main` as it was reviewed: `HEAD` must be `origin/main`, with nothing uncommitted. `deploy.sh` and the relay's build step check this themselves (`ops/gate.mjs`), so it holds whether or not you deploy through `oh`. A preview, and the preview relay, can be deployed from any branch.
+- Production is built from `main` as it was reviewed: `HEAD` must be `origin/main` as it can be fetched now, with nothing uncommitted and no untracked file. For the site, no file git ignores may sit in the folders it is published from whole (`site/pages`, `site/public`, `app/web`, `service/functions`). `deploy.sh` and the relay's build step check this themselves (`ops/gate.mjs`), so it holds whether or not you deploy through `oh`. A preview, and the preview relay, can be deployed from any branch you have read: deploying one runs that branch's own `oh`, `deploy.sh`, builds and `service/do/wrangler.toml` on your machine, with your Cloudflare token, which can also deploy production ([security model](../explanation/security-model.md#secrets)).
 - A production deploy of the site also holds the terms and the privacy policy to `site/ledger.json`. It emails nobody: after publishing a change that matters to subscribers, [tell them](change-the-terms.md#tell-subscribers) yourself. See [Change the terms](change-the-terms.md#publish-it).
 - Make sure the commit passes CI, or run `./check.sh full`.
 - Install Node, git and Flutter. CI pins the Flutter version in `.github/workflows/ci.yml`. The web build needs no Rust: the wasm is committed.
+- Wrangler is run from `ops/wrangler`, at the version its `package.json` names and with its whole dependency tree locked in `package-lock.json`. The first deploy installs it there with `npm ci`, as it does again whenever the lockfile changes. Of the credentials `oh` reads, it passes Wrangler and `deploy.sh`, and the builds they run, Cloudflare's alone: never `STRIPE_API_KEY` or New Relic's.
 - To deploy the relay, you also need a linux/amd64 machine with Dart, Cargo (CI pins the Rust version in `.github/workflows/ci.yml`) and Docker running. Wrangler builds the house's image from `service/bench/Dockerfile` with binaries built on your machine (`service/bench/build.sh`). Run `dart pub get` in `service/` once. `./oh deploy relay` says which of these is missing.
 - Export `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`. For what else the scripts read, see [environment variables](../reference/configuration.md#deploying-and-operating).
 - For production, `serviceKey` must be set in `config/openhearts.json`: `deploy.sh` refuses a production deploy without it. To set it up, see [Mint or rotate the service key](rotate-the-service-key.md).
@@ -43,11 +44,11 @@ Use this guide to publish the site, the web app and the service's handlers to Cl
 
    For the relay, `oh` first runs `wrangler deploy --dry-run`, which runs `service/bench/build.sh` (it builds the deal and Schnorr libraries and compiles the house) and builds the house's image, but uploads nothing. A real deploy uploads the worker, live at once, before it builds the image, so an image that failed to build there would leave the new worker beside the old house. Only once the dry run has built both does `oh` deploy: the build again, the worker, and the house's image built and pushed.
 
-   If the deploy fails after its upload all the same, `oh` puts back the version that served before (`wrangler rollback`), and says so. If it can't tell which version served, it rolls nothing back: check with `npx wrangler deployments status` from `service/do`.
+   If the deploy fails after its upload all the same, `oh` puts back the version that served before (`wrangler rollback`), and says so. If it can't tell which version served, it rolls nothing back: check with `../../ops/wrangler/wrangler deployments status` from `service/do`.
 
 ## Deploy a preview
 
-From any branch:
+From any branch you have read (see [Before you begin](#before-you-begin)):
 
 ```bash
 ./oh deploy site --label my-change --apply
@@ -74,7 +75,7 @@ There is one preview relay for every preview. It runs the branch it was last dep
    ./oh preview secrets --apply
    ```
 
-   It sets the previews' service secret on the Pages project's preview environment and the preview relay's house secret, and shows neither. It writes their public keys to `config/openhearts.json` as `preview.serviceKey` and `preview.houseKey`: commit them.
+   It sets the previews' service secret and the key their sign-ins are stored under (`OH_ID_HMAC`) on the Pages project's preview environment, and the preview relay's house secret, and shows none of them. It writes the public keys to `config/openhearts.json` as `preview.serviceKey` and `preview.houseKey`: commit them. A sign-in linked on a preview before has to be linked again.
 
 1. Deploy the preview relay, from the branch you're on:
 

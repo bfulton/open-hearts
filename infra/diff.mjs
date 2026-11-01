@@ -10,6 +10,12 @@ const isObject = (x) => x !== null && typeof x === 'object' && !Array.isArray(x)
 /// which are made for previews and are never production's.
 export const OWN_SECRETS_BY = './oh preview secrets --apply';
 
+/// What deploys relay [def] (infra/cloudflare.mjs: relay, or
+/// relay.preview): oh, which builds production's with the PhotoDNA
+/// module in place, builds before it uploads, and puts back what served
+/// if the deploy fails (ops/release.mjs).
+export const relayDeploy = (def) => `./oh deploy relay${def.env ? ` --${def.env}` : ''} --apply`;
+
 /// Lists of plain values are compared as sets: the APIs answer them in
 /// orders of their own.
 const sameList = (a, b) => {
@@ -151,16 +157,14 @@ export function pagesEnvPlan(want, have, ids) {
     envPatch[name] = { type: 'plain_text', value };
     lines.push(h ? (h.type === 'plain_text' ? `set ${name}: ${JSON.stringify(h.value)} -> ${JSON.stringify(value)}` : `set ${name} as plain text (it is ${h.type})`) : `add ${name} = ${JSON.stringify(value)}`);
   }
-  // oh sets a secret in every environment that lists it, so one command
-  // puts right a secret missing from either (docs/reference/oh.md); a
-  // preview's own (ownSecrets) is made for previews, and set by the
-  // command that makes it.
-  const put = (name) => `\`./oh secret set ${name} --apply\``;
+  // oh sets a secret in every environment that lists it (docs/reference/oh.md);
+  // one made with its key (madeBy), or a preview's own (ownSecrets), is
+  // set by the command that makes it.
   const own = want.ownSecrets ?? [];
   for (const name of [...want.secrets, ...own]) {
     const h = vars[name];
     if (h?.type === 'secret_text') continue;
-    const fix = own.includes(name) ? `\`${OWN_SECRETS_BY}\`` : put(name);
+    const fix = `\`${own.includes(name) ? OWN_SECRETS_BY : (want.madeBy?.[name] ?? `./oh secret set ${name} --apply`)}\``;
     owner.push(h ? `${name} is ${h.type}, not a secret: set it with ${fix}` : `secret ${name} is not set: ${fix}`);
   }
   for (const [name, h] of Object.entries(vars)) {

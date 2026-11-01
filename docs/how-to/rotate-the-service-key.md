@@ -35,43 +35,29 @@ Every part above checks against exactly one key, so there is no overlap between 
 
 ## Mint the first key pair
 
-1. Mint a pair. It prints both halves once and keeps neither:
+1. Mint a pair. It sets the secret half as `OH_SERVICE_SECRET` on the Pages project's production environment, without showing it, and writes the public half to `config/openhearts.json` as `serviceKey`:
 
    ```bash
-   ./oh key mint
+   ./oh key mint --apply
    ```
 
-1. Put the `OH_SERVICE_KEY` value in `config/openhearts.json` as `serviceKey`, and commit the change to `main`.
-1. Set the `OH_SERVICE_SECRET` value as a secret on the Pages project's production environment. It asks for the value, which isn't shown as you paste it, and sets it where `infra/cloudflare.mjs` lists it, which is production alone:
-
-   ```bash
-   ./oh secret set OH_SERVICE_SECRET --apply
-   ```
-
-   Do not save the secret anywhere else.
-
+1. Commit `config/openhearts.json` to `main`.
 1. Deploy the relay worker and the site from `main`, as [Deploy the site, app and service](deploy.md) shows.
 1. Build and release both phone apps, as [Build a phone release](cut-a-phone-release.md) shows.
 
 ## Rotate to a new key pair
 
-1. Mint a new pair:
+1. Mint a new pair. It sets the new secret on the Pages project's production environment, without showing it, and writes the new key to `config/openhearts.json` as `serviceKey`:
 
    ```bash
-   ./oh key mint
+   ./oh key mint --apply
    ```
 
-1. Put the new `OH_SERVICE_KEY` value in `config/openhearts.json` as `serviceKey`, and commit the change to `main`. Do not deploy yet.
-1. Build both phone releases from this commit and submit them to the stores, but hold their release until the last step. A phone build with the new key can get no licence while the service still signs with the old secret.
-1. Set the new `OH_SERVICE_SECRET` value on the Pages project's production environment. It asks for the value, which isn't shown as you paste it:
+   A Pages secret reaches only deployments made after it is set, so the live deployment goes on signing with the old pair until the site is deployed again. The old secret is kept nowhere: from here on, the rotation can't be taken back to the old pair, and the next deploy of the site signs with the new one. To abandon the rotation, mint again and start over.
 
-   ```bash
-   ./oh secret set OH_SERVICE_SECRET --apply
-   ```
-
-   A Pages secret reaches only deployments made after it is set, so the live deployment goes on signing with the old pair until the next step.
-
-1. At once, deploy the site from `main`:
+1. Commit `config/openhearts.json` to `main`. Do not deploy yet.
+1. Build both phone releases from this commit and submit them to the stores, but hold their release until the last step. A phone build with the new key can get no licence while the live deployment still signs with the old pair.
+1. Once the stores have approved both releases, deploy the site from `main` at once:
 
    ```bash
    ./oh deploy site --apply

@@ -14,6 +14,10 @@ export const app = {
   name: 'Open Hearts',
 };
 
+/// NerdGraph's address for the account's region, NEW_RELIC_REGION: EU,
+/// in any case, or US, the default.
+export const newRelicEndpoint = (region) => ((region ?? 'US').toUpperCase() === 'EU' ? 'https://api.eu.newrelic.com/graphql' : 'https://api.newrelic.com/graphql');
+
 /// From outside, once a minute, from two places: the cheapest kind of
 /// check (a ping monitor, which New Relic does not count against its
 /// synthetic checks), each with text the answer must carry, so a page

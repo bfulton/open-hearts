@@ -9,7 +9,7 @@
 import { rm } from 'node:fs/promises';
 import { join } from 'node:path';
 
-import { Failed, Usage, need, relayHost, relayWrangler, root, wranglerVersion } from './env.mjs';
+import { Failed, Usage, WRANGLER, cloudflareOnly, need, relayHost, relayWrangler, root, wranglerVersion } from './env.mjs';
 import { releaseProblems } from './gate.mjs';
 import { MODULE_ALIAS, MODULE_DIR, fetchModule, pinsOf } from './photodna.mjs';
 import { termsProblems, untold } from './terms.mjs';
@@ -66,7 +66,7 @@ export async function relay(ctx, { flags }) {
   await rm(dir, { recursive: true, force: true });
   try {
     const withModule = (await fetchModule(ctx, dir)) !== null;
-    await deployRelay(ctx, version, 'relay', { flags: withModule ? ['--alias', MODULE_ALIAS] : [] });
+    await deployRelay(ctx, 'relay', { flags: withModule ? ['--alias', MODULE_ALIAS] : [] });
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
@@ -74,25 +74,26 @@ export async function relay(ctx, { flags }) {
 
 /// `wrangler deploy` of a relay worker from service/do, [env] naming
 /// which (`--env preview`, or nothing for production's) and [flags] the
-/// rest; [what] it is called in what is said. Wrangler uploads the
+/// rest; [what] it is called in what is said. Wrangler, and the build
+/// it runs, are given only Cloudflare's credentials. Wrangler uploads the
 /// worker, live at once, before it builds the house's image and pushes
 /// it, so an image that failed to build would leave the new worker
 /// beside the old house. So the deploy is built first with --dry-run,
 /// which runs the custom build and builds the image but uploads
 /// nothing; and should the deploy fail after its upload all the same
 /// (the image's push, say), the version that served before is put back.
-async function deployRelay(ctx, version, what, { env = [], flags = [] } = {}) {
-  const cwd = join(root, 'service/do');
-  const wrangler = (...args) => ['--yes', `wrangler@${version}`, ...args, ...env];
-  const built = await ctx.run('npx', wrangler('deploy', '--dry-run', ...flags), { cwd });
+async function deployRelay(ctx, what, { env = [], flags = [] } = {}) {
+  const options = { cwd: join(root, 'service/do'), env: cloudflareOnly(ctx.env) };
+  const wrangler = (...args) => [...args, ...env];
+  const built = await ctx.run(WRANGLER, wrangler('deploy', '--dry-run', ...flags), options);
   if (built !== 0) throw new Failed(`${what}: not deployed: its build or the house's image failed (wrangler deploy --dry-run exited ${built}), and nothing was uploaded`);
-  const before = await serving(ctx, wrangler('deployments', 'status', '--json'), cwd);
-  const code = await ctx.run('npx', wrangler('deploy', ...flags), { cwd });
+  const before = await serving(ctx, wrangler('deployments', 'status', '--json'), options);
+  const code = await ctx.run(WRANGLER, wrangler('deploy', ...flags), options);
   if (code === 0) return;
-  const after = await serving(ctx, wrangler('deployments', 'status', '--json'), cwd);
+  const after = await serving(ctx, wrangler('deployments', 'status', '--json'), options);
   if (!before || !after) throw new Failed(`${what}: wrangler deploy exited ${code}, and which version serves can't be told: see wrangler deployments status${env.length ? ` ${env.join(' ')}` : ''}, from service/do`);
   if (after === before) throw new Failed(`${what}: wrangler deploy exited ${code}; ${before} still serves`);
-  const back = await ctx.run('npx', wrangler('rollback', before, '--message', `${what}: its deploy failed after the upload`, '--yes'), { cwd });
+  const back = await ctx.run(WRANGLER, wrangler('rollback', before, '--message', `${what}: its deploy failed after the upload`, '--yes'), options);
   if (back !== 0) throw new Failed(`${what}: wrangler deploy exited ${code} with ${after} live, and putting ${before} back failed too (wrangler rollback exited ${back})`);
   throw new Failed(`${what}: wrangler deploy exited ${code} with ${after} live; ${before}, which served before, serves again`);
 }
@@ -100,12 +101,12 @@ async function deployRelay(ctx, version, what, { env = [], flags = [] } = {}) {
 /// The version serving all of a worker's traffic, from what [args]
 /// (wrangler deployments status --json) said; null when that can't be
 /// told, or the traffic is split.
-async function serving(ctx, args, cwd) {
-  const { code, out } = await ctx.capture('npx', args, { cwd });
+async function serving(ctx, args, options) {
+  const { code, out } = await ctx.capture(WRANGLER, args, options);
   if (code !== 0) return null;
   let status;
   try {
-    // What npx and Wrangler say on stderr comes with it.
+    // What npm and Wrangler say on stderr comes with it.
     status = JSON.parse(out.slice(out.indexOf('{'), out.lastIndexOf('}') + 1));
   } catch (e) {
     if (e instanceof SyntaxError) return null;
@@ -135,7 +136,7 @@ async function previewRelay(ctx, { flags }) {
     return;
   }
   if (!ready) throw new Failed('preview relay: not deployed (see above)');
-  await deployRelay(ctx, version, 'preview relay', { env: ['--env', 'preview'] });
+  await deployRelay(ctx, 'preview relay', { env: ['--env', 'preview'] });
 }
 
 export async function site(ctx, { flags }) {
@@ -165,7 +166,7 @@ export async function site(ctx, { flags }) {
       ctx.warn(`could not delete old deployments: ${e?.message ?? e}. Deploying anyway; ./oh deploy prune --apply tries again.`);
     }
   }
-  const code = await ctx.run(join(root, 'deploy.sh'), [label]);
+  const code = await ctx.run(join(root, 'deploy.sh'), [label], { env: cloudflareOnly(ctx.env) });
   if (code !== 0) throw new Failed(`site: deploy.sh exited ${code}`);
   if (publishing.some(({ entry }) => told(entry))) ctx.log('published: now email web subscribers what changed (./oh terms notify --apply)');
 }
@@ -401,8 +402,11 @@ export async function verify(ctx) {
       continue;
     }
     const { code, out } = await ctx.capture('node', [join(root, script)], { env: ctx.env });
+    // Clean is nothing to change and nothing to fix by hand: infra's
+    // last line is "0 change(s), 0 by hand; …", observability's
+    // "0 change(s); …".
     const last = out.trim().split('\n').at(-1) ?? '';
-    check(code === 0 && /^0 change\(s\)/.test(last), `${script}: ${last}`);
+    check(code === 0 && /^0 change\(s\)(, 0 by hand)?;/.test(last), `${script}: ${last}`);
   }
   if (failures.length) throw new Failed(`${failures.length} check(s) failed`);
 }

@@ -6,3 +6,9 @@ updates:
     directory: /
     schedule:
       interval: weekly
+  # Wrangler, which every deploy runs (ops/wrangler): its next release,
+  # its whole tree locked, the same way.
+  - package-ecosystem: npm
+    directory: /ops/wrangler
+    schedule:
+      interval: weekly

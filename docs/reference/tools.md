@@ -34,7 +34,7 @@ Run the Dart tools from `service` as `dart run bin/<name>.dart` or `dart run too
 | File | What it does | Main flags |
 |---|---|---|
 | `service/bin/house.dart` | Runs the house: woken for a table (`POST /wake?table=…`), it follows the table's log from the start, deals and plays its bot seats, holds half of each person's escrow and says it when that person goes, and says how the game came out, in the log and on the results tag. Woken for a pool (`POST /wake?pool=…`), it seats the pool a round at a time, with bots chosen by the ratings it folds from the results tag, until nobody has waited there for a minute. A wake's JSON body, `{"timing": …}`, says the operator's clocks for the tables it seats; a wake without one leaves them as they were. Reads `OH_HOUSE_SECRET`, and `OH_HOUSE_KEY` and `OH_SERVICE_KEY` where set; a secret that is not `OH_HOUSE_KEY`'s does not start. Ends on SIGTERM. | `--relay <url,…>`, with `{tag}` where the table's tag goes; `--port <n>` answers `GET /ping`, `GET /status` and `POST /wake?table=…` or `?pool=…`; `--pace <0..1>` the share of each bot's thinking time it takes before it says the bot's card (1, the default; the browser suites pass their app's pace), never longer than the quickest person at the table takes over a card |
-| `service/bin/service_key.dart` | Mints the service's signing pair, and prints both halves once. Run by `./oh key mint`. | None |
+| `service/bin/service_key.dart` | Mints a signing pair and prints it as one line of JSON, for `./oh key mint`, `./oh house key` and `./oh preview secrets`, which set its secret without showing it. | None |
 | `service/tool/forget.mjs` | Not run by itself: forgets an account (`forget`), for `./oh account delete`. Marks it forgotten in `OH_RECORDS` (`forgottenKey`), takes its name off its kept games (`anonymizeGames`) and deletes every row the service keeps for it (`forgetAccount`). | Not applicable |
 | `service/tool/suspend.mjs` | Not run by itself: how an account stands (`standing`), what an act would do (`wouldDo`), and an order carried out in the account's turn (`carry`), for `./oh account`. | Not applicable |
 | `service/tool/find.mjs` | Not run by itself: finds accounts by name or email (`findAccounts`), or by a device's key (`accountOf`), for `./oh account`. | Not applicable |
@@ -49,7 +49,7 @@ Run the Dart tools from `service` as `dart run bin/<name>.dart` or `dart run too
 | File | What it does | Main flags |
 |---|---|---|
 | `deploy.sh` | Builds the site, the app and the handlers, and uploads them to the Pages project as one deployment. Run by `./oh deploy site`, which deletes old deployments before a production deploy (as `./oh deploy prune` does). Refuses production without `serviceKey` and `houseKey` in `config/openhearts.json`, or when `ops/gate.mjs` finds anything in the way. A preview's app is built with the previews' keys (`preview.serviceKey`, `preview.houseKey`) and the preview relay. Needs `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`. | `[label]`: the Pages branch, which defaults to `main` on `main` and `dev` elsewhere. |
-| `build_phone.sh` | Builds the native libraries, then a store release compiled with what `config/openhearts.json` names. Run by `./oh phone`. | `ios` or `android`; further arguments go to `flutter build`. |
+| `build_phone.sh` | Builds the native libraries, then a store release compiled with what `config/openhearts.json` names. Run by `./oh phone`. Refuses when `ops/gate.mjs` finds anything in the way: a store release is built from `main` as it was reviewed. | `ios` or `android`; further arguments go to `flutter build`. |
 | `crypto/deal/build.sh` | Builds the deal library for the Dart VM, and the wasm, copied to `app/web/deal.wasm`. | None |
 | `crypto/schnorr/build.sh` | Builds the Schnorr library for the Dart VM. | None |
 | `crypto/schnorr_wasm/build.sh` | Builds BIP-340 for the browser and the relay, copies it to `app/web/schnorr.wasm`, and checks it against BIP-340's test vectors. | None |
@@ -59,6 +59,7 @@ Run the Dart tools from `service` as `dart run bin/<name>.dart` or `dart run too
 | `site/build.mjs` | Builds the site into a directory, once in each language, with the sitemap that lists it. `deploy.sh` runs it. | `<out>` |
 | `app/worker/build.sh` | Compiles the review worker beside a built app. `deploy.sh` and `e2e/build.sh` run it. | `<build directory>` |
 | `service/bench/build.sh` | Builds the house's container image. The relay's `wrangler deploy` runs it. | None |
+| `ops/wrangler/wrangler` | Runs Wrangler at the version `ops/wrangler/package.json` names, with its whole dependency tree as `package-lock.json` locks it, installed beside it with `npm ci` the first time and whenever the lockfile changes. `deploy.sh` and `./oh` run Wrangler through it. | Wrangler's own |
 
 ## Accounts and monitoring
 

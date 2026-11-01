@@ -14,6 +14,7 @@
 // else holds any.
 
 import { Failed, Usage, need } from './env.mjs';
+import { newRelicEndpoint } from '../observability/monitoring.mjs';
 
 /// How many events one query of Workers Logs returns at most; a window
 /// that fills it is split in two and asked again.
@@ -62,14 +63,15 @@ function said(event) {
 }
 
 /// The device's own reports of the table, from New Relic: a game lost,
-/// or a line down for long. Null, said, where there are no credentials.
+/// or a line down for long. None, and said so, where there are no
+/// credentials.
 async function reports(ctx, short, days) {
   const env = ctx.env;
   if (!env.NEW_RELIC_API_KEY || !env.NEW_RELIC_ACCOUNT_ID) {
     ctx.log('  the device: not asked (needs NEW_RELIC_API_KEY and NEW_RELIC_ACCOUNT_ID)');
     return [];
   }
-  const endpoint = env.NEW_RELIC_REGION === 'EU' ? 'https://api.eu.newrelic.com/graphql' : 'https://api.newrelic.com/graphql';
+  const endpoint = newRelicEndpoint(env.NEW_RELIC_REGION);
   const nrql = `SELECT timestamp, errorMessage, seen, line, build FROM JavaScriptError WHERE \`table\` = '${short}' SINCE ${days} days ago LIMIT 100`;
   const res = await ctx.fetch(endpoint, {
     method: 'POST',
@@ -89,6 +91,12 @@ async function reports(ctx, short, days) {
 }
 
 const stamp = (ms) => new Date(ms).toISOString().replace('T', ' ').replace('Z', '');
+
+/// [text] with each control character written out as \xNN: what is
+/// printed here comes partly from anybody (a socket's close reason, a
+/// report filed with the page's public key), and a terminal would act
+/// on an escape sequence in it.
+const shown = (text) => String(text).replace(/[\u0000-\u001f\u007f-\u009f]/g, (c) => `\\x${c.charCodeAt(0).toString(16).padStart(2, '0')}`);
 
 export async function table(ctx, { args, flags }) {
   const id = args.table ?? '';
@@ -119,5 +127,5 @@ export async function table(ctx, { args, flags }) {
     ctx.log('nothing: the house never served it, and nothing was said of it in that time');
     return;
   }
-  for (const r of rows) ctx.log(`${stamp(r.at)}  ${r.from.padEnd(6)}  ${r.text}`);
+  for (const r of rows) ctx.log(`${stamp(r.at)}  ${r.from.padEnd(6)}  ${shown(r.text)}`);
 }

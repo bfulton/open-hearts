@@ -855,7 +855,8 @@ Secrets are set by hand and checked only by name. Everything else that
 is not secret is in `config/openhearts.json`, committed: the service's
 public keys (production's, and the one previews have), the TURN key's
 id, the Stripe price, and the store and sign-in identifiers. `deploy.sh`
-compiles the build's from it and ships the file to the worker, which
+compiles the build's from it, and from nothing else
+(`app/tool/defines.mjs`), and ships the file to the worker, which
 reads it beneath the project's settings
 (`service/functions/deployment.mjs`): a variable of the same name set on
 the project wins, as one set by a test does. A field left null is a
@@ -877,7 +878,9 @@ production's. Every preview build is made with the same key, and talks
 to the preview relay (`deploy.sh`).
 
 A preview runs whatever branch was deployed to it, so its secrets are
-its own ([secrets](security-model.md#secrets)). Nobody buys anything on
+its own ([secrets](security-model.md#secrets)). Deploying one runs that
+branch's own tooling with the operator's Cloudflare token, so it is
+deployed only from a branch the operator has read. Nobody buys anything on
 a preview: the operator invites the people who play there (`oh preview
 invite`), each invitation an account on the previews' store that is
 nobody's purchase, good for a year, which a device joins with one of

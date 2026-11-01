@@ -67,6 +67,7 @@ Each suite is a `suite_<name>` function in `check.sh`, run from the repository's
 | `site/` | `site`, `e2e_site`, `ops` |
 | `config/` | `site`, `functions`, `infra`, `ops` |
 | `infra/` | `infra`, `ops` |
+| `observability/` | `infra`, `ops` |
 | `ops/`, `oh` | `ops` |
 | `e2e/*.test.mjs` | `workers` |
 | Any other path under `e2e/`, any other `*.sh` file, `.github/` | `scripts` |

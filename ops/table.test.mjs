@@ -87,6 +87,32 @@ test('the house, the relay, its object and the device, in the order things happe
   assert.match(ctx.asked.find((a) => a.nrql).nrql, /WHERE `table` = '83167bb6' SINCE 3 days ago/);
 });
 
+test('what anybody can write is printed with its control characters written out, never sent to the terminal', async () => {
+  const ctx = context({
+    lines: { 'cloudflare-workers': [json('30:44.000', { relay: 'close', tag: 'table:83167bb6', as: 'unanswered', code: 4000, clean: true, why: '\u001b[2K\u001b[1Agone\u0007', sockets: 0 })] },
+    reports: [{ timestamp: at('31:05.000'), errorMessage: 'lost\u001b]52;c;eA==\u0007', seen: '\u009b31m' }],
+    env: { NEW_RELIC_API_KEY: 'k', NEW_RELIC_ACCOUNT_ID: '1' },
+  });
+  await table(ctx, { args: { table: id }, flags: {} });
+  const timeline = ctx.said.filter((l) => l.startsWith('2026'));
+  assert.deepEqual(timeline, [
+    '2026-10-23 23:30:44.000  relay   socket close as unanswered code 4000 (\\x1b[2K\\x1b[1Agone\\x07); 0 on the tag',
+    '2026-10-23 23:31:05.000  device  lost\\x1b]52;c;eA==\\x07: \\x9b31m',
+  ]);
+  assert.ok(timeline.every((l) => !/[\u0000-\u001f\u007f-\u009f]/.test(l)));
+});
+
+test("New Relic is asked in the account's region, written in either case", async () => {
+  for (const [region, host] of [['EU', 'api.eu.newrelic.com'], ['eu', 'api.eu.newrelic.com'], ['US', 'api.newrelic.com'], [undefined, 'api.newrelic.com']]) {
+    const ctx = context({ env: { NEW_RELIC_API_KEY: 'k', NEW_RELIC_ACCOUNT_ID: '1', ...(region ? { NEW_RELIC_REGION: region } : {}) } });
+    const asked = [];
+    const answer = ctx.fetch;
+    ctx.fetch = async (url, init) => (asked.push(new URL(url).host), answer(url, init));
+    await table(ctx, { args: { table: id }, flags: {} });
+    assert.equal(asked.at(-1), host, String(region));
+  }
+});
+
 test('without New Relic the device is left out, and said so; its first eight are enough', async () => {
   const ctx = context({ lines: { containers: [house('29:02.724', 'x')] } });
   await table(ctx, { args: { table: '83167bb6' }, flags: { days: '1' } });
