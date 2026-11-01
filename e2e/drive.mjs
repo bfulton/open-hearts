@@ -20,6 +20,7 @@ import { basename, dirname, extname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { format } from 'node:util';
 import { build as buildSite } from '../site/build.mjs';
+import { headersFor, parseHeaders } from '../site/headers.mjs';
 import { configOf } from '../service/functions/config.mjs';
 import { wakePath } from '../service/do/bench.mjs';
 
@@ -380,6 +381,10 @@ const recordsBucket = () => ({
 export async function serveApp({ relayPort = null, pace = null, config = null } = {}) {
   const site = mkdtempSync(join(tmpdir(), 'oh-site-'));
   buildSite(site);
+  // With the headers Pages gives them: the site's _headers, as built
+  // for the deploy, which is where the app's Content-Security-Policy is
+  // (headers.mjs; csp.mjs holds the app to it).
+  const headerRules = parseHeaders(readFileSync(join(site, '_headers'), 'utf8'));
   // Static files as a fetch, which is what the worker's own ASSETS
   // binding is, by Pages' rules: a directory is its index.html, an
   // address with no extension its .html.
@@ -391,7 +396,10 @@ export async function serveApp({ relayPort = null, pace = null, config = null } 
     else if (!extname(file)) file += '.html';
     try {
       const body = await readFile(file);
-      return new Response(body, { status: 200, headers: { 'content-type': types[extname(file)] ?? 'application/octet-stream' } });
+      return new Response(body, {
+        status: 200,
+        headers: { ...headersFor(headerRules, path), 'content-type': types[extname(file)] ?? 'application/octet-stream' },
+      });
     } catch {
       return new Response(null, { status: 404 });
     }
