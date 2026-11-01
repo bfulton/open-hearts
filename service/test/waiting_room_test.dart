@@ -174,6 +174,37 @@ void main() {
       closeAll([a, (h.$1, h.$2, null)]);
     });
 
+    test("a waiter's avatar is seated as a device sends one, so nobody's keeps the house from seating the pool", () async {
+      final h = await seats();
+      // Waiting for bots at once, with an avatar padded past what the
+      // relay stores of a seating (service/do/relay.mjs, storedMost).
+      final x = RelayTransport(relays: [relay.url], signer: SchnorrSigner.generate(), table: poolTag('unrated', target: gameOverScore));
+      await x.ready;
+      final seating = x.lobby.where((e) => e.kind == TableKinds.lobby && e.pubkey == house.publicKey).first;
+      final since = DateTime.now().millisecondsSinceEpoch;
+      void say() => x.announce({
+            'kind': 'wait',
+            'name': 'X',
+            'rating': 1500,
+            'since': since,
+            'botsAfter': 0,
+            'avatar': {'icon': 'pets', 'color': 3, 'pad': 'x' * 30000},
+          }, ephemeral: true);
+      say();
+      final beat = Timer.periodic(const Duration(milliseconds: 500), (_) => say());
+      final seated = await seating.timeout(const Duration(seconds: 10));
+      beat.cancel();
+      final seat = ((jsonDecode(seated.content) as Map)['seats'] as List).first as Map;
+      expect(seat['avatar'], {'icon': 'pets', 'color': 3}, reason: 'the icon and the colour, and nothing else');
+      x.close();
+      // And the next to wait is seated as ever: the house was not told
+      // no, so it did not sit the relay out.
+      final a = await join('A');
+      a.$2.playWithBots();
+      await a.$3.timeout(const Duration(seconds: 10));
+      closeAll([a, (h.$1, h.$2, null)]);
+    });
+
     test('a waiter who said nothing waits the pool\'s time, whatever another chose', () async {
       // One takes bots at once; the other said nothing, so waits the
       // pool's eight seconds here. Far apart in rating for as long as

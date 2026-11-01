@@ -725,7 +725,9 @@ squashed from a pull request, the pull request's number.
   socket's rate, and only an answer to the socket's own challenge is
   checked. An event a room or a pool keeps is at most 24 KiB, which a
   picture fits in, so one subscriber can no longer fill a lobby past
-  what its object can hold, and have it fail each time it wakes. The
+  what its object can hold, and have it fail each time it wakes; the
+  house's seatings carry only the icon and colour of each waiter's
+  avatar, so nobody's can make one too long to keep. The
   service reads no request body past its bound, and quotes a report's
   note in the operator's email so that it cannot pass for instructions.
   (2026-11-01, #47)

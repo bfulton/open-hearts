@@ -425,7 +425,7 @@ test("subscribing counts against the socket's rate, from the bucket publishing t
   assert.match(a.of('OK').at(-1)[3], /^rate-limited: /);
 });
 
-test('a lobby keeps no event longer than a picture needs, and carries a longer one it does not keep', async () => {
+test('a lobby keeps no event that weighs more than a picture needs, and carries a longer one it does not keep', async () => {
   const relay = objectRelay(verify, { tag: 'ROOM42' });
   const a = socket();
   relay.open(a);
@@ -437,7 +437,15 @@ test('a lobby keeps no event longer than a picture needs, and carries a longer o
   const long = await lobby(4244, 'x'.repeat(storedMost));
   await relay.message(a, JSON.stringify(['EVENT', long]));
   assert.deepEqual(a.of('OK').at(-1), ['OK', long.id, false, STORED_TOO_BIG_WHY]);
-  assert.equal(relay.stored, 1, 'the picture alone');
+  // Past U+00FF, the object holds a string at two bytes a character, so
+  // half as many of them weigh as much.
+  const wide = await lobby(4244, '一'.repeat(storedMost / 2));
+  await relay.message(a, JSON.stringify(['EVENT', wide]));
+  assert.deepEqual(a.of('OK').at(-1), ['OK', wide.id, false, STORED_TOO_BIG_WHY]);
+  const names = await lobby(4244, JSON.stringify({ kind: 'start', seats: ['山田花子', 'Ελένη', 'Анна', 'José'].map((name) => ({ name })) }));
+  await relay.message(a, JSON.stringify(['EVENT', names]));
+  assert.deepEqual(a.of('OK').at(-1), ['OK', names.id, true, '']);
+  assert.equal(relay.stored, 2, 'the picture and the seating');
   // Somebody waiting is forwarded and forgotten, so held to the
   // message limit alone.
   const waiting = await lobby(24245, 'x'.repeat(storedMost));

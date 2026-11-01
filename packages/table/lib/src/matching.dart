@@ -36,6 +36,22 @@ import 'signing.dart';
 import 'spec.dart';
 import 'timing.dart';
 
+/// What of the avatar a waiter says ([raw]) is read: its icon and its
+/// colour, as a device sends them (app/lib/avatar.dart, toJson), and
+/// nothing else; null for none. The house says it again in its
+/// seating, which the relay stores only up to a length
+/// (service/do/relay.mjs, storedMost). Anything more in it would let
+/// one waiter make the seating too long to store: refused, and the
+/// house would then sit that relay out for a minute
+/// (RelayGroup.refusalMs), seating nobody in the pool.
+Map<String, Object?>? waiterAvatar(Object? raw) => switch (raw) {
+      final Map<Object?, Object?> a => {
+          if (a['icon'] case final String icon when icon.length <= 32) 'icon': icon,
+          if (a['color'] case final int color) 'color': color,
+        },
+      _ => null,
+    };
+
 /// Someone waiting, as the others see them.
 class Waiter {
   Waiter({required this.key, required this.name, required this.rating, required this.since, this.avatar, this.pace = 0, this.licence, this.botsAfterMs});
@@ -51,8 +67,8 @@ class Waiter {
   /// Who is waiting: the account, or the key where nothing names one.
   AccountId get account => licence?.account ?? key;
 
-  /// How they chose to look, as they said it — the app's business;
-  /// the table carries it to the seating unread.
+  /// How they chose to look: an icon and a colour, the app's business
+  /// ([waiterAvatar]), carried to the seating.
   final Map<String, Object?>? avatar;
 
   /// Their rating, as they state it — it decides who they sit with,
@@ -397,7 +413,7 @@ class WaitingRoom {
             rating: c['rating'] as int? ?? 1500,
             pace: switch (c['pace']) { final int p when p > 0 && p <= 120 => p, _ => 0 },
             since: c['since'] as int? ?? _now,
-            avatar: c['avatar'] is Map ? Map<String, Object?>.from(c['avatar'] as Map) : null,
+            avatar: waiterAvatar(c['avatar']),
             licence: licence,
           ),
         );
@@ -634,7 +650,7 @@ class PoolHost {
         // How long they have waited, by this clock: rounds, windows and
         // the wait before bots are all the house's.
         since: now,
-        avatar: c['avatar'] is Map ? Map<String, Object?>.from(c['avatar'] as Map) : null,
+        avatar: waiterAvatar(c['avatar']),
         licence: licence,
       ),
     );

@@ -182,10 +182,12 @@ object runs on one thread shared by everyone on that tag.
   subscriptions always fit in the attachment a hibernating socket
   carries), a few subscriptions (`maxSubscriptions`), and a
   burst-then-rate limit on publishing, subscribing and asking for a
-  table's log, that refuses floods before checking signatures. A stored
-  event is at most `storedMost` characters, so a lobby's object holds
-  its newest `storedKeep` in a bounded amount of memory. An event is serialised
-  once for all listeners. Presence uses the tighter `objectLimits`,
+  table's log, that refuses floods before checking signatures. A
+  stored event weighs at most `storedMost` as the object holds it, so a
+  lobby's object holds its newest `storedKeep` in a bounded amount of
+  memory; and the house's seatings carry only the icon and colour of a
+  waiter's avatar, so no waiter can make one too long to store. An
+  event is serialised once for all listeners. Presence uses the tighter `objectLimits`,
   tables use `tableLimits`.
 - A socket that has not answered the challenge has what it says held
   up to `heldMost` messages and `heldMostChars` characters, and may

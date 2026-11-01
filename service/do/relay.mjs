@@ -995,15 +995,23 @@ export const resultsTag = 'standings';
 /// folded by the service rather than by every device.
 export const storedKeep = (tag) => (tag === resultsTag ? 20000 : 2000);
 
-/// The longest an event a tag stores may be, as JSON, in characters.
-/// The longest a device stores is a picture, PROFILE_PICTURE_MOST bytes
-/// in base64 (some 16,000 characters); a seating of four is a few
-/// thousand, and a result less. So a room's or a pool's object holds
-/// its [storedKeep] in some 50 MB at the most, inside the 128 MB an
-/// object has. Held only to [tableLimits]' message, one subscriber's
-/// 2,000 events would be twice that, and the object would fail each
-/// time it woke and read them back.
+/// The most an event a tag stores may weigh, in bytes as the object
+/// holds it ([storedWeight]). The longest a device stores is a picture,
+/// PROFILE_PICTURE_MOST bytes in base64 (some 16,000 characters); a
+/// seating of four is a few thousand, and a result less. So a room's or
+/// a pool's object holds its [storedKeep] in some 50 MB at the most,
+/// inside the 128 MB an object has. Held only to [tableLimits]'
+/// message, one subscriber's 2,000 events would be twice that or more,
+/// and the object would fail each time it woke and read them back.
 export const storedMost = 24 * 1024;
+
+/// What [event] weighs against [storedMost]: its JSON's length, and
+/// twice that once any character in it is past U+00FF, since V8 then
+/// holds the string at two bytes a character.
+export function storedWeight(event) {
+  const json = JSON.stringify(event);
+  return /[^\u0000-\u00ff]/.test(json) ? json.length * 2 : json.length;
+}
 
 /// A player's quick reaction at a live table (packages/table,
 /// reactions.dart): 👍, 😬 and the rest, as a short code and the moment
@@ -1102,8 +1110,8 @@ export const RESULT_NOT_HOUSE_WHY = 'blocked: a result is the house\'s word';
 /// (service/functions/names.mjs): the app never sends one.
 export const NAME_REFUSED_WHY = 'blocked: a name that is not allowed';
 
-/// An event to be stored that is longer than [storedMost].
-export const STORED_TOO_BIG_WHY = `too big: a stored event is at most ${storedMost} characters`;
+/// An event to be stored that weighs more than [storedMost].
+export const STORED_TOO_BIG_WHY = 'too big: a stored event is longer than this relay keeps';
 
 /// Why a view of a table said by a key that holds no seat at it is not
 /// carried.
@@ -1115,7 +1123,7 @@ export const VIEW_NOT_SEATED_WHY = 'blocked: a view of the table is one of its p
 /// belongs to it, and nobody writes into one tag's store through
 /// another's. A reaction anywhere but a table's own tag, or in any
 /// shape but a reaction's ([reactionRefusal]). An event to be stored
-/// longer than [storedMost]. And anything that shows
+/// that weighs more than [storedMost]. And anything that shows
 /// the others a name the filter refuses ([namesIn]), or a picture
 /// anywhere but in a picture of its own ([pictureInAvatar]).
 ///
@@ -1133,7 +1141,7 @@ export function refusalFor(tag, { house = null } = {}) {
         ? 'blocked: presence carries ephemeral kinds only'
         : `blocked: this tag stores only kind ${lobbyKind}, tagged ${tag}`;
     }
-    if (!ephemeral(event.kind) && JSON.stringify(event).length > storedMost) return STORED_TOO_BIG_WHY;
+    if (!ephemeral(event.kind) && storedWeight(event) > storedMost) return STORED_TOO_BIG_WHY;
     if (pictureInAvatar(event)) return PICTURE_IN_AVATAR_WHY;
     return namesIn(event).some(nameRefused) ? NAME_REFUSED_WHY : null;
   };
