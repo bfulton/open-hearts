@@ -6,7 +6,7 @@ import { APP_HOST } from './app_host.mjs';
 import { signerFor } from './licence.mjs';
 import { REFUSED } from './refusals.mjs';
 import { digestOf } from './rows.mjs';
-import { S, isLocal } from './settings.mjs';
+import { isLocal, serviceSettings } from './settings.mjs';
 
 /// The origin a browser may call the handlers from, echoed back, or
 /// null: the site's own hosts, the app's (which calls its own origin's
@@ -81,7 +81,7 @@ export async function askedBy(body, handler, what, signer, { now = Date.now() } 
   if (!signer.verify(key, await digestOf(requestStatement(handler, key, at, what)), sig)) {
     return { status: 401, body: { error: 'not signed by that key' } };
   }
-  if (Math.abs(now / 1000 - at) > S().requestToleranceS) {
+  if (Math.abs(now / 1000 - at) > serviceSettings().requestToleranceS) {
     return { status: 401, body: { error: REFUSED.clockOff } };
   }
   return { key };

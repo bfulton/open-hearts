@@ -233,7 +233,7 @@ Two groups go together. When a group breaks its rule, the worker drops every fie
 
 ## Service settings
 
-The row `config|service` in `OH_STORE`. It is never served. The Pages worker and the `Household` object read it at most once a minute per isolate (`settle`, `SETTINGS_KEPT_MS`). Each number is taken when it is a whole number within its bounds, and otherwise keeps its default (`serviceSettingsOf`).
+The row `config|service` in `OH_STORE`. It is never served. The Pages worker and the `Household` object read it at most once a minute per isolate (`loadServiceSettings`, `SETTINGS_KEPT_MS`). Each number is taken when it is a whole number within its bounds, and otherwise keeps its default (`serviceSettingsOf`).
 
 Defaults and bounds: `SERVICE_DEFAULTS` and `SERVICE_BOUNDS` in `service/functions/settings.mjs`.
 

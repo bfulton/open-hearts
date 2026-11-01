@@ -24,7 +24,7 @@ import { sendNotice } from './notices.mjs';
 import { profileRead, profileWritten } from './profile.mjs';
 import { REFUSED } from './refusals.mjs';
 import { storeOf } from './rows.mjs';
-import { S, SITE, notConfigured, settle } from './settings.mjs';
+import { SITE, loadServiceSettings, notConfigured, serviceSettings } from './settings.mjs';
 import { bindPurchase } from './subscriptions.mjs';
 import { SUSPENDED_WHY, carryOut } from './suspension.mjs';
 
@@ -175,7 +175,7 @@ export async function dropDevice(key, device, store, { now = Date.now(), active 
   const theirs = await store.get(`KEY#${device}`, 'ENTITLEMENT');
   if (theirs?.account === account) await store.del(`KEY#${device}`, 'ENTITLEMENT');
   if (active) await dropActive(account, device, active, revoke);
-  return { status: 200, body: { devices: (await devicesOn(store, account)).length, most: S().mostDevices } };
+  return { status: 200, body: { devices: (await devicesOn(store, account)).length, most: serviceSettings().mostDevices } };
 }
 
 // ---- one account at a time ----------------------------------------------
@@ -194,6 +194,17 @@ export async function dropDevice(key, device, store, { now = Date.now(), active 
 // turn — its account found or made — is an object of its own, named
 // `sub:` and the subscription.
 
+/// The setting that is each kind's allowance an hour ([kindOf]). Any
+/// other kind, a change, a device coming in or an unlink, has the
+/// changes' allowance, each counted apart.
+const ALLOWANCES = Object.freeze({
+  read: 'householdReadsPerHour',
+  shown: 'householdReadsPerHour',
+  active: 'activationsPerHour',
+  profile: 'profileWritesPerHour',
+  record: 'recordsPerHour',
+});
+
 /// One household's queue and its hour: everything asked of it runs in
 /// order, and what is over the hour's allowance is refused before it
 /// touches the store. [free], where given, runs first in the turn, and
@@ -209,18 +220,7 @@ export function sequencer({ now = Date.now } = {}) {
       const recent = (done[kind] = (done[kind] ?? []).filter((at) => t - at < 3600000));
       // An operator's order (suspension.mjs) is never held back by what
       // the account's own devices have asked for this hour.
-      const most =
-        kind === 'order'
-          ? Infinity
-          : kind === 'read' || kind === 'shown'
-          ? S().householdReadsPerHour
-          : kind === 'active'
-            ? S().activationsPerHour
-            : kind === 'profile'
-              ? S().profileWritesPerHour
-              : kind === 'record'
-                ? S().recordsPerHour
-                : S().householdChangesPerHour;
+      const most = kind === 'order' ? Infinity : serviceSettings()[ALLOWANCES[kind] ?? 'householdChangesPerHour'];
       if (recent.length >= most) return { status: 429, body: { error: 'too many at once: try again in a while' } };
       recent.push(t);
       return work();
@@ -283,7 +283,7 @@ export async function householdOp(op, store, { now = Date.now(), mail = null, ac
       // word, so a device shows a link made on another device, or one
       // Apple has since taken away (appleIdNotice), as it is now.
       const signIn = (await store.get(`ACCOUNT#${account}`, 'LOGIN'))?.provider ?? null;
-      return { status: 200, body: { devices, most: S().mostDevices, signIn } };
+      return { status: 200, body: { devices, most: serviceSettings().mostDevices, signIn } };
     }
     case 'attest':
       return attest(op.who, op.key, store, op.login, { now });
@@ -526,7 +526,7 @@ export class Household {
     // terms (notices.mjs) only borrow the binding.
     if (op?.op === 'alert') return Response.json(await sendAlert(op, this.env));
     if (op?.op === 'notice') return Response.json(await sendNotice(op, this.env));
-    await settle(this.env);
+    await loadServiceSettings(this.env);
     const store = storeOf(this.env);
     if (!store) return Response.json({ status: 503, body: notConfigured('OH_STORE') });
     return Response.json(

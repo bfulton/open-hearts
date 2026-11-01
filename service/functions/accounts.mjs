@@ -4,7 +4,7 @@
 
 import { REFUSED } from './refusals.mjs';
 import { dayAfter, dayOf, digestOf, hex, isAccount, newAccount } from './rows.mjs';
-import { S } from './settings.mjs';
+import { serviceSettings } from './settings.mjs';
 
 /// How far this key is paid up to, and the account it is a device of.
 /// One read of the device's own row; the account's and its
@@ -29,7 +29,7 @@ export async function entitlementOf(store, key, { now = Date.now(), openHouse = 
   if (!row) {
     if (!openHouse) return null;
     const subscription = `local-${key.slice(0, 16)}`;
-    const renews_at = dayAfter(now, S().licenceDays);
+    const renews_at = dayAfter(now, serviceSettings().licenceDays);
     await store.put(`SUB#${subscription}`, 'META', { source: 'local', txn_ref: null, renews_at, cancelled_at: null });
     await paidFor(store, subscription, key, { now });
     return store.get(`KEY#${key}`, 'ENTITLEMENT');
@@ -175,21 +175,21 @@ export async function ticketFor(key, store, { now = Date.now() } = {}) {
   const account = await accountOfKey(store, key);
   if (!account) return { status: 402, body: { error: REFUSED.noSubscription } };
   const out = await store.get(`ACCOUNT#${account}`, 'TICKET');
-  if (out && Date.parse(out.expires_at) - now >= S().ticketReuseMinutes * 60000) {
+  if (out && Date.parse(out.expires_at) - now >= serviceSettings().ticketReuseMinutes * 60000) {
     const ticket = await store.get(`TICKET#${out.code}`, 'META');
     if (ticket && !ticket.used_at) {
-      return { status: 200, body: { ticket: out.code, expires_at: out.expires_at, devices: out.devices, most: S().mostDevices } };
+      return { status: 200, body: { ticket: out.code, expires_at: out.expires_at, devices: out.devices, most: serviceSettings().mostDevices } };
     }
   }
   const devices = await devicesOn(store, account);
-  if (devices.length >= S().mostDevices) {
-    return { status: 409, body: { error: REFUSED.accountFull, devices: devices.length, most: S().mostDevices } };
+  if (devices.length >= serviceSettings().mostDevices) {
+    return { status: 409, body: { error: REFUSED.accountFull, devices: devices.length, most: serviceSettings().mostDevices } };
   }
   const code = nonce();
-  const expires_at = new Date(now + S().ticketMinutes * 60000).toISOString();
+  const expires_at = new Date(now + serviceSettings().ticketMinutes * 60000).toISOString();
   await store.put(`TICKET#${code}`, 'META', { account, expires_at, used_at: null, made_by: key }, { ttl: TICKET_KEPT_S });
   await store.put(`ACCOUNT#${account}`, 'TICKET', { code, expires_at, devices: devices.length }, { ttl: TICKET_KEPT_S });
-  return { status: 200, body: { ticket: code, expires_at, devices: devices.length, most: S().mostDevices } };
+  return { status: 200, body: { ticket: code, expires_at, devices: devices.length, most: serviceSettings().mostDevices } };
 }
 
 /// A device arriving with a code. The code is spent whether or not the
@@ -370,8 +370,8 @@ export async function joinAccount(key, account, store, { now = Date.now(), movin
   if (!isAccount(account)) return { status: 404, body: { error: 'no such account' } };
   const devices = await devicesOn(store, account);
   const already = devices.some((d) => d.key === key);
-  if (!already && devices.length >= S().mostDevices) {
-    return { status: 409, body: { error: REFUSED.accountFull, devices: devices.length, most: S().mostDevices } };
+  if (!already && devices.length >= serviceSettings().mostDevices) {
+    return { status: 409, body: { error: REFUSED.accountFull, devices: devices.length, most: serviceSettings().mostDevices } };
   }
   const today = dayOf(now);
   // A device of another account that is still paid up stays in it. A

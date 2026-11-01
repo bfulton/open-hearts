@@ -31,7 +31,7 @@ import { MOST_PROFILE_BODY } from './profile.mjs';
 import { anonymizeGames, keepRecord, keptGames, markForgotten, recordMost, recordResponse, tableIdShape } from './records.mjs';
 import { REFUSED } from './refusals.mjs';
 import { bytesOf64, isAccount, storeOf } from './rows.mjs';
-import { S, notConfigured, openHouse, settle } from './settings.mjs';
+import { loadServiceSettings, notConfigured, openHouse, serviceSettings } from './settings.mjs';
 import { APPLE_ID_GONE, PROVIDERS, appleIdNotice, supersede, unlinkFromAccount, whoSignedIn } from './signin.mjs';
 import { appleTransaction, playPurchase, playSubscriptionOf, pushedByPlay, storeAccountOf } from './stores.mjs';
 import { checkout, endAtStripe, endRefunded, manage, payerLookup, record, sameSite, webSubscriptionsOf, webhookSigned } from './stripe.mjs';
@@ -575,7 +575,7 @@ async function turn(request, env) {
   // Local mode's own TURN server, where OH_TURN_LOCAL names one, kept
   // for voice and video chat: the browser rig sets none now.
   if (openHouse(env, request) && env.OH_TURN_LOCAL) {
-    return json(request, 200, { iceServers: [{ urls: [env.OH_TURN_LOCAL], username: LOCAL_TURN, credential: LOCAL_TURN }], ttl: S().turnTtlS });
+    return json(request, 200, { iceServers: [{ urls: [env.OH_TURN_LOCAL], username: LOCAL_TURN, credential: LOCAL_TURN }], ttl: serviceSettings().turnTtlS });
   }
   const { status, body: out } = await mint(env);
   return json(request, status, out);
@@ -776,7 +776,7 @@ export default {
     }
     const route = Object.hasOwn(ROUTES, name) ? ROUTES[name] : null;
     const started = Date.now();
-    if (route) await settle(env);
+    if (route) await loadServiceSettings(env);
     let response;
     try {
       response = route ? await route(request, env, ctx) : json(request, 404, { error: 'no such handler' });

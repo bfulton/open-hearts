@@ -26,7 +26,7 @@ import { accountOfKey, entitlementOf } from './accounts.mjs';
 import { inHousehold } from './household.mjs';
 import { REFUSED } from './refusals.mjs';
 import { dayAfter, dayOf, digestOf, earlier, hex, licenceStatement, storeOf } from './rows.mjs';
-import { S, notConfigured } from './settings.mjs';
+import { notConfigured, serviceSettings } from './settings.mjs';
 import { SUSPENDED_WHY } from './suspension.mjs';
 
 const PLAN = 'year';
@@ -179,7 +179,7 @@ export async function licence(key, env, { signer, now = Date.now(), open = false
     if ((written ?? (await store.get(`KEY#${key}`, 'ENTITLEMENT')))?.suspended) return { status: 403, body: { error: SUSPENDED_WHY, suspended: true } };
     return { status: 402, body: { error: REFUSED.noSubscription } };
   }
-  const until = earlier(dayAfter(now, S().licenceDays), held.licensed_until);
+  const until = earlier(dayAfter(now, serviceSettings().licenceDays), held.licensed_until);
   const signed = await licenceFor(key, held.account, until, { signer, ...keys });
   if (!signed) return { status: 503, body: { error: 'the service key does not match its secret' } };
   return { status: 200, body: { licence: signed } };

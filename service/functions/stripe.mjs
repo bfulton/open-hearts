@@ -11,7 +11,7 @@
 import { paidFor } from './accounts.mjs';
 import { REFUSED } from './refusals.mjs';
 import { dayOf, isAccount } from './rows.mjs';
-import { S, SITE, STRIPE_PRICE } from './settings.mjs';
+import { SITE, STRIPE_PRICE, serviceSettings } from './settings.mjs';
 import { dateSubscription } from './subscriptions.mjs';
 
 // ---- buying, on the web ------------------------------------------------
@@ -259,7 +259,7 @@ export async function webhookSigned(header, raw, secret, { now = Date.now() } = 
   }
   const t = Number(parts.t);
   if (!Number.isFinite(t) || !v1.length) return false;
-  if (Math.abs(now / 1000 - t) > S().webhookToleranceS) return false;
+  if (Math.abs(now / 1000 - t) > serviceSettings().webhookToleranceS) return false;
   const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, [
     'verify',
   ]);

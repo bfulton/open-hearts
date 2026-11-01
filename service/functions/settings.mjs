@@ -119,11 +119,11 @@ let settings = SERVICE_DEFAULTS;
 let settledAt = -Infinity;
 
 /// What the service runs by now.
-export const S = () => settings;
+export const serviceSettings = () => settings;
 
 /// Reads the row if this isolate has not lately; a store that is down,
 /// or no store, is the defaults. Called at the top of every request.
-export async function settle(env, { now = Date.now() } = {}) {
+export async function loadServiceSettings(env, { now = Date.now() } = {}) {
   if (now - settledAt < SETTINGS_KEPT_MS) return settings;
   settledAt = now;
   let raw = null;
@@ -136,7 +136,7 @@ export async function settle(env, { now = Date.now() } = {}) {
   return settings;
 }
 
-/// For a test: these settings, until the next [settle] that reads.
+/// For a test: these settings, until the next [loadServiceSettings] that reads.
 export function useSettings(next = {}) {
   settings = Object.freeze({ ...SERVICE_DEFAULTS, ...next });
   settledAt = Infinity;
