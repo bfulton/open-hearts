@@ -83,24 +83,6 @@ class V2Event {
     required this.sig,
   });
 
-  /// Builds, hashes and signs an event.
-  factory V2Event.sign(Signer signer, {
-    required String table,
-    required V2Kind kind,
-    required Map<String, Object?> body,
-  }) {
-    final canonical = _canonical(table, signer.publicKey, kind, body);
-    final id = digestOf(canonical);
-    return V2Event._(
-      id: id,
-      table: table,
-      author: signer.publicKey,
-      kind: kind,
-      body: Map.unmodifiable(body),
-      sig: signer.sign(id),
-    );
-  }
-
   /// Parses a received event and checks its hash and signature. Returns
   /// null for anything malformed or unsigned by its claimed author.
   /// With [verifySignature] off only the hash is checked — for an
@@ -166,8 +148,6 @@ class V2Event {
       {'id': id, 'table': table, 'author': author, 'kind': kind.name, 'body': body, 'sig': sig};
 
   /// The id an event with this content has, wherever it came from.
-  /// A frame leaves the id out and this puts it back (`frame.dart`);
-  /// the parser then checks it, as it checks one that travelled.
   static String idFor({required String table, required PublicKey author, required V2Kind kind, required Map<String, Object?> body}) =>
       digestOf(_canonical(table, author, kind, body));
 

@@ -11,8 +11,8 @@
 /// hand, no pass, no deal.
 ///
 /// A view is a player's account, signed by their key, not a proof:
-/// the proof is the record, checked when the game is over (record.dart,
-/// game_record.dart). So it is read strictly — a view that does not
+/// the proof is the record, checked when the game is over
+/// (record.dart). So it is read strictly — a view that does not
 /// parse is dropped — and believed only as far as a scoreboard is.
 ///
 /// Watching is live play, which is a subscription's: a watcher says it
