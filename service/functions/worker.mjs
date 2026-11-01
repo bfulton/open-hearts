@@ -771,7 +771,15 @@ export default {
     const route = Object.hasOwn(ROUTES, name) ? ROUTES[name] : null;
     const started = Date.now();
     if (route) await settle(env);
-    const response = route ? await route(request, env, ctx) : json(request, 404, { error: 'no such handler' });
+    let response;
+    try {
+      response = route ? await route(request, env, ctx) : json(request, 404, { error: 'no such handler' });
+    } catch (e) {
+      // A handler that throws is counted as the 500 the runtime answers
+      // for it, and thrown on, so the runtime answers and logs it as before.
+      measure(env, name, 500, Date.now() - started);
+      throw e;
+    }
     measure(env, route ? name : 'unknown', response.status, Date.now() - started);
     return response;
   },

@@ -56,3 +56,11 @@ test('nothing bound, nothing written; a dataset that throws stops nothing', asyn
   const answer = await worker.fetch(new Request('https://dev.open-hearts.pages.dev/api/config'), env);
   assert.equal(answer.status, 200);
 });
+
+test('a handler that throws is counted as the 500 the runtime answers, and still throws', async () => {
+  const OH_METRICS = dataset();
+  const OH_STORE = { get: async () => { throw new Error('KV down'); } };
+  const order = new Request('https://dev.open-hearts.pages.dev/api/order', { method: 'POST', body: JSON.stringify({ order: 'e'.repeat(32) }) });
+  await assert.rejects(worker.fetch(order, { OH_METRICS, OH_STORE }), /KV down/);
+  assert.deepEqual(OH_METRICS.points.map((p) => p.blobs), [['order', '500']]);
+});
