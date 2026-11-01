@@ -32,8 +32,10 @@ Future<bool> shareLink(String url) async {
 /// which Safari on a phone blocks by default — so the caller copies
 /// instead. Opened empty and cut off before it goes anywhere: with
 /// `noopener` asked for, the browser answers null whether it opened
-/// one or not, and a blocked tab would look like an opened one.
-bool openBeside(String url) {
+/// one or not, and a blocked tab would look like an opened one. It
+/// opens before anything is awaited, inside the tap that asked, which a
+/// browser requires of a new tab.
+Future<bool> openBeside(String url) async {
   final tab = _open(''.toJS, '_blank'.toJS);
   if (tab == null) return false;
   tab['opener'] = null;

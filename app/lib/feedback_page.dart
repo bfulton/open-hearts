@@ -11,8 +11,8 @@
 /// Where it goes is the operator's to say (net/remote_config.dart,
 /// `feedback`): a page, or an address to mail. Until they say, it is
 /// the project's issues on GitHub, which anyone can read, and the page
-/// says so where the button is. A build that cannot open a page — the
-/// phone builds — copies the report instead, and says where to.
+/// says so where the button is. Where the address cannot be opened, the
+/// report is copied instead, and the page says where to take it.
 library;
 
 import 'package:flutter/foundation.dart';
@@ -55,6 +55,16 @@ Uri sendingTo(Uri to, {required String title, required String report}) {
   return to;
 }
 
+/// A report's title: the first line of what the player wrote, cut at
+/// eighty characters, and never through one, which would send half an
+/// emoji.
+String titleOf(String said) {
+  final firstLine = said.split('\n').first;
+  final chars = firstLine.characters;
+  if (chars.isEmpty) return 'Something is broken';
+  return chars.length > 80 ? '${chars.take(79)}…' : firstLine;
+}
+
 /// Whether [to] takes the report in its address, rather than by the
 /// clipboard.
 bool carriesReport(Uri to) => to.scheme == 'mailto' || (to.host == 'github.com' && to.path.endsWith('/issues/new'));
@@ -94,14 +104,8 @@ class _FeedbackPageState extends State<FeedbackPage> {
     final l10n = context.l10n;
     final to = RemoteSettings.current.config.feedback ?? projectIssues;
     final said = _said.text.trim();
-    final firstLine = said.split('\n').first;
-    final title = firstLine.isEmpty
-        ? 'Something is broken'
-        : firstLine.length > 80
-            ? '${firstLine.substring(0, 79)}…'
-            : firstLine;
     final report = reportOf(said: said, about: _about(context));
-    final opened = openBeside(sendingTo(to, title: title, report: report));
+    final opened = await openBeside(sendingTo(to, title: titleOf(said), report: report));
     if (opened && carriesReport(to)) return;
     // A page that does not take the report in its address, or no way
     // to open one: the report goes by the clipboard, and the player is
