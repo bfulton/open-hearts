@@ -599,11 +599,12 @@ test('at a table whose house never says how the game came out, ticks stop at the
   }
 });
 
-test('once the log holds the most ticks and connections noted, it takes no more of either, also once it is woken from storage', async () => {
+test('once the log holds the most ticks and connections noted, it takes no more ticks and notes nobody gone, but notes back a person it last noted gone, also once it is woken from storage', async () => {
   const now = clock();
-  // Bao's device coming and going, noted one short of the most.
+  // Bao's device coming and going, noted one short of the most, and
+  // last noted gone.
   const comings = Array.from({ length: notesMost - 1 }, (_, i) => ({ n: i + 1, t: 1, ...(i % 2 ? { up: bao.public } : { down: bao.public }) }));
-  const { relay } = referee({ now, gate: gateOn(now), entries: [{ n: 0, t: 1, e: await startOf(ada) }, ...comings] });
+  const { relay, wanted } = referee({ now, gate: gateOn(now), entries: [{ n: 0, t: 1, e: await startOf(ada) }, ...comings] });
   const until = Math.floor(now() / 1000) + 600;
   const a = socket();
   relay.open(a, null, { account: null, key: ada.public, epoch: 0, until }, 'log');
@@ -614,19 +615,38 @@ test('once the log holds the most ticks and connections noted, it takes no more 
   await tick();
   assert.equal(relay.entries.length, notesMost + 1, 'the last one');
   await tick();
-  // The house, never there, is not noted as gone; nor is Bao back, nor
-  // Ada gone.
+  // The house, never there, is not noted as gone, nor is Ada once she
+  // goes.
   relay.settle();
+  relay.close(a);
+  assert.equal(relay.entries.length, notesMost + 1);
+  // The house coming and going is not noted, so it is not wanted again.
+  const woken = wanted.n;
+  const h = socket();
+  relay.open(h);
+  await answerAs(relay, h, house, now);
+  await relay.message(h, JSON.stringify(['LOG', 'log', notesMost]));
+  relay.close(h);
+  assert.equal(relay.entries.length, notesMost + 1);
+  assert.equal(wanted.n, woken);
+  // Bao is noted back, or every side would hold him gone and give his
+  // seat to a bot at his next turn.
   const b = socket();
   relay.open(b);
   await answerAs(relay, b, bao, now);
   await relay.message(b, JSON.stringify(['LOG', 'log', notesMost]));
-  relay.close(a);
-  assert.equal(relay.entries.length, notesMost + 1);
-  // Events are taken as before.
-  await say(relay, b, await wrapped(await tableEvent(bao, 'pass', { hand: 0, seat: 1, turn: 1 })));
-  assert.deepEqual(ok(b).slice(2), [true, '']);
+  assert.deepEqual(relay.entries.at(-1), { n: notesMost + 1, t: now(), up: bao.public });
+  // Not noted gone again, he is not noted back again.
+  relay.close(b);
+  const c = socket();
+  relay.open(c);
+  await answerAs(relay, c, bao, now);
+  await relay.message(c, JSON.stringify(['LOG', 'log', notesMost]));
   assert.equal(relay.entries.length, notesMost + 2);
+  // Events are taken as before.
+  await say(relay, c, await wrapped(await tableEvent(bao, 'pass', { hand: 0, seat: 1, turn: 1 })));
+  assert.deepEqual(ok(c).slice(2), [true, '']);
+  assert.equal(relay.entries.length, notesMost + 3);
 });
 
 test('the clock never runs back in the log', async () => {

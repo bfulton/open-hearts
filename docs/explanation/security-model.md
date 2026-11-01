@@ -171,8 +171,12 @@ object runs on one thread shared by everyone on that tag.
   can once the game is over, and at a table whose house never says that
   word (one with no house, or one the house will not serve) its people
   cannot tick for ever. Once the log holds `notesMost` ticks and
-  connections noted, it takes no more of either, and only events grow
-  it. These bound each table. A subscriber can still start as many
+  connections noted, it takes no more ticks and notes no more
+  connections closing. It still notes a person back whom it last noted
+  gone, or they would stay gone on every side's rules and lose their
+  seat at their next turn; nobody is noted gone after that point, so
+  this happens at most once for each, and otherwise only events grow
+  the log. These bound each table. A subscriber can still start as many
   tables as it likes, which is left to the account's spend alerts.
 - Each socket is bounded: message size, REQ size (so a socket's
   subscriptions always fit in the attachment a hibernating socket

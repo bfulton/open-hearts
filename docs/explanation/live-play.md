@@ -470,7 +470,10 @@ A device that is there and slow is timed by its clock, and a phone off
 the network for longer than the silence comes back to a bot in its seat
 if its turn came round meanwhile. Silence is answered at the seat's own
 turn and nowhere else, so a seat whose person is away holds nobody up
-until it is theirs to move.
+until it is theirs to move. Once the log holds `notesMost` ticks and
+connections noted, the referee notes no more connections closing, so a
+person who leaves after that is timed by their clock alone; one it
+noted gone before is still noted back when they return.
 
 A seat whose deal shows its person said they held the lead card nowhere
 is given up in the hand it broke, and the hand with it

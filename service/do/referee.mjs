@@ -33,8 +33,12 @@
 // the log with ticks, nobody can once the game is over, and at a table
 // whose house never says that word (one with no house, or one the house
 // will not serve) its people cannot tick for ever. Once the log holds
-// [notesMost] ticks and connections noted, it takes no more of either,
-// and only events grow it.
+// [notesMost] ticks and connections noted, it takes no more ticks and
+// notes no more connections closing. It still notes a person back whom
+// it last noted gone, or they would stay gone on every side's rules and
+// lose their seat at their next turn. Nobody is noted gone after that
+// point, so this happens at most once for each, and otherwise only
+// events grow the log.
 //
 // But for the start, which every side has to read as the same table
 // for anything after it to mean anything: a log that began with one
@@ -67,10 +71,12 @@ export const tickGapMs = 250;
 /// table's end.
 export const ticksInARowMost = 2400;
 
-/// The most entries the log takes that are not table events: ticks and
-/// connections noted, together. A table in play adds one only when a
-/// deadline is due or a person's device comes or goes, and never comes
-/// near this.
+/// How many entries that are not table events (ticks and connections
+/// noted, together) the log holds before it takes no more ticks and
+/// notes no more connections closing. A person it last noted gone is
+/// still noted back past this, at most once each, since nobody is noted
+/// gone after it. A table in play adds one only when a deadline is due
+/// or a person's device comes or goes, and never comes near this.
 export const notesMost = 100000;
 
 /// A table's tag (packages/table, spec.dart, newTableId): the only tags
@@ -291,16 +297,18 @@ export function tableReferee({ table, verify, house = null, now = Date.now, entr
     return entry;
   }
 
-  /// One more entry that is not an event, a tick or a connection noted,
-  /// if the log takes more of them ([notesMost]).
+  /// One more tick or connection closing noted, if the log takes more of
+  /// them ([notesMost]).
   const appendNote = (fields) => (notes < notesMost ? append(fields) : null);
 
-  /// [socket], answered as [key], following the log one more time.
+  /// [socket], answered as [key], following the log one more time. A
+  /// key the log last noted gone is noted back even past [notesMost]:
+  /// only that note ends its absence on every side's rules.
   function opened(key) {
     if (!key) return;
     const count = (open.get(key) ?? 0) + 1;
     open.set(key, count);
-    if (count === 1 && downLogged.has(key)) appendNote({ up: key });
+    if (count === 1 && downLogged.has(key)) append({ up: key });
   }
 
   return {
