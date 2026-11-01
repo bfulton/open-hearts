@@ -619,7 +619,7 @@ class Lobby extends ChangeNotifier {
     if (queue == null || signer == null || queue.present.length > 1) return;
     queue.waitForPerson();
     _changed();
-    unawaited(askHandler('waiting', signer, {'pool': queue.pool, 'target': queue.target}, null, what: '${queue.pool} ${queue.target}'));
+    unawaited(askHandler('waiting', signer, {'pool': queue.pool, 'target': queue.target}, what: '${queue.pool} ${queue.target}'));
   }
 
   /// The seated table is its own tag on the relay, whose object is the

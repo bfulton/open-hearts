@@ -25,10 +25,10 @@ import 'seat_store.dart';
 
 /// Sends [record] to be kept, signed by [signer] for its table. True
 /// once it is kept, by this device or by another of the table's.
-Future<bool> keepGame(Signer signer, GameRecord record, {Uri? endpoint}) async {
+Future<bool> keepGame(Signer signer, GameRecord record) async {
   final table = record.spec.id;
-  final answer = await askHandler('record', signer, {'table': table, 'record': jsonEncode(record.toJson())}, endpoint,
-      what: table, timeout: waits.record);
+  final answer =
+      await askHandler('record', signer, {'table': table, 'record': jsonEncode(record.toJson())}, what: table, timeout: waits.record);
   return answer?.status == 200;
 }
 
@@ -57,9 +57,9 @@ class GameNotShown implements Exception {
 /// KeptGame), and nothing of it shown until the check says so. Null when
 /// none is kept, or it cannot be reached, or what came back is not a
 /// record. Throws [GameNotShown] when the service will not show it here.
-Future<KeptGame?> gameOf(String table, {Signer? signer, Uri? endpoint}) async {
+Future<KeptGame?> gameOf(String table, {Signer? signer}) async {
   final asking = signer ?? await Identity.signer();
-  final answer = await askHandler('review', asking, {'table': table}, endpoint, what: table, timeout: waits.record);
+  final answer = await askHandler('review', asking, {'table': table}, what: table, timeout: waits.record);
   switch (answer?.status) {
     case 200:
       break;

@@ -146,7 +146,7 @@ class _SubscribePageState extends State<SubscribePage> {
     if (asked != _asked) return;
     final household = said.answer;
     // The account's sign-in as the service has it, over the device's note.
-    final signedIn = household != null && household.toldSignIn ? await noteSignIn(household.signIn) : _signedIn;
+    final signedIn = household != null ? await noteSignIn(household.signIn) : _signedIn;
     if (!mounted) return;
     setState(() {
       _household = household;
@@ -366,7 +366,7 @@ class _SubscribePageState extends State<SubscribePage> {
       });
       return;
     }
-    await rememberSignIn(done.provider);
+    await noteSignIn(done.provider.name);
     _asked++;
     final wasLive = Entitlement.current.live;
     if (done.licence case final licence?) await Entitlement.current.adopt(licence);

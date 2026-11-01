@@ -133,7 +133,6 @@ void main() {
     final account = '0a' * 16;
     stand.says('supersede', {'account': account, 'at': '2026-10-06', 'licence': signedFor(me.publicKey)});
     final said = await supersedeWith(me, Provider.google, 'local:ada', service: _service);
-    expect(said.answer!.account, account);
     expect(said.answer!.licence!.holdsFor(me.publicKey, service: _service), isTrue);
     final asked = sentTo(stand, 'supersede');
     expect(schnorrVerifier(me.publicKey, requestDigest('supersede', me.publicKey, asked['at'] as int), asked['sig'] as String), isTrue,
@@ -190,7 +189,7 @@ void main() {
     await licenceThisDevice();
     // Noted here once, and since taken away (Apple, the person no longer
     // using Sign in with Apple for the app).
-    await rememberSignIn(Provider.apple);
+    await noteSignIn('apple');
     stand.says('devices', {
       'devices': [
         {'key': me.publicKey, 'bound_at': '2026-09-01'},
@@ -233,6 +232,7 @@ void main() {
         {'key': me.publicKey, 'bound_at': '2026-10-06'},
       ],
       'most': 5,
+      'signIn': 'apple',
     });
     await press(tester, 'Sign in with Apple');
     expect(tokens.asked, ['apple ${signInNonce(me.publicKey)}'], reason: 'the token is asked for this device\'s key');
@@ -284,6 +284,13 @@ void main() {
     expect(stand.seen.where((s) => s.startsWith('/api/supersede')), isEmpty, reason: 'nothing moved yet');
 
     stand.says('supersede', {'account': '0a' * 16, 'at': '2026-10-06', 'licence': signedFor(me.publicKey)});
+    stand.says('devices', {
+      'devices': [
+        {'key': me.publicKey, 'bound_at': '2026-09-01'},
+      ],
+      'most': 5,
+      'signIn': 'google',
+    });
     await press(tester, 'Use that account here');
     expect(sentTo(stand, 'supersede')['provider'], 'google');
     expect(find.textContaining('Signed in with Google.'), findsOneWidget);

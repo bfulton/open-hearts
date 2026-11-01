@@ -1,4 +1,5 @@
-/// The relays a device talks to: a constant of the build, not a setting.
+/// The relays a device talks to: the build's, or the ones of ours the
+/// remote config names.
 ///
 /// A deployed build talks to our relay and nothing else
 /// (docs/explanation/relay.md): one Cloudflare object per tag

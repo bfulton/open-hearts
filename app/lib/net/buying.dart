@@ -2,8 +2,9 @@
 ///
 /// On the web that is Stripe Checkout, in subscription mode: this
 /// device asks the service for a session with its own key in the
-/// metadata, the browser goes there, and Stripe's webhook lands at the
-/// service's entitle handler with that key. Nobody is asked to make an
+/// metadata, the browser goes there, and Stripe's webhook (the
+/// service's `stripe` handler, service/functions/stripe.mjs) binds that
+/// key to the subscription. Nobody is asked to make an
 /// account, and nothing about the card comes back here — what comes
 /// back is a licence (licence.dart).
 ///
@@ -99,12 +100,11 @@ enum BuyRefusal {
 /// to. Returns a reason when it could not, which the screen says rather
 /// than sitting there having apparently done nothing; null when the
 /// browser is on its way there.
-Future<BuyRefusal?> buy(Signer signer, {String? lang, Uri? endpoint, Uri? from, Duration? timeout}) async {
-  timeout ??= waits.buy;
+Future<BuyRefusal?> buy(Signer signer, {String? lang}) async {
   if (!canLeaveForStripe) return BuyRefusal.notHere;
-  final url = endpoint ?? handlerAt('checkout');
+  final url = handlerAt('checkout');
   if (url == null) return BuyRefusal.notHere;
-  final at = from ?? Uri.base;
+  final at = Uri.base;
   ({int status, String body}) answer;
   try {
     answer = await askService(
@@ -115,7 +115,7 @@ Future<BuyRefusal?> buy(Signer signer, {String? lang, Uri? endpoint, Uri? from, 
         'cancelled': returnAddress(at, bought: false),
         'lang': ?lang,
       }),
-    ).timeout(timeout);
+    ).timeout(waits.buy);
   } catch (_) {
     return BuyRefusal.unreachable;
   }
@@ -130,16 +130,14 @@ Future<BuyRefusal?> buy(Signer signer, {String? lang, Uri? endpoint, Uri? from, 
 /// device is on — to cancel, change the card, read an invoice — and
 /// leaves for it, coming back to where it was. A reason when it could
 /// not; null when the browser is on its way.
-Future<BuyRefusal?> manageSubscription(Signer signer, {Uri? endpoint, Uri? from, Duration? timeout}) async {
-  timeout ??= waits.buy;
+Future<BuyRefusal?> manageSubscription(Signer signer) async {
   if (!canLeaveForStripe) return BuyRefusal.notHere;
-  final url = endpoint ?? handlerAt('manage');
+  final url = handlerAt('manage');
   if (url == null) return BuyRefusal.notHere;
-  final at = from ?? Uri.base;
   ({int status, String body}) answer;
   try {
-    answer = await askService(url, jsonEncode({...signedAsk(signer, 'manage'), 'back': returnAddress(at, bought: false)}))
-        .timeout(timeout);
+    answer = await askService(url, jsonEncode({...signedAsk(signer, 'manage'), 'back': returnAddress(Uri.base, bought: false)}))
+        .timeout(waits.buy);
   } catch (_) {
     return BuyRefusal.unreachable;
   }

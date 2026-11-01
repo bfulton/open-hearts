@@ -154,12 +154,10 @@ PhoneStore? storeHere() => platform.storeHere();
 /// for, or why not. As a household code is claimed (household.dart,
 /// [claimCode]), and signed over the proof, so the proof cannot be
 /// carried to another key.
-Future<Said<Licence>> presentProof(Signer signer, StoreKind store, String proof,
-    {Uri? endpoint, String service = serviceKey}) async {
+Future<Said<Licence>> presentProof(Signer signer, StoreKind store, String proof, {String service = serviceKey}) async {
   // The service asks the store in turn, which is slower than a
   // household's question: the wait is a checkout's.
-  final answer =
-      await askHandler('store', signer, {'store': store.name, 'proof': proof}, endpoint, what: proof, timeout: waits.buy);
+  final answer = await askHandler('store', signer, {'store': store.name, 'proof': proof}, what: proof, timeout: waits.buy);
   if (answer?.status != 200) return (answer: null, refusal: refusalOf(answer));
   Licence? licence;
   try {

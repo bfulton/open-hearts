@@ -549,6 +549,18 @@ void main() {
     // links are then in.
     expect(lastAt(stand, 'checkout')['lang'], 'en');
 
+    // An answer that would send it to a host that only looks like
+    // Stripe's, or to Stripe's over plain http, sends it nowhere.
+    for (final elsewhere in ['https://checkout.stripe.com.evil.example/c/pay/x', 'http://checkout.stripe.com/c/pay/x']) {
+      stand.says('checkout', {'url': elsewhere});
+      await tester.pumpWidget(const SizedBox());
+      await _pumpPage(tester);
+      await tester.tap(find.text('Subscribe'));
+      await tester.pumpAndSettle();
+      expect(sentTo, isEmpty, reason: elsewhere);
+      expect(find.text('The shop is not open yet.'), findsOneWidget, reason: elsewhere);
+    }
+
     // A checkout on Stripe's own host is gone to. (The page spins on
     // until the browser has gone, so it never settles.)
     stand.says('checkout', {'url': 'https://checkout.stripe.com/c/pay/cs_test_1'});

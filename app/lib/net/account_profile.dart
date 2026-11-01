@@ -165,7 +165,7 @@ class AccountProfile extends ChangeNotifier {
     // One made for another account stays with that account's past.
     if (unsent != null) await prefs.remove(_unsent);
     final signer = await Identity.signer();
-    final answer = await askHandler('profile', signer, const {}, null);
+    final answer = await askHandler('profile', signer, const {});
     if (answer == null || answer.status != 200) return;
     final json = jsonDecode(answer.body);
     if (json is! Map) return;
@@ -197,7 +197,7 @@ class AccountProfile extends ChangeNotifier {
     final text = jsonEncode({'name': name, ...(await Identity.avatar()).toJson()});
     final signer = await Identity.signer();
     // The text is what is signed: nobody else's request writes it.
-    final answer = await askHandler('profile', signer, {'profile': text}, null, what: text);
+    final answer = await askHandler('profile', signer, {'profile': text}, what: text);
     // Unanswered, superseded, or over the hour's allowance: still
     // unsent, and tried again.
     if (answer == null) return;

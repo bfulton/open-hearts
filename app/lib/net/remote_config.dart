@@ -451,9 +451,9 @@ class RemoteSettings extends ChangeNotifier {
   /// The service's config, kept for next time. One that cannot be had —
   /// no service behind this build, offline, slow, nonsense — changes
   /// nothing: the device goes on with what it has.
-  Future<void> refresh({Uri? endpoint, Duration? timeout}) async {
+  Future<void> refresh({Duration? timeout}) async {
     timeout ??= waits.config;
-    final url = endpoint ?? handlerAt('config');
+    final url = handlerAt('config');
     if (url == null) return;
     String? body;
     try {
