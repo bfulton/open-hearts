@@ -50,10 +50,9 @@ class RelayTransport implements ReactionLane {
   static const poolPrefix = 'queue:';
 
   /// How far back a pool's seatings are worth reading. A seating is for
-  /// its own round of a few seconds and ignored after it, and the
-  /// rounds are cut by each device's own clock, so the pool already
-  /// takes the clocks to agree within one; a minute is that with room
-  /// to spare.
+  /// its own round of a few seconds, the house's, and a device takes one
+  /// only within two rounds of its own clock (matching.dart); a minute
+  /// is that with room to spare.
   static const poolHistorySeconds = 60;
 
   /// Where the stored lobby events start for [tag]: a pool's from a

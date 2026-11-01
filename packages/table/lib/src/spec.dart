@@ -126,17 +126,18 @@ class TableSpec {
   /// house's own ([seatingSalt]): only a pool's tables are rated.
   final bool rated;
 
-  /// The score the game runs to. The player who starts the table
-  /// chooses it; it rides in the signed start event because a table
-  /// whose seats disagree about when the game ends forks at the end of
-  /// a hand.
+  /// The score the game runs to: a pool's, which its tag names, or the
+  /// one chosen by the player who starts a friends' table. It rides in
+  /// the signed start event because a table whose seats disagree about
+  /// when the game ends forks at the end of a hand.
   final int target;
 
   /// The table's clocks: a person's grace and bank, the house's
   /// deadlines, how long a closed connection is waited for
-  /// (timing.dart). Chosen like [target], by the device that seats the
-  /// table from its remote config, and carried in the start for the same
-  /// reason: sides that disagreed about when a deadline passed would
+  /// (timing.dart). The house's at a pool's table, as the operator last
+  /// told it, and at a friends' table those of the starting device's
+  /// remote config. Carried in the start for the same reason as
+  /// [target]: sides that disagreed about when a deadline passed would
   /// come to different tables.
   final TableTiming timing;
 

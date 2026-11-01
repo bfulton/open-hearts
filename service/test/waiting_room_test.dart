@@ -358,6 +358,18 @@ void main() {
       await other.close();
     });
 
+    test('a seating that names no target is not sat at', () async {
+      final waiting = await join('W', botsAfterMs: 60000);
+      final t = RelayTransport(relays: [relay.url], signer: house, table: poolTag('unrated'));
+      await t.ready;
+      expect(await t.announceTaken(seating(newSalt(), [waiting.$2.me], house.publicKey)..remove('target')), isTrue);
+      expect(await waiting.$3.then((_) => true).timeout(const Duration(seconds: 2), onTimeout: () => false), isFalse);
+      expect(await t.announceTaken(seating(newSalt(), [waiting.$2.me], house.publicKey)), isTrue);
+      expect((await waiting.$3.timeout(const Duration(seconds: 5))).target, gameOverScore, reason: 'one that names it is');
+      t.close();
+      closeAll([waiting]);
+    });
+
     test('the operator\'s clocks are the table\'s: as the house was last told them, whatever a device\'s say', () async {
       final first = TableTiming.parse({'graceMs': 3000});
       final then = TableTiming.parse({'graceMs': 5000});

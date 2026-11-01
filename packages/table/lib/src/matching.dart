@@ -441,9 +441,8 @@ class WaitingRoom {
     // Every table a pool seats is sealed, and the house's to hold the
     // bots of and to say the end of: this build's.
     if (c['sealed'] != true || c['house'] != house) return;
-    // A house on an older build says nothing about the target, which
-    // means the game it seats runs to fifty.
-    if ((c['target'] as int? ?? gameOverScore) != target) return;
+    // Another pool's game.
+    if (c['target'] != target) return;
     final seats = <SeatHolder>[];
     final names = <int, String>{};
     final avatars = <int, Map<String, Object?>>{};
