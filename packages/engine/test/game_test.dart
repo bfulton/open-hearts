@@ -590,7 +590,43 @@ void sealedTests() {
       game.play(1, nine);
       expect(() => game.play(2, nine), throwsArgumentError);
       expect(() => game.play(2, twoOfClubs), throwsArgumentError);
+      expect(game.allows(2, nine), isFalse, reason: 'allows says no to what play refuses');
+      expect(game.allows(2, twoOfClubs), isFalse);
       expect(game.playedThisHand, {twoOfClubs, nine});
+    });
+
+    test('allows says of every card what play does, a hidden hand\'s too, through a whole hand', () {
+      // Seats 0 and 2 seen, 1 and 3 hidden, every pass known. Each
+      // passes its three highest, so the 2♣ stays where it was dealt.
+      final hands = handsFrom(3);
+      final game = HeartsGame(sealed: true)..deal([hands[0], null, hands[2], null]);
+      game.declareLeader(hands.indexWhere((h) => h.contains(twoOfClubs)));
+      for (var s = 0; s < seatCount; s++) {
+        game.setPass(s, (List.of(hands[s])..sort()).reversed.take(3).toList());
+      }
+      bool takes(int seat, Card card) {
+        try {
+          game.lookahead().play(seat, card);
+          return true;
+        } on ArgumentError {
+          return false;
+        }
+      }
+
+      var turns = 0;
+      while (game.phase == Phase.playing) {
+        if (game.pendingTrick != null) {
+          game.collectTrick();
+          continue;
+        }
+        final seat = game.currentSeat!;
+        for (final card in Card.deck) {
+          expect(game.allows(seat, card), takes(seat, card), reason: 'seat $seat, $card, turn $turns');
+        }
+        game.play(seat, Card.deck.firstWhere((c) => game.allows(seat, c)));
+        turns++;
+      }
+      expect(turns, 52);
     });
 
     test('rests in dealing until dealt, then plays out like any game when every hand is seen', () {

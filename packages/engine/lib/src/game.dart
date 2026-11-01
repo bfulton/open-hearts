@@ -466,36 +466,41 @@ class HeartsGame {
   }
 
   /// Whether [card] can be [play]ed by [seat] now, as far as this side
-  /// can tell: the full rules over a hand it sees, [legalFromHidden]
-  /// over one it does not.
+  /// can tell: the full rules over a hand it sees; over one it does not,
+  /// a card the hand can still be holding ([_notInHidden]) that
+  /// [legalFromHidden] lets it play. True exactly when [play] takes it.
   bool allows(int seat, Card card) {
     if (currentSeat != seat) return false;
     final hand = _hands[seat];
-    if (hand == null) return legalFromHidden(card: card, trick: _trick, isFirstTrick: isFirstTrick);
+    if (hand == null) return _notInHidden(seat, card) == null && legalFromHidden(card: card, trick: _trick, isFirstTrick: isFirstTrick);
     return legalPlays(hand: hand, trick: _trick, heartsBroken: _heartsBroken, isFirstTrick: isFirstTrick).contains(card);
   }
 
+  /// Why [card] cannot be in [seat]'s hand, one this side does not see,
+  /// or null when it can be: the seat has no cards left, the card has
+  /// been played this hand, or it is in a hand this side sees.
+  String? _notInHidden(int seat, Card card) {
+    if (_sizes[seat] == 0) return 'seat $seat has no cards';
+    if (_played.contains(card)) return '$card has been played this hand';
+    for (var s = 0; s < seatCount; s++) {
+      if (_hands[s]?.contains(card) == true) return '$card is in seat $s\'s hand, not seat $seat\'s';
+    }
+    return null;
+  }
+
   /// Plays [card] from [seat]. Throws [StateError] out of turn and
-  /// [ArgumentError] on an illegal card — an illegal play is a bug in the
-  /// caller, never a rule the engine quietly bends. From a hidden hand
-  /// the card is checked as far as the rules allow without the hand.
+  /// [ArgumentError] on a card [allows] refuses — an illegal play is a
+  /// bug in the caller, never a rule the engine quietly bends. From a
+  /// hidden hand the card is checked as far as can be without the hand.
   void play(int seat, Card card) {
     if (currentSeat != seat) {
       throw StateError('not seat $seat\'s turn (current: $currentSeat)');
     }
-    if (!allows(seat, card)) {
-      throw ArgumentError('$card is not a legal play for seat $seat');
-    }
     final hand = _hands[seat];
-    if (hand == null) {
-      if (_sizes[seat] == 0) throw StateError('seat $seat has no cards');
-      if (_played.contains(card)) throw ArgumentError('$card has been played this hand');
-      for (var s = 0; s < seatCount; s++) {
-        if (_hands[s]?.contains(card) == true) throw ArgumentError('$card is in seat $s\'s hand, not seat $seat\'s');
-      }
-    } else {
-      hand.remove(card);
+    if (!allows(seat, card)) {
+      throw ArgumentError(hand == null ? (_notInHidden(seat, card) ?? '$card is not a legal play for seat $seat') : '$card is not a legal play for seat $seat');
     }
+    hand?.remove(card);
     _sizes[seat]--;
     _trick.add(Play(seat, card));
     _played.add(card);
