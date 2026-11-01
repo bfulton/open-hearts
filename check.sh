@@ -269,7 +269,8 @@ quick() {
   # pointing at nothing, and this takes a second.
   add docs
   # The app's tests a change can reach, by their imports
-  # (app/tool/affected_tests.mjs); all of them when it cannot tell.
+  # (app/tool/affected_tests.mjs); all of them when the change is to
+  # something every test stands on.
   if [ ${#app_files[@]} -gt 0 ]; then
     local hit
     hit=$(node app/tool/affected_tests.mjs "${app_files[@]}")
