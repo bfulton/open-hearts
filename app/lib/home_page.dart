@@ -1229,7 +1229,7 @@ class RoomView extends StatelessWidget {
     bool blocked(RoomMember m) => m.key != room.me && (pictures?.isBlocked(idOf(m)) ?? false);
     Avatar avatarOf(RoomMember m) {
       final picture = m.avatar.picture;
-      if (m.key == room.me || picture == null || pictures == null || pictures.allows(idOf(m), picture)) return m.avatar;
+      if (m.key == room.me || picture == null || pictures == null || pictures.allows(idOf(m))) return m.avatar;
       return m.avatar.copyWith(clearPicture: true);
     }
 

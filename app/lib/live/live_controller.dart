@@ -732,15 +732,14 @@ class LiveController extends ChangeNotifier with TableModel {
     final picture = avatar.picture;
     final pictures = this.pictures;
     if (picture == null || pictures == null) return avatar;
-    return pictures.allows(key, picture) ? avatar : avatar.copyWith(clearPicture: true);
+    return pictures.allows(key) ? avatar : avatar.copyWith(clearPicture: true);
   }
 
   /// Who holds [seat], for the sheet holding their badge opens: their
   /// account, their name and the picture they chose, as they chose
-  /// them, whether this device blocked them, and whether it hides their
-  /// picture — by the viewer's choice, or the check's. Null for a bot
-  /// and for your own seat.
-  ({String key, String name, Uint8List? picture, bool blocked, bool hidden, bool flagged})? playerAt(int seat) {
+  /// them, whether this device blocked them, and whether the viewer hid
+  /// their picture. Null for a bot and for your own seat.
+  ({String key, String name, Uint8List? picture, bool blocked, bool hidden})? playerAt(int seat) {
     final holder = _shownHolders[seat];
     if (holder is! HumanSeat || seat == mySeat) return null;
     final picture = (seatAvatars[seat] ?? Avatar.none).picture;
@@ -751,7 +750,6 @@ class LiveController extends ChangeNotifier with TableModel {
       picture: picture,
       blocked: _blocked(holder.account),
       hidden: picture != null && pictures != null && pictures.isHidden(holder.account),
-      flagged: picture != null && pictures != null && pictures.wasFlagged(holder.account, picture),
     );
   }
 

@@ -156,7 +156,6 @@
   "yourPicture": "Dein Bild",
   "useIt": "Verwenden",
   "cropHelp": "Ziehen zum Verschieben, mit zwei Fingern vergrößern.\nWas im Kreis ist, ist dein Bild.",
-  "pictureFlagged": "Dieses Gerät dachte, du würdest dieses Bild nicht am Tisch sehen wollen. Das ist eine Vermutung, hier getroffen, und sie kann falsch sein.",
   "showPicture": "Bild von {name} zeigen",
   "hidePicture": "Bild von {name} ausblenden",
   "pictureChoiceNote": "Nur auf diesem Gerät, und nur das Bild: Name und Punktestand bleiben.",

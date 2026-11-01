@@ -163,9 +163,9 @@ class Lobby extends ChangeNotifier {
   /// (pace_store.dart). Nothing until it has played enough to know.
   Pace pace = Pace.fresh;
 
-  /// What this device does with the others' pictures: the list of
-  /// people whose pictures it does not show, and the check it runs on
-  /// the rest (pictures.dart). Read once, carried to the table.
+  /// What this device does with the others' pictures: the people whose
+  /// pictures it does not show, and the players it blocked
+  /// (pictures.dart). Read once, carried to the table.
   Pictures? pictures;
 
   String? _error;

@@ -655,13 +655,13 @@ opens, checked as it was then (`legacy/v2_record.dart`).
 
 A picture comes from a stranger's device. A check on the sender's
 device would prove nothing, since it belongs to whoever is misusing it,
-so any check runs on the **viewer's** device (`app/lib/pictures.dart`).
-It fails open: with no model, or no answer within a few seconds, the
-picture shows, to be taken back if the answer later says so. Holding
-the badge offers a kept-off picture anyway. No model ships yet; one
-would be fetched from the app's origin and checked against a hash the
-app carries. Needing no model, holding another player's badge hides
-their picture on this device for good.
+so the service checks a picture once, when the account sets it, before
+any player is shown it ([the account's
+profile](service.md#the-accounts-profile)), and the relay carries only
+an account's checked picture ([an account's
+pictures](relay.md#an-accounts-pictures)). On the viewer's device,
+holding another player's badge hides their picture there for good,
+until it is shown again (`app/lib/pictures.dart`).
 
 ## Blocking and reporting
 

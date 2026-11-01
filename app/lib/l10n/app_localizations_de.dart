@@ -793,10 +793,6 @@ class AppLocalizationsDe extends AppLocalizations {
       'Ziehen zum Verschieben, mit zwei Fingern vergrößern.\nWas im Kreis ist, ist dein Bild.';
 
   @override
-  String get pictureFlagged =>
-      'Dieses Gerät dachte, du würdest dieses Bild nicht am Tisch sehen wollen. Das ist eine Vermutung, hier getroffen, und sie kann falsch sein.';
-
-  @override
   String showPicture(String name) {
     return 'Bild von $name zeigen';
   }

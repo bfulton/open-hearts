@@ -125,7 +125,6 @@ class _LivePageState extends State<LivePage> {
     if (about == null) return;
     final pictures = _c.pictures;
     final picture = about.picture;
-    final showIt = about.hidden || about.flagged;
     final shown = about.blocked ? context.l10n.blockedPlayer : about.name;
     final chosen = await showModalBottomSheet<_AboutPlayer>(
       context: context,
@@ -139,19 +138,11 @@ class _LivePageState extends State<LivePage> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               if (picture != null && pictures != null && !about.blocked) ...[
-                if (about.flagged)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: Text(
-                      sheet.l10n.pictureFlagged,
-                      style: const TextStyle(fontSize: 13, color: Palette.chromeDim),
-                    ),
-                  ),
                 TextButton(
-                  onPressed: () => Navigator.of(sheet).pop(showIt ? _AboutPlayer.showPicture : _AboutPlayer.hidePicture),
-                  style: TextButton.styleFrom(foregroundColor: showIt ? Palette.gold : Palette.danger),
+                  onPressed: () => Navigator.of(sheet).pop(about.hidden ? _AboutPlayer.showPicture : _AboutPlayer.hidePicture),
+                  style: TextButton.styleFrom(foregroundColor: about.hidden ? Palette.gold : Palette.danger),
                   child: Text(
-                    showIt ? sheet.l10n.showPicture(about.name) : sheet.l10n.hidePicture(about.name),
+                    about.hidden ? sheet.l10n.showPicture(about.name) : sheet.l10n.hidePicture(about.name),
                     style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
                   ),
                 ),
