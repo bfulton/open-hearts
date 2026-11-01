@@ -33,6 +33,10 @@ abstract final class LeftEarly {
     await prefs.setInt(_key, atMs);
   }
 
+  /// The wait runs from [atMs], whatever was kept: a time kept ahead of
+  /// the clock, which was set back since, brought back to now.
+  static Future<void> reset(int atMs) async => (await SharedPreferences.getInstance()).setInt(_key, atMs);
+
   /// The wait is over: nothing kept.
   static Future<void> clear() async => (await SharedPreferences.getInstance()).remove(_key);
 

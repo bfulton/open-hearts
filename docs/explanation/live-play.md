@@ -473,7 +473,9 @@ longer run the deal, and an account taken up on another device
 The wait is the device's alone (`app/lib/live/left_early.dart`). It
 keeps the time of its last early leave until the wait after it is over;
 meanwhile Play live is shut and says until when, and `Lobby.play`
-refuses. Nothing else holds a device to it: matchmaking has nobody in
+refuses. A time kept ahead of the device's clock, which was set back
+since, counts from now instead, so the wait never runs longer than it
+says. Nothing else holds a device to it: matchmaking has nobody in
 charge to ask. A device whose storage was cleared, or a build changed
 to skip the wait, plays again at once. Like pace, it decides nothing
 anybody else has to trust.
