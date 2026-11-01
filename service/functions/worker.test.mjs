@@ -1444,6 +1444,9 @@ test('a sign-in token is read only when the provider signed it, for us, for this
   const nonce = await nonceFor(KEY);
   const good = await p.token({ sub: 'sub-1', nonce });
   assert.deepEqual(await whoSignedIn('google', good, KEY, signedInAs, p.fetch), { provider: 'google', sub: 'sub-1' });
+  // Google signs with either form of its issuer, as Play's push is taken.
+  const bare = await p.token({ sub: 'sub-1', nonce, iss: 'accounts.google.com' });
+  assert.deepEqual(await whoSignedIn('google', bare, KEY, signedInAs, p.fetch), { provider: 'google', sub: 'sub-1' });
 
   const cases = {
     'another app\'s audience': await p.token({ sub: 'sub-1', nonce, aud: 'someone.else' }),

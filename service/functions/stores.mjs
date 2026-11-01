@@ -3,7 +3,7 @@
 
 import { REFUSED } from './refusals.mjs';
 import { bytesOf64, digestOf, hex } from './rows.mjs';
-import { jwtOf } from './signin.mjs';
+import { PROVIDERS, jwtOf } from './signin.mjs';
 import { appleSigned } from './x509.mjs';
 
 // ---- buying in a store -------------------------------------------------
@@ -190,7 +190,7 @@ export async function pushedByPlay(token, env, fetchImpl = fetch, { now = Date.n
   if (!env.OH_PLAY_PUSH_AUDIENCE || !env.OH_PLAY_PUSH_EMAIL) return false;
   const claims = await jwtOf('google', token, fetchImpl, { now });
   if (!claims) return false;
-  if (claims.iss !== 'https://accounts.google.com' && claims.iss !== 'accounts.google.com') return false;
+  if (!PROVIDERS.google.issuers.includes(claims.iss)) return false;
   const aud = Array.isArray(claims.aud) ? claims.aud : [claims.aud];
   if (!aud.includes(env.OH_PLAY_PUSH_AUDIENCE)) return false;
   if (typeof claims.exp !== 'number' || claims.exp * 1000 <= now) return false;

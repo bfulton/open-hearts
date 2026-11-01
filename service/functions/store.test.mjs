@@ -497,6 +497,8 @@ test('Play\'s notifications, pushed by Pub/Sub: checked, then Play asked what th
     }
     const ok = await worker.fetch(send('play', note, auth(await pushToken(claims))), env);
     assert.equal(ok.status, 200);
+    // Google signs with either form of its issuer, as a sign-in is taken.
+    assert.equal((await worker.fetch(send('play', note, auth(await pushToken({ ...claims, iss: 'accounts.google.com' }))), env)).status, 200);
     const { recorded } = await ok.json();
     assert.equal(recorded.renews_at, new Date(now).toISOString().slice(0, 10), 'on hold is not paid for now');
     // Refunded: voided, and nothing more is asked.
