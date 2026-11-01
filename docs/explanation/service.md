@@ -867,7 +867,9 @@ NIP-44 v2, since an ICE candidate carries an address.
 **The house** ([live play](live-play.md#the-house)). A sealed table's
 object wakes the house as the table starts, and again whenever the
 house is not on the table's log, at most once every twenty seconds
-(`wakeLimiter` in `service/do/referee.mjs`). The wake goes to the
+(`wakeLimiter` in `service/do/referee.mjs`), until the house has said a
+result there: how the game came out, or that it will not serve the table
+([live play](live-play.md#when-the-house-will-not-serve-a-table)). The wake goes to the
 `Bench` object (`service/do/bench.mjs`), which starts a Cloudflare
 Container running `service/bin/house.dart` if it is not running, waits
 for it to answer, and tells it of the table. The house reads the table's

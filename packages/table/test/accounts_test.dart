@@ -125,15 +125,14 @@ void main() {
       t.close();
     });
 
-    test('with a seat that shows none is not served by the house, fails at the house\'s first turn, and is not believed', () {
+    test('with a seat that shows none is not served by the house, which says so and ends the table, and is not believed', () {
       final t = table(without: 1)..start();
-      // The house is not there to say how it came out: the run waits for
-      // that word, and the table is over long before the limit.
-      t.run(limitMs: 10 * 60 * 1000);
+      expect(t.run(), isTrue, reason: 'over at the house\'s word, which the house let the table go after');
       expect(t.following.map((c) => c.state), everyElement(TableState.failed));
       expect(t.house!.serving, isEmpty, reason: 'the house let the table go');
       expect(t.results, isEmpty, reason: 'nobody is rated on it');
-      expect(t.referee.log.where((e) => e.event?.author == t.houseSigner.publicKey), isEmpty, reason: 'the house said nothing at it');
+      expect([for (final e in t.referee.log) if (e.event?.author == t.houseSigner.publicKey) e.event!.body], [t.clients.first.rules.refusal],
+          reason: 'the house said one thing at it: that it will not serve it (refusal_test.dart)');
       final verdict = verifyRecord(GameRecord(spec: t.spec, log: t.referee.log), crypto: crypto, house: t.houseSigner.publicKey, allowUnfinished: true);
       expect(verdict.ok, isFalse);
       expect(verdict.reason, 'seat 1 has no licence for its key');

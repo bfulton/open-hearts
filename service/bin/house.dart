@@ -15,7 +15,10 @@
 /// every bot seat, holds half of each person's escrow and says it when
 /// that person goes, and once the game is over says how it came out —
 /// in the log, which every side and every kept game checks it against,
-/// and on the results tag, where the ratings are folded from. A table
+/// and on the results tag, where the ratings are folded from. A table it
+/// will not serve (a seat without its licence, a rated table it did not
+/// seat) it says so of, once, in the table's log alone, and the table
+/// ends there, failed: nothing goes on the results tag for it. A table
 /// the house was serving before it stopped wakes it again, and it goes
 /// on from the log; its bot seats' deal secrets are made from its own
 /// secret, so nothing is lost with the process.

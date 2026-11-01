@@ -103,11 +103,12 @@ void main() {
       // Any one of a table's people can write its start: rated, naming
       // whoever they like, with a salt of their own.
       final t = SimTable(humans: 2, seed: 112, target: 1, crypto: crypto, rated: true, salt: newSalt(Random(1)))..start();
-      t.run(limitMs: 10 * 60 * 1000);
+      expect(t.run(), isTrue, reason: 'over at the house\'s word, which the house let the table go after');
       expect(t.following.map((c) => c.state), everyElement(TableState.failed));
       expect(t.house!.serving, isEmpty, reason: 'the house let the table go');
       expect(t.results, isEmpty);
-      expect(t.referee.log.where((e) => e.event?.author == t.houseSigner.publicKey), isEmpty, reason: 'the house said nothing at it');
+      expect([for (final e in t.referee.log) if (e.event?.author == t.houseSigner.publicKey) e.event!.body], [t.clients.first.rules.refusal],
+          reason: 'the house said one thing at it: that it will not serve it (refusal_test.dart)');
       t.close();
     });
 
@@ -128,7 +129,8 @@ void main() {
       final over = alone(t);
       expect(over.state, TableState.finished, reason: 'the game went on with a bot in the empty seat');
       expect(over.removals[1]?.exit, Exit.booted);
-      expect(t.results, isEmpty);
+      expect(over.result?.body['n'], over.endN, reason: 'the house served it and said how it came out, as for any table, and did not refuse it');
+      expect(t.results, isEmpty, reason: 'and published nothing');
       t.close();
     });
   });

@@ -85,8 +85,9 @@ enum TableState {
   ended,
 
   /// A turn of the house's ran out: the operator's service stopped
-  /// answering, and nobody else can play a bot seat's cards. Nobody is
-  /// rated.
+  /// answering, and nobody else can play a bot seat's cards. Or the
+  /// house said it will not serve the table ([TableRules.refusal]).
+  /// Nobody is rated.
   failed,
 }
 
@@ -189,9 +190,28 @@ class TableRules {
   bool get over => _state == TableState.finished || _state == TableState.ended || _state == TableState.failed;
 
   /// The house's word on how the game came out, once it is in the log
-  /// and names the log as it stood when the game ended.
+  /// and names the log as it stood when the game ended; or its word that
+  /// it will not serve the table ([refusal]).
   TableEvent? get result => _result;
   TableEvent? _result;
+
+  /// The house's word that it will not serve a table: a result that says
+  /// failed and names the log as it stood after its start alone. The
+  /// house says it as it reads the start, and cannot know where in the
+  /// log the word will land, so it names what it has read; whatever came
+  /// in between changes nothing about the word. A table the house refuses
+  /// ends there, failed and unrated, at every side alike, and the
+  /// referee, which asks for the house until it has said a result, stops
+  /// asking (service/do/referee.mjs). Taken only from the house and only
+  /// while the table is being played: a table that has ended on its own
+  /// keeps its end. Its totals are zero and unread. Null before the
+  /// log's start.
+  Map<String, Object?>? get refusal => _startHash == null
+      ? null
+      : {'n': 1, 'hash': _startHash, 'state': TableState.failed.name, 'totals': List.filled(seatCount, 0)};
+
+  /// The log's hash as it stood after its start.
+  String? _startHash;
 
   /// How many entries the log had, and its hash, when the game ended:
   /// what the house's result has to name.
@@ -440,6 +460,7 @@ class TableRules {
       return;
     }
     _spec = spec;
+    _startHash = hash.value;
     _now = e.t;
     _holders = List.of(spec.seats);
     _game = HeartsGame(seed: spec.seed, sealed: spec.sealed, target: spec.target);
@@ -457,6 +478,16 @@ class TableRules {
     _result = ev;
   }
 
+  /// The house's word that it will not serve the table ([refusal]): the
+  /// table fails here. A word that says anything else at a table being
+  /// played is not read.
+  void _takeRefusal(TableEvent ev) {
+    final body = refusal!;
+    if (ev.author != _spec!.house || ev.body['n'] != body['n'] || ev.body['hash'] != body['hash'] || ev.body['state'] != body['state']) return;
+    _result = ev;
+    _fail();
+  }
+
   void _takeEvent(TableEvent ev) {
     final spec = _spec!;
     if (ev.table != spec.id) return;
@@ -470,7 +501,9 @@ class TableRules {
         _takeRelease(ev);
       case EventKind.deal || EventKind.pass || EventKind.play:
         _takeMove(ev);
-      case EventKind.start || EventKind.result:
+      case EventKind.result:
+        _takeRefusal(ev);
+      case EventKind.start:
         break;
     }
   }

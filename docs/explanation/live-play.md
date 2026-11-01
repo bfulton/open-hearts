@@ -558,7 +558,8 @@ says it (`House.pace`; [bots](#bots)).
 The house runs as one process for every table, in a Cloudflare
 Container the relay's Worker owns (`service/do/bench.mjs`). A table's
 object wakes it as the table starts, and again whenever the house is not
-on the log, at most once in twenty seconds (`wakeEveryMs`). The
+on the log, at most once in twenty seconds (`wakeEveryMs`), until the
+house has said a result there. The
 container is stopped once the house has had nothing to serve for ten
 minutes. Every bot seat's deal secret is made from the house's own
 secret, so a house started again reads the log from the start and goes
@@ -588,6 +589,33 @@ that runs out, its deadline and `houseGraceMs` after it, fails the game:
 it ends there, and nobody is rated on it. The screen says "Connection
 failure" over "The game's server stopped answering", and offers the way
 home, and the device tells the operator once.
+
+### When the house will not serve a table
+
+Any one of a table's people writes its start, so the house reads the
+start once and checks it against what does not change: the service's
+key and its own secret. It will not serve a table with a seat that has
+no licence the service signed for its key, held to the day the table
+began and not the day it is read, or with one account seated twice; and
+not a rated table whose salt is not its own
+([ratings](#ratings)). It says so once, in the table's log: a result of
+its saying `failed`, which names the log as it stood after its start
+(`TableRules.refusal`), whatever came into the log before the word.
+Every side ends the table there, failed, as when a turn of the house's
+runs out, but at once, and nobody is rated on it.
+
+The word is also what stops the table asking for the house. The
+referee asks for it, at most once in twenty seconds, until the house
+has said a result; a house that merely let such a table go was woken
+for it every twenty seconds until the log's notes ran out, some eleven
+days, and a subscriber who started many such tables could multiply
+that. The word goes in the table's own log and nowhere else: the house
+publishes nothing on the results tag for a table it will not serve, and
+reads nothing more of it once it has said the word.
+
+A table the house has not yet reached, or reached through a relay that
+was down, is not refused: the house says the word only of a table whose
+start it has read and checked, and what it checks never changes.
 
 ### What the house can see
 

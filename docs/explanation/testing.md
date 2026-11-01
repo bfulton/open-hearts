@@ -164,6 +164,14 @@ The harnesses:
   doing nothing, the phone off the network, at every moment of a hand:
   on or off turn, mid-trick, the last trick, the pass, the deal, a hand
   boundary. Sealed and not.
+- A table the house will not serve (`packages/table/test/refusal_test.dart`,
+  and the twelve-day wake count in `service/do/referee.test.mjs`): the
+  house says so once, in the table's log; every side ends the table
+  failed at that word and nobody is rated or published on it; and the
+  table's object, which asks for the house until it has said a result,
+  wakes it once, where a house that said nothing was woken every twenty
+  seconds until the log's notes ran out. A table the house serves, has
+  not reached yet, or meets again after a restart gets no such word.
 - The chaos walk (`packages/table_sim/lib/src/chaos_walk.dart`, run by
   `chaos_test.dart`, `chaos_sealed_test.dart` and
   `packages/table/tool/chaos.dart`) throws random faults at tables of one

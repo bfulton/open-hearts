@@ -246,6 +246,15 @@ class TableClient {
     if (_closed) return;
     _lastT = e.t;
     _lastAt = clock.nowMs;
+    if (_refusal != null) {
+      // A table the house will not serve is read no further: only for
+      // its word to come back.
+      if (e.event?.id == _refusal) {
+        _refusalIn = true;
+        _notify();
+      }
+      return;
+    }
     rules.feed(e);
   }
 
@@ -418,10 +427,11 @@ class TableClient {
     _send(kind, body);
   }
 
-  void _send(EventKind kind, Map<String, Object?> body) {
+  TableEvent _send(EventKind kind, Map<String, Object?> body) {
     final e = TableEvent.sign(signer, table: tableId, kind: kind, body: body);
     rules.made(e);
     line.send(e);
+    return e;
   }
 
   /// This side's piece of each departed person's secret the table is
@@ -453,6 +463,27 @@ class TableClient {
       'state': rules.state.name,
       'totals': rules.game.totals,
     });
+  }
+
+  /// The id of the house's word that it will not serve this table, once
+  /// it has said it.
+  String? _refusal;
+  bool _refusalIn = false;
+
+  /// Whether the log has carried the house's refusal back: the house has
+  /// nothing more to say at the table, and no more of it to read.
+  bool get refusalIn => _refusalIn;
+
+  /// The house's word that it will not serve this table, in place of
+  /// its word on how a game came out (packages/table, rules.dart,
+  /// [TableRules.refusal]): said once, whatever the log has by now, and
+  /// from here nothing more of the log is read but for the word coming
+  /// back. Every side ends the table at it, and the referee stops
+  /// waiting on the house for it (service/do/referee.mjs).
+  void refuse() {
+    if (role != Role.houseFollower || _resulted || !started) return;
+    _resulted = true;
+    _refusal = _send(EventKind.result, rules.refusal!).id;
   }
 
   // ---- the deal's slow calls ----------------------------------------------
