@@ -389,6 +389,43 @@ test('an event is kept as a table event has it, and whatever else it carries is 
   assert.deepEqual(relay.entries[1].e, play);
 });
 
+test('an event nested deeper than a table event goes is refused, and the log goes on', async () => {
+  const { relay } = referee();
+  const a = socket();
+  relay.open(a);
+  await say(relay, a, await wrapped(await startOf(ada)));
+  // A play with [n] lists one in another in its body, written out by
+  // hand: too deep for JSON.stringify to write. The event and its body
+  // are two deep, so thirty more is as deep as one may go.
+  const play = (n) => {
+    const content = JSON.stringify(tableEvent(bao, 'play', { hand: 0, seat: 1, turn: 4, card: '2C', x: 0 })).replace('"x":0', `"x":${'['.repeat(n)}0${']'.repeat(n)}`);
+    return sign.event(bao, { kind: logKind, content, tags: [['t', table]], created_at: 1000 + ids });
+  };
+  for (const n of [31, 5000]) {
+    await say(relay, a, await play(n));
+    assert.deepEqual(ok(a).slice(2), [false, 'invalid: not a table event']);
+  }
+  await say(relay, a, await play(30));
+  assert.deepEqual(ok(a).slice(2), [true, '']);
+  const later = socket();
+  relay.open(later);
+  await relay.message(later, JSON.stringify(['LOG', 'l', 0]));
+  assert.equal(later.entries.length, 2);
+  assert.deepEqual(later.of('LOGEND').at(-1), ['LOGEND', 'l', 2]);
+});
+
+test('every event of a game played at a refereed table is taken', async () => {
+  // A real game, with real keys and licences (packages/table,
+  // tool/game_fixture.dart): nothing an honest build says nests too deep.
+  const real = JSON.parse(gunzipSync(readFileSync(new URL('../../packages/table/test/fixtures/refereed_four.json.gz', import.meta.url))).toString());
+  const r = tableReferee({ table: real.spec.id, verify, house: real.spec.house });
+  const events = real.log.filter((entry) => entry.e).map((entry) => entry.e);
+  for (const e of events) {
+    assert.deepEqual(await r.take({ pubkey: e.author, content: JSON.stringify(e) }), { ok: true, why: '' }, `${e.kind} ${e.id}`);
+  }
+  assert.equal(r.entries.length, events.length);
+});
+
 test('a key\'s last socket on the log closing is noted, and its first opening again', async () => {
   // The wall clock: an answer to the challenge is checked against it.
   const { relay } = referee({ gate: gateOn(), now: Date.now });

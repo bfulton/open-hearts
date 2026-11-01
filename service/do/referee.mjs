@@ -158,8 +158,30 @@ export async function startRefusal(content, table) {
   return null;
 }
 
+/// How deep a table event may nest, counting itself (packages/table,
+/// events.dart, TableEvent.deepest). No build writes one deeper than six:
+/// a start's licences. Every side reads an event, and writes it out
+/// again, by walking it to the bottom, so a deep enough one would
+/// overflow the stack of every side that met it, and the log would go no
+/// further for anyone.
+const deepest = 32;
+
+/// Whether [value] nests no deeper than [deepest], counted without
+/// recursion, so that no depth can overflow the count itself.
+function shallow(value) {
+  const stack = [[value, 1]];
+  while (stack.length) {
+    const [v, depth] = stack.pop();
+    if (!v || typeof v !== 'object') continue;
+    if (depth > deepest) return false;
+    for (const child of Object.values(v)) stack.push([child, depth + 1]);
+  }
+  return true;
+}
+
 /// The table event a [logKind] event carries, the fields a table event
-/// has and nothing else; null for content that is not one.
+/// has and nothing else; null for content that is not one, or that
+/// nests deeper than any table event does.
 function eventIn(content) {
   let said;
   try {
@@ -167,7 +189,7 @@ function eventIn(content) {
   } catch {
     return null;
   }
-  if (!said || typeof said !== 'object' || Array.isArray(said)) return null;
+  if (!said || typeof said !== 'object' || Array.isArray(said) || !shallow(said)) return null;
   const { id, table, author, kind, body, sig } = said;
   if (typeof id !== 'string' || !hex64.test(id) || typeof author !== 'string' || !hex64.test(author) || typeof sig !== 'string') return null;
   return { id, table, author, kind, body, sig };

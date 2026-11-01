@@ -316,6 +316,11 @@ times a person's share of a game to a hundred. Past it the referee
 refuses that person's events, so their turns run out as a device's
 that has gone. The house's events are not held to it.
 
+No event nested deeper than 32 levels is taken (`deepest`); none a build
+writes goes past six, a start's licences. Every side walks an event to
+the bottom to read it and to write it out again, and one deep enough
+would overflow each of them, so the log would go no further for anyone.
+
 A socket is carried at all only once it answers the relay's challenge:
 a device in use, by the activation its account's service gave it, or
 the house, by its key (`serviceGate` in `service/do/relay.mjs`). The

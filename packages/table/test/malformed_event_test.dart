@@ -56,6 +56,30 @@ void main() {
     expect(entry.unread, isNull);
   });
 
+  test('an event nested deeper than any build writes one is dropped by the parser, not thrown out of it', () {
+    Object? lists(int n) {
+      Object? x = 0;
+      for (var i = 0; i < n; i++) {
+        x = [x];
+      }
+      return x;
+    }
+
+    // The event and its body are two deep, so thirty more is as deep as
+    // one may go.
+    Map<String, Object?> play(int n) => signed(EventKind.play, {'hand': 0, 'turn': 4, 'seat': 0, 'card': '2C', 'x': lists(n)});
+    expect(TableEvent.parse(play(30)), isNotNull);
+    expect(TableEvent.parse(play(31)), isNull);
+    // Deep enough to overflow the stack of anything that walks it: too
+    // deep to sign, so put together by hand.
+    final deep = {...play(0), 'body': {'hand': 0, 'turn': 4, 'seat': 0, 'card': '2C', 'x': lists(10000)}};
+    expect(TableEvent.parse(deep), isNull);
+    final e = LogEntry.parse({'n': 3, 't': 1000, 'e': deep});
+    expect(e, isNotNull, reason: 'an entry that changes nothing, not one the log cannot go past');
+    expect(e!.event, isNull);
+    expect(e.digestInput, '3|1000|e|${deep['id']}');
+  });
+
   test('a log entry carrying one is kept as it came, by its id', () {
     final raw = signed(EventKind.play, {'hand': 0, 'turn': 4, 'seat': 0});
     final e = LogEntry.parse({'n': 3, 't': 1000, 'e': raw}, verifySignature: false)!;
