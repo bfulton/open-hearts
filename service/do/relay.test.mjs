@@ -482,6 +482,15 @@ const table = '0123456789abcdef0123456789abcdef';
 const reaction = (key, { tag = table, content = '{"react":"nice","hand":2,"turn":17}', tags = [['t', tag]], at = 1000 } = {}) =>
   sign.event(key, { kind: reactionKind, content, tags, created_at: at });
 
+test("the object's relay takes its logger as the relay does, on every kind of tag", async () => {
+  for (const tag of ['online', 'ROOM42', table]) {
+    const lines = [];
+    const relay = objectRelay(verify, { tag, log: (line) => lines.push(line) });
+    relay.open(socket());
+    assert.deepEqual(lines, ['connected (1)'], tag);
+  }
+});
+
 test("a reaction rides a table's tag: carried to whoever reads it there, and kept by nobody", async () => {
   const kept = [];
   const relay = objectRelay(verify, { tag: table, kept: (e) => kept.push(e) });

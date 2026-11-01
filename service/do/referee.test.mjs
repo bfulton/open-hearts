@@ -98,16 +98,16 @@ function clock(at = 1_000_000) {
 }
 
 /// The relay of [table]'s tag as the object builds it, with the house
-/// [house] and [log] as kept; [wanted] counts each time the house is
+/// [house] and [entries] as kept; [wanted] counts each time the house is
 /// wanted and away.
-function referee({ now = clock(), log = [], gate = null, kept = [], tag = table } = {}) {
+function referee({ now = clock(), entries = [], gate = null, kept = [], tag = table } = {}) {
   const wanted = { n: 0 };
   const relay = objectRelay(verify, {
     tag,
     now,
     gate,
     house: house.public,
-    log,
+    entries,
     keepEntry: (entry) => kept.push(entry),
     wanted: () => wanted.n++,
   });
@@ -202,7 +202,7 @@ test('the start is taken only as it was written, and only as the table its id na
     await say(relay, a, event);
     assert.equal(ok(a)[2], false, what);
     assert.match(ok(a)[3], why, what);
-    assert.equal(relay.log.length, 0, what);
+    assert.equal(relay.entries.length, 0, what);
   }
   // And worked out alike from the text alone.
   assert.equal(await startRefusal(JSON.stringify(await startOf(ada)), table), null);
@@ -217,7 +217,7 @@ test('two starts at once begin the log once', async () => {
   relay.open(b);
   const [ea, eb] = [await wrapped(await startOf(ada)), await wrapped(await startOf(bao))];
   await Promise.all([say(relay, a, ea), say(relay, b, eb)]);
-  assert.equal(relay.log.length, 1);
+  assert.equal(relay.entries.length, 1);
   assert.deepEqual([ok(a)[2], ok(b)[2]], [true, true]);
   assert.deepEqual([ok(a)[3], ok(b)[3]].sort(), ['', 'duplicate: the table has started']);
 });
@@ -282,7 +282,7 @@ test('after the start, the people\'s and the house\'s events, in the order they 
     assert.match(ok(a)[3], why);
   }
   assert.equal(watcher.entries.length, 3);
-  assert.equal(relay.log.length, 3);
+  assert.equal(relay.entries.length, 3);
 });
 
 test('a view of the table is carried only from one of its people, once its start says who they are', async () => {
@@ -323,7 +323,7 @@ test('an event is taken under the id its bytes hash to and no other, so nobody c
   assert.deepEqual(ok(a).slice(2), [false, 'invalid: an event\'s id is the hash of what it says']);
   await say(relay, a, await wrapped(leave));
   assert.deepEqual(ok(a).slice(2), [true, '']);
-  assert.deepEqual(relay.log.map((entry) => entry.e.author), [ada.public, bao.public]);
+  assert.deepEqual(relay.entries.map((entry) => entry.e.author), [ada.public, bao.public]);
 });
 
 test('every event of a real game, as the table made it, is taken as it came', async () => {
@@ -371,7 +371,7 @@ test('each person\'s events fill no more than their share of the log, also once 
   }
 
   // The object woken from what it wrote down: Ada's share is as full.
-  const again = referee({ log: structuredClone(kept) });
+  const again = referee({ entries: structuredClone(kept) });
   again.relay.open(a);
   await say(again.relay, a, await wrapped(await big(ada, 25)));
   assert.deepEqual(ok(a).slice(2), [false, full]);
@@ -386,7 +386,7 @@ test('an event is kept as a table event has it, and whatever else it carries is 
   const play = await tableEvent(ada, 'play', { hand: 0, seat: 0, turn: 4 });
   await say(relay, a, await wrapped(await startOf(ada)));
   await say(relay, a, await sign.event(ada, { kind: logKind, content: JSON.stringify({ ...play, padding: 'x'.repeat(1000) }), tags: [['t', table]] }));
-  assert.deepEqual(relay.log[1].e, play);
+  assert.deepEqual(relay.entries[1].e, play);
 });
 
 test('a key\'s last socket on the log closing is noted, and its first opening again', async () => {
@@ -406,35 +406,35 @@ test('a key\'s last socket on the log closing is noted, and its first opening ag
   // Before the start nothing is noted: there is no table to note it of.
   relay.close(s);
   await say(relay, a1, await wrapped(await startOf(ada)));
-  assert.equal(relay.log.length, 1);
+  assert.equal(relay.entries.length, 1);
 
   relay.close(a1);
-  assert.equal(relay.log.length, 1, 'one of two sockets: still there');
+  assert.equal(relay.entries.length, 1, 'one of two sockets: still there');
   relay.close(a2);
-  assert.deepEqual(relay.log.at(-1).down, ada.public);
+  assert.deepEqual(relay.entries.at(-1).down, ada.public);
   // Gone, and gone again by another socket that was not following: once.
   const a3 = await as(ada);
   relay.close(a3);
-  assert.equal(relay.log.length, 2);
+  assert.equal(relay.entries.length, 2);
   // Back, and the entry that says so is in what the socket is sent.
   const a4 = await as(ada);
   await relay.message(a4, JSON.stringify(['LOG', 'log', 0]));
-  assert.deepEqual(relay.log.at(-1).up, ada.public);
+  assert.deepEqual(relay.entries.at(-1).up, ada.public);
   assert.deepEqual(a4.entries.map((e) => e.n), [0, 1, 2]);
   // Its subscription closed is its connection to the log closed.
   await relay.message(a4, JSON.stringify(['CLOSE', 'log']));
-  assert.deepEqual(relay.log.at(-1).down, ada.public);
+  assert.deepEqual(relay.entries.at(-1).down, ada.public);
   // Somebody not at the table comes and goes unnoted.
   const s2 = await as(stranger);
   await relay.message(s2, JSON.stringify(['LOG', 'log', 0]));
   relay.close(s2);
-  assert.equal(relay.log.length, 4);
+  assert.equal(relay.entries.length, 4);
   assert.deepEqual(b.entries.map((e) => Object.keys(e).filter((k) => k !== 'n' && k !== 't')[0]), ['e', 'down', 'up', 'down']);
 });
 
 test('a socket whose answer has run out is sent nothing more of the log', async () => {
   const at = clock(Date.now());
-  const { relay } = referee({ gate: gateOn(at), now: at, log: [{ n: 0, t: 1, e: await startOf(ada) }] });
+  const { relay } = referee({ gate: gateOn(at), now: at, entries: [{ n: 0, t: 1, e: await startOf(ada) }] });
   // Ada's device, on an activation good for an hour; the house, on its
   // key, for a day.
   const a = socket();
@@ -449,7 +449,7 @@ test('a socket whose answer has run out is sent nothing more of the log', async 
   // Two hours on: the house is heard, and Ada's socket is sent none of it.
   at.at += 2 * 3600 * 1000;
   await say(relay, h, await wrapped(await tableEvent(house, 'deal', { hand: 0, seat: 3, turn: -13 })));
-  assert.equal(relay.log.length, 3);
+  assert.equal(relay.entries.length, 3);
   assert.equal(a.of('LOG').length, 2);
 });
 
@@ -493,15 +493,15 @@ test('a tick when asked, once the table has begun, no oftener than the gap', asy
   const a = socket();
   relay.open(a);
   await relay.message(a, JSON.stringify(['TICK']));
-  assert.equal(relay.log.length, 0);
+  assert.equal(relay.entries.length, 0);
   await say(relay, a, await wrapped(await startOf(ada)));
   now.at += tickGapMs - 1;
   await relay.message(a, JSON.stringify(['TICK']));
-  assert.equal(relay.log.length, 1);
+  assert.equal(relay.entries.length, 1);
   now.at += 1;
   await relay.message(a, JSON.stringify(['TICK']));
   await relay.message(a, JSON.stringify(['TICK']));
-  assert.deepEqual(relay.log.slice(1), [{ n: 1, t: 1_000_000 + tickGapMs }]);
+  assert.deepEqual(relay.entries.slice(1), [{ n: 1, t: 1_000_000 + tickGapMs }]);
 });
 
 test('the clock never runs back in the log', async () => {
@@ -512,7 +512,7 @@ test('the clock never runs back in the log', async () => {
   await say(relay, a, await wrapped(await startOf(ada)));
   now.at -= 5000;
   await say(relay, a, await wrapped(await tableEvent(bao, 'pass', { hand: 0, seat: 1, turn: 1 })));
-  assert.equal(relay.log[1].t, relay.log[0].t);
+  assert.equal(relay.entries[1].t, relay.entries[0].t);
 });
 
 test('the house is wanted as a sealed table starts, and while it is away, until it has said how the game came out', async () => {
@@ -536,7 +536,7 @@ test('the house is wanted as a sealed table starts, and while it is away, until 
   const b = socket();
   unsealed.relay.open(b);
   await say(unsealed.relay, b, await wrapped(await startOf(ada, plainSpec)));
-  assert.equal(unsealed.relay.log.length, 1);
+  assert.equal(unsealed.relay.entries.length, 1);
   assert.equal(unsealed.wanted.n, 0);
 });
 
@@ -549,18 +549,18 @@ test('a log written down comes back as it was, and goes on from there', async ()
   await say(first.relay, a, await wrapped(await startOf(ada, plainSpec)));
   const pass = await tableEvent(bao, 'pass', { hand: 0, seat: 1, turn: 1 }, { on: plain });
   await say(first.relay, a, await wrapped(pass));
-  assert.deepEqual(first.kept, first.relay.log);
+  assert.deepEqual(first.kept, first.relay.entries);
 
   // The object woke with both people's sockets still open, each
   // carrying its subscription and who it answered as: nothing changed,
   // and nothing is noted.
   now.at += 60_000;
-  const again = referee({ now, log: structuredClone(first.kept), tag: plain });
+  const again = referee({ now, entries: structuredClone(first.kept), tag: plain });
   const until = Math.floor(Date.now() / 1000) + 600;
   again.relay.open(a, null, { account: null, key: ada.public, epoch: 0, until }, 'log');
   again.relay.open(socket(), null, { account: null, key: bao.public, epoch: 0, until }, 'log');
   again.relay.settle();
-  assert.equal(again.relay.log.length, 2);
+  assert.equal(again.relay.entries.length, 2);
   // An event it took before is still taken once.
   await say(again.relay, a, await wrapped(pass));
   assert.deepEqual(ok(a).slice(2), [true, 'duplicate: already in the log']);
@@ -569,20 +569,20 @@ test('a log written down comes back as it was, and goes on from there', async ()
   assert.deepEqual(a.entries.at(-1), { n: 2, t: 1_060_000, e: play });
 
   // A log with a gap in it is kept as far as it runs.
-  const gapped = referee({ log: [first.kept[0], { ...first.kept[1], n: 5 }], tag: plain });
-  assert.equal(gapped.relay.log.length, 1);
+  const gapped = referee({ entries: [first.kept[0], { ...first.kept[1], n: 5 }], tag: plain });
+  assert.equal(gapped.relay.entries.length, 1);
 });
 
 test('woken with nobody on the log that the log says is there, they are noted as gone', async () => {
   const gate = gateOn();
-  const log = [{ n: 0, t: 1, e: await startOf(ada) }, { n: 1, t: 2, down: bao.public }];
-  const { relay, wanted } = referee({ gate, log });
+  const entries = [{ n: 0, t: 1, e: await startOf(ada) }, { n: 1, t: 2, down: bao.public }];
+  const { relay, wanted } = referee({ gate, entries });
   // Ada's socket came back with the object, Bao's gone already; the
   // house is not there.
   const a = socket();
   relay.open(a, null, { account: null, key: ada.public, epoch: 0, until: Math.floor(Date.now() / 1000) + 600 }, 'log');
   relay.settle();
-  assert.deepEqual(relay.log.slice(2).map((e) => e.down), [house.public]);
+  assert.deepEqual(relay.entries.slice(2).map((e) => e.down), [house.public]);
   assert.equal(wanted.n, 2, 'once for the entry, once for the house\'s absence');
 });
 
@@ -616,7 +616,7 @@ test('the results are the house\'s to say, and nobody else\'s', async () => {
 });
 
 test('before its answer, a socket\'s LOG and TICK wait with everything else it said', async () => {
-  const { relay } = referee({ gate: gateOn(), now: Date.now, log: [{ n: 0, t: 1, e: await startOf(ada) }] });
+  const { relay } = referee({ gate: gateOn(), now: Date.now, entries: [{ n: 0, t: 1, e: await startOf(ada) }] });
   const a = socket();
   relay.open(a);
   await relay.message(a, JSON.stringify(['LOG', 'log', 0]));

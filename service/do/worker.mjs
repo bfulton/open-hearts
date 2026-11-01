@@ -146,8 +146,8 @@ export class TagRelay {
     const presence = tag === presenceTag;
     // A table's or a lobby's tag keeps the lobby kind (docs/explanation/relay.md):
     // what an evicted object held comes back from its own storage.
-    const kept = tagStore(this.state.storage, tag);
-    const [store, log] = await Promise.all([kept.load(), kept.loadLog()]);
+    const rows = tagStore(this.state.storage, tag);
+    const [store, entries] = await Promise.all([rows.load(), rows.loadLog()]);
     const house = /^[0-9a-f]{64}$/.test(this.env.OH_HOUSE_KEY ?? '') ? this.env.OH_HOUSE_KEY : null;
     const relay = objectRelay(verify, {
       tag,
@@ -155,14 +155,14 @@ export class TagRelay {
       // The operator's limits are presence's; a table's are the relay's own.
       limits: presence ? limits : null,
       store,
-      kept: (event, gone) => this.state.waitUntil(kept.keep(event, gone)),
+      kept: (event, gone) => this.state.waitUntil(rows.keep(event, gone)),
       withhold: (event) => this.pictures.withheld(event),
       screen: this.owned,
-      forget: (event) => this.state.waitUntil(kept.forget(event)),
+      forget: (event) => this.state.waitUntil(rows.forget(event)),
       gate: this.gate(verify, tag, house),
       house,
-      log,
-      keepEntry: (entry) => this.state.waitUntil(kept.keepEntry(entry)),
+      entries,
+      keepEntry: (entry) => this.state.waitUntil(rows.keepEntry(entry)),
       wanted: () => this.wakeHouse(),
     });
     for (const socket of this.state.getWebSockets()) {

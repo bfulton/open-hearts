@@ -182,7 +182,7 @@ function eventIn(content) {
 /// — a start that names it, and every entry after while it is away,
 /// until its word on how the game came out is in; [send] sends text to
 /// a socket, [admitted] says whether a socket may be carried now.
-export function tableReferee({ table, verify, house = null, now = Date.now, entries: kept = [], keep = null, wanted = null, send = () => {}, admitted = () => true }) {
+export function tableReferee({ table, verify, house = null, now = Date.now, entries: written = [], keep = null, wanted = null, send = () => {}, admitted = () => true }) {
   const entries = [];
   /// The start's writers ([writersOf]), once there is a start.
   let spec = null;
@@ -218,7 +218,7 @@ export function tableReferee({ table, verify, house = null, now = Date.now, entr
   }
 
   // The log as kept, as far as it runs on without a gap.
-  for (const entry of kept) {
+  for (const entry of written) {
     if (!entry || entry.n !== entries.length) break;
     note(entry);
   }

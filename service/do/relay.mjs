@@ -870,7 +870,7 @@ export function createRelay({ verify, store = memoryStore(), refuse = null, log 
     },
 
     /// The table's log, on a table's tag.
-    get log() {
+    get entries() {
       return table?.entries ?? null;
     },
 
@@ -906,8 +906,8 @@ export function createRelay({ verify, store = memoryStore(), refuse = null, log 
 /// only where pictures are put out: a lobby's tag, never presence or the
 /// results.
 ///
-/// A table's tag keeps the table's log besides (referee.mjs): [log] is
-/// the log as kept, [keepEntry] is told of each entry added to it, to
+/// A table's tag keeps the table's log besides (referee.mjs): [entries]
+/// is the log as kept, [keepEntry] is told of each entry added to it, to
 /// write it down, and [wanted] each time the table wants its house and
 /// the house is not there. [house] is this relay's house: the key a
 /// sealed table's spec has to name, and the one key the results are
@@ -918,7 +918,7 @@ export function createRelay({ verify, store = memoryStore(), refuse = null, log 
 /// waits there and the house is not there.
 export function objectRelay(
   verify,
-  { tag = presenceTag, now = Date.now, count = null, limits = null, store = null, kept = null, also = null, gate = null, withhold = null, screen = null, forget = null, house = null, log = null, keepEntry = null, wanted = null, say = null } = {},
+  { tag = presenceTag, now = Date.now, count = null, limits = null, store = null, kept = null, also = null, gate = null, withhold = null, screen = null, forget = null, house = null, entries = null, keepEntry = null, wanted = null, log = null } = {},
 ) {
   const presence = tag === presenceTag;
   const own = refusalFor(tag, { house, now });
@@ -927,8 +927,8 @@ export function objectRelay(
   return createRelay({
     verify,
     gate,
-    log: say,
-    referee: tableTag.test(tag) ? ({ send, admitted }) => tableReferee({ table: tag, verify, house, now, entries: log ?? [], keep: keepEntry, wanted, send, admitted }) : null,
+    log,
+    referee: tableTag.test(tag) ? ({ send, admitted }) => tableReferee({ table: tag, verify, house, now, entries: entries ?? [], keep: keepEntry, wanted, send, admitted }) : null,
     watcher: pool ? ({ holds }) => poolWatch({ house, here: () => holds(house), wanted, now }) : null,
     // Presence keeps nothing; a table's tag keeps its lobby.
     store: presence ? null : (store ?? memoryStore(storedKeep(tag))),
