@@ -57,10 +57,12 @@ async function sourceProblems(ctx) {
   return problems;
 }
 
-/// Files git ignores that the site's deploy would publish.
+/// Files git ignores that the site's deploy would publish. Listed with
+/// -z, so that git writes each path as it is: without it, a path with a
+/// space or a non-ASCII character comes back quoted, and would not match.
 async function ignoredProblems(ctx) {
-  const listed = (await ctx.capture('git', ['status', '--porcelain', '--ignored', '--untracked-files=all', '--', ...PUBLISHED_FROM])).out;
-  const ignored = listed.split('\n').filter((l) => l.startsWith('!! ')).map((l) => l.slice(3)).filter(published);
+  const listed = (await ctx.capture('git', ['status', '--porcelain', '-z', '--ignored', '--untracked-files=all', '--', ...PUBLISHED_FROM])).out;
+  const ignored = listed.split('\0').filter((l) => l.startsWith('!! ')).map((l) => l.slice(3)).filter(published);
   return ignored.length ? [`files git ignores would be published: ${ignored.join(', ')}`] : [];
 }
 

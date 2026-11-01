@@ -9,8 +9,8 @@
 // (docs/how-to/update-the-photodna-module.md).
 
 import { createHash } from 'node:crypto';
-import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
-import { isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { lstat, mkdir, readFile, readdir, realpath, writeFile } from 'node:fs/promises';
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 
 import { Failed, Usage, root } from './env.mjs';
 
@@ -111,18 +111,42 @@ export async function fetchModule(ctx, dir) {
     const bytes = await bucket.read(keyOf(sha256));
     if (!bytes) throw new Failed(`the PhotoDNA module's ${name} (${sha256}) is not in the private bucket: keep it there with oh photodna put`);
     if (sha256Of(bytes) !== sha256) throw new Failed(`the PhotoDNA module's ${name} in the private bucket is not what config/openhearts.json pins`);
-    await writeFile(join(dir, name), bytes);
+    // A link in the file's place would write the module wherever it
+    // points.
+    const to = join(dir, name);
+    if ((await lstat(to).catch(() => null))?.isSymbolicLink()) throw new Failed(`${to} is a link: the module is written only as a file of its own`);
+    await writeFile(to, bytes);
   }
   return pins;
 }
 
+/// Whether [dir] is in this checkout once every link on the way is
+/// followed: the nearest folder of it that exists is resolved, and the
+/// rest of the path, not made yet, is added to that.
+async function inCheckout(dir) {
+  const checkout = await realpath(root);
+  let at = resolve(dir);
+  const rest = [];
+  for (;;) {
+    const real = await realpath(at).catch((e) => (e.code === 'ENOENT' ? null : Promise.reject(e)));
+    if (real) {
+      at = real;
+      break;
+    }
+    rest.unshift(basename(at));
+    if (dirname(at) === at) break;
+    at = dirname(at);
+  }
+  const rel = relative(checkout, join(at, ...rest));
+  return !(rel === '..' || rel.startsWith(`..${sep}`) || isAbsolute(rel));
+}
+
 /// `oh photodna get <dir>`: the pinned module, into [dir], to change it.
 /// Never into this checkout, where one `git add` would put it in the
-/// public repository.
+/// public repository, however the path is spelled or linked.
 export async function get(ctx, { args }) {
   if (!args.dir) throw new Usage('name the folder to put the module in');
-  const rel = relative(root, resolve(args.dir));
-  if (!(rel === '..' || rel.startsWith(`..${sep}`) || isAbsolute(rel))) throw new Usage(`${args.dir} is in this repository: name a folder outside it`);
+  if (await inCheckout(args.dir)) throw new Usage(`${args.dir} is in this repository: name a folder outside it`);
   const pins = await fetchModule(ctx, args.dir);
   if (!pins) throw new Failed('config/openhearts.json pins no PhotoDNA module (photodna.module)');
   for (const [name, sha256] of Object.entries(pins)) ctx.log(`${name}: ${sha256}`);

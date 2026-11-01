@@ -8,7 +8,7 @@
 
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
@@ -172,6 +172,21 @@ test('get fetches exactly the pinned files, each checked against its pin', async
     assert.match(asked.warned.join('\n'), /is in this repository: name a folder outside it/);
     assert.ok(!existsSync(join(inside, 'edge.mjs')), `nothing written in ${inside}`);
   }
+  // Nor through a link: a folder outside that links back in, or a file
+  // in the module's place that links anywhere.
+  const links = temp('links');
+  symlinkSync(root, join(links, 'checkout'));
+  const linked = join(links, 'checkout', 'photodna-copy');
+  const throughLink = context({ config: configText(pins), bucket: privateBucket(kept) });
+  assert.equal(await main(['photodna', 'get', linked], throughLink), 2);
+  assert.match(throughLink.warned.join('\n'), /is in this repository: name a folder outside it/);
+  assert.ok(!existsSync(join(root, 'photodna-copy')), 'nothing written through the link');
+  const planted = join(temp('out'), 'm');
+  mkdirSync(planted, { recursive: true });
+  symlinkSync(join(temp('elsewhere'), 'edge.mjs'), join(planted, 'edge.mjs'));
+  const asLink = context({ config: configText(pins), bucket: privateBucket(kept) });
+  assert.equal(await main(['photodna', 'get', planted], asLink), 1);
+  assert.match(asLink.warned.join('\n'), /edge\.mjs is a link: the module is written only as a file of its own/);
   const beside = join(temp('out'), 'm');
   assert.equal(await main(['photodna', 'get', beside], context({ config: configText(pins), bucket: privateBucket(kept) })), 0);
 });

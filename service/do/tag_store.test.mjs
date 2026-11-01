@@ -33,7 +33,9 @@ function storage() {
     async put(key, value) {
       rows.set(key, structuredClone(value));
     },
+    /// One key, or up to 128 of them, as an object's storage takes.
     async delete(key) {
+      if (Array.isArray(key) && key.length > 128) throw new RangeError(`delete takes 128 keys at most, not ${key.length}`);
       for (const k of Array.isArray(key) ? key : [key]) rows.delete(k);
     },
     /// Keys in order, or the other way with [reverse], from [start] and
@@ -218,6 +220,20 @@ test('a day on, the sweep deletes what is a day old and leaves the rest', async 
   assert.equal(await kept.sweep({ now: now + 2 * KEPT_MS }), true);
   assert.equal(st.rows.size, 0);
   assert.equal(st.alarm, null);
+});
+
+test('the sweep deletes any number of events, 128 keys at a time as storage takes them', async () => {
+  const st = storage();
+  const kept = tagStore(st, 'ABCD');
+  const now = 10 * KEPT_MS;
+  const day = Math.floor((now - KEPT_MS) / 1000);
+  // 300 a day old, and 200 dated far ahead.
+  for (let i = 0; i < 300; i++) await kept.keep(await lobby(keys[i % keys.length], 'ABCD', day - 1 - i), null, { now: 0 });
+  for (let i = 0; i < 200; i++) await kept.keep(await lobby(keys[i % keys.length], 'ABCD', Math.floor(now / 1000) + 2 * 60 * 60 + i), null, { now: 0 });
+  const fresh = await lobby(keys[0], 'ABCD', day + 1);
+  await kept.keep(fresh, null, { now: 0 });
+  assert.equal(await kept.sweep({ now }), true);
+  assert.deepEqual([...st.rows.keys()], [keyOf(fresh)]);
 });
 
 test('the tag kept for good is the one the table package publishes results on', () => {

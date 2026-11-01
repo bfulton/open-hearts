@@ -169,15 +169,17 @@ test('production is released only from main as it was reviewed', async () => {
   assert.deepEqual(untracked, ['uncommitted changes: 1 file(s)']);
   // So is one git ignores, where the site's deploy would publish it; the
   // relay's build takes only what its code imports.
-  const published = 'status --porcelain --ignored --untracked-files=all -- site/pages site/public app/web service/functions';
-  const ignored = { ...clean, [published]: '!! app/web/.index.html.swp\n!! site/public/img/notes.txt\n!! site/pages/draft.html\n!! service/functions/scratch.mjs\n' };
-  assert.deepEqual(await releaseProblems(fake({ capture: git(ignored), ...settled() }), 'site'), ['files git ignores would be published: app/web/.index.html.swp, site/public/img/notes.txt, site/pages/draft.html, service/functions/scratch.mjs']);
+  const published = 'status --porcelain -z --ignored --untracked-files=all -- site/pages site/public app/web service/functions';
+  // As git writes it with -z: each entry ended by a NUL, paths unquoted.
+  const z = (...paths) => paths.map((path) => `!! ${path}\0`).join('');
+  const ignored = { ...clean, [published]: z('app/web/.index.html.swp', 'site/public/img/notes.txt', 'site/pages/draft.html', 'service/functions/scratch.mjs', 'site/public/private notes.txt', 'site/public/é.txt') };
+  assert.deepEqual(await releaseProblems(fake({ capture: git(ignored), ...settled() }), 'site'), ['files git ignores would be published: app/web/.index.html.swp, site/public/img/notes.txt, site/pages/draft.html, service/functions/scratch.mjs, site/public/private notes.txt, site/public/é.txt']);
   assert.deepEqual(await releaseProblems(fake({ capture: git(ignored) }), 'relay'), []);
   // An ignored file the deploy leaves out is no reason to refuse it:
   // Wrangler uploads no .DS_Store and nothing in node_modules or .git,
   // site/build.mjs reads only the pages' .html, and deploy.sh copies
   // only the service's modules, not their tests or fixtures.
-  const unpublished = { ...clean, [published]: '!! site/public/.DS_Store\n!! site/public/img/.DS_Store\n!! app/web/node_modules/x/a.js\n!! app/web/.git/HEAD\n!! site/pages/.draft.html.swp\n!! service/functions/notes.txt\n!! service/functions/old/x.mjs\n!! service/functions/x.test.mjs\n!! service/functions/x.fixtures.mjs\n' };
+  const unpublished = { ...clean, [published]: z('site/public/.DS_Store', 'site/public/img/.DS_Store', 'app/web/node_modules/x/a.js', 'app/web/.git/HEAD', 'site/pages/.draft.html.swp', 'service/functions/notes.txt', 'service/functions/old/x.mjs', 'service/functions/x.test.mjs', 'service/functions/x.fixtures.mjs') };
   assert.deepEqual(await releaseProblems(fake({ capture: git(unpublished), ...settled() }), 'site'), []);
   // Main as it is now: a fetch that failed leaves this clone's main as
   // it last saw it, which may be older.

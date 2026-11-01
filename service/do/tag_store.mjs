@@ -86,7 +86,7 @@ export function tagStore(storage, tag) {
       const before = keyOf({ created_at: Math.floor((now - KEPT_MS) / 1000), id: '' });
       const ahead = keyOf({ created_at: Math.floor((now + AHEAD_MOST_MS) / 1000) + 1, id: '' });
       const gone = [...(await storage.list({ prefix: 'ev:', end: before })).keys(), ...(await storage.list({ prefix: 'ev:', start: ahead })).keys()];
-      if (gone.length) await storage.delete(gone);
+      for (let i = 0; i < gone.length; i += DELETE_MOST) await storage.delete(gone.slice(i, i + DELETE_MOST));
       const last = [...(await storage.list({ prefix: 'log:', reverse: true, limit: 1 })).values()][0];
       let logGone = false;
       if (last && now - last.t >= KEPT_MS) {
