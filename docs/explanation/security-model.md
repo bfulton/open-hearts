@@ -213,11 +213,21 @@ policy (`site/public/_headers`), so no other page can frame the app and
 steer its one-tap buttons. One page is excepted: `openhearts.game/carry`,
 which hands a device's storage to `play.openhearts.game`. Only that
 origin may frame it, it has no buttons, and it answers only that origin
-([the device, carried over](service.md#the-device-carried-over)). The app loads one
-third-party script, on play.openhearts.game only: New Relic's browser
-agent, which its loader (`app/web/observability.js`) fetches from
-`js-agent.newrelic.com`. Cloudflare's
-Web Analytics and email obfuscation are off, since both inject scripts.
+([the device, carried over](service.md#the-device-carried-over)). The app loads these
+third-party scripts:
+
+- New Relic's browser agent, on every page of play.openhearts.game
+  only, which its loader (`app/web/observability.js`) fetches from
+  `js-agent.newrelic.com`.
+- A sign-in provider's script, once the Subscription page offers that
+  sign-in (`app/lib/net/provider_tokens_web.dart`): Apple's
+  `appleid.auth.js` from `appleid.cdn-apple.com` in a build with
+  `apple.servicesId`, and Google's client from `accounts.google.com` in
+  a build with `google.webClientId`.
+
+Each runs in the app's own document, so it can read the app's storage,
+the device's secret key included. Cloudflare's Web Analytics and email
+obfuscation are off, since both inject scripts.
 Open: a fuller CSP (`script-src`) has not been set. The Flutter build
 needs `wasm-unsafe-eval`, and the policy has to be tested against it.
 
