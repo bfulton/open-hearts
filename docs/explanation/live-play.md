@@ -350,7 +350,11 @@ the time. A side that can see a deadline due asks for a tick (`TICK`) a
 moment past it, and again every second while nothing has moved the
 table. The referee adds one when its last entry is at least a quarter
 of a second old (`tickGapMs`), for one of the table's people or its
-house, until the house's word on how the game came out is in.
+house, until the house's word on how the game came out is in. It adds
+no more than `ticksInARowMost` in a row with no event between them, ten
+minutes of them, and none once the log holds `notesMost` ticks and
+connections noted, so a table whose house never says that word cannot
+be ticked on for ever.
 
 At a sealed table every bot seat is the house's to play. At an unsealed
 one, which only the simulator deals, every side works a bot's moves out

@@ -18,7 +18,7 @@ import { gunzipSync } from 'node:zlib';
 import { wasmPath } from './host.mjs';
 import { NAME_REFUSED_WHY, RESULT_NOT_HOUSE_WHY, VIEW_NOT_SEATED_WHY, lobbyKind, objectRelay, resultsTag, schnorrVerifier, serviceGate, tableLimits, watchKind } from './relay.mjs';
 import { eventIdOf } from '../functions/records.mjs';
-import { authorMost, logKind, specIdOf, startRefusal, tableReferee, tickGapMs, wakeEveryMs, wakeLimiter, writersOf } from './referee.mjs';
+import { authorMost, logKind, notesMost, specIdOf, startRefusal, tableReferee, tickGapMs, ticksInARowMost, wakeEveryMs, wakeLimiter, writersOf } from './referee.mjs';
 import { keys, signing } from './sign.mjs';
 import { KEPT_MS, entryKey, tagStore } from './tag_store.mjs';
 
@@ -565,6 +565,68 @@ test('a tick only for the table\'s people and its house, and none once the house
   now.at += tickGapMs;
   await again.relay.message(b, JSON.stringify(['TICK']));
   assert.equal(again.relay.entries.length, kept.length);
+});
+
+test('at a table whose house never says how the game came out, ticks stop at the most in a row, also once it is woken from storage, until an event', async () => {
+  const now = clock();
+  // Ada, the only one there, at a table with no house, and at a sealed
+  // one whose house never comes.
+  for (const s of [plainSpec, sealedSpec]) {
+    const { relay, kept } = referee({ now, gate: gateOn(now), tag: s.id });
+    const a = socket();
+    relay.open(a);
+    await answerAs(relay, a, ada, now);
+    await say(relay, a, await wrapped(await startOf(ada, s)));
+    const ticks = async (r, n) => {
+      const before = r.entries.length;
+      for (let i = 0; i < n; i++) {
+        now.at += tickGapMs;
+        await r.message(a, JSON.stringify(['TICK']));
+      }
+      return r.entries.length - before;
+    };
+    assert.equal(await ticks(relay, ticksInARowMost + 5), ticksInARowMost, s.sealed ? 'sealed' : 'no house');
+
+    // Woken from the log as it was written down: no more ticks yet.
+    const again = referee({ now, gate: gateOn(now), entries: structuredClone(kept), tag: s.id });
+    again.relay.open(a);
+    await answerAs(again.relay, a, ada, now);
+    assert.equal(await ticks(again.relay, 5), 0);
+    // An event, and the ticks begin again.
+    await say(again.relay, a, await wrapped(await tableEvent(bao, 'pass', { hand: 0, seat: 1, turn: 1 }, { on: s.id })));
+    assert.deepEqual(ok(a).slice(2), [true, '']);
+    assert.equal(await ticks(again.relay, 3), 3);
+  }
+});
+
+test('once the log holds the most ticks and connections noted, it takes no more of either, also once it is woken from storage', async () => {
+  const now = clock();
+  // Bao's device coming and going, noted one short of the most.
+  const comings = Array.from({ length: notesMost - 1 }, (_, i) => ({ n: i + 1, t: 1, ...(i % 2 ? { up: bao.public } : { down: bao.public }) }));
+  const { relay } = referee({ now, gate: gateOn(now), entries: [{ n: 0, t: 1, e: await startOf(ada) }, ...comings] });
+  const until = Math.floor(now() / 1000) + 600;
+  const a = socket();
+  relay.open(a, null, { account: null, key: ada.public, epoch: 0, until }, 'log');
+  const tick = async () => {
+    now.at += tickGapMs;
+    await relay.message(a, JSON.stringify(['TICK']));
+  };
+  await tick();
+  assert.equal(relay.entries.length, notesMost + 1, 'the last one');
+  await tick();
+  // The house, never there, is not noted as gone; nor is Bao back, nor
+  // Ada gone.
+  relay.settle();
+  const b = socket();
+  relay.open(b);
+  await answerAs(relay, b, bao, now);
+  await relay.message(b, JSON.stringify(['LOG', 'log', notesMost]));
+  relay.close(a);
+  assert.equal(relay.entries.length, notesMost + 1);
+  // Events are taken as before.
+  await say(relay, b, await wrapped(await tableEvent(bao, 'pass', { hand: 0, seat: 1, turn: 1 })));
+  assert.deepEqual(ok(b).slice(2), [true, '']);
+  assert.equal(relay.entries.length, notesMost + 2);
 });
 
 test('the clock never runs back in the log', async () => {

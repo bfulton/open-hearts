@@ -26,10 +26,15 @@
 // Each person's events may fill only so much of the log ([authorMost]),
 // so one seat's events cannot grow the table's object until it fails
 // for everybody, nor make every side that reads the log read without
-// end. A tick is taken only from the table's people and its house, and
-// none after the house's word on the game: nobody else can lengthen the
-// log with ticks, and nobody can once the game is over. While it is on,
-// the log takes one at most every [tickGapMs].
+// end. The entries that are not events are bounded too. A tick is taken
+// only from the table's people and its house, at most one every
+// [tickGapMs], none after the house's word on the game, and none past
+// [ticksInARowMost] since the last event. So nobody else can lengthen
+// the log with ticks, nobody can once the game is over, and at a table
+// whose house never says that word (one with no house, or one the house
+// will not serve) its people cannot tick for ever. Once the log holds
+// [notesMost] ticks and connections noted, it takes no more of either,
+// and only events grow it.
 //
 // But for the start, which every side has to read as the same table
 // for anything after it to mean anything: a log that began with one
@@ -54,6 +59,19 @@ export const logKind = 4250;
 /// deadline it is waiting on has not moved the table, and every side
 /// waiting on it asks at once.
 export const tickGapMs = 250;
+
+/// The most ticks the log takes with no table event between them: ten
+/// minutes of ticks at one every [tickGapMs]. A side asks for one only
+/// once a deadline is due, and a tick past it moves the table on, so at
+/// a table in play a few come between one event and the next, or the
+/// table's end.
+export const ticksInARowMost = 2400;
+
+/// The most entries the log takes that are not table events: ticks and
+/// connections noted, together. A table in play adds one only when a
+/// deadline is due or a person's device comes or goes, and never comes
+/// near this.
+export const notesMost = 100000;
 
 /// A table's tag (packages/table, spec.dart, newTableId): the only tags
 /// that keep a log.
@@ -221,6 +239,10 @@ export function tableReferee({ table, verify, house = null, now = Date.now, entr
   let said = false;
   /// author -> how many characters of the log its events fill.
   const filled = new Map();
+  /// How many entries are not events: ticks, and connections noted.
+  let notes = 0;
+  /// How many ticks have come since the last event.
+  let ticksInARow = 0;
 
   const lastAt = () => (entries.length ? entries[entries.length - 1].t : -Infinity);
 
@@ -233,6 +255,10 @@ export function tableReferee({ table, verify, house = null, now = Date.now, entr
       filled.set(e.author, (filled.get(e.author) ?? 0) + JSON.stringify(e).length);
       if (entry.n === 0) spec = writersOf(e.body?.spec, table, house);
       if (e.kind === 'result' && spec?.house && e.author === spec.house) said = true;
+      ticksInARow = 0;
+    } else {
+      notes++;
+      if (!entry.up && !entry.down) ticksInARow++;
     }
     if (entry.up) downLogged.delete(entry.up);
     if (entry.down) downLogged.add(entry.down);
@@ -265,12 +291,16 @@ export function tableReferee({ table, verify, house = null, now = Date.now, entr
     return entry;
   }
 
+  /// One more entry that is not an event, a tick or a connection noted,
+  /// if the log takes more of them ([notesMost]).
+  const appendNote = (fields) => (notes < notesMost ? append(fields) : null);
+
   /// [socket], answered as [key], following the log one more time.
   function opened(key) {
     if (!key) return;
     const count = (open.get(key) ?? 0) + 1;
     open.set(key, count);
-    if (count === 1 && downLogged.has(key)) append({ up: key });
+    if (count === 1 && downLogged.has(key)) appendNote({ up: key });
   }
 
   return {
@@ -351,7 +381,7 @@ export function tableReferee({ table, verify, house = null, now = Date.now, entr
     settle() {
       if (!spec) return;
       for (const key of spec.writers) {
-        if ((open.get(key) ?? 0) === 0 && !downLogged.has(key)) append({ down: key });
+        if ((open.get(key) ?? 0) === 0 && !downLogged.has(key)) appendNote({ down: key });
       }
       if (wantsHouse()) wanted?.();
     },
@@ -367,7 +397,7 @@ export function tableReferee({ table, verify, house = null, now = Date.now, entr
       const left = (open.get(l.key) ?? 1) - 1;
       if (left > 0) return open.set(l.key, left);
       open.delete(l.key);
-      if (spec?.writers.has(l.key) && !downLogged.has(l.key)) append({ down: l.key });
+      if (spec?.writers.has(l.key) && !downLogged.has(l.key)) appendNote({ down: l.key });
     },
 
     /// The subscription [socket] follows the log under, for it to carry
@@ -379,12 +409,15 @@ export function tableReferee({ table, verify, house = null, now = Date.now, entr
     /// A tick asked for by a socket that answered the relay's challenge
     /// as [key] (null where nobody answers one), if the log has begun,
     /// [key] is one of the table's people or its house, the house's word
-    /// on the game is not in, and the last entry is [tickGapMs] old.
+    /// on the game is not in, the last entry is [tickGapMs] old, fewer
+    /// than [ticksInARowMost] ticks have come since the last event, and
+    /// the log takes more entries that are not events ([notesMost]).
     /// Only the sides at the table wait on its deadlines, and none once
     /// the game is over.
     tick(key = null) {
-      if (!entries.length || (key !== null && !spec?.writers.has(key)) || said || now() - lastAt() < tickGapMs) return null;
-      return append({});
+      if (!entries.length || (key !== null && !spec?.writers.has(key)) || said) return null;
+      if (ticksInARow >= ticksInARowMost || now() - lastAt() < tickGapMs) return null;
+      return appendNote({});
     },
   };
 }

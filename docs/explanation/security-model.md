@@ -165,9 +165,15 @@ object runs on one thread shared by everyone on that tag.
   cannot grow its table's object until it fails, or make every
   reconnecting side read without end. The house is the operator's and
   is not held to it. A tick (`TICK`) is taken only from the table's
-  people and its house, at most one every `tickGapMs`, and none after
-  the house's word on the game, so nobody else can lengthen the log
-  with ticks, and nobody can once the game is over.
+  people and its house, at most one every `tickGapMs`, none after the
+  house's word on the game, and none past `ticksInARowMost` since the
+  last event. So nobody else can lengthen the log with ticks, nobody
+  can once the game is over, and at a table whose house never says that
+  word (one with no house, or one the house will not serve) its people
+  cannot tick for ever. Once the log holds `notesMost` ticks and
+  connections noted, it takes no more of either, and only events grow
+  it. These bound each table. A subscriber can still start as many
+  tables as it likes, which is left to the account's spend alerts.
 - Each socket is bounded: message size, REQ size (so a socket's
   subscriptions always fit in the attachment a hibernating socket
   carries), a few subscriptions (`maxSubscriptions`), and a
