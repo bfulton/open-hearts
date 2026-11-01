@@ -394,18 +394,20 @@ test('an event nested deeper than a table event goes is refused, and the log goe
   const a = socket();
   relay.open(a);
   await say(relay, a, await wrapped(await startOf(ada)));
-  // A play with [n] lists one in another in its body, written out by
-  // hand: too deep for JSON.stringify to write. The event and its body
-  // are two deep, so thirty more is as deep as one may go.
-  const play = (n) => {
-    const content = JSON.stringify(tableEvent(bao, 'play', { hand: 0, seat: 1, turn: 4, card: '2C', x: 0 })).replace('"x":0', `"x":${'['.repeat(n)}0${']'.repeat(n)}`);
-    return sign.event(bao, { kind: logKind, content, tags: [['t', table]], created_at: 1000 + ids });
-  };
+  const outer = (content) => sign.event(bao, { kind: logKind, content, tags: [['t', table]], created_at: 1000 + ++ids });
+  // A play with [n] lists one in another in its body. The event and its
+  // body are two deep, so thirty more is as deep as one may go. Too deep
+  // ones are written out by hand, since JSON.stringify can't write 5000
+  // levels; the depth is refused before the id is looked at.
+  const tooDeep = async (n) => outer(JSON.stringify(await tableEvent(bao, 'play', { hand: 0, seat: 1, turn: 4, card: '2C', x: 0 })).replace('"x":0', `"x":${'['.repeat(n)}0${']'.repeat(n)}`));
   for (const n of [31, 5000]) {
-    await say(relay, a, await play(n));
-    assert.deepEqual(ok(a).slice(2), [false, 'invalid: not a table event']);
+    await say(relay, a, await tooDeep(n));
+    assert.deepEqual(ok(a).slice(2), [false, 'invalid: not a table event'], `${n} deep`);
   }
-  await say(relay, a, await play(30));
+  // Thirty deep, under an id that is the hash of what it says: taken.
+  let x = 0;
+  for (let i = 0; i < 30; i++) x = [x];
+  await say(relay, a, await outer(JSON.stringify(await tableEvent(bao, 'play', { hand: 0, seat: 1, turn: 4, card: '2C', x }))));
   assert.deepEqual(ok(a).slice(2), [true, '']);
   const later = socket();
   relay.open(later);
