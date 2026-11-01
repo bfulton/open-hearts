@@ -17,6 +17,7 @@
 /// without seeing them. The rest is the audit's, at the end of the hand.
 library;
 
+import 'dart:collection';
 import 'dart:math';
 
 import 'card.dart';
@@ -88,6 +89,7 @@ class HeartsGame {
     _hands = [for (final h in g._hands) h == null ? null : List.of(h)];
     _sizes = List.of(g._sizes);
     _trick.addAll(g._trick);
+    _played.addAll(g._played);
     final pending = g._pendingTrick;
     _pendingTrick = pending == null ? null : (plays: List.of(pending.plays), winner: pending.winner);
     _lastTrick = g._lastTrick;
@@ -169,6 +171,11 @@ class HeartsGame {
   List<Play> get trick => List.unmodifiable(_trick);
   final List<Play> _trick = [];
 
+  /// Every card played this hand, the trick on the table included: what
+  /// a bot reads to know whether the queen is still out (BotView.of).
+  Set<Card> get playedThisHand => UnmodifiableSetView(_played);
+  final Set<Card> _played = {};
+
   /// The finished trick still sitting on the table, waiting for
   /// [collectTrick]. Null whenever the table is live.
   ({List<Play> plays, int winner})? get pendingTrick => _pendingTrick;
@@ -228,6 +235,7 @@ class HeartsGame {
     _passed = List.filled(seatCount, false);
     _received = [for (var s = 0; s < seatCount; s++) <Card>[]];
     _trick.clear();
+    _played.clear();
     _pendingTrick = null;
     _lastTrick = const [];
     _tricksPlayed = 0;
@@ -481,6 +489,7 @@ class HeartsGame {
     final hand = _hands[seat];
     if (hand == null) {
       if (_sizes[seat] == 0) throw StateError('seat $seat has no cards');
+      if (_played.contains(card)) throw ArgumentError('$card has been played this hand');
       for (var s = 0; s < seatCount; s++) {
         if (_hands[s]?.contains(card) == true) throw ArgumentError('$card is in seat $s\'s hand, not seat $seat\'s');
       }
@@ -489,6 +498,7 @@ class HeartsGame {
     }
     _sizes[seat]--;
     _trick.add(Play(seat, card));
+    _played.add(card);
     if (card.suit == Suit.hearts) _heartsBroken = true;
     if (_trick.length == seatCount) {
       _pendingTrick = (plays: List.of(_trick), winner: trickWinner(_trick));

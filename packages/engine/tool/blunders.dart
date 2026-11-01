@@ -32,7 +32,6 @@ void main(List<String> args) {
     final table = draw.take(seatCount).toList();
     final bots = [for (final p in table) Bot(persona: p)];
     final game = HeartsGame(seed: 1000 + t);
-    final played = <Card>{};
     // What each seat could have played instead, per play of the trick.
     final trickChoices = <({int seat, Card card, List<Card> legal, int lead})>[];
     while (game.phase != Phase.gameOver) {
@@ -41,7 +40,6 @@ void main(List<String> args) {
           for (var s = 0; s < seatCount; s++) {
             game.setPass(s, bots[s].choosePass(game.handOf(s)));
           }
-          played.clear();
         case Phase.playing:
           if (game.pendingTrick != null) {
             final trick = game.pendingTrick!.plays;
@@ -75,7 +73,7 @@ void main(List<String> args) {
                         seat: winner,
                         hand: [...game.handOf(winner), winning],
                         trick: const [],
-                        played: played,
+                        played: game.playedThisHand,
                         heartsBroken: game.heartsBroken,
                         isFirstTrick: false,
                         taken: game.taken,
@@ -95,23 +93,12 @@ void main(List<String> args) {
           }
           final seat = game.currentSeat!;
           final legal = game.legalPlaysFor(seat);
-          final view = BotView(
-            seat: seat,
-            hand: game.handOf(seat),
-            trick: game.trick,
-            played: played,
-            heartsBroken: game.heartsBroken,
-            isFirstTrick: game.isFirstTrick,
-            taken: game.taken,
-          );
-          final card = bots[seat].chooseCard(view, legal);
+          final card = bots[seat].chooseCard(BotView.of(game, seat), legal);
           trickChoices.add((seat: seat, card: card, legal: legal, lead: game.trick.length));
           game.play(seat, card);
-          played.add(card);
           plays++;
         case Phase.handOver:
           game.nextHand();
-          played.clear();
         case Phase.gameOver:
           break;
         case Phase.dealing:

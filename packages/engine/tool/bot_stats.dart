@@ -33,14 +33,12 @@ void main(List<String> args) {
   for (var seed = 0; seed < games; seed++) {
     final game = HeartsGame(seed: seed);
     final bot = Bot(persona: persona);
-    final played = <Card>{};
     while (game.phase != Phase.gameOver) {
       switch (game.phase) {
         case Phase.passing:
           for (var s = 0; s < seatCount; s++) {
             game.setPass(s, bot.choosePass(game.handOf(s)));
           }
-          played.clear();
         case Phase.playing:
           if (game.pendingTrick != null) {
             final p = game.pendingTrick!;
@@ -51,18 +49,12 @@ void main(List<String> args) {
             break;
           }
           final seat = game.currentSeat!;
-          final view = BotView(
-            seat: seat, hand: game.handOf(seat), trick: game.trick,
-            played: played, heartsBroken: game.heartsBroken,
-            isFirstTrick: game.isFirstTrick, taken: game.taken);
-          final c = bot.chooseCard(view, game.legalPlaysFor(seat));
+          final c = bot.chooseCard(BotView.of(game, seat), game.legalPlaysFor(seat));
           game.play(seat, c);
-          played.add(c);
         case Phase.handOver:
           hands++;
           if (game.moonShooter != null) moons++;
           game.nextHand();
-          played.clear();
         case Phase.gameOver:
           break;
         case Phase.dealing:

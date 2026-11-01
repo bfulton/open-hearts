@@ -113,7 +113,6 @@ class SoloRecord {
         s == humanSeat ? null : Bot(persona: Persona.named(personas[s])),
     ];
     final hands = <ReplayedHand>[];
-    final played = <Card>{};
     var handIndex = 0;
     var playIndex = 0;
     var tricks = <List<Play>>[];
@@ -132,7 +131,6 @@ class SoloRecord {
           for (var s = 0; s < seatCount; s++) {
             game.setPass(s, s == humanSeat ? pass : bots[s]!.choosePass(game.handOf(s)));
           }
-          played.clear();
         case Phase.playing:
           if (game.pendingTrick != null) {
             tricks.add(game.pendingTrick!.plays);
@@ -146,19 +144,9 @@ class SoloRecord {
             card = plays[playIndex++];
             if (!game.legalPlaysFor(seat).contains(card)) return Replay(hands, game, complete: false);
           } else {
-            final view = BotView(
-              seat: seat,
-              hand: game.handOf(seat),
-              trick: game.trick,
-              played: played,
-              heartsBroken: game.heartsBroken,
-              isFirstTrick: game.isFirstTrick,
-              taken: game.taken,
-            );
-            card = bots[seat]!.chooseCard(view, game.legalPlaysFor(seat));
+            card = bots[seat]!.chooseCard(BotView.of(game, seat), game.legalPlaysFor(seat));
           }
           game.play(seat, card);
-          played.add(card);
         case Phase.handOver:
           hands.add(ReplayedHand(handIndex, List.of(tricks), game.handScores, game.moonShooter, passed, dealt));
           tricks = [];
@@ -166,7 +154,6 @@ class SoloRecord {
           handIndex++;
           game.nextHand();
           dealt = _dealt(game);
-          played.clear();
         case Phase.gameOver:
           break;
         case Phase.dealing:

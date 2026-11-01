@@ -10,7 +10,6 @@ library;
 import 'dart:math';
 
 import 'bot.dart';
-import 'card.dart';
 import 'game.dart';
 import 'persona.dart';
 
@@ -72,35 +71,22 @@ class Arena {
   }
 
   static void _playOut(HeartsGame game, List<Bot> bots) {
-    final played = <Card>{};
     while (game.phase != Phase.gameOver) {
       switch (game.phase) {
         case Phase.passing:
           for (var s = 0; s < seatCount; s++) {
             game.setPass(s, bots[s].choosePass(game.handOf(s)));
           }
-          played.clear();
         case Phase.playing:
           if (game.pendingTrick != null) {
             game.collectTrick();
             break;
           }
           final seat = game.currentSeat!;
-          final view = BotView(
-            seat: seat,
-            hand: game.handOf(seat),
-            trick: game.trick,
-            played: played,
-            heartsBroken: game.heartsBroken,
-            isFirstTrick: game.isFirstTrick,
-            taken: game.taken,
-          );
-          final card = bots[seat].chooseCard(view, game.legalPlaysFor(seat));
+          final card = bots[seat].chooseCard(BotView.of(game, seat), game.legalPlaysFor(seat));
           game.play(seat, card);
-          played.add(card);
         case Phase.handOver:
           game.nextHand();
-          played.clear();
         case Phase.gameOver:
           break;
         case Phase.dealing:

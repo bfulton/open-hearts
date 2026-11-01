@@ -18,6 +18,7 @@ library;
 import 'dart:math';
 
 import 'card.dart';
+import 'game.dart';
 import 'persona.dart';
 import 'rules.dart';
 
@@ -42,6 +43,15 @@ class BotView {
     required this.isFirstTrick,
     this.taken = const [0, 0, 0, 0],
   });
+
+  /// What [seat] sees of [game] at its turn.
+  BotView.of(HeartsGame game, this.seat)
+      : hand = game.handOf(seat),
+        trick = game.trick,
+        played = game.playedThisHand,
+        heartsBroken = game.heartsBroken,
+        isFirstTrick = game.isFirstTrick,
+        taken = game.taken;
 
   final int seat;
   final List<Card> hand;
