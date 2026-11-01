@@ -4,7 +4,7 @@ Use this guide when a person asks for their account's data to be deleted, as the
 
 Most people don't need to ask: **Delete account**, at the foot of the app's subscription page, deletes the account from any of its devices at once, and the operator does nothing ([how it works](../explanation/service.md#deleting-an-accounts-data)). Point a person who asks to it. Use the command below when they can't, for example when they no longer have any of their devices.
 
-`./oh account delete` forgets the account ([the oh command](../reference/oh.md)). It takes the account's name off every kept game it played (`anonymizeGames` in `service/functions/records.mjs`), and deletes every row the service keeps for it in `OH_STORE` (`forgetAccount` in `service/functions/deletion.mjs`): its devices and their entitlements, its codes and backup codes, its sign-in, its device in use, its profile, any suspension or name and picture held, and the rows of every subscription it has had, the notes that it was told of changes to the terms or the privacy policy among them. Its results stay on the relay, under its account number, which nothing left in the service ties to the person.
+`./oh account delete` forgets the account ([the oh command](../reference/oh.md)). It takes the account's name off every kept game it played (`anonymizeGames` in `service/functions/records.mjs`), and deletes every row the service keeps for it in `OH_STORE` (`forgetAccount` in `service/functions/deletion.mjs`): its devices and their entitlements, its codes and backup codes, its sign-in, its device in use, its profile, any suspension or name and picture held, and the rows of every subscription it has had, the notes that it was told of changes to the terms or the privacy policy among them, unless Stripe still runs it (below). Its results stay on the relay, under its account number, which nothing left in the service ties to the person.
 
 ## Before you begin
 
@@ -30,7 +30,7 @@ Most people don't need to ask: **Delete account**, at the foot of the app's subs
 
 1. Make sure the subscription is cancelled. The command refuses an account whose subscription is still paid up and has no cancellation, since its next renewal would find nothing to renew. A web subscription the person hasn't cancelled can be ended with `./oh account refund "$account" --apply`, which refunds the unused part of its year ([how](end-an-account.md#refund-a-web-subscription)). A store subscription is cancelled by the person, in their store.
 
-   A web subscription that is cancelled but still runs to the end of its year is still one in Stripe. Once its account is forgotten, its notes of changes to the terms and the privacy policy go too, so until the subscription ends, `./oh terms notify` counts it as not told of a change of the last 60 days, and `--apply` writes to its subscriber about that change again.
+   A web subscription that is cancelled but still runs to the end of its year is still one in Stripe, and `./oh terms notify` writes to every subscription with no note that it was told of a change of the last 60 days. So the command keeps that subscription's notes of the changes it was told of, and `./oh verify` and `./oh terms notify` go on counting it as told of them. Until the subscription ends, a change published after the deletion is one it has no note of, and `./oh terms notify --apply` writes to its subscriber about it, as to any other.
 
 1. See what would change. Without `--apply`, the command only reads:
 
@@ -56,6 +56,7 @@ Most people don't need to ask: **Delete account**, at the foot of the app's subs
 - **Its kept games, without its name.** The moves stay, for the other players. A browser that opened a game before the run keeps its own copy.
 - **Its `Household` object's note of the device in use**: the device's key, how many times the account was taken up, times, the table it last sat at, the relay tags it opened since, and whether the account was suspended (the `active` entry of `Household` in `service/functions/household.mjs`). Nothing outside the object can reach it. It is written over only when the account is taken up again, which after deletion never happens. It holds no name or picture.
 - **Stripe's own record of a web subscription**, which holds the email address and, in the subscription's metadata, the paying device's key.
+- **The notes that a web subscription still running was told of changes to the terms or the privacy policy**, a `NOTICE#` row for each change, with the day it was told and its language. They stay after the subscription ends.
 - Copies of results, records and table events that other people's devices keep, which the service cannot reach.
 
 A deletion from the app leaves less in the `Household` object (only how many times the account was taken up) and, once Stripe tells the service the subscription ended, a `SUB#` row saying so, with no customer and no account.

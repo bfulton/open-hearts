@@ -24,9 +24,14 @@ export async function forget(store, bucket, account, { apply = false, log = () =
   if (!isAccount(account)) throw new Error('name the account, 32 hex');
   const subscription = (await store.get(`ACCOUNT#${account}`, 'META'))?.subscription;
   const sub = typeof subscription === 'string' ? await store.get(`SUB#${subscription}`, 'META') : null;
-  if (sub && !sub.cancelled_at && sub.renews_at && sub.renews_at >= dayOf(now)) {
-    throw new Error(`${subscription} is still paid up to ${sub.renews_at}; cancel it first`);
-  }
+  const running = !!sub && !sub.final && sub.renews_at >= dayOf(now);
+  if (running && !sub.cancelled_at) throw new Error(`${subscription} is still paid up to ${sub.renews_at}; cancel it first`);
+  // A web subscription that is cancelled but runs to the end of what was
+  // paid for is still a subscriber's in Stripe, and `oh terms notify`
+  // writes to every subscription with no note that it was told of a
+  // change (ops/terms.mjs). So its notes stay, and this person is not
+  // written to again about a change they were told of.
+  const notesKept = running ? [subscription] : [];
   // The mark first: a game kept from then on, one that ends while this
   // runs or that the account plays while its last licence runs, is kept
   // without its name (records.mjs, keepRecord). Then the games already
@@ -41,7 +46,7 @@ export async function forget(store, bucket, account, { apply = false, log = () =
   }
   const games = await anonymizeGames(bucket, account, { dry: !apply });
   for (const { key, named } of games) log(`${apply ? 'took' : 'would take'} the name off ${key}, seat ${named.join(', ')}`);
-  const rows = await forgetAccount(store, account, { dry: !apply, keys: store.list });
+  const rows = await forgetAccount(store, account, { dry: !apply, keys: store.list, notesKept });
   // A household code is a code: its row is said, and not its name.
   for (const row of rows) log(`${apply ? 'deleted' : 'would delete'} ${row.replace(/^TICKET#[^|]+/, 'TICKET#…')}`);
   log(`${games.length} game(s) and ${rows.length} row(s) ${apply ? 'changed' : 'to change; --apply changes them'}`);

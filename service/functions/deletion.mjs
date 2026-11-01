@@ -59,10 +59,11 @@ export async function deleteAccount(op, store, active, { now = Date.now(), revok
 /// found are the ones the account's META names, now and before
 /// (accountFor), and the notes those of [notices], the changes
 /// subscribers are told of, as [document, version] (notices.mjs,
-/// toldVersions).
+/// toldVersions). The notes of the subscriptions in [notesKept] stay:
+/// those Stripe still runs (service/tool/forget.mjs).
 /// Throws [Held], deleting nothing, while the account is under a legal
 /// hold (holds.mjs).
-export async function forgetAccount(store, account, { dry = false, keys = null, notices = [] } = {}) {
+export async function forgetAccount(store, account, { dry = false, keys = null, notices = [], notesKept = [] } = {}) {
   if (!isAccount(account)) return [];
   const held = await holdOf(store, account);
   if (held) throw new Held(held);
@@ -97,7 +98,7 @@ export async function forgetAccount(store, account, { dry = false, keys = null, 
     if ((await store.get(`SUB#${sub}`, 'ACCOUNT'))?.account !== account) continue;
     // Its notes first: a run that stops part way finds the subscription
     // again by its own rows.
-    const notes = noted ? noted.filter(([, sk]) => sk === `SUB#${sub}`) : versions.map(([document, version]) => noticeRow(document, version, sub));
+    const notes = notesKept.includes(sub) ? [] : noted ? noted.filter(([, sk]) => sk === `SUB#${sub}`) : versions.map(([document, version]) => noticeRow(document, version, sub));
     for (const [npk, nsk] of notes) if (await store.get(npk, nsk)) await del(npk, nsk);
     for (const sk of await store.under(`SUB#${sub}`, '')) await del(`SUB#${sub}`, sk);
   }

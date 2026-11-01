@@ -569,12 +569,15 @@ that a late event about it is turned away. Under a legal hold
 app is answered as for a deletion.
 
 From the operator's command, a subscription still paid up is cancelled
-first. Where the `Household` object runs, its note of the device in use
-(its key, the epoch, times, the table it said it sat at, the relay
-objects it was seen at, and whether the account was suspended) is in the
-object's own storage and is not reached from outside. It is written over
-the next time the account is taken up, which after deletion is never,
-and it holds no name or picture.
+first. A web subscription cancelled but still running keeps its notes of
+the changes it was told of: Stripe still lists it, and `oh terms notify`
+would otherwise write to its subscriber about them again. Where the
+`Household` object runs, its note of the device in use (its key, the
+epoch, times, the table it said it sat at, the relay objects it was seen
+at, and whether the account was suspended) is in the object's own
+storage and is not reached from outside. It is written over the next
+time the account is taken up, which after deletion is never, and it
+holds no name or picture.
 
 Either way, its results stay on the relay, under its account number,
 which nothing left in the service ties to the person; a result cannot be

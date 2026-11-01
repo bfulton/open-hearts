@@ -11,6 +11,7 @@ import { accountFor } from './accounts.mjs';
 import { accountsNamed, accountsPaidBy, forgetAccount } from './deletion.mjs';
 import { memoryStore } from './rows.mjs';
 import { anonymizeGames, withoutNames } from './records.mjs';
+import { forget } from '../tool/forget.mjs';
 import { restBucket } from '../tool/r2.mjs';
 
 const ADA = 'a'.repeat(32);
@@ -219,6 +220,32 @@ test('every subscription an account has had goes with it, and nobody else\'s', a
   // The address the old subscription was paid with finds nobody now.
   const stripe = async (path) => (path.startsWith('/customers/search') ? { data: [{ id: 'cus_1', email: 'ada@example.com' }] } : { data: [{ id: 'sub_old' }] });
   assert.deepEqual(await accountsPaidBy(store, stripe, 'ada@example.com'), []);
+});
+
+test('the operator\'s tool keeps the notes of a web subscription Stripe still runs, so its subscriber is not told again', async () => {
+  const now = Date.parse('2026-11-01T12:00:00Z');
+  const bucket = { list: async () => [], get: async () => null, put: async () => {} };
+  /// Ada's account with sub_1, whose META is [meta], told of a change to the terms.
+  const subscribed = async (meta) => {
+    const store = memoryStore();
+    await store.put(`ACCOUNT#${ADA}`, 'META', { subscription: 'sub_1' });
+    await store.put('SUB#sub_1', 'ACCOUNT', { account: ADA });
+    await store.put('SUB#sub_1', 'META', { source: 'stripe', ...meta });
+    await store.put('NOTICE#terms@2026-10-23', 'SUB#sub_1', { at: '2026-10-24T00:00:00Z', lang: 'en' });
+    return { ...store, list: keysOf(store) };
+  };
+  // Not cancelled: refused, and nothing deleted.
+  const paid = await subscribed({ renews_at: '2027-03-01', cancelled_at: null });
+  await assert.rejects(forget(paid, bucket, ADA, { apply: true, now }), /sub_1 is still paid up to 2027-03-01; cancel it first/);
+  assert.ok(paid.rows.has(`ACCOUNT#${ADA}|META`));
+  // Cancelled, and running to 2027-03-01: Stripe still lists it, so its note stays.
+  const running = await subscribed({ renews_at: '2027-03-01', cancelled_at: '2026-10-30' });
+  await forget(running, bucket, ADA, { apply: true, now });
+  assert.deepEqual([...running.rows.keys()], ['NOTICE#terms@2026-10-23|SUB#sub_1']);
+  // Ended in Stripe today: its note goes with the rest.
+  const ended = await subscribed({ renews_at: '2026-11-01', cancelled_at: '2026-11-01', final: true });
+  await forget(ended, bucket, ADA, { apply: true, now });
+  assert.deepEqual([...ended.rows.keys()], []);
 });
 
 test('a lapsed subscriber who pays again keeps a note of the subscription before, and both go with the account, found without a listing', async () => {
