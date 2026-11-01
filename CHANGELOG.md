@@ -732,8 +732,9 @@ squashed from a pull request, the pull request's number.
   note in the operator's email so that it cannot pass for instructions.
   (2026-11-01, #47)
 - Releases are held to reviewed code throughout. A production web
-  build takes its keys, relays and sign-in IDs from
-  config/openhearts.json alone, never the shell; the release gate
+  build takes nothing from the shell: its keys and sign-in IDs come
+  from config/openhearts.json, and its relay is the app's own, as a
+  phone build's is; the release gate
   refuses untracked files, and ignored files the site would publish,
   and refuses when origin/main cannot be fetched; store builds are
   gated too; and `OH_RELAY_DRY_RUN`, which skipped the relay's gate, is
