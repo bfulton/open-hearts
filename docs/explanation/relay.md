@@ -159,3 +159,8 @@ shows only the codes it knows, so a new reaction needs no new relay.
 A watcher's ask and a seated player's answer ride the table's own tag.
 The relay forwards both and stores neither, like the rest of a table's
 traffic ([watching a live game](live-play.md#watching-a-live-game)).
+Watchers believe a view, so once the table's start is in its log, the
+relay carries a view only from a key that holds a seat in person
+(`viewRefusal` in `service/do/relay.mjs`), and refuses anybody else's
+with the reason `blocked: a view of the table is one of its people's
+to say`.

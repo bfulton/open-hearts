@@ -455,6 +455,13 @@ export function createRelay({ verify, store = memoryStore(), refuse = null, log 
   /// The table's referee, on a table's tag.
   const table = referee?.({ send: sendText, admitted }) ?? null;
 
+  /// Why [event] is not carried when it is a view of the table from a
+  /// key that holds no seat at it: a view is a seated player's to say
+  /// (packages/table, watch.dart), and the watchers believe it, so once
+  /// the start says who sits there, nobody else's is carried.
+  const viewRefusal = (event) =>
+    table && event.kind === watchKind && table.seated(event.pubkey) === false && namingContent(event)?.view !== undefined ? VIEW_NOT_SEATED_WHY : null;
+
   /// Whether a socket that answered the gate as [key], for no account,
   /// is carried now: the house, on this tag. Nobody, with no gate.
   const holds = (key) => {
@@ -604,7 +611,7 @@ export function createRelay({ verify, store = memoryStore(), refuse = null, log 
       if (!ok) log?.(`not logged ${event.id.slice(0, 6)}: ${why}`);
       return send(from, ['OK', event.id, ok, why]);
     }
-    const why = await refuse?.(event);
+    const why = viewRefusal(event) ?? (await refuse?.(event));
     if (why) {
       count?.('refused');
       log?.(`refused ${event.id.slice(0, 6)}: ${why}`);
@@ -958,6 +965,11 @@ export const resultsTag = 'standings';
 /// folded by the service rather than by every device.
 export const storedKeep = (tag) => (tag === resultsTag ? 20000 : 2000);
 
+/// The watch lane of a live table (packages/table, watch.dart,
+/// TableKinds.watch): a watcher saying it is there, and a seated
+/// player's view of the table. Ephemeral.
+export const watchKind = 24247;
+
 /// A player's quick reaction at a live table (packages/table,
 /// reactions.dart): 👍, 😬 and the rest, as a short code and the moment
 /// it was said at, `{"react":"nice","hand":2,"turn":17}`. Ephemeral, so
@@ -1004,7 +1016,7 @@ export function reactionRefusal(tag, event) {
 /// The kinds whose content names players (packages/table, nostr.dart,
 /// TableKinds): the lobby, waiting in a pool or a room, and a watched
 /// table.
-const namingKinds = new Set([lobbyKind, 24245, 24247]);
+const namingKinds = new Set([lobbyKind, 24245, watchKind]);
 
 /// [event]'s content as an object, for a kind that names players, or
 /// null.
@@ -1051,6 +1063,10 @@ export const RESULT_NOT_HOUSE_WHY = 'blocked: a result is the house\'s word';
 /// Why an event naming somebody as the filter refuses is not carried
 /// (service/functions/names.mjs): the app never sends one.
 export const NAME_REFUSED_WHY = 'blocked: a name that is not allowed';
+
+/// Why a view of a table said by a key that holds no seat at it is not
+/// carried.
+export const VIEW_NOT_SEATED_WHY = 'blocked: a view of the table is one of its people\'s to say';
 
 /// What a tag's object refuses. Presence: anything but the ephemeral
 /// kinds. A table's or a lobby's tag: anything but the ephemeral kinds

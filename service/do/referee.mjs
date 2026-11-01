@@ -251,6 +251,12 @@ export function tableReferee({ table, verify, house = null, now = Date.now, entr
       return wantsHouse();
     },
 
+    /// Whether [key] holds a seat in person, by the table's start: null
+    /// while the log has not begun.
+    seated(key) {
+      return spec ? spec.people.has(key) : null;
+    },
+
     /// A [logKind] event, its own id and signature already checked:
     /// {ok, why}, as the relay answers it. Waits only on a start, while
     /// the log has not begun: every other event is in the log, or not,

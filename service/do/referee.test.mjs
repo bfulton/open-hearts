@@ -15,7 +15,7 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 
 import { wasmPath } from './host.mjs';
-import { RESULT_NOT_HOUSE_WHY, lobbyKind, objectRelay, resultsTag, schnorrVerifier, serviceGate } from './relay.mjs';
+import { RESULT_NOT_HOUSE_WHY, VIEW_NOT_SEATED_WHY, lobbyKind, objectRelay, resultsTag, schnorrVerifier, serviceGate, watchKind } from './relay.mjs';
 import { eventIdOf } from '../functions/records.mjs';
 import { logKind, specIdOf, startRefusal, tickGapMs, wakeEveryMs, wakeLimiter, writersOf } from './referee.mjs';
 import { keys, signing } from './sign.mjs';
@@ -282,6 +282,30 @@ test('after the start, the people\'s and the house\'s events, in the order they 
   }
   assert.equal(watcher.entries.length, 3);
   assert.equal(relay.log.length, 3);
+});
+
+test('a view of the table is carried only from one of its people, once its start says who they are', async () => {
+  const { relay } = referee();
+  const a = socket();
+  const watcher = socket();
+  relay.open(a);
+  relay.open(watcher);
+  await relay.message(watcher, JSON.stringify(['REQ', 'watch', { kinds: [watchKind], '#t': [table] }]));
+  await say(relay, a, await wrapped(await startOf(ada)));
+  const said = (key, content) => sign.event(key, { kind: watchKind, content: JSON.stringify(content), tags: [['t', table]], created_at: 1000 + ++ids });
+  const view = { table, seq: 120, hand: 2, phase: 'play' };
+
+  // A stranger's game of its own, shown to whoever watches: not carried.
+  await say(relay, a, await said(stranger, { view: { ...view, seq: 2 ** 53 - 1, phase: 'gameOver' } }));
+  assert.deepEqual(ok(a).slice(2), [false, VIEW_NOT_SEATED_WHY]);
+  // A seated player's, and anybody saying they watch: carried.
+  const players = await said(bao, { view });
+  await say(relay, a, players);
+  assert.equal(ok(a)[2], true, ok(a)[3]);
+  const watching = await said(stranger, { watching: true });
+  await say(relay, a, watching);
+  assert.equal(ok(a)[2], true, ok(a)[3]);
+  assert.deepEqual(watcher.of('EVENT').map((m) => m[2].id), [players.id, watching.id]);
 });
 
 test('an event is kept as a table event has it, and whatever else it carries is left out', async () => {
