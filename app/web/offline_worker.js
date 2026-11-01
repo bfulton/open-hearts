@@ -41,6 +41,15 @@ function neverKept(url) {
 
 // Every page in this scope is the one app, whatever its query — a
 // room, a code, `?e2e` — so a page is kept once, under the scope.
+// A file opened as a page (robots.txt, or a missing file, which the
+// site answers with its front page) is not the app, and is left to the
+// network: kept under the scope, it would open offline in its place.
+// A file is told from a page as the host tells them
+// (service/functions/app_host.mjs, appPage): a dot in the last segment.
+function isFile(url) {
+  return url.pathname.slice(url.pathname.lastIndexOf('/') + 1).includes('.');
+}
+
 function keyOf(request) {
   return request.mode === 'navigate' ? self.registration.scope : request.url;
 }
@@ -84,6 +93,7 @@ self.addEventListener('fetch', (event) => {
   if (request.method !== 'GET') return;
   const url = new URL(request.url);
   if (url.origin !== self.location.origin || neverKept(url)) return;
+  if (request.mode === 'navigate' && isFile(url)) return;
   const key = keyOf(request);
   event.respondWith(
     fetch(request).then(

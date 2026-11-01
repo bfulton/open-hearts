@@ -68,7 +68,9 @@ worker, `app/web/offline_worker.js`, from `app/web/flutter_bootstrap.js`.
 The worker fetches from the network first and keeps a copy of each file.
 It falls back to the copy only when the network fails, so online
 behaviour is unchanged and offline the last loaded build opens.
-`build-info.json` and the service's handlers are never cached. At
+`build-info.json` and the service's handlers are never cached, and a
+file opened as a page, such as `robots.txt`, is left to the network, so
+it never takes the app's place offline. At
 `play.openhearts.game` the worker's scope is the whole host; at a
 preview it is `/play/`. The `offline` browser suite checks this
 ([test suites](../reference/test-suites.md)).
