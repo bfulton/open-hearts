@@ -562,7 +562,8 @@ async function turn(request, env) {
   if (pre) return pre;
   if (request.method !== 'POST') return json(request, 405, { error: 'POST' }, { allow: 'POST, OPTIONS' });
   // Credentials are a relay anybody holding them can send anything
-  // through for four hours, and it is billed by the gigabyte. So they
+  // through until they run out (turnTtlS), and it is billed by the
+  // gigabyte. So they
   // are a subscribed device's, as live play is, and nobody else's.
   const asked = await signedFor(request, env, 'turn');
   if (asked instanceof Response) return asked;
@@ -571,8 +572,8 @@ async function turn(request, env) {
   if (!(await heldAccount(store, asked.key, asked.body, env, { signer: asked.signer, openHouse: openHouse(env, request) }))) {
     return json(request, 402, { error: REFUSED.noSubscription });
   }
-  // Local mode's own TURN server (the browser rig's, e2e/drive.mjs), so
-  // the rig's channels take the path production's do.
+  // Local mode's own TURN server, where OH_TURN_LOCAL names one, kept
+  // for voice and video chat: the browser rig sets none now.
   if (openHouse(env, request) && env.OH_TURN_LOCAL) {
     return json(request, 200, { iceServers: [{ urls: [env.OH_TURN_LOCAL], username: LOCAL_TURN, credential: LOCAL_TURN }], ttl: S().turnTtlS });
   }

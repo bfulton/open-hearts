@@ -227,6 +227,5 @@ the same carry-over and the same handlers as production.
   by presence. The relay's own refusal is proved in `service/do`'s
   tests.
 - **TURN.** With `OH_TURN_LOCAL` set as well, `turn` hands out a local
-  TURN server with fixed credentials. The rig points it at a coturn it
-  starts on `127.0.0.1`, so channels in the suites go through TURN as
-  they do in production.
+  TURN server with fixed credentials. The rig sets none now: no part of
+  the game uses TURN, which stays for voice and video chat.

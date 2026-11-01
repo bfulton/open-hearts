@@ -3,8 +3,10 @@
 // Realtime TURN credentials good for a few hours, minted from a Realtime
 // TURN key — its id in config/openhearts.json (OH_TURN_KEY_ID), its
 // token a project secret (OH_TURN_API_TOKEN) and never here. Without
-// the secrets the handler says so (503) and the app falls back to STUN
-// alone.
+// the secrets the handler says so (503), and the asker has no ICE
+// servers. Nothing in the app asks for them yet: they are kept for the
+// voice and video chat that is planned (ROADMAP.md; app/lib/net/
+// turn.dart).
 
 import { S, notConfigured } from './settings.mjs';
 

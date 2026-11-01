@@ -196,10 +196,11 @@ export function checkoutFields(key, price, back, cancelled, lang) {
     'line_items[0][quantity]': '1',
     success_url: back,
     cancel_url: cancelled,
-    // Three places, because three different events carry it back: the
-    // session's own metadata, the reference on the session, and the
-    // subscription's metadata, which is what a renewal a year from now
-    // will have.
+    // The key is read back from the session's own metadata alone, which
+    // only this worker writes ([record]). The session's reference and the
+    // subscription's metadata carry it too, so that whoever reads the
+    // session or the subscription in Stripe's Dashboard, a year on
+    // included, sees which device it is for; nothing here reads them.
     'metadata[key]': key,
     client_reference_id: key,
     'subscription_data[metadata][key]': key,
