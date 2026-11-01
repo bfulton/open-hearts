@@ -5,26 +5,21 @@
 /// playing a card a second with a fourth who reads the whole hand each
 /// turn is a bad evening for all four, whatever anybody is rated.
 ///
-/// **A pace is a device's own account of itself**, and that is not a
-/// shortcut. Everything else a table agrees on is derived from the
-/// record, which carries no clock at all: an event is `(table, author,
-/// kind, body)` and nothing in it says when. The time bank works
-/// because each peer measures for itself and a majority has to agree,
-/// not because the number is shared — `bankLeftMs` is explicitly "by
-/// this peer's clock". So four peers asked how long a seat took would
-/// sign four different numbers, and a result needs a majority of
-/// identical ones to stand. A pace cannot go in there.
-///
-/// What a device can measure without dispute is its own turns: the
-/// clock it started when the turn opened and stopped when it played.
-/// That is exact, it is nobody else's business, and it is the number
-/// matchmaking actually needs — to put slow players together, each
-/// player has to know their own pace and ask for a table that suits
-/// it. So it is stated in the pool the way a rating is stated there,
-/// and it decides who you sit with and nothing else.
+/// **A pace is a device's own account of itself.** What a device can
+/// measure is its own turns: the clock it started when the turn opened
+/// and stopped when it played. That is exact, it is nobody else's
+/// business, and it is the number matchmaking actually needs — to put
+/// slow players together, each player has to know their own pace and
+/// ask for a table that suits it. So it is stated in the pool the way a
+/// rating is stated there, checked for nothing but its range, and it
+/// decides who you sit with and nothing else.
 ///
 /// A player who lies is matched with people who play at a speed they
 /// do not, which is its own punishment and costs nobody else a game.
+///
+/// At a table, the referee's log times every card, the same for every
+/// side (TableRules.cardTimesOf), and the house keeps its bots up with
+/// the people by those times ([tablePaceOf]).
 library;
 
 /// A player's pace: seconds a card, over the cards it was measured on.
@@ -68,16 +63,6 @@ class Pace {
     final n = held + cards;
     return Pace(secondsPerCard: (secondsPerCard * held + seconds) / n, cards: n);
   }
-
-  /// The word for it, for a screen. Bands wide enough that nobody is on
-  /// a boundary they can feel.
-  String get word => switch (stated) {
-        0 => 'not yet known',
-        <= 4 => 'brisk',
-        <= 9 => 'steady',
-        <= 20 => 'unhurried',
-        _ => 'slow',
-      };
 
   Map<String, Object?> toJson() => {'spc': secondsPerCard, 'cards': cards};
 

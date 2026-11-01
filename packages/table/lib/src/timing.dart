@@ -126,15 +126,6 @@ class TableTiming {
     return parse(json);
   }
 
-  /// This timing with a person's clock of [bank]'s.
-  TableTiming withBank(TimeBank bank) => TableTiming(
-        bank: bank,
-        botActsMs: botActsMs,
-        botDealsMs: botDealsMs,
-        houseGraceMs: houseGraceMs,
-        silenceMs: silenceMs,
-      );
-
   @override
   bool operator ==(Object other) {
     if (other is! TableTiming) return false;

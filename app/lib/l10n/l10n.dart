@@ -42,12 +42,11 @@ extension EngineWords on AppLocalizations {
   /// The players who share a win, as one phrase: "Anna and Bao".
   String together(Iterable<String> names) => names.join(' $listAnd ');
 
-  /// How fast a player plays, as the profile says it: the same bands as
-  /// [Pace.word], whose English this replaces on the screen.
+  /// How fast a player plays, as the profile says it: in bands wide
+  /// enough that nobody is on a boundary they can feel.
   String paceLine(Pace pace) => pace.known
       ? paceKnown(
           switch (pace.stated) {
-            0 => 'unknown',
             <= 4 => 'brisk',
             <= 9 => 'steady',
             <= 20 => 'unhurried',

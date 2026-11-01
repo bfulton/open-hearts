@@ -50,8 +50,8 @@ class PlayerStats {
   final bool reached;
 
   /// How long this device takes over a card, as it has measured itself
-  /// (pace_store.dart). Never on a relay: nobody else can agree on it,
-  /// and nobody else is told.
+  /// (pace_store.dart). Never on a relay: it is this device's own
+  /// measurement, and nobody else is told.
   final Pace pace;
 
   /// The games alone hand by hand: the recent scores and what the

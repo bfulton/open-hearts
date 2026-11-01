@@ -61,10 +61,10 @@ class Waiter {
   final int rating;
 
   /// Seconds they take over a card, as they state it — their own
-  /// device's account of itself, since no two peers can agree on a
-  /// number the record does not carry (pace.dart). Like the rating it
-  /// decides who they sit with and nothing else. Zero is a player who
-  /// has not played enough to know, and sits with anybody.
+  /// device's account of itself, checked for nothing but its range
+  /// (pace.dart). Like the rating it decides who they sit with and
+  /// nothing else. Zero is a player who has not played enough to know,
+  /// and sits with anybody.
   final int pace;
 
   /// When they started waiting, ms since the epoch: by their own clock

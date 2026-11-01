@@ -1,11 +1,9 @@
 /// This device's own pace, kept on it (packages/table, pace.dart).
 ///
-/// Not on a relay and not in a result. A pace is the one number about a
-/// game that no two peers can agree on — the record carries no clock —
-/// so it is measured by the device that played the cards, kept by it,
-/// and stated by it in the pool the way a rating is stated there. It
-/// decides who you sit with and nothing else, and nobody is ever told
-/// how long you took.
+/// Not on a relay and not in a result. It is measured by the device
+/// that played the cards, kept by it, and stated by it in the pool the
+/// way a rating is stated there. It decides who you sit with and nothing
+/// else, and nobody is ever told how long you took.
 library;
 
 import 'dart:convert';
