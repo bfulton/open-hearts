@@ -156,12 +156,11 @@ class WatchedTable {
         return out;
       }
 
-      // At most sixty characters, as the app keeps a name
-      // (app/lib/identity.dart, longestName), counted in code points
-      // rather than UTF-16 units, so a name of emoji counts the same as
-      // one of letters.
+      // At most [longestName] characters, the longest name kept
+      // (names.dart), counted in code points rather than UTF-16 units,
+      // so a name of emoji counts the same as one of letters.
       final names = [for (final n in m['names'] as List) n as String];
-      if (names.length != seatCount || names.any((n) => n.runes.length > 60)) return null;
+      if (names.length != seatCount || names.any((n) => n.runes.length > longestName)) return null;
       final plays = <({int seat, Card card})>[];
       for (final p in m['plays'] as List) {
         final pair = p as List;
