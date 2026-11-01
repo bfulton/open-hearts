@@ -20,7 +20,7 @@ import { lobbyKind, waitingKind, watchKind } from './kinds.mjs';
 import { logKind, tableReferee, tableTag } from './referee.mjs';
 import { isPoolTag, poolWatch, seatingHeld } from './pool.mjs';
 
-export { lobbyKind };
+export { lobbyKind, watchKind };
 
 /// Kinds 20000–29999 are ephemeral: forwarded to whoever is listening
 /// and then forgotten. Every kind presence uses is one of these, which
@@ -988,11 +988,6 @@ export const resultsTag = 'standings';
 /// inside an object's memory, and the point at which ratings should be
 /// folded by the service rather than by every device.
 export const storedKeep = (tag) => (tag === resultsTag ? 20000 : 2000);
-
-/// The watch lane of a live table (packages/table, watch.dart,
-/// TableKinds.watch): a watcher saying it is there, and a seated
-/// player's view of the table. Ephemeral.
-export const watchKind = 24247;
 
 /// A player's quick reaction at a live table (packages/table,
 /// reactions.dart): 👍, 😬 and the rest, as a short code and the moment
