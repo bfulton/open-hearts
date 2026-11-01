@@ -640,7 +640,7 @@ class DealSession {
         final shareCustody = [for (final c in (m['shareCustody'] as List? ?? const [])) _unb64(c)];
         if (shareCustody.length != custodianKeys.length || shareCustody.any((c) => c.length != scalarBytes)) return false;
       }
-      return pk.length == pointBytes && crypto.verifyKey(pk, _name(seat), proof);
+      return pk.length == pointBytes && proof.length == keyProofBytes && crypto.verifyKey(pk, _name(seat), proof);
     } catch (_) {
       return false;
     }
@@ -1188,6 +1188,7 @@ class DealSession {
   /// the position is in. Remembered, so that taking the same token
   /// after checking it costs nothing more.
   int? _openWith(int owner, int p, Uint8List token) {
+    if (token.length != tokenBytes) return null;
     final seen = _checked[p];
     if (seen != null && _same(seen.token, token)) return seen.card;
     if (!crypto.verifyToken(_pks[owner]!, _masked(p), token)) return null;
@@ -1292,6 +1293,7 @@ class DealSession {
       if (p < 0 || p >= deckSize || _holderOf[p] != seat || deck == null) return null;
       final owner = p ~/ _handSize;
       final t = _unb64(m['token']);
+      if (t.length != tokenBytes) return null;
       if (!verified && !crypto.verifyToken(_pks[owner]!, _masked(p), t)) return null;
       _keepChecked(owner, p, t);
       _openWhatCan();
@@ -1371,7 +1373,7 @@ class DealSession {
       final clear = m['tokens'];
       if (clear != null) {
         final tokens = [for (final t in clear as List) _unb64(t)];
-        if (tokens.length != positions.length) return false;
+        if (tokens.length != positions.length || tokens.any((t) => t.length != tokenBytes)) return false;
         for (var i = 0; i < positions.length; i++) {
           final p = positions[i];
           if (!crypto.verifyToken(_pks[p ~/ _handSize]!, _masked(p), tokens[i])) return false;

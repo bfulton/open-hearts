@@ -729,4 +729,42 @@ void main() {
     expect(jurors[0].topUpPart(3, at: at, have: [1]), isNull);
     expect(jurors[0].topUpPart(3, at: 9, have: [1, 3]), isNull, reason: 'an index nobody holds');
   });
+
+  test('a token or a key proof of the wrong size is refused, whatever follows it in memory', () {
+    final seats = [for (final k in ['a', 'b', 'c', 'd']) HumanDealSeat(k)];
+    final all = dealOut(seats);
+    List<int> sized(List<int> b, int n) => n <= b.length ? b.sublist(0, n) : [...b, ...List.filled(n - b.length, 0)];
+    // Each honest one is checked first: one byte short, the byte the
+    // Rust would read next is then likely the honest one's last.
+    final keys = all[0].myKeys()!;
+    final proof = base64Decode(keys['proof'] as String);
+    expect(all[1].verifyKeys(keys), isTrue);
+    for (final n in [1, keyProofBytes - 1, keyProofBytes + 1]) {
+      expect(all[1].verifyKeys({...keys, 'proof': base64Encode(sized(proof, n))}), isFalse, reason: 'a key proof of $n bytes');
+    }
+    final p = all[0].positionOf(0, all[0].handOf(0)!.first)!;
+    final play = all[0].playToken(p)!;
+    final token = base64Decode(play['token'] as String);
+    expect(all[1].verifyPlay(0, play), isNotNull);
+    for (final n in [1, pointBytes, tokenBytes - 1, tokenBytes + 1]) {
+      final bent = {...play, 'token': base64Encode(sized(token, n))};
+      expect(all[1].verifyPlay(0, bent), isNull, reason: 'a token of $n bytes');
+      expect(all[1].acceptPlay(0, bent, verified: true), isNull, reason: 'a token of $n bytes, taken unchecked');
+    }
+    final toBot = make([...seats.take(3), const BotDealSeat()], 0);
+    final clear = {
+      'from': 0,
+      'to': 3,
+      'positions': [p],
+      'tokens': [base64Encode(sized(token, tokenBytes - 1))],
+    };
+    expect(toBot.verifyPass(clear), isFalse, reason: 'a token in the clear one byte short');
+    for (var s = 0; s < 4; s++) {
+      final m = all[s].myDeclaration()!;
+      if (m['position'] == -1) continue;
+      final t = base64Decode(m['token'] as String);
+      expect(all[(s + 1) % 4].verifyDeclaration(m), isTrue);
+      expect(all[(s + 1) % 4].verifyDeclaration({...m, 'token': base64Encode(sized(t, tokenBytes - 1))}), isFalse);
+    }
+  });
 }

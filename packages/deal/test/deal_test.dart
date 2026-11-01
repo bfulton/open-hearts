@@ -48,6 +48,28 @@ void main() {
     expect(d.unmask([sharePks[0], ...pks.skip(1)], [bare[0], ...bare.skip(2)], masked), isNull);
   });
 
+  test('an input of the wrong size is refused before the Rust reads it', () {
+    final secret = seed(1);
+    final pk = d.keygen(secret);
+    final masked = maskedAt(d.initialDeck(pk), 0);
+    final token = d.revealToken(secret, masked, seed(2));
+    expect(d.verifyToken(pk, masked, token), isTrue);
+    // The Rust reads 128 bytes of a token whatever it is given. One
+    // byte short, the byte it would read next is likely the last byte
+    // of the whole token, left in the memory the call above just freed.
+    expect(d.verifyToken(pk, masked, Uint8List.sublistView(token, 0, tokenBytes - 1)), isFalse, reason: 'one byte short');
+    expect(d.verifyToken(pk, masked, Uint8List.fromList([...token, 0])), isFalse, reason: 'one byte long');
+    expect(d.verifyToken(pk, masked, Uint8List(1)), isFalse);
+    final name = Uint8List.fromList('seat'.codeUnits);
+    final proof = d.keyProof(secret, name, seed(3));
+    expect(d.verifyKey(pk, name, proof), isTrue);
+    expect(d.verifyKey(pk, name, Uint8List.sublistView(proof, 0, keyProofBytes - 1)), isFalse);
+    expect(() => d.keygen(Uint8List.sublistView(secret, 0, scalarBytes - 1)), throwsStateError);
+    expect(() => d.open(secret, d.seal(secret, pk, masked, seed(4))), throwsStateError,
+        reason: 'open takes the ciphertext, not the argument after it');
+    expect(d.unmask([pk, pk], [DealCrypto.tokenOf(token)], masked), isNull, reason: 'a token for every key');
+  });
+
   test('four seats deal fifty-two cards, each opened once, none without every token', () {
     final secrets = [for (var i = 1; i <= 4; i++) seed(i)];
     final pks = [for (final s in secrets) d.keygen(s)];
@@ -111,8 +133,9 @@ void main() {
     final token = d.revealToken(secrets[0], masked0, seed(50));
     final sealed = d.seal(secrets[0], pks[1], masked0, seed(51));
     expect(sealed, hasLength(sealedBytes + sealProofBytes));
-    expect(d.open(secrets[1], sealed), token.sublist(0, pointBytes));
-    expect(d.open(secrets[2], sealed), isNot(token.sublist(0, pointBytes)));
+    final ciphertext = Uint8List.sublistView(sealed, 0, sealedBytes);
+    expect(d.open(secrets[1], ciphertext), token.sublist(0, pointBytes));
+    expect(d.open(secrets[2], ciphertext), isNot(token.sublist(0, pointBytes)));
     expect(d.verifySeal(pks[0], pks[1], masked0, sealed), isTrue);
     expect(d.verifySeal(pks[2], pks[1], masked0, sealed), isFalse, reason: 'not another seat\'s token');
     expect(d.verifySeal(pks[0], pks[2], masked0, sealed), isFalse, reason: 'not sealed to another seat');

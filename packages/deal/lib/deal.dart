@@ -7,7 +7,10 @@
 /// Sizes are fixed (crypto/deal/src/lib.rs): a point 32 bytes, a
 /// masked card 64, a deck of 52 masked cards 3328, a key proof 64, a
 /// reveal token with its proof 128, a sealed token 64 with a 160-byte
-/// argument after it. A shuffle proof is a few kilobytes.
+/// argument after it. A shuffle proof is a few kilobytes. The Rust
+/// reads a fixed-size input at its size whatever it is given, so both
+/// bindings refuse an input of any other size before calling it: a
+/// check is false, and a call that makes something throws.
 library;
 
 import 'dart:typed_data';
@@ -20,6 +23,7 @@ export 'src/work.dart';
 const deckSize = 52;
 const pointBytes = 32;
 const scalarBytes = 32;
+const seedBytes = 32;
 const maskedBytes = 64;
 const deckBytes = deckSize * maskedBytes;
 const keyProofBytes = 64;
@@ -155,6 +159,7 @@ abstract class DealCrypto {
   /// recipient's key made of it. A seal is a ciphertext of a card's
   /// shape, so a share's part is [shareToken] over the seal itself and
   /// [verifyToken] checks it; this adds them up and takes them off.
+  /// [sealed] is the [sealedBytes] of ciphertext, as for [open].
   Uint8List openShared(Uint8List sealed, List<Uint8List> parts);
 
   /// One share's part of opening [masked], proved against that share's
@@ -168,7 +173,8 @@ abstract class DealCrypto {
   /// [pointBytes] tokens, with no proofs among them. A token is
   /// checked when it arrives — against its key, singly or in a batch —
   /// and opening is addition, which has nothing to check. [pks] says
-  /// how many to expect and nothing else. Null if the sum is no card.
+  /// how many to expect and nothing else, and there must be as many
+  /// [tokens]. Null if the sum is no card.
   int? unmask(List<Uint8List> pks, List<Uint8List> tokens, Uint8List masked);
 
   /// The token in what [revealToken] or [shareToken] wrote.
@@ -187,6 +193,7 @@ abstract class DealCrypto {
   bool verifySeal(Uint8List pkOwner, Uint8List pkTo, Uint8List masked, Uint8List sealed);
 
   /// The token inside a sealed one, with the key it was sealed to.
+  /// [sealed] is the [sealedBytes] of ciphertext, without the argument.
   Uint8List open(Uint8List secret, Uint8List sealed);
 
   /// Thirty-two bytes two seats share and nobody else can compute,
