@@ -434,6 +434,25 @@ test('a Play token is asked of Play with the service account, and acknowledged o
   assert.equal(g.calls.some((c) => c.url.includes('oauth2.googleapis.com/token')), false, 'kept from the first ask');
 });
 
+test("an acknowledgement Play refuses, and a service account that does not read, are said in the log, and neither says the secret", async (t) => {
+  const logged = t.mock.method(console, 'log', () => {});
+  const said = () => logged.mock.calls.map((c) => c.arguments.join(' '));
+  forgetPlayAccess();
+  const g = google({ [TOKEN]: playing() });
+  const refusing = async (url, init) => (String(url).endsWith(':acknowledge') ? new Response('{}', { status: 403 }) : g(url, init));
+  assert.equal((await playPurchase(TOKEN, playEnv, refusing, { now })).paid, true, 'the purchase is taken all the same');
+  assert.deepEqual(said(), ['play acknowledge: 403']);
+  const down = async (url, init) => (String(url).endsWith(':acknowledge') ? Promise.reject(new TypeError('fetch failed')) : g(url, init));
+  await playPurchase(TOKEN, playEnv, down, { now });
+  assert.deepEqual(said().slice(1), ['play acknowledge: unreachable']);
+  logged.mock.resetCalls();
+  forgetPlayAccess();
+  for (const secret of ['private_key: MIIE not json', JSON.stringify({ client_email: 'play@x' })]) {
+    assert.equal((await playPurchase(TOKEN, { ...playEnv, OH_PLAY_SERVICE_ACCOUNT: secret }, g, { now })).status, 502, 'Play taken as not answering');
+  }
+  assert.deepEqual(said(), Array(2).fill('play: OH_PLAY_SERVICE_ACCOUNT does not parse, or lacks client_email or private_key'));
+});
+
 test('a Play token is ours only for this product, and paid only while Play says so', async () => {
   const states = {
     SUBSCRIPTION_STATE_ACTIVE: true,

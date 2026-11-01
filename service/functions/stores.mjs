@@ -95,7 +95,17 @@ const b64urlText = (text) => b64url(new TextEncoder().encode(text));
 /// minute before it runs out.
 export async function playToken(env, fetchImpl = fetch, { now = Date.now() } = {}) {
   if (playAccess && playAccess.until > now) return playAccess.token;
-  const account = JSON.parse(env.OH_PLAY_SERVICE_ACCOUNT);
+  let account;
+  try {
+    account = JSON.parse(env.OH_PLAY_SERVICE_ACCOUNT);
+    if (typeof account?.client_email !== 'string' || typeof account?.private_key !== 'string') throw new Error();
+  } catch {
+    // Said in words of its own: what JSON.parse says quotes the start of
+    // the secret. Thrown on, so Play is taken as not answering and its
+    // notifications are sent again until the secret is put right.
+    console.log('play: OH_PLAY_SERVICE_ACCOUNT does not parse, or lacks client_email or private_key');
+    throw new Error('OH_PLAY_SERVICE_ACCOUNT');
+  }
   const iat = Math.floor(now / 1000);
   const head = b64urlText(JSON.stringify({ alg: 'RS256', typ: 'JWT' }));
   const claims = b64urlText(
@@ -156,14 +166,19 @@ export async function playPurchase(token, env, fetchImpl = fetch, { now = Date.n
   // Play refunds a purchase nobody acknowledged within three days; this
   // is where it is taken, so this is where it is acknowledged.
   if (p.acknowledgementState === 'ACKNOWLEDGEMENT_STATE_PENDING' && PLAY_PAID.has(p.subscriptionState)) {
+    // One that does not go is asked again on the next notification or
+    // the next device to bring it, and said in the log: a service account
+    // that may read purchases but not acknowledge them would see every
+    // purchase refunded.
     try {
-      await fetchImpl(`${PLAY}/${encodeURIComponent(pkg)}/purchases/subscriptions/${encodeURIComponent(product)}/tokens/${encodeURIComponent(token)}:acknowledge`, {
+      const ack = await fetchImpl(`${PLAY}/${encodeURIComponent(pkg)}/purchases/subscriptions/${encodeURIComponent(product)}/tokens/${encodeURIComponent(token)}:acknowledge`, {
         method: 'POST',
         headers: { authorization: `Bearer ${access}`, 'content-type': 'application/json' },
         body: '{}',
       });
+      if (!ack.ok) console.log(`play acknowledge: ${ack.status}`);
     } catch {
-      // Asked again on the next notification or the next device to bring it.
+      console.log('play acknowledge: unreachable');
     }
   }
   // A token that replaced another — a resubscription, a plan change — is
