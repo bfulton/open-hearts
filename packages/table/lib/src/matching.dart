@@ -27,6 +27,7 @@ import 'dart:math';
 import 'package:engine/engine.dart';
 
 import 'licence.dart';
+import 'names.dart';
 import 'nostr.dart';
 import 'pace.dart';
 import 'relay_transport.dart';
@@ -391,7 +392,7 @@ class WaitingRoom {
           e.pubkey,
           () => Waiter(
             key: e.pubkey,
-            name: (c['name'] as String?)?.trim() ?? '',
+            name: cleanName(c['name'] as String? ?? ''),
             rating: c['rating'] as int? ?? 1500,
             pace: switch (c['pace']) { final int p when p > 0 && p <= 120 => p, _ => 0 },
             since: c['since'] as int? ?? _now,
@@ -456,7 +457,7 @@ class WaitingRoom {
           final key = m['key'] as String;
           if (key == me) mine = true;
           seats.add(HumanSeat(key, licence: m['licence'] == null ? null : Licence.parse(m['licence']) ?? (throw const FormatException('licence'))));
-          names[s] = m['name'] as String? ?? 'Someone';
+          names[s] = cleanName(m['name'] as String? ?? 'Someone');
           if (m['avatar'] is Map) avatars[s] = Map<String, Object?>.from(m['avatar'] as Map);
         }
         s++;
@@ -621,7 +622,7 @@ class PoolHost {
       e.pubkey,
       () => Waiter(
         key: e.pubkey,
-        name: (c['name'] as String?)?.trim() ?? '',
+        name: cleanName(c['name'] as String? ?? ''),
         rating: c['rating'] as int? ?? 1500,
         pace: switch (c['pace']) { final int p when p > 0 && p <= 120 => p, _ => 0 },
         // How long they have waited, by this clock: rounds, windows and

@@ -158,7 +158,7 @@ The `profile` handler takes the profile as JSON text and checks it with `profile
 
 | Field | Accepted | Limit in the worker | Limit in the app |
 |---|---|---|---|
-| `name` | A string, already trimmed, with no control characters | `PROFILE_NAME_MOST` characters | `Identity.longestName` in `app/lib/identity.dart` |
+| `name` | A string, already trimmed, with no control characters | `PROFILE_NAME_MOST` characters | `longestName` in `packages/table/lib/src/names.dart` |
 | `icon` | `null`, or one of `PROFILE_ICONS` | `PROFILE_ICONS` | `AvatarIcons.all` in `app/lib/avatar.dart` |
 | `color` | `null`, or a whole number from 0 up to, but not including, `PROFILE_COLOURS` | `PROFILE_COLOURS` | `AvatarIcons.paletteSize` in `app/lib/avatar.dart` |
 | `picture` | `null`, or base64 of a JPEG | `PROFILE_PICTURE_MOST` bytes | `Avatar.maxPictureBytes` in `app/lib/avatar.dart` |

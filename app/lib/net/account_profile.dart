@@ -33,6 +33,7 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:table/table.dart' show cleanName;
 
 import '../avatar.dart';
 import '../entitlement.dart';
@@ -193,7 +194,7 @@ class AccountProfile extends ChangeNotifier {
   Future<void> _send(String account) async {
     final changes = _changes;
     // A name the others may not see goes as none (Identity.playable).
-    final name = Identity.playable(Identity.nameOf(await Identity.name() ?? ''));
+    final name = Identity.playable(cleanName(await Identity.name() ?? ''));
     final text = jsonEncode({'name': name, ...(await Identity.avatar()).toJson()});
     final signer = await Identity.signer();
     // The text is what is signed: nobody else's request writes it.

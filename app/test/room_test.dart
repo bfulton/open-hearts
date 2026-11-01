@@ -152,6 +152,26 @@ void main() {
     });
   });
 
+  test('a name another device sends is kept without what turns text round, and no longer than a profile keeps one', () {
+    fakeAsync((async) {
+      final bus = Bus();
+      int now() => async.elapsed.inMilliseconds;
+      // A build that cleans nothing: an override that draws "kcuf" as
+      // the word the filter refuses, and a name no profile would keep.
+      final sent = '\u202ekcuf\u202c${'x' * 500}';
+      final clean = 'kcuf${'x' * (longestName - 4)}';
+      final a = Room(house: _house, canDeal: true, channel: bus.attach(FakeSigner('a')), code: 'ROOM', myName: 'Ada', nowMs: now);
+      final b = Room(house: _house, canDeal: true, channel: bus.attach(FakeSigner('b')), code: 'ROOM', myName: sent, nowMs: now);
+      async.elapse(const Duration(seconds: 3));
+      expect(a.members.map((m) => m.name), ['Ada', clean]);
+      async.elapse(const Duration(seconds: 10));
+      expect(a.spec, isNotNull);
+      expect(a.seatNames.values.toSet(), {'Ada', clean}, reason: 'and the same at the table, whoever led');
+      a.dispose();
+      b.dispose();
+    });
+  });
+
   test('four in: it starts at once; a fifth is told the table filled without them', () {
     fakeAsync((async) {
       final bus = Bus();

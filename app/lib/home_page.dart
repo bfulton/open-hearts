@@ -1262,6 +1262,8 @@ class RoomView extends StatelessWidget {
                     i < members.length
                         ? (members[i].key == room.me ? l10n.nameIsYou(members[i].name) : blocked(members[i]) ? l10n.blockedPlayer : members[i].name)
                         : l10n.emptySeat,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       fontSize: 15,
                       color: i < members.length ? Palette.chrome : Palette.chromeDim,

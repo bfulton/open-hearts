@@ -486,6 +486,8 @@ class _ReviewPageState extends State<ReviewPage> {
                   Expanded(
                     child: Text(
                       nameAt(s),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w600,

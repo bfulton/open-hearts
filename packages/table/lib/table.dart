@@ -20,6 +20,7 @@ export 'src/legacy/v2_record.dart';
 export 'src/licence.dart';
 export 'src/log.dart';
 export 'src/matching.dart';
+export 'src/names.dart';
 export 'src/nip44.dart';
 export 'src/nostr.dart';
 export 'src/pace.dart';

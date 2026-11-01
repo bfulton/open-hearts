@@ -502,6 +502,13 @@ answers by one file of cases (`service/functions/names.vectors.json`):
 - **At the relay**, an event naming somebody with a refused name is not
   carried ([refused names](relay.md#refused-names)).
 
+The filter reads a name with its invisible characters taken out, so the
+app also takes out the ones that change the direction text is drawn in
+before it shows any name, its own or one another device sent
+(`cleanName`, `packages/table/lib/src/names.dart`). A name with a
+right-to-left override in it would otherwise show a refused word spelled
+backwards as the word itself, or reverse the sentence around it.
+
 ### Deleting an account's data
 
 A player deletes their account in the app, from any of its devices:

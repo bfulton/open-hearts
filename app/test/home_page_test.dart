@@ -426,6 +426,30 @@ void main() {
     room.dispose();
   });
 
+  testWidgets('in a room, a name too long for its line is cut short on one line', (tester) async {
+    tester.view
+      ..physicalSize = const Size(390, 844)
+      ..devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    final bus = Bus();
+    final room = Room(channel: bus.attach(FakeSigner('a')), code: 'KP4T9MXR', myName: 'Ada');
+    final long = Room(channel: bus.attach(FakeSigner('b')), code: 'KP4T9MXR', myName: 'W' * 500);
+    await tester.pumpWidget(still(Scaffold(
+      body: ListenableBuilder(
+        listenable: room,
+        builder: (_, _) => RoomView(room: room, ledger: null, onLeave: () {}, onShare: () {}),
+      ),
+    )));
+    for (var i = 0; i < 10 && room.members.length < 2; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    final shown = find.text('W' * longestName);
+    expect(shown, findsOneWidget, reason: 'kept no longer than a profile keeps a name');
+    expect(tester.getSize(shown).height, tester.getSize(find.text('Ada (you)')).height, reason: 'one line, like the rest');
+    long.dispose();
+    room.dispose();
+  });
+
   testWidgets('unlicensed there is no way into a live game, not even a link — and a price instead', (tester) async {
     // A name on the device and a room link in the address: the way
     // into a room that asks for no button at all.

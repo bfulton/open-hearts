@@ -16,6 +16,7 @@ import 'dart:typed_data';
 import 'package:deal/deal.dart';
 import 'package:engine/engine.dart';
 
+import '../names.dart';
 import '../replay.dart';
 import '../sealed_pass.dart';
 import '../signing.dart';
@@ -104,7 +105,7 @@ class GameRecordV2 {
         names: {
           for (final e in ((m['names'] as Map?) ?? const {}).entries)
             if (int.tryParse('${e.key}') case final seat? when seat >= 0 && seat < seatCount && e.value is String)
-              seat: (e.value as String).length > 40 ? (e.value as String).substring(0, 40) : e.value as String,
+              seat: cleanName(e.value as String, most: 40),
         },
       );
     } catch (_) {

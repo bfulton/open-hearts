@@ -369,7 +369,7 @@ class Room extends ChangeNotifier {
         if (!licenceFits(licence, e.pubkey, at: DateTime.fromMillisecondsSinceEpoch(now))) return;
         if (licence != null && licence.account == this.licence?.account) return;
         final p = _others[e.pubkey];
-        final member = RoomMember(e.pubkey, _orNull<String>(c['name']) ?? 'Someone',
+        final member = RoomMember(e.pubkey, _nameOf(c['name']),
             since: _orNull<int>(c['since']) ?? now, avatar: Avatar.fromJson(c['avatar'], withPicture: false), licence: licence);
         final policy = _orNull<int>(c['policy']);
         final theirSeed = _orNull<int>(c['seed']);
@@ -518,7 +518,7 @@ class Room extends ChangeNotifier {
           // Each person as their own beats said they are: whoever sent
           // the start could have named them anything.
           final heard = _others[key]?.member;
-          names[s] = key == me ? myName : heard?.name ?? m['name'] as String? ?? 'Someone';
+          names[s] = key == me ? myName : heard?.name ?? _nameOf(m['name']);
           final chosen = key == me ? myAvatar : heard?.avatar ?? Avatar.fromJson(m['avatar'], withPicture: false);
           final picture = key == me ? myAvatar.picture : _pictures[key];
           avatars[s] = picture == null ? chosen : chosen.copyWith(picture: picture);
@@ -611,3 +611,10 @@ class Room extends ChangeNotifier {
 /// relay is whatever its sender wrote, so a field of the wrong type is
 /// taken as one left out.
 T? _orNull<T>(Object? value) => value is T ? value : null;
+
+/// A name another device sent, cleaned for showing ([cleanName]), or
+/// 'Someone' when it is not text or nothing is left of it.
+String _nameOf(Object? value) {
+  final name = cleanName(_orNull<String>(value) ?? '');
+  return name.isEmpty ? 'Someone' : name;
+}

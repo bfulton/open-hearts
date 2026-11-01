@@ -29,6 +29,7 @@ import 'package:engine/engine.dart';
 
 import 'client.dart';
 import 'licence.dart';
+import 'names.dart';
 import 'signing.dart';
 import 'spec.dart';
 
@@ -184,7 +185,7 @@ class WatchedTable {
         seq: m['seq'] as int,
         hand: m['hand'] as int,
         phase: Phase.values.byName(m['phase'] as String),
-        names: names,
+        names: [for (final n in names) cleanName(n)],
         totals: seats(m['totals']),
         taken: seats(m['taken'], most: 26),
         plays: plays,

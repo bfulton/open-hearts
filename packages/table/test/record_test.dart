@@ -60,6 +60,11 @@ void main() {
       expect(v.vouched, isTrue);
     });
 
+    test('reads a name as it may be shown: nothing in it that turns text round, and no longer than a kept name', () {
+      final m = stored(kept)..['names'] = {'0': '\u202enimda\u202c', '1': '😀' * 50};
+      expect(GameRecord.parse(m, verifySignatures: false)!.names, {0: 'nimda', 1: '😀' * 40});
+    });
+
     test('is not a game of another house\'s, nor checked without the deal', () {
       expect(verifyRecord(kept, crypto: crypto, house: FakeSigner('another house').publicKey).ok, isFalse);
       expect(verifyRecord(kept).ok, isFalse);
