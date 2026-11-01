@@ -163,12 +163,14 @@ void main() {
       closeAll([a, b, (h.$1, h.$2, null)]);
     });
 
-    test('a name is seated as it may be shown: nothing in it that turns text round, and no longer than a profile keeps one', () async {
+    test('a name is seated as it may be shown: nothing in it that turns text round', () async {
       final h = await seats();
-      final a = await join('\u202ekcuf\u202c${'x' * 500}');
+      // As long as a name the relay carries; a longer one it refuses
+      // (service/functions/names.mjs).
+      final a = await join('\u202ekcuf\u202c${'x' * (longestName - 6)}');
       a.$2.playWithBots();
       await a.$3.timeout(const Duration(seconds: 10));
-      expect(a.$2.seatNames.values, ['kcuf${'x' * (longestName - 4)}']);
+      expect(a.$2.seatNames.values, ['kcuf${'x' * (longestName - 6)}']);
       closeAll([a, (h.$1, h.$2, null)]);
     });
 

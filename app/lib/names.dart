@@ -5,6 +5,8 @@
 // away. The same steps as names.mjs and name_fold.mjs, held to the same
 // answers by service/functions/names.vectors.json.
 
+import 'package:table/table.dart' show longestName;
+
 import 'blocked_names.dart';
 
 /// Digits and signs written for letters, read as those letters.
@@ -16,6 +18,12 @@ final _marks = RegExp(r'[\p{M}\p{Cf}]', unicode: true);
 final _notAWord = RegExp(r'[^\p{L}\p{N}@$]+', unicode: true);
 final _aLetter = RegExp(r'\p{L}', unicode: true);
 final _camel = RegExp(r'(\p{Ll})(\p{Lu})', unicode: true);
+
+/// The characters cleanName (packages/table, names.dart) takes out of a
+/// name that the filter would read as a break between words: control
+/// characters, and the line and paragraph separators (names.mjs,
+/// NOT_SENT).
+final _notSent = RegExp(r'[\p{Cc}\u2028\u2029]', unicode: true);
 
 /// [name] in lower case, accents and the like folded to plain letters
 /// ([nameFolds]), without combining marks or invisible characters.
@@ -100,10 +108,13 @@ bool _refusedWords(List<String> words, {bool reservedOnly = false}) {
   return blockedAnywhere.any(joined.contains);
 }
 
-/// Whether [name] may not be shown to others: as written, and with
+/// Whether [name] may not be shown to others. One no app sends is
+/// refused outright: longer than [longestName], or with a character of
+/// [_notSent] in it. Any other is held to the lists as written, and with
 /// words run together as `ShitHead` parted; and for the reserved words,
 /// with look-alike letters read as the Latin ones they are drawn like.
 bool nameRefused(String name) {
+  if (name.runes.length > longestName || _notSent.hasMatch(name)) return true;
   if (blockedSymbols.any(name.contains)) return true;
   final parted = name.replaceAllMapped(_camel, (m) => '${m[1]} ${m[2]}');
   if (_refusedWords(_foldedWords(name)) || _refusedWords(_foldedWords(parted))) return true;

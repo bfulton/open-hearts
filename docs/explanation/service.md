@@ -516,7 +516,12 @@ app also takes out the ones that change the direction text is drawn in
 before it shows any name, its own or one another device sent
 (`cleanName`, `packages/table/lib/src/names.dart`). A name with a
 right-to-left override in it would otherwise show a refused word spelled
-backwards as the word itself, or reverse the sentence around it.
+backwards as the word itself, or reverse the sentence around it. The
+app takes out control characters and line breaks too, and cuts a name
+to sixty characters, so a name with one of those in it, or a longer
+one, is refused outright: the app never sends one, and what it would
+show is not the name the filter read, as a control character between
+*Ad* and *min* would show *Admin*.
 
 ### Deleting an account's data
 

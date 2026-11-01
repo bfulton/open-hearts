@@ -116,6 +116,12 @@ test('nothing that shows the others a name the filter refuses is carried, wherev
   assert.equal(table(watched(['Ada', 'Bao', 'Sam', 'Cy'])), null);
   assert.equal(table(watched(['Ada', 'Bao', 'nazi', 'Cy'])), NAME_REFUSED_WHY);
   assert.equal(table(watched(['Ada', 'Bao', 'Аdmin', 'Cy'])), NAME_REFUSED_WHY, 'with a Cyrillic А');
+  // A name no app sends: one the app would show joined up as `Admin`,
+  // or cut to end in it.
+  assert.equal(room(said(24245, { kind: 'wait', name: 'Ad\u0001min', rating: 1500 })), NAME_REFUSED_WHY);
+  assert.equal(room(said(24245, { kind: 'here', name: 'Ad\u2028min' })), NAME_REFUSED_WHY);
+  assert.equal(room(said(24245, { kind: 'here', name: `${'x'.repeat(54)} adminz` })), NAME_REFUSED_WHY);
+  assert.equal(room(said(24245, { kind: 'here', name: 'x'.repeat(60) })), null);
   // A kind that names nobody is not read for names: a table's own events.
   assert.equal(room(said(24242, { name: 'fuck' })), null);
   // Content that is not JSON, or names nobody, is carried as before.

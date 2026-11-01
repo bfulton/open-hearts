@@ -80,7 +80,16 @@
     "helpdesκ",
     "Open Hеarts",
     "Аdmin",
-    "ОpenHearts"
+    "ОpenHearts",
+    "Ad\u0001min",
+    "Ad\u0085min",
+    "Ad\u2028min",
+    "Ad\u2029min",
+    "Mod\u0000erator",
+    "Of\nficial",
+    "sh\u0001it",
+    "Ada\u0007",
+    "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx adminz"
   ],
   "allowed": [
     "",
@@ -143,6 +152,7 @@
     "НАТАША",
     "Ελένη",
     "Νίκος Παπαδόπουλος",
-    "ΟΜΗΡΟΣ"
+    "ΟΜΗΡΟΣ",
+    "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\ud83d\ude00"
   ]
 }

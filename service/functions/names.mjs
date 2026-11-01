@@ -17,9 +17,28 @@
 // word is matched whole, so Cassandra and Scunthorpe are names like any
 // other, and so are Staffan and Supporter; what the lists miss, a report
 // catches.
+//
+// A name no app sends is refused too: one longer than the app shows, or
+// with a control character or a line break in it. The app cuts such a
+// name, or takes those characters out, before it shows a name it is
+// sent (packages/table, names.dart, cleanName), and what it then shows
+// is not what was read here: `Ad\u0001min` is two words to the filter
+// and `Admin` on the screen.
 
 import { BLOCKED_ANYWHERE, BLOCKED_PHRASES, BLOCKED_SYMBOLS, BLOCKED_WORDS, NAME_FOLDS } from './blocked_names.mjs';
 import { foldedWords, splitCamel } from './name_fold.mjs';
+
+/// The longest name, in characters: what a profile keeps (profile.mjs),
+/// and what the app cuts a name it is sent to (packages/table,
+/// names.dart, longestName; profile.test.mjs holds the two equal).
+export const NAME_MOST = 60;
+
+/// The characters the app takes out of a name it is sent (packages/table,
+/// names.dart, cleanName) that the filter would read as a break between
+/// words: control characters, and the line and paragraph separators.
+/// The others it takes out are format characters, which the filter
+/// drops too (name_fold.mjs).
+const NOT_SENT = /[\p{Cc}\u2028\u2029]/u;
 
 /// Words that would make a name pass for Open Hearts or its staff, in
 /// the app's five languages, folded: refused as the lists' words are.
@@ -82,8 +101,11 @@ function refusedWords(words, reservedOnly = false) {
 
 /// Whether [name] may not be shown to others. A name that is not a
 /// string is not this filter's to judge (profile.mjs checks its shape).
+/// One no app sends is refused outright: longer than [NAME_MOST], or
+/// with a character of [NOT_SENT] in it.
 export function nameRefused(name) {
   if (typeof name !== 'string') return false;
+  if ([...name].length > NAME_MOST || NOT_SENT.test(name)) return true;
   if (BLOCKED_SYMBOLS.some((s) => name.includes(s))) return true;
   // As written, and with words run together as `ShitHead` parted; and
   // for the reserved words, with look-alike letters read as Latin ones.

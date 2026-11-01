@@ -24,7 +24,7 @@
 // not kept: the others would see it.
 
 import { entitlementOf } from './accounts.mjs';
-import { nameRefused } from './names.mjs';
+import { NAME_MOST, nameRefused } from './names.mjs';
 import { REFUSED } from './refusals.mjs';
 import { isAccount } from './rows.mjs';
 
@@ -37,8 +37,9 @@ export const PROFILE_ICONS = Object.freeze([
 /// How many colours the palette has (AvatarIcons.paletteSize).
 export const PROFILE_COLOURS = 10;
 
-/// The longest name, in characters.
-export const PROFILE_NAME_MOST = 60;
+/// The longest name, in characters: the longest the filter lets be
+/// (names.mjs).
+export const PROFILE_NAME_MOST = NAME_MOST;
 
 /// What the service says of a name the filter refuses (names.mjs),
 /// which the app knows (net/account_profile.dart) and does not send
