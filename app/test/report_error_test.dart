@@ -15,7 +15,7 @@ void main() {
     noticed = (message, attributes) => told.add((message, attributes));
     addTearDown(() => noticed = null);
     reportLine('game lost: the house let a turn run out',
-        table: '83167bb6681da6f1b6f4ab8931028fbb', account: 'the house let a turn run out at h0/t49; line up', line: '1 of 1 open');
+        table: '83167bb6681da6f1b6f4ab8931028fbb', seen: 'the house let a turn run out at h0/t49; line up', line: '1 of 1 open');
     expect(told, hasLength(1));
     final (message, attributes) = told.single;
     expect(message, 'live: game lost: the house let a turn run out');

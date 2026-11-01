@@ -444,12 +444,12 @@ class LiveController extends ChangeNotifier with TableModel {
   void _watchLine() {
     if (client.state == TableState.failed && !_toldLost) {
       _toldLost = true;
-      reportLine('game lost: the house let a turn run out', table: spec.id, account: _seen, line: _lineHealth);
+      reportLine('game lost: the house let a turn run out', table: spec.id, seen: _seen, line: _lineHealth);
     }
     final cannotDeal = client.cannotDeal;
     if (cannotDeal != null && !_toldCannotDeal) {
       _toldCannotDeal = true;
-      reportLine('cannot deal: $cannotDeal', table: spec.id, account: _seen, line: _lineHealth);
+      reportLine('cannot deal: $cannotDeal', table: spec.id, seen: _seen, line: _lineHealth);
     }
     if (!client.lineDown) {
       _wasUp = true;
@@ -491,7 +491,7 @@ class LiveController extends ChangeNotifier with TableModel {
       if (_disposed || since == null) return;
       if (!_toldDown && client.clock.nowMs - since >= downTooLongMs && client.lineDown) {
         _toldDown = true;
-        reportLine('line down ${(client.clock.nowMs - since) ~/ 1000} s', table: spec.id, account: _seen, line: _lineHealth);
+        reportLine('line down ${(client.clock.nowMs - since) ~/ 1000} s', table: spec.id, seen: _seen, line: _lineHealth);
       }
       notifyListeners();
       _armDown();
