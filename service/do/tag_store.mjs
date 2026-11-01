@@ -28,14 +28,14 @@ const DELETE_MOST = 128;
 /// getAlarm, setAlarm.
 export function tagStore(storage, tag) {
   return {
-    /// The memory store a relay for this tag starts with: what storage
-    /// holds, oldest first, the newest [storedKeep] of it. Presence
-    /// keeps nothing.
+    /// The memory store a relay for this tag starts with: the newest
+    /// [storedKeep] of what storage holds, oldest first, read and no
+    /// more. Presence keeps nothing.
     async load() {
       if (tag === presenceTag) return null;
       const store = memoryStore(storedKeep(tag));
-      const rows = await storage.list({ prefix: 'ev:' });
-      for (const event of rows.values()) store.add(event);
+      const rows = await storage.list({ prefix: 'ev:', reverse: true, limit: storedKeep(tag) });
+      for (const event of [...rows.values()].reverse()) store.add(event);
       return store;
     },
 

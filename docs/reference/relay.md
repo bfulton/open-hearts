@@ -57,18 +57,18 @@ The relay speaks a subset of NIP-01, plus NIP-42's `AUTH` (`createRelay` in `ser
 | Client | `EVENT`, `REQ`, `CLOSE`, `AUTH`; and on a table's tag `LOG` (the log, from an entry on, under a subscription id; asked again by a line that has heard nothing for five seconds, so that its answer shows the line still carries) and `TICK` (an entry with the referee's time in it, when a deadline is due) |
 | Relay | `AUTH` (a challenge, as each socket opens), `OK`, `EVENT`, `EOSE`, `CLOSED`, `NOTICE`; and on a table's tag `LOG` (one entry of the log) and `LOGEND` (the end of the log as it stands, after which each entry comes as it is added) |
 
-A deployed relay object holds every socket's `EVENT`, `REQ` and `CLOSE` until the socket answers the challenge (`serviceGate`). It carries a socket only for a device with a current activation, which is the device in use of an account with a subscription, or for the house. While a socket's answer has run out, the relay holds what it says and sends it no entry of a table's log, and asks it again.
+A deployed relay object holds every socket's `EVENT`, `REQ`, `CLOSE`, `LOG` and `TICK` until the socket answers the challenge (`serviceGate`), up to `heldMost` messages and `heldMostChars` characters, and takes one answer to each challenge. It carries a socket only for a device with a current activation, which is the device in use of an account with a subscription, or for the house. While a socket's answer has run out, the relay holds what it says and sends it no entry of a table's log, and asks it again.
 
 The reason in a refusal starts with one of these words:
 
 | Prefix | Meaning |
 |---|---|
-| `rate-limited:` | The socket published more than its burst and rate allow. Checked before the signature. |
-| `invalid:` | A bad ID or signature, or a reaction of the wrong size or shape. |
-| `blocked:` | This tag's object does not carry this kind, or a reaction is on the wrong tag. |
+| `rate-limited:` | The socket published, or asked for a table's log, more than its burst and rate allow. Checked before the signature. |
+| `invalid:` | A bad ID or signature, a table event whose ID is not the hash of what it says, a stored kind dated more than `datedAheadMostS` ahead of the relay's clock, or a reaction of the wrong size or shape. |
+| `blocked:` | This tag's object does not carry this kind, a reaction is on the wrong tag, or a person's events have filled their share of a table's log (`authorMost` in `service/do/referee.mjs`). |
 | `duplicate:` | The relay already has this event. The `OK` is `true`. |
 | `withheld:` | A picture the operator took down ([withheld pictures](../explanation/relay.md#withheld-pictures)). The `OK` is `true`, and the event is neither stored nor passed on. |
-| `auth-required:` | The socket has not answered the challenge, or its answer is stale or carries no current activation. |
+| `auth-required:` | The socket has not answered the challenge, or has answered it already, or its answer is stale or carries no current activation. |
 | `superseded:` | Another device of this account is in use. The relay closes the socket. |
 | `suspended:` | This account is suspended from live play. The relay closes the socket. |
 | `deleted:` | This account was deleted, from one of its devices. The relay closes the socket. |
@@ -82,10 +82,11 @@ Each deployed tag's object holds every socket to these limits. `service/do/host.
 |---|---|---|
 | Longest message, in characters | `objectLimits.message` | `tableLimits.message` |
 | Longest `REQ`, in characters | `objectLimits.request` | `tableLimits.request` |
-| Events a socket may publish at once | `objectLimits.burst` | `tableLimits.burst` |
-| Events a socket may publish each second, after the burst | `objectLimits.perSecond` | `tableLimits.perSecond` |
+| Events a socket may publish, and table logs it may ask for, at once | `objectLimits.burst` | `tableLimits.burst` |
+| The same each second, after the burst | `objectLimits.perSecond` | `tableLimits.perSecond` |
 | Subscriptions per socket; the oldest goes when a new one arrives | `maxSubscriptions` | `maxSubscriptions` |
 | Messages held while the challenge is unanswered | `heldMost` | `heldMost` |
+| Characters held while the challenge is unanswered | `heldMostChars` | `heldMostChars` |
 | Age of an answer to the challenge, in seconds | `answerFreshS` | `answerFreshS` |
 | Event IDs remembered to answer duplicates | `rememberedIds` | `rememberedIds` |
 
@@ -97,7 +98,7 @@ All are in `service/do/relay.mjs`. The operator can change the `online` limits w
 |---|---|---|
 | Ephemeral kinds, on any tag | Not stored: forwarded to matching subscriptions, then forgotten | `ephemeral` in `service/do/relay.mjs` |
 | Anything on `online` that is not ephemeral | Refused | `refusalFor` |
-| Kind 4244 on a pool, room code or table tag, tagged `t` with that same tag | A day, in the object's own storage; an alarm deletes older events | `KEPT_MS` and `SWEEP_EVERY_MS` in `service/do/tag_store.mjs` |
+| Kind 4244 on a pool, room code or table tag, tagged `t` with that same tag | A day from its date, in the object's own storage; an alarm deletes older events. One dated more than `datedAheadMostS` ahead is refused. | `KEPT_MS` and `SWEEP_EVERY_MS` in `service/do/tag_store.mjs`; `refusalFor` |
 | A pool's seating (`match`) said by anybody but the house (`OH_HOUSE_KEY`), or by anybody with no house | Withheld: answered `OK` true with the reason, and neither stored nor sent on; one already stored is dropped as a subscription is served | `seatingHeld` in `service/do/pool.mjs` |
 | Kind 4244 on the results tag (`GameResult.tag`) | For good | `resultsTag` in `service/do/relay.mjs`; `tagStore` in `service/do/tag_store.mjs` |
 | Any other kind that is not ephemeral | Refused | `refusalFor` |

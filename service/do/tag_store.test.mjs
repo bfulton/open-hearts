@@ -7,7 +7,7 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 
 import { wasmPath } from './host.mjs';
-import { NAME_REFUSED_WHY, PICTURE_IN_AVATAR_WHY, lobbyKind, namesIn, objectRelay, pictureInAvatar, refusalFor, resultsTag, schnorrVerifier, storedKeep } from './relay.mjs';
+import { NAME_REFUSED_WHY, PICTURE_IN_AVATAR_WHY, datedAheadMostS, lobbyKind, namesIn, objectRelay, pictureInAvatar, refusalFor, resultsTag, schnorrVerifier, storedKeep } from './relay.mjs';
 import { keys, signing } from './sign.mjs';
 import { KEPT_MS, SWEEP_EVERY_MS, keyOf, tagStore } from './tag_store.mjs';
 import { pictureScreen } from './withheld.mjs';
@@ -36,15 +36,20 @@ function storage() {
     async delete(key) {
       for (const k of Array.isArray(key) ? key : [key]) rows.delete(k);
     },
-    async list({ prefix = '', end = null, limit = Infinity } = {}) {
+    /// Keys in order, or the other way with [reverse]; [limit] counts
+    /// from the first of them either way, as an object's storage does.
+    async list({ prefix = '', end = null, limit = Infinity, reverse = false } = {}) {
       const out = new Map();
-      for (const k of sorted()) {
+      for (const k of reverse ? sorted().reverse() : sorted()) {
         if (out.size >= limit) break;
         if (!k.startsWith(prefix) || (end !== null && k >= end)) continue;
         out.set(k, rows.get(k));
       }
+      this.read += out.size;
       return out;
     },
+    /// How many rows every list so far has read.
+    read: 0,
     async getAlarm() {
       return alarm;
     },
@@ -237,6 +242,28 @@ test('results are kept for good: no sweep, and storage keeps what memory lets go
   // What is loaded is the newest the memory holds.
   assert.equal(storedKeep(resultsTag), 20000);
   assert.equal((await kept.load()).size, 2);
+});
+
+test('an object woken holds the newest of what it stored, oldest first, and reads no more of it', async () => {
+  const st = storage();
+  const most = storedKeep('ABCD');
+  // More rows than memory holds, as the results' storage has: it keeps
+  // every one.
+  const events = Array.from({ length: most + 5 }, (_, i) => ({ id: i.toString(16).padStart(64, '0'), created_at: 1000 + i, kind: lobbyKind }));
+  for (const e of events) st.rows.set(keyOf(e), e);
+  st.read = 0;
+  const store = await tagStore(st, 'ABCD').load();
+  assert.deepEqual(store.ids(), events.slice(5).map((e) => e.id));
+  assert.equal(st.read, most);
+});
+
+test('a stored event dated more than an hour ahead of the relay\'s clock is not taken, since it would be kept past its day', () => {
+  const t = 1_800_000_000;
+  const room = refusalFor('ABCD', { now: () => t * 1000 });
+  const at = (created_at, kind = lobbyKind) => ({ kind, tags: [['t', 'ABCD']], content: '', created_at });
+  assert.equal(room(at(t + datedAheadMostS)), null);
+  assert.equal(room(at(t + datedAheadMostS + 1)), 'invalid: dated in the future');
+  assert.equal(room(at(t + 10 * datedAheadMostS, 24245)), null, 'one forwarded and forgotten is not kept by its date');
 });
 
 test('a room\'s object lets the oldest go from storage as it lets it go from memory', async () => {
