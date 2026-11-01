@@ -40,7 +40,7 @@
 
 import { heldPictureKey, hold, keepHeldPictures } from '../functions/holds.mjs';
 import { bodyOf } from '../functions/http.mjs';
-import { NcmecRefused, fileDetailsXml, fileReport, reportXml } from '../functions/ncmec.mjs';
+import { fileDetailsXml, fileReport, reportXml } from '../functions/ncmec.mjs';
 import { pictureHash } from './arachnid.mjs';
 import { CHECKERS, SHIELD, anyChecker, checkerIn, checkersOf, listed, verdictOf } from './checkers.mjs';
 import { Unreadable } from './jpeg.mjs';
@@ -638,5 +638,3 @@ export class KnownPictures {
     return after;
   }
 }
-
-export { NcmecRefused };

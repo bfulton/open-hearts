@@ -17,7 +17,7 @@ For why the checks are split this way, see [how Open Hearts is tested](../explan
 - With `CHECK_PLAN` set to any non-empty value, `check.sh` prints the lanes it would run, and runs nothing.
 - Each suite's output is in `build/check/<suite>.log`. A table of suites, results and times follows the run. The exit code is the verdict.
 - The suites `engine`, `deal`, `table`, `table_slow`, `app`, `app_analyze` and `crypto` run at the lowest priority (`patient` in `check.sh`).
-- Before any of `engine`, `deal`, `table`, `table_slow`, `service`, `service_js` or `service_object`, the step `deps` runs `dart pub get` in `packages/engine`, `packages/deal`, `packages/table_sim`, `packages/table` and `service`, as CI does: `dart analyze` doesn't fetch dependencies itself, and the three service suites, side by side in one package, would each fetch them at once. It has a row in the table and a log, `build/check/deps.log`.
+- Before any of `engine`, `deal`, `table`, `table_slow` or `service`, the step `deps` runs `dart pub get` in `packages/engine`, `packages/deal`, `packages/table_sim`, `packages/table` and `service`, as CI does: `dart analyze` doesn't fetch dependencies itself, and `table` and `table_slow`, side by side in one package, would each fetch them at once. It has a row in the table and a log, `build/check/deps.log`.
 - `<cores>` below is the machine's core count.
 
 ## Suites
@@ -30,9 +30,7 @@ Each suite is a `suite_<name>` function in `check.sh`, run from the repository's
 | `deal` | `dart analyze --fatal-infos` and `dart test -j <cores>` in `packages/deal` |
 | `table` | `dart analyze --fatal-infos` and `dart test -j <cores>` in `packages/table_sim`, then `dart analyze --fatal-infos` and `dart test -j <cores> -x slow` in `packages/table`: the fast tier |
 | `table_slow` | `dart test -j <cores> -t slow` in `packages/table`: the slow tier |
-| `service` | `dart analyze --fatal-infos` and `dart test -j <cores>` in `service`, against the Dart relay |
-| `service_js` | The `service` tests with `OH_RELAY=js`: against the relay the Cloudflare object runs |
-| `service_object` | The `service` tests with `OH_RELAY=object`: against that relay under the object's own rules |
+| `service` | `dart analyze --fatal-infos` and `dart test -j <cores>` in `service`, against the relay the Cloudflare object runs, under its own rules (`service/do/host.mjs --object`) |
 | `relay_js` | `node --test service/do/*.test.mjs` |
 | `functions` | `node --test service/functions/*.test.mjs` |
 | `site` | `node --test site/*.test.mjs`: every page in every language, the terms and the privacy policy against `site/ledger.json` and main's copy of it, and the store listings' words against each store's limits |
@@ -62,7 +60,7 @@ Each suite is a `suite_<name>` function in `check.sh`, run from the repository's
 | `packages/engine/` | `engine` |
 | `packages/deal/` | `deal` |
 | `packages/table/`, `packages/table_sim/` | `table` |
-| `service/do/` | `relay_js`, `service_js`, `service_object` |
+| `service/do/` | `relay_js`, `service` |
 | `service/functions/` | `functions`, `ops` |
 | `service/tool/*.mjs` | `functions`, `ops` |
 | Any other path under `service/` | `service` |
@@ -92,7 +90,7 @@ For the `app` suite, `quick` passes `-x slow`, and runs only the test files that
 | 2 | `app_analyze`, then `app` (every tier) |
 | 3 | `engine` and `deal` |
 | 4 | `relay_js`, `functions`, `site`, `infra`, `ops`, `workers`, `scripts` and `docs`; then `crypto`, only where `crypto/deal` has been built with cargo here and `cargo` is on the `PATH`. Otherwise `full` says that `crypto` didn't run. |
-| 5 | `e2e_build`; then `e2e_move` and `e2e_site`; then `service`, `service_js`, `service_object` and `e2e_house`; then `e2e_run` and `e2e_offline`; then `e2e_flows` |
+| 5 | `e2e_build`; then `e2e_move` and `e2e_site`; then `service` and `e2e_house`; then `e2e_run` and `e2e_offline`; then `e2e_flows` |
 
 
 ## Tiers and test settings
@@ -151,7 +149,7 @@ Runs on pull requests and on pushes to `main`. A newer push to the same pull req
 | `app` | Builds and tests the Rust crates in `crypto/deal` and `crypto/schnorr`, and tests `crypto/vendor`. Then the engine's and deal's analysis and tests, `flutter analyze`, `flutter test -j 4` (every tier), and `flutter test --platform chrome test/web`. | `engine`, `deal`, `app_analyze`, `app`, and the tests of `crypto` |
 | `web` | `flutter build web` as `deploy.sh` makes it, then `app/worker/build.sh` | None |
 | `table` | Builds the Rust libraries, then the simulator's analysis and tests in `packages/table_sim`, and `dart test -x slow` and `dart test -t slow` in `packages/table` | `table`, `table_slow` |
-| `service` | Builds the Rust libraries, then the `service` tests three ways (`OH_RELAY` unset, `js` and `object`) and `node --test service/do/*.test.mjs` | `service`, `service_js`, `service_object`, `relay_js` |
+| `service` | Builds the Rust libraries, then the `service` tests and `node --test service/do/*.test.mjs` | `service`, `relay_js` |
 | `wasm` | `cargo clippy` on `crypto/deal`, `crypto/schnorr` and `crypto/schnorr_wasm`; builds both wasm files with `crypto/deal/build.sh` and `crypto/schnorr_wasm/build.sh`; fails if `app/web/deal.wasm` or `app/web/schnorr.wasm` differ from what was committed | The clippy part of `crypto` |
 | `node` | The handlers', site's, infrastructure's and page workers' node tests, `./check.sh scripts` and `./check.sh docs` | `functions`, `site`, `infra`, `workers`, `scripts`, `docs` |
 | `e2e` | Three runners: `flows`; `run`; and `escrow`, `offline`, `move` and `site`. Each installs coturn and Playwright, builds with `./e2e/build.sh` (cached by its sources), and runs `node e2e/<suite>.mjs` for each suite. | `e2e_build` and the browser suites |

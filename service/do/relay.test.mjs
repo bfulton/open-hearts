@@ -374,7 +374,7 @@ test('the object reads nothing bigger than presence ever says, and sends nothing
   const big = await sign.event(keys[0], { kind: 24246, content: 'x'.repeat(objectLimits.message), tags: [['t', 'online']] });
   await relay.message(a, JSON.stringify(['EVENT', big]));
   assert.equal(listener.of('EVENT').length, 0);
-  assert.match(a.said.at(-1)[1], /too big/);
+  assert.deepEqual(a.said.at(-1), ['NOTICE', 'too big: over this tag\'s message limit']);
 
   // Anything inside the limit is taken whole, however far past what
   // presence says it is.

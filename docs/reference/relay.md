@@ -76,7 +76,7 @@ The reason in a refusal starts with one of these words:
 
 ## Limits
 
-Each deployed tag's object holds every socket to these limits. `service/do/host.mjs` applies them only with `--object`, which is how `OH_RELAY=object` runs it.
+Each deployed tag's object holds every socket to these limits. `service/do/host.mjs` applies them only with `--object`, which is how the `service` tests run it (`service/lib/src/relay.dart`).
 
 | Limit | `online` | Every other tag |
 |---|---|---|

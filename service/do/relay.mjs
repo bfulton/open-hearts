@@ -2,11 +2,12 @@
 // speaks (docs/explanation/service.md), written as plain functions over
 // anything that can send a string. The Cloudflare object
 // (worker.mjs) and a plain node host (host.mjs) both drive this file,
-// so what the app meets on Cloudflare is what the Dart suites — the
-// same ones that run against the Dart relay — run against here.
+// so what the app meets on Cloudflare is what the Dart and browser
+// suites run against.
 //
-// Nothing is imported but the service's name filter, plain functions
-// too: no node, no Cloudflare. Signatures are checked by the wasm the
+// What is imported is plain functions too — the service's name filter,
+// a table's referee (referee.mjs) and a pool's watch (pool.mjs) — with
+// no node and no Cloudflare. Signatures are checked by the wasm the
 // app already carries (app/web/schnorr.wasm, built from
 // crypto/schnorr_wasm), handed in already compiled, because a Worker
 // may not compile wasm at runtime and because BIP-340 is not worth a
@@ -35,14 +36,13 @@ export const maxSubscriptions = 8;
 /// without end; past the cap it drops back to the ids actually kept.
 export const rememberedIds = 40000;
 
-/// What the object (worker.mjs) holds one socket to. The node host under
-/// the suites carries whole tables, whose deal is the big one, and asks
-/// for no limits; the object carries presence, whose largest event is a
-/// beat with the device's activation in it, under a kilobyte, for
-/// everyone on the tag at once — and
-/// takes a socket from anybody. Cloudflare hands an object messages of
-/// up to 32 MiB, and an event that matches presence is sent on to
-/// every device listening, on the one thread they all share.
+/// What presence's object (worker.mjs, and host.mjs with --object) holds
+/// one socket to; every other tag's holds it to [tableLimits]. Presence's
+/// largest event is a beat with the device's activation in it, under a
+/// kilobyte, for everyone on the tag at once, and the tag takes a socket
+/// from anybody. Cloudflare hands an object messages of up to 32 MiB,
+/// and an event that matches presence is sent on to every device
+/// listening, on the one thread they all share.
 export const objectLimits = Object.freeze({
   /// The longest message read at all, in characters.
   message: 64 * 1024,
@@ -380,18 +380,14 @@ const finalWhy = (why) => typeof why === 'string' && why.length <= 120 && /^(sup
 /// subscriptions it was carrying. [refuse] may answer with a promise:
 /// the node host asks the Dart test that installed the policy.
 ///
-/// [limits] is [objectLimits], or null for none; [now] is the clock
-/// the rate is measured by. [count], if given, is told what became of
-/// each message — `count('events')`, `count('delivered', n)` — and
-/// nothing about who sent it: what the operator watches (worker.mjs).
+/// [limits] is [objectLimits] or [tableLimits], or null for none; [now]
+/// is the clock the rate is measured by. [count], if given, is told what
+/// became of each message — `count('events')`, `count('delivered', n)` —
+/// and nothing about who sent it: what the operator watches (worker.mjs).
 ///
 /// [gate], when given, is who may use it ([serviceGate]): every socket
 /// is asked, and carried nothing until it has answered. A socket may
 /// then also have `close()`, for the relay to end it.
-///
-/// [heard], when given, is told of each event the relay took, after its
-/// OK, with who the gate let in to say it ({account, key, …}), or null
-/// where there is no gate.
 ///
 /// [withhold], when given, says of an event (or a promise of saying)
 /// why the relay keeps it to itself, or null: one the operator took
@@ -417,7 +413,7 @@ const finalWhy = (why) => typeof why === 'string' && why.length <= 120 && /^(sup
 /// (pool.mjs, poolWatch) from the relay's own `holds`: it is told of
 /// each event the relay took, and says whether the pool wants its house
 /// ([wantsHouse]).
-export function createRelay({ verify, store = memoryStore(), refuse = null, log = null, limits = null, now = Date.now, count = null, heard = null, kept = null, gate = null, withhold = null, screen = null, forget = null, referee = null, watcher = null }) {
+export function createRelay({ verify, store = memoryStore(), refuse = null, log = null, limits = null, now = Date.now, count = null, kept = null, gate = null, withhold = null, screen = null, forget = null, referee = null, watcher = null }) {
   /// socket -> subscription id -> {raw, filters}. The raw filters are
   /// kept beside the parsed ones because a hibernating socket has to
   /// carry them somewhere and JSON is what it can carry.
@@ -654,9 +650,6 @@ export function createRelay({ verify, store = memoryStore(), refuse = null, log 
       for (const id of stored) seen.add(id);
     }
     send(from, ['OK', event.id, true, '']);
-    // Whatever the host wants to know of an event it took, and from
-    // whom.
-    heard?.(event, auths.get(from)?.who ?? null);
     watching?.heard(event);
     // Written out once, not once a listener: the same text either way.
     const wire = JSON.stringify(event);
@@ -714,7 +707,7 @@ export function createRelay({ verify, store = memoryStore(), refuse = null, log 
     // Not read at all past the limit: parsing it is the cost.
     if (limits && raw.length > limits.message) {
       count?.('tooBig');
-      return send(socket, ['NOTICE', 'too big: this relay carries presence']);
+      return send(socket, ['NOTICE', 'too big: over this tag\'s message limit']);
     }
     let message;
     try {

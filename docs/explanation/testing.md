@@ -209,10 +209,10 @@ the same carry-over and the same handlers as production.
 
 ### The service
 
-- **Every relay.** The `service/` suite runs against the local Dart
-  relay, against the relay the Cloudflare object runs, and against that
-  relay under the object's own rules (`OH_RELAY`), so the app's side of
-  the wire is checked against each.
+- **The relay.** The `service/` suite runs against the relay the
+  Cloudflare object runs, under the object's own rules
+  (`service/do/host.mjs --object`), so the app's side of the wire is
+  checked against what production runs.
 - **Local mode.** The browser suites run the Pages worker in-process
   over a `Map`, with `OH_OPEN_HOUSE` set. In that mode any key that asks
   is written a subscription and an account of its own and licensed, and

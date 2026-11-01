@@ -137,9 +137,9 @@ export class TagRelay {
 
   /// The sockets this object already holds are handed back to the new
   /// relay with the subscriptions they were carrying. What the relay
-  /// takes from each of them is bounded (relay.mjs, objectLimits): the
-  /// tag is open to anybody, and every device on it shares this one
-  /// thread.
+  /// takes from each of them is bounded (relay.mjs, objectLimits on
+  /// presence, tableLimits elsewhere): the tag is open to anybody, and
+  /// every device on it shares this one thread.
   async build() {
     const [verify, limits] = await Promise.all([schnorrVerifier(wasm), limitsFrom(this.env)]);
     const tag = (this.tag ??= (await this.state.storage.get('tag')) ?? presenceTag);

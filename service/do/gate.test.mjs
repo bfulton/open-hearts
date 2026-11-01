@@ -106,17 +106,6 @@ test('a socket is asked who it is, and carried nothing until it has answered', a
   assert.equal(a.of('EOSE').length, 1);
 });
 
-test('what the relay took is told to its host with who said it: the account the gate let in', async () => {
-  const heard = [];
-  const relay = createRelay({ verify, now, gate: serviceGate({ service: SERVICE.public, verify, now }), heard: (event, who) => heard.push([event.id, who]) });
-  const a = socket();
-  relay.open(a);
-  await relay.message(a, JSON.stringify(['AUTH', await showing(ADA, a, await activation(ADA))]));
-  const said = await beat(ADA);
-  await relay.message(a, JSON.stringify(['EVENT', said]));
-  assert.deepEqual(heard, [[said.id, { account: ACCOUNT, key: ADA.public, epoch: 1, until: T + 3600 }]]);
-});
-
 test('before its answer, a socket\'s messages are held up to a count and a size, and past either it is told to answer first', async () => {
   const relay = gated();
   const a = socket();

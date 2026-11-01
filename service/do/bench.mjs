@@ -80,7 +80,6 @@ export class Bench {
       if (!tag || tag.length > 128) return new Response('a table or a pool to wake for\n', { status: 400 });
       return (await this.wake(tag)) ? new Response('awake\n') : new Response('not up yet\n', { status: 503 });
     }
-    if (request.method === 'GET' && url.pathname === '/status') return Response.json(await this.status());
     return new Response('not found\n', { status: 404 });
   }
 
