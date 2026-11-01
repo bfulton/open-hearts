@@ -24,7 +24,7 @@ import 'nostr.dart';
 import 'pace.dart' show tablePaceOf;
 import 'referee_line.dart';
 import 'results.dart';
-import 'rules.dart' show TableRules;
+import 'rules.dart' show TableRules, TableState;
 import 'signing.dart';
 import 'spec.dart';
 
@@ -127,10 +127,23 @@ class House {
 
   void _look(_Served s) {
     final f = s.follower!;
-    if (!f.started) return;
     // A table it will not serve is let go once the log has its word.
     if (s.refused) {
       if (f.refusalIn) _drop(s);
+      return;
+    }
+    if (!f.started) {
+      // A log that has begun with a start this build does not read: a spec
+      // it does not parse, or of a revision of the deal it does not speak
+      // (rules.dart, _start). Nobody plays such a table here, but the
+      // referee took its start by its id and asks for the house until it
+      // says a result, whatever the result says, so it says this one as it
+      // says any it will not serve. Else it follows the table until the
+      // log's notes run out, and the house with it, some eleven days.
+      if (f.rules.state == TableState.failed && f.rules.refusal != null) {
+        trace?.call(s.table, 'house: a start this build does not read; not served');
+        _refuse(s);
+      }
       return;
     }
     // The spec is the log's start, which never changes: it is checked

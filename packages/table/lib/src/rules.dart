@@ -206,7 +206,10 @@ class TableRules {
   /// asking (service/do/referee.mjs). Taken only from the house and only
   /// while the table is being played: a table that has ended on its own
   /// keeps its end. Its totals are zero and unread. Null before the
-  /// log's start.
+  /// log's start. A start this side cannot read has a word too, which
+  /// nobody takes, since that table has failed at every side that reads
+  /// as this one does: the referee, which takes a start by its id alone,
+  /// is the one that wants it.
   Map<String, Object?>? get refusal => _startHash == null
       ? null
       : {'n': 1, 'hash': _startHash, 'state': TableState.failed.name, 'totals': List.filled(seatCount, 0)};
@@ -457,6 +460,7 @@ class TableRules {
   bool _speaks(TableSpec spec) => spec.deal == dealRevision || (readsOldGames && spec.deal < dealRevision);
 
   void _start(LogEntry e) {
+    _startHash = hash.value;
     final ev = e.event;
     final spec = ev == null || ev.kind != EventKind.start ? null : TableSpec.parse(ev.body['spec']);
     if (spec == null ||
@@ -468,7 +472,6 @@ class TableRules {
       return;
     }
     _spec = spec;
-    _startHash = hash.value;
     _now = e.t;
     _holders = List.of(spec.seats);
     _game = HeartsGame(seed: spec.seed, sealed: spec.sealed, target: spec.target);

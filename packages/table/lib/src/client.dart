@@ -486,9 +486,10 @@ class TableClient {
   /// back. Every side ends the table at it, and the referee stops
   /// waiting on the house for it (service/do/referee.mjs).
   void refuse() {
-    if (role != Role.houseFollower || _resulted || !started) return;
+    final word = rules.refusal;
+    if (role != Role.houseFollower || _resulted || word == null) return;
     _resulted = true;
-    _refusal = _send(EventKind.result, rules.refusal!).id;
+    _refusal = _send(EventKind.result, word).id;
   }
 
   // ---- the deal's slow calls ----------------------------------------------
