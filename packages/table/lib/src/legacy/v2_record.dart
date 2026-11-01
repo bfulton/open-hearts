@@ -605,6 +605,8 @@ class _RecordVerifier {
         },
     ],
     leadCard: twoOfClubs.index,
+    // Frozen with the rest: a game kept then has its passes as they were.
+    readsOldPasses: true,
   );
 
   /// The hand's audits, read ahead once every key is in: the secrets

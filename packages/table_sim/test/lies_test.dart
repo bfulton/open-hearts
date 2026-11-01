@@ -42,7 +42,7 @@ void main() {
 
     final lie = {...pass, 'sealed': Lie.seal.sealedPass([for (final s in pass['sealed']! as List) s as String], Random(0))};
     for (final s in lie['sealed']! as List) {
-      expect(base64.decode(s as String), hasLength(sealedBytes + sealProofBytes), reason: 'each the size an honest seal is');
+      expect(base64.decode(s as String), hasLength(passSealBytes), reason: 'each the size an honest seal is');
     }
     expect(all[1].verifyPass(lie), isFalse);
   });

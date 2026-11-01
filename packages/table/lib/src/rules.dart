@@ -123,6 +123,7 @@ class TableRules {
     this.worker,
     this.random,
     this.trace,
+    this.readsOldPasses = false,
   });
 
   /// The table the log is for: the start must name it.
@@ -163,6 +164,12 @@ class TableRules {
   final Random? random;
 
   final void Function(String line)? trace;
+
+  /// Whether the deal also reads a pass as passes were made before a
+  /// token's proof was hidden (`DealSession.readsOldPasses`). For the
+  /// verifier of a record, which has to check games kept then; a table
+  /// plays none.
+  final bool readsOldPasses;
 
   // ---- what the log has said ---------------------------------------------
 
@@ -709,6 +716,7 @@ class TableRules {
       // bot seat the house holds escrows to nobody, since nobody else
       // may see its cards.
       custodians: me != null && _dealtTo[me] is HumanSeat ? [house] : const [],
+      readsOldPasses: readsOldPasses,
       mySecret: secret,
       random: random,
     )..log = (l) => trace?.call('deal: $l');

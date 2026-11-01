@@ -95,6 +95,7 @@ class DealSession {
     this.myKey,
     this.wrap,
     this.custodians = const [],
+    this.readsOldPasses = false,
     Uint8List? mySecret,
     Random? random,
   })  : _random = random ?? Random.secure() {
@@ -144,6 +145,13 @@ class DealSession {
   /// at a refereed table.
   final List<String> custodians;
 
+  /// Whether this side also reads a pass as passes were made before a
+  /// token's proof travelled hidden: the proofs beside the seals, in
+  /// the clear (`proofs`). Only for the verifiers of games kept then,
+  /// which are kept for good; a table never takes such a pass, and a
+  /// side that does not read them refuses one for the size of its seals.
+  final bool readsOldPasses;
+
   final Random _random;
   final Map<int, Uint8List> _secrets = {};
   final Map<int, Uint8List> _pks = {};
@@ -156,9 +164,14 @@ class DealSession {
   /// Tokens by (seat that made it, position).
   final Map<int, Map<int, Uint8List>> _tokens = {};
 
-  /// Tokens sealed to a seat, by position, kept until its secret is
-  /// known here — the receiver's own, or a departed receiver's.
+  /// Passes sealed to a seat, by position, kept until its secret is
+  /// known here — the receiver's own, or a departed receiver's. Each
+  /// is a seal whole, as a pass carried it ([passSealBytes]).
   final Map<int, Map<int, Uint8List>> _sealedTo = {};
+
+  /// The positions whose seal came with its proof in the clear, from a
+  /// pass made before proofs were hidden ([readsOldPasses]).
+  final Set<int> _proofsInTheClear = {};
 
   /// Cards opened, by position.
   final Map<int, int> _cards = {};
@@ -967,7 +980,11 @@ class DealSession {
         // nothing settled gets this far.
         try {
           final point = crypto.open(secret, Uint8List.sublistView(s.value, 0, sealedBytes));
-          final token = Uint8List.fromList([...point, ...Uint8List.sublistView(s.value, sealedBytes + sealProofBytes)]);
+          final hidden = Uint8List.sublistView(s.value, sealedBytes + sealProofBytes);
+          final proof = _proofsInTheClear.contains(p)
+              ? hidden
+              : _xor(hidden, _passPad(crypto.sharedSecret(secret, _pks[owner]!), owner, e.key, p));
+          final token = Uint8List.fromList([...point, ...proof]);
           if (crypto.verifyToken(_pks[owner]!, _masked(p), token)) {
             _tokens.putIfAbsent(owner, () => {})[p] = DealCrypto.tokenOf(token);
             _passed.putIfAbsent(owner, () => {})[p] = token;
@@ -1163,9 +1180,14 @@ class DealSession {
   /// the table. What is sealed is for one seat's eyes, so nobody else
   /// can look; the argument says, without looking, that what is in
   /// there is the share this seat's key owes for that card
-  /// (docs/explanation/fair-deal.md). The reveal proof still travels beside it,
-  /// in the clear, because it is what makes the opened point a whole
-  /// token for the receiver to unmask with.
+  /// (docs/explanation/fair-deal.md).
+  ///
+  /// The token's own proof, which makes the opened point a whole token
+  /// for the receiver to play with, travels after the argument,
+  /// hidden under a pad only the two seats can make ([_passPad]). It
+  /// cannot go in the clear: the other three seats' tokens are public,
+  /// so the 52 cards give 52 candidates for the token, and a proof
+  /// that one of them verifies against is the card.
   ///
   /// A seat passes cards it was dealt, so every position here is its
   /// own at the deal: that is what the argument is about, and a pass of
@@ -1180,20 +1202,61 @@ class DealSession {
       if (_tokens[me]?[p] == null) return null;
       // Made here rather than taken from the store, which keeps the
       // token alone: a pass needs the proof beside it, in the clear or
-      // as the half that travels with a seal. Deterministic, so it is
-      // the same token either way.
+      // as the part that travels hidden with a seal. Deterministic, so
+      // it is the same token either way.
       tokens.add(crypto.revealToken(secret, _masked(p), _seed('pass token $p', me, _masked(p))));
     }
     if (_public(to)) {
       return {'from': me, 'to': to, 'positions': positions, 'tokens': [for (final t in tokens) _b64(t)]};
     }
+    final shared = crypto.sharedSecret(secret, _pks[to]!);
     return {
       'from': me,
       'to': to,
       'positions': positions,
-      'sealed': [for (final p in positions) _b64(crypto.seal(secret, _pks[to]!, _masked(p), _draw()))],
-      'proofs': [for (final t in tokens) _b64(Uint8List.sublistView(t, pointBytes))],
+      'sealed': [
+        for (final (i, p) in positions.indexed)
+          _b64(Uint8List.fromList([
+            ...crypto.seal(secret, _pks[to]!, _masked(p), _draw()),
+            ..._xor(Uint8List.sublistView(tokens[i], pointBytes), _passPad(shared, me, to, p)),
+          ])),
+      ],
     };
+  }
+
+  /// What a token's proof is hidden under in a pass: [tokenProofBytes]
+  /// from the secret the passer and the receiver share ([shared], from
+  /// either one's secret and the other's key), for this position of
+  /// this hand, so that no two proofs are hidden under the same pad.
+  /// Only a seat holding either secret can make it, which is the
+  /// receiver, or everyone once the receiver or the passer has left and
+  /// its secret is rebuilt — whose cards are then open to all.
+  ///
+  /// Nothing says the proof is a good one beyond the receiver finding
+  /// out, so there is no tag to check: a token that does not verify
+  /// leaves its position shut, as a seal that opens nothing does
+  /// ([_openWhatCan]).
+  Uint8List _passPad(Uint8List shared, int from, int to, int position) {
+    final mac = Hmac(sha256, shared);
+    final label = utf8.encode('pass|$tableId|$hand|$from|$to|$position|');
+    final pad = <int>[];
+    for (var block = 0; pad.length < tokenProofBytes; block++) {
+      pad.addAll(mac.convert([...label, block]).bytes);
+    }
+    return Uint8List.fromList(pad.sublist(0, tokenProofBytes));
+  }
+
+  /// The seals of a sealed pass, each whole ([passSealBytes]). A pass
+  /// as made before proofs were hidden had them beside the seals, in the
+  /// clear: put after each seal here, and said to be so (`clear`), where
+  /// this side reads such a pass at all ([readsOldPasses]).
+  ({List<Uint8List> sealed, bool clear}) _sealsOf(Map<String, Object?> m) {
+    final sealed = [for (final s in m['sealed'] as List) _unb64(s)];
+    final beside = readsOldPasses ? m['proofs'] : null;
+    if (beside == null) return (sealed: sealed, clear: false);
+    final proofs = [for (final s in beside as List) _unb64(s)];
+    if (proofs.length != sealed.length) throw const FormatException('a seal for each proof');
+    return (sealed: [for (final (i, s) in sealed.indexed) Uint8List.fromList([...s, ...proofs[i]])], clear: true);
   }
 
   /// Whether a pass is well formed — positions the passer holds, a
@@ -1217,18 +1280,18 @@ class DealSession {
         }
         return true;
       }
-      final sealed = [for (final s in m['sealed'] as List) _unb64(s)];
-      final proofs = [for (final s in m['proofs'] as List) _unb64(s)];
-      if (sealed.length != positions.length || proofs.length != positions.length) return false;
-      if (!sealed.every((s) => s.length == sealedBytes + sealProofBytes)) return false;
-      if (!proofs.every((p) => p.length == tokenBytes - pointBytes)) return false;
+      final (:sealed, clear: _) = _sealsOf(m);
+      if (sealed.length != positions.length) return false;
+      if (!sealed.every((s) => s.length == passSealBytes)) return false;
       if (_pks[from] == null || _pks[to] == null) return false;
       // The argument each seal carries: what is sealed is the share
       // [from]'s key owes for that card. Checked by everyone, so a
       // receiver left with cards it cannot open is the table's
       // business, not only its own (docs/explanation/fair-deal.md).
+      // The proof hidden after it is the receiver's to find out about.
       for (var i = 0; i < positions.length; i++) {
-        if (!crypto.verifySeal(_pks[from]!, _pks[to]!, _masked(positions[i]), sealed[i])) return false;
+        final seal = Uint8List.sublistView(sealed[i], 0, sealedBytes + sealProofBytes);
+        if (!crypto.verifySeal(_pks[from]!, _pks[to]!, _masked(positions[i]), seal)) return false;
       }
       return true;
     } catch (e) {
@@ -1260,15 +1323,16 @@ class DealSession {
           _passed.putIfAbsent(owner, () => {})[positions[i]] = tokens[i];
         }
       } else {
-        final sealed = [for (final s in m['sealed'] as List) _unb64(s)];
-        final proofs = [for (final s in m['proofs'] as List) _unb64(s)];
-        if (sealed.length != positions.length || proofs.length != positions.length) return false;
+        final (:sealed, :clear) = _sealsOf(m);
+        if (sealed.length != positions.length) return false;
         final keep = _sealedTo.putIfAbsent(to, () => {});
         for (var i = 0; i < positions.length; i++) {
-          // The ciphertext, its argument, and the reveal proof, kept
+          // The ciphertext, its argument, and the hidden proof, kept
           // whole: the receiver opens the first, and the point that
-          // comes out plus the last is the token it unmasks with.
-          keep[positions[i]] = Uint8List.fromList([...sealed[i], ...proofs[i]]);
+          // comes out plus the last, uncovered, is the token it
+          // unmasks with.
+          keep[positions[i]] = sealed[i];
+          if (clear) _proofsInTheClear.add(positions[i]);
         }
       }
       for (final p in positions) {

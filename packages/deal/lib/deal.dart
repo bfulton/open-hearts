@@ -10,7 +10,9 @@
 /// argument after it. A shuffle proof is a few kilobytes. The Rust
 /// reads a fixed-size input at its size whatever it is given, so both
 /// bindings refuse an input of any other size before calling it: a
-/// check is false, and a call that makes something throws.
+/// check is false, and a call that makes something throws. A pass
+/// carries more than the Rust makes: the token's own proof, hidden,
+/// after each seal ([passSealBytes]).
 library;
 
 import 'dart:typed_data';
@@ -30,6 +32,17 @@ const keyProofBytes = 64;
 const tokenBytes = 128;
 const sealedBytes = 64;
 const sealProofBytes = 160;
+
+/// A token's proof: what follows its point in [tokenBytes].
+const tokenProofBytes = tokenBytes - pointBytes;
+
+/// A seal as a pass carries it: the sealed token ([sealedBytes]), the
+/// argument that it is the right one ([sealProofBytes]), and after
+/// them the token's own proof ([tokenProofBytes]) hidden from all but
+/// the seat it is passed to. The proof is what makes the token whole
+/// when that seat plays the card, and in the clear it would name the
+/// card to anyone reading the log (docs/explanation/fair-deal.md).
+const passSealBytes = sealedBytes + sealProofBytes + tokenProofBytes;
 
 /// How many custodians have to answer to open a bot seat escrowed to
 /// several, as a v2 game's jury held one: any two of them.
@@ -198,7 +211,8 @@ abstract class DealCrypto {
 
   /// Thirty-two bytes two seats share and nobody else can compute,
   /// from this seat's secret and the other's key; the same from either
-  /// side.
+  /// side. A pass hides the proof of a token under it
+  /// (`DealSession.passMessage`).
   Uint8List sharedSecret(Uint8List secret, Uint8List pk);
 }
 

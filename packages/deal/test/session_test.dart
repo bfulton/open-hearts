@@ -36,7 +36,12 @@ void main() {
   }
 
   DealSession make(List<DealSeat> seats, int? seat,
-          {String? key, List<String> custodians = const [], int seed = 1, bool verifier = false, Uint8List? secret}) =>
+          {String? key,
+          List<String> custodians = const [],
+          int seed = 1,
+          bool verifier = false,
+          bool readsOldPasses = false,
+          Uint8List? secret}) =>
       DealSession(
         d,
         tableId: 'T1',
@@ -48,6 +53,7 @@ void main() {
         myKey: key ?? (seat == null ? null : (seats[seat] as HumanDealSeat).key),
         wrap: verifier ? null : wrapFor(key ?? (seat == null ? 'nobody' : (seats[seat] as HumanDealSeat).key)),
         custodians: custodians,
+        readsOldPasses: readsOldPasses,
         mySecret: secret,
         random: Random(seed * 100 + (seat ?? 99)),
       );
@@ -316,6 +322,195 @@ void main() {
     expect(all[0].acceptAudit({'seat': 1, 'secret': base64Encode(Uint8List(32))}), isFalse,
         reason: 'a wrong secret is refused, for a seat already known too');
     expect(all[0].acceptAudit(all[1].myAudit()!), isTrue, reason: 'the true one again is fine');
+  });
+
+  test('what a pass publishes names no card: nobody reading the log can find one, with every public key and token in hand', () {
+    final seats = [for (final k in ['a', 'b', 'c', 'd']) HumanDealSeat(k)];
+    final all = dealOut(seats);
+
+    // All that the log carries which bears on a pass: every seat's key,
+    // the tokens every seat published for the positions it was not
+    // dealt, and the deck as the last seat shuffled it. A reader has
+    // the cards' points too, since they are fixed (the initial deck).
+    final pks = [for (final x in all) base64Decode(x.myKeys()!['pk'] as String)];
+    final batches = [for (final x in all) base64Decode(x.myTokens()!['tokens'] as String)];
+    final deck = all[0].deck!;
+    final joint = d.aggregate(pks);
+    final initial = d.initialDeck(joint);
+    final minusOne = d.lagrange([1, 2], 2);
+    Uint8List neg(Uint8List point) => d.pointScale(point, minusOne);
+    Uint8List secondHalf(Uint8List masked) => Uint8List.sublistView(masked, pointBytes);
+    // A card's point is the initial deck's second half less the joint
+    // key; negated here once, since the sum below wants it taken off.
+    final lessCard = [for (var c = 0; c < deckSize; c++) neg(secondHalf(maskedAt(initial, c)))];
+    // Seat j's token for position p: its place among the 39 it owes.
+    Uint8List tokenBy(int j, int p) {
+      final k = p < j * 13 ? p : p - 13;
+      return Uint8List.sublistView(batches[j], k * pointBytes, (k + 1) * pointBytes);
+    }
+
+    /// The cards [pass] gives away to a reader with nothing but the
+    /// log. The passer's token for a position is the masked card's
+    /// second half less the other three seats' tokens (which are public)
+    /// less the card's point, so there are 52 candidates for it; each is
+    /// tried against every 96 bytes that the pass publishes about the
+    /// position, on a point's boundary, as a reveal proof for the passer's
+    /// key. A candidate that a proof vouches for is the token, and
+    /// says the card.
+    Map<int, int> readFrom(Map<String, Object?> pass) {
+      final from = pass['from'] as int;
+      final positions = [for (final p in pass['positions'] as List) p as int];
+      final found = <int, int>{};
+      for (final (i, p) in positions.indexed) {
+        final published = <Uint8List>[];
+        for (final v in pass.values) {
+          if (v is! List || v.length != positions.length || v[i] is! String) continue;
+          final bytes = base64.decode(v[i] as String);
+          for (var o = 0; o + tokenBytes - pointBytes <= bytes.length; o += pointBytes) {
+            published.add(Uint8List.sublistView(bytes, o, o + tokenBytes - pointBytes));
+          }
+        }
+        final masked = maskedAt(deck, p);
+        final others = [for (var j = 0; j < 4; j++) if (j != from) neg(tokenBy(j, p))];
+        for (var c = 0; c < deckSize; c++) {
+          final guess = d.aggregate([secondHalf(masked), joint, ...others, lessCard[c]]);
+          for (final proof in published) {
+            if (d.verifyToken(pks[from], masked, Uint8List.fromList([...guess, ...proof]))) found[p] = c;
+          }
+        }
+      }
+      return found;
+    }
+
+    final positions = [0, 6, 12];
+    final dealt = {for (final p in positions) p: all[0].openedCardAt(p)!};
+    final pass = all[0].passMessage(1, positions)!;
+    broadcast(all, 0, (x) => x.acceptPass(pass));
+    all[0].acceptPass(pass);
+
+    // The reading works: given the reveal proof of each token beside
+    // its seal, in the clear, it finds every card.
+    final leaked = {
+      ...pass,
+      'proofs': [
+        for (final p in positions) base64Encode(base64Decode(all[1].playToken(p)!['token'] as String).sublist(pointBytes)),
+      ],
+    };
+    expect(readFrom(leaked), dealt, reason: 'a proof in the clear names its card');
+
+    // And what the pass publishes holds no such proof.
+    expect(readFrom(pass), isEmpty, reason: 'the pass as made names none of its cards');
+  });
+
+  test('a pass hides each proof under a pad of its own, and one bent on the way is the receiver\'s to find out', () {
+    final seats = [for (final k in ['a', 'b', 'c', 'd']) HumanDealSeat(k)];
+    final all = dealOut(seats);
+    final positions = [0, 6, 12];
+    final toOne = all[0].passMessage(1, positions)!;
+    final toTwo = all[0].passMessage(2, positions)!;
+    broadcast(all, 0, (x) => x.acceptPass(toOne));
+    all[0].acceptPass(toOne);
+
+    // The proof each token has, which seat 1 now holds whole.
+    final proofs = [
+      for (final p in positions) base64Decode(all[1].playToken(p)!['token'] as String).sublist(pointBytes),
+    ];
+    Uint8List hidden(Map<String, Object?> pass, int i) =>
+        Uint8List.fromList(base64Decode((pass['sealed']! as List)[i] as String).sublist(sealedBytes + sealProofBytes));
+    List<int> pad(Map<String, Object?> pass, int i) => [for (var b = 0; b < tokenProofBytes; b++) hidden(pass, i)[b] ^ proofs[i][b]];
+
+    final pads = [for (var i = 0; i < positions.length; i++) base64Encode(pad(toOne, i))];
+    expect(pads.toSet(), hasLength(3), reason: 'no two positions hidden under one pad');
+    for (var i = 0; i < positions.length; i++) {
+      expect(hidden(toOne, i), isNot(proofs[i]), reason: 'not in the clear');
+      expect(base64Encode(pad(toTwo, i)), isNot(pads[i]), reason: 'nor one pad for two receivers');
+    }
+
+    // A proof bent on its way is for the receiver to find out: no other
+    // seat can tell (nothing it can see is wrong), and the receiver
+    // leaves that card shut and the rest open.
+    final fresh = dealOut(seats);
+    final pass = fresh[0].passMessage(1, positions)!;
+    final sealed = [for (final s in pass['sealed']! as List) base64Decode(s as String)];
+    sealed[1][passSealBytes - 1] ^= 1;
+    final bent = {...pass, 'sealed': [for (final s in sealed) base64Encode(s)]};
+    for (final x in fresh) {
+      expect(x.verifyPass(bent), isTrue, reason: 'the argument is about the seal, which is whole');
+    }
+    broadcast(fresh, 0, (x) => x.acceptPass(bent));
+    expect(fresh[1].openedCardAt(positions[0]), isNotNull);
+    expect(fresh[1].openedCardAt(positions[1]), isNull, reason: 'a token whose proof does not verify is not taken');
+    expect(fresh[1].playToken(positions[1]), isNull);
+    expect(fresh[1].openedCardAt(positions[2]), isNotNull);
+  });
+
+  test('a pass as it was kept before proofs were hidden is read by a verifier of kept games, and by no table', () {
+    final seats = [for (final k in ['a', 'b', 'c', 'd']) HumanDealSeat(k)];
+    final keeper = make(seats, null, verifier: true, readsOldPasses: true);
+    final all = dealOut(seats, extra: [keeper]);
+    final positions = [0, 6, 12];
+    final dealt = [for (final p in positions) all[0].openedCardAt(p)!];
+    final made = all[0].passMessage(1, positions)!;
+    // Seat 1 has each token whole once it takes the pass; its proof in
+    // the clear beside the seals without it is the pass as it was kept.
+    expect(all[1].acceptPass(made), isTrue);
+    final old = {
+      for (final e in made.entries)
+        if (e.key != 'sealed') e.key: e.value,
+      'sealed': [
+        for (final s in made['sealed']! as List) base64Encode(base64Decode(s as String).sublist(0, sealedBytes + sealProofBytes)),
+      ],
+      'proofs': [
+        for (final p in positions) base64Encode(base64Decode(all[1].playToken(p)!['token'] as String).sublist(pointBytes)),
+      ],
+    };
+
+    for (final x in [all[0], all[2], all[3]]) {
+      expect(x.verifyPass(made), isTrue);
+      expect(x.verifyPass(old), isFalse, reason: 'a table does not read it');
+      expect(x.acceptPass(old), isFalse);
+    }
+    expect(keeper.verifyPass(made), isTrue, reason: 'and the reader of kept games reads a pass as it is made now');
+    expect(keeper.verifyPass({...old, 'proofs': (old['proofs']! as List).take(2).toList()}), isFalse, reason: 'a proof short');
+    expect(keeper.verifyPass(old), isTrue);
+    expect(keeper.acceptPass(old), isTrue);
+    expect(keeper.holderOf(positions[0]), 1);
+    // The audit gives it seat 1's secret, and the cards the proofs went with open.
+    expect(keeper.provideSecret(1, all[1].mySecret!), isTrue);
+    for (final (i, p) in positions.indexed) {
+      expect(keeper.openedCardAt(p), dealt[i], reason: 'a proof in the clear is taken as it is, not uncovered');
+    }
+    expect(all[3].acceptPass(made), isTrue);
+    expect(all[3].verifyPlay(1, keeper.playToken(positions[0])!), dealt[0], reason: 'and a card so passed plays whole');
+  });
+
+  test('a card passed to a seat that then leaves opens for the others when its secret is rebuilt, and is played with a whole token', () {
+    final seats = [for (final k in ['a', 'b', 'c', 'd']) HumanDealSeat(k)];
+    final juror = make(seats, null, key: 'juror');
+    final all = dealOut(seats, custodians: ['juror', 'other-juror'], extra: [juror]);
+    final positions = [0, 5, 12];
+    final passed = [for (final p in positions) all[0].openedCardAt(p)!];
+    final pass = all[0].passMessage(1, positions)!;
+    broadcast(all, 0, (x) => x.acceptPass(pass));
+    all[0].acceptPass(pass);
+    expect(all[2].openedCardAt(positions[0]), isNull, reason: 'a seat that is not the receiver cannot open it');
+
+    for (final x in all) {
+      x.seatLeft(1);
+    }
+    expect(all[2].acceptRelease(all[0].releaseShare(1)!), isTrue);
+    expect(all[2].openedCardAt(positions[0]), isNull, reason: 'a seat\'s piece alone is not the secret');
+    expect(all[2].acceptRelease(juror.releaseShare(1)!), isTrue);
+    for (final (i, p) in positions.indexed) {
+      expect(all[2].openedCardAt(p), passed[i], reason: 'the secret rebuilt, the seal opens here too');
+    }
+
+    // The bot that plays seat 1 plays a card it was passed: with the
+    // token the passer's key owes, whole, so that the rest of the table
+    // can check it without having been told the proof.
+    final play = all[2].playToken(positions[0])!;
+    expect(all[3].verifyPlay(1, play), passed[0]);
+    expect(all[3].acceptPlay(1, play), passed[0]);
   });
 
   test('a bot seat a juror holds escrows to the jury alone: any two jurors open it, a player and a juror cannot', () {
@@ -630,6 +825,16 @@ void main() {
       final bent = {...play, 'token': base64Encode(sized(token, n))};
       expect(all[1].verifyPlay(0, bent), isNull, reason: 'a token of $n bytes');
       expect(all[1].acceptPlay(0, bent, verified: true), isNull, reason: 'a token of $n bytes, taken unchecked');
+    }
+    // A pass's seal is the seal, its argument, and the proof hidden after
+    // them: any other length is refused, whatever the Rust would read.
+    final pass = all[0].passMessage(1, [p])!;
+    final seal = base64Decode((pass['sealed']! as List).single as String);
+    expect(seal, hasLength(passSealBytes));
+    expect(all[2].verifyPass(pass), isTrue);
+    for (final n in [sealedBytes + sealProofBytes, passSealBytes - 1, passSealBytes + 1]) {
+      expect(all[2].verifyPass({...pass, 'sealed': [base64Encode(sized(seal, n))]}), isFalse, reason: 'a seal of $n bytes');
+      expect(all[2].acceptPass({...pass, 'sealed': [base64Encode(sized(seal, n))]}), isFalse, reason: 'a seal of $n bytes, offered');
     }
     final toBot = make([...seats.take(3), const BotDealSeat()], 0);
     final clear = {

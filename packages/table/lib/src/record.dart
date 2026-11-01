@@ -154,7 +154,9 @@ RecordVerdict verifyRecord(GameRecord record, {DealCrypto? crypto, PublicKey? ho
     if (crypto == null) return no('a sealed game, and no deal here to check it with');
     if (house != null && spec.house != house) return no('the table names another house');
   }
-  final rules = TableRules(tableId: spec.id, crypto: crypto);
+  // Games are kept for good, and a game kept before a pass hid its
+  // proofs is read as it was made.
+  final rules = TableRules(tableId: spec.id, crypto: crypto, readsOldPasses: true);
   if (replay != null) {
     var shown = 0;
     void playsUpTo(int hand) {

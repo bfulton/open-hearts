@@ -103,8 +103,9 @@ void main() {
       'a declared token': (j) => bent(j, 'deal', 'token', (p) => flip(p, 2), round: 3),
       'a played token\'s proof': (j) => bent(j, 'play', 'token', (p) => flip(p, 70)),
       'a sealed pass': (j) => bent(j, 'pass', 'sealed', (l) => [flip((l as List).first, 5), ...l.skip(1)]),
-      // (The reveal proofs a pass carries beside its seals are the
-      // receiver's to play the cards with, and are checked when it does.)
+      // (The reveal proofs a pass kept then carries beside its seals,
+      // in the clear, are the receiver's to play the cards with, and are
+      // checked when it does.)
       'a seal\'s argument': (j) => bent(j, 'pass', 'sealed', (l) => [flip((l as List).first, -10), ...l.skip(1)]),
       'an audited secret': (j) => bent(j, 'deal', 'secret', (p) => flip(p, 9), round: 4),
     };
