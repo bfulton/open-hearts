@@ -655,7 +655,7 @@ class _PointsGlowState extends State<_PointsGlow> with TickerProviderStateMixin 
     // The trick that was on the table as this seat's has gone from it:
     // taken, and on its way to the seat.
     if (old.trick != null && _up.value > 0 && !_down.isAnimating) {
-      final still = MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+      final still = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
       _waits = still ? Duration.zero : Pacing.trickSweeps;
       _down
         ..duration = _waits + _lasts
@@ -790,7 +790,7 @@ class _MoonQuakeState extends State<_MoonQuake> with SingleTickerProviderStateMi
     // it was opened.
     final shooter = widget.shooter;
     if (shooter == null || old.shooter != null) return;
-    if (MediaQuery.maybeOf(context)?.disableAnimations ?? false) return;
+    if (MediaQuery.maybeDisableAnimationsOf(context) ?? false) return;
     _shooter = shooter;
     _away = -seatDirection[shooter]!;
     _quake.forward(from: 0);
@@ -907,7 +907,7 @@ class _Shows extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final still = MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+    final still = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
     return AnimatedSwitcher(
       duration: still ? Duration.zero : const Duration(milliseconds: 180),
       child: child ?? const SizedBox.shrink(),
@@ -1119,7 +1119,7 @@ class _TrickState extends State<_Trick> with SingleTickerProviderStateMixin {
     // All four going at once is the trick being swept; anything less is
     // the table catching up with itself.
     if (swept.length < seatCount) return;
-    if (MediaQuery.maybeOf(context)?.disableAnimations ?? false) return;
+    if (MediaQuery.maybeDisableAnimationsOf(context) ?? false) return;
     // No setState: this is a widget update, and the build is next.
     // The taker's own card first, so the other three are drawn over it
     // as they are gathered onto it.
@@ -1746,7 +1746,7 @@ class _YourTurnState extends State<_YourTurn> with SingleTickerProviderStateMixi
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    if (!turnPillBreathes || (MediaQuery.maybeOf(context)?.disableAnimations ?? false)) {
+    if (!turnPillBreathes || (MediaQuery.maybeDisableAnimationsOf(context) ?? false)) {
       _breath
         ..stop()
         ..value = 0.6;

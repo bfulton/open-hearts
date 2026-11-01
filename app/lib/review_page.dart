@@ -856,7 +856,7 @@ class _Busy extends StatelessWidget {
   Widget build(BuildContext context) => RepaintBoundary(
     child: CircularProgressIndicator(
       strokeWidth: strokeWidth,
-      value: MediaQuery.maybeOf(context)?.disableAnimations ?? false ? 0.3 : null,
+      value: MediaQuery.maybeDisableAnimationsOf(context) ?? false ? 0.3 : null,
     ),
   );
 }

@@ -75,14 +75,14 @@ class _SubscribePageState extends State<SubscribePage> {
   /// the foreground. One the service refused in its own words is not.
   Timer? _again;
   final _backoff = Backoff();
-  late final AppLifecycleListener _lifecycle = AppLifecycleListener(onResume: _listAgainNow);
+  late final AppLifecycleListener _lifecycle;
 
   @override
   void initState() {
     super.initState();
     Entitlement.current.addListener(_changed);
     StoreShop.current.addListener(_changed);
-    _lifecycle;
+    _lifecycle = AppLifecycleListener(onResume: _listAgainNow);
     unawaited(_load());
     // A store that has not said what it sells is asked again here,
     // where it is wanted.

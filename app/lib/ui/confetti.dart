@@ -36,7 +36,7 @@ class _ConfettiState extends State<Confetti> with SingleTickerProviderStateMixin
     return List.generate(widget.pieces, (_) => _Piece(r));
   }();
 
-  bool get _still => MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+  bool get _still => MediaQuery.maybeDisableAnimationsOf(context) ?? false;
 
   @override
   void didChangeDependencies() {
