@@ -150,13 +150,15 @@ class DealSession {
   /// at a refereed table.
   final List<String> custodians;
 
-  /// Whether this side also reads a pass as passes were made before
-  /// the seat it was for played its card with an opening of its own:
-  /// with a proof of the token beside each seal, in the clear
-  /// (`proofs`), or after it under a pad ([_passPad]). Only for the
-  /// verifiers of games kept then, which are kept for good; a table
-  /// never takes such a pass, and a side that does not read them
-  /// refuses one for the size of its seals or the field beside them.
+  /// Whether this side reads a pass as the first revision of the deal's
+  /// messages made it ([dealRevision]), and as no other's: with a proof
+  /// of the token beside each seal, in the clear (`proofs`) or after it
+  /// under a pad ([_passPad]), and a play of the card with the passer's
+  /// token. Only for the verifiers of games kept then, which are kept for
+  /// good, of a game whose spec says that revision. A side that does not
+  /// reads the second's, and refuses a pass of the first for the size of
+  /// its seals or the field beside them, as the first refuses the
+  /// second's.
   final bool readsOldPasses;
 
   final Random _random;
@@ -1345,7 +1347,10 @@ class DealSession {
       if (m.containsKey('proofs') && !readsOldPasses) return false;
       final (:sealed, clear: _) = _sealsOf(m);
       if (sealed.length != positions.length) return false;
-      if (!sealed.every((s) => s.length == passSealBytes || (readsOldPasses && s.length == _oldPassSealBytes))) return false;
+      // One revision's shape and no other's: the first revision's, where
+      // it is read, a game of which holds no pass of the second's that its
+      // table took.
+      if (!sealed.every((s) => s.length == (readsOldPasses ? _oldPassSealBytes : passSealBytes))) return false;
       if (_pks[from] == null || _pks[to] == null) return false;
       // Each seal's first half, the point its randomness makes, is its
       // own. With one randomness for two seals the receiver's opening of
@@ -1405,7 +1410,15 @@ class DealSession {
           // a play to be checked against: its play carries the token.
           keep[positions[i]] = sealed[i];
           if (clear) _proofsInTheClear.add(positions[i]);
-          if (sealed[i].length == passSealBytes) _sealOf[positions[i]] = Uint8List.sublistView(sealed[i], 0, sealedBytes);
+          if (sealed[i].length == passSealBytes) {
+            _sealOf[positions[i]] = Uint8List.sublistView(sealed[i], 0, sealedBytes);
+            // What was checked of the position before it was sealed, the
+            // lead card's declaration, is a check of the owner's token. A
+            // play of it now carries an opening, and the bytes of that
+            // declaration are not one: they must not be taken for it
+            // from memory.
+            _checked.remove(positions[i]);
+          }
         }
       }
       for (final p in positions) {

@@ -49,7 +49,8 @@ const passSealBytes = sealedBytes + sealProofBytes;
 /// the revision it was made under, and a build plays no other. A build
 /// of a later revision still reads the games of this one, and of the one
 /// before, and every verifier reads each by the revision its spec names,
-/// since a log that changed with the revision cannot say so itself.
+/// since a log that changed with the revision cannot say so itself, and
+/// reads it exclusively: of a game of the first, none of the second's.
 ///
 /// 1 is every game kept before 2, which carried a proof of each passed
 /// token beside the seals of a pass (in the clear, and then hidden after

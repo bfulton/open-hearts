@@ -550,6 +550,34 @@ void main() {
     expect(commitment(again), isNot(commitment(one)), reason: 'the same card, another seal');
   });
 
+  test('a lead card declared and then passed is played with its receiver\'s opening, and not with the declaration that opened it', () {
+    final seats = [for (final k in ['a', 'b', 'c', 'd']) HumanDealSeat(k)];
+    final all = dealOut(seats);
+    final leader = all[0].leader!;
+    final to = (leader + 1) % 4;
+    final lead = all[leader].positionOf(leader, leadCard)!;
+    final others = [for (final c in all[leader].handOf(leader)!.where((c) => c != leadCard).take(2)) all[leader].positionOf(leader, c)!];
+    // The declaration is in the log, whole: a token with its proof, which
+    // every side checked, and every side but the declarer's remembers
+    // having checked.
+    final declaration = all[leader].myDeclaration()!;
+    expect(declaration['position'], lead);
+    final pass = all[leader].passMessage(to, [lead, ...others])!;
+    broadcast(all, leader, (x) => x.acceptPass(pass));
+    all[leader].acceptPass(pass);
+    // What the receiver was not given, it cannot say: the declaration's
+    // bytes are no opening of a seal made since, to any side.
+    final replayed = {'position': lead, 'opening': declaration['token']};
+    for (final x in all) {
+      expect(x.verifyPlay(to, replayed), isNull, reason: 'seat ${all.indexOf(x)}');
+      expect(x.acceptPlay(to, replayed), isNull);
+    }
+    final honest = all[to].playToken(lead)!;
+    for (final x in all) {
+      expect(x.verifyPlay(to, honest), leadCard, reason: 'the receiver\'s own opening opens it for every side');
+    }
+  });
+
   test('a pass whose seals share their randomness is refused: the opening of one would open them all', () {
     final seats = [for (final k in ['a', 'b', 'c', 'd']) HumanDealSeat(k)];
     final all = dealOut(seats);
@@ -639,7 +667,13 @@ void main() {
     expect(clearKeeper.verifyPass(clear), isTrue);
     expect(clearKeeper.verifyPass({...clear, 'proofs': (clear['proofs']! as List).take(2).toList()}), isFalse, reason: 'a proof short');
     expect(hiddenKeeper.verifyPass(hidden), isTrue);
-    expect(hiddenKeeper.verifyPass(made), isTrue, reason: 'and a reader of kept games reads a pass as it is made now');
+    // A reader of the first revision reads what the first made, and not
+    // what the second does: a game of the first has no such pass in it that
+    // its table took, and one that is there is one its table skipped.
+    for (final keeper in [clearKeeper, hiddenKeeper]) {
+      expect(keeper.verifyPass(made), isFalse, reason: 'a pass as it is made now is none of the first revision\'s');
+      expect(keeper.acceptPass(made), isFalse);
+    }
     for (final (keeper, old) in [(clearKeeper, clear), (hiddenKeeper, hidden)]) {
       expect(keeper.acceptPass(old), isTrue);
       expect(keeper.holderOf(positions[0]), 1);
