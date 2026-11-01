@@ -126,8 +126,6 @@ class _SubscribePageState extends State<SubscribePage> {
       _me = me;
       _signedIn = signedIn;
     });
-    final offered = providerTokens.offered;
-    if (signedIn == null && offered.isNotEmpty) providerTokens.prepare(offered);
     if (!Entitlement.current.live) return;
     await _list(me);
   }
@@ -763,7 +761,10 @@ class _SubscribePageState extends State<SubscribePage> {
 /// One provider's button: the provider's own where it insists on
 /// drawing it (Google's, on the web), and otherwise one drawn here —
 /// Apple's to Apple's own rules, Google's in the page's style.
-class _SignInButton extends StatelessWidget {
+/// A sign-in with [provider]. The provider is got ready (on the web, its
+/// script fetched) when its button is first on the screen, and a page
+/// that shows no button, such as a suspended account's, fetches nothing.
+class _SignInButton extends StatefulWidget {
   const _SignInButton({required this.provider, required this.nonce, required this.label, required this.enabled, required this.onAsked});
 
   final Provider provider;
@@ -772,13 +773,26 @@ class _SignInButton extends StatelessWidget {
   final bool enabled;
   final void Function(Asked asked) onAsked;
 
-  Future<void> _ask() async => onAsked(await providerTokens.ask(provider, nonce));
+  @override
+  State<_SignInButton> createState() => _SignInButtonState();
+}
+
+class _SignInButtonState extends State<_SignInButton> {
+  @override
+  void initState() {
+    super.initState();
+    providerTokens.prepare([widget.provider]);
+  }
+
+  Future<void> _ask() async => widget.onAsked(await providerTokens.ask(widget.provider, widget.nonce));
 
   @override
   Widget build(BuildContext context) {
-    final own = providerTokens.ownButton(provider, nonce, onAsked);
+    final enabled = widget.enabled;
+    final own = providerTokens.ownButton(widget.provider, widget.nonce, widget.onAsked);
     if (own != null) return IgnorePointer(ignoring: !enabled, child: own);
-    return switch (provider) {
+    final label = widget.label;
+    return switch (widget.provider) {
       Provider.apple => SignInWithAppleButton(
           onPressed: enabled ? () => unawaited(_ask()) : null,
           text: label,

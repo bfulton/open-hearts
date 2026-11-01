@@ -48,8 +48,11 @@ class FakeTokens implements ProviderTokens {
   @override
   Widget? ownButton(Provider provider, String nonce, void Function(Asked asked) onAsked) => null;
 
+  /// The providers got ready, in order.
+  final prepared = <Provider>[];
+
   @override
-  void prepare(List<Provider> providers) {}
+  void prepare(List<Provider> providers) => prepared.addAll(providers);
 }
 
 FakeTokens offering(List<Provider> offered) {
@@ -179,6 +182,25 @@ void main() {
     expect(find.text('This device'), findsOneWidget);
     expect(find.textContaining('Sign in'), findsNothing);
     expect(find.text('Your account'), findsNothing);
+  });
+
+  testWidgets('a provider is got ready only once its button is on the screen, so a suspended account\'s page fetches nothing', (tester) async {
+    standUp();
+    final tokens = offering([Provider.apple]);
+    final me = await Identity.signer();
+    await Entitlement.current.load(me.publicKey);
+    await Entitlement.current.suspend();
+    await openPage(tester);
+    expect(find.text('Suspended from live play'), findsWidgets);
+    expect(find.text('Sign in with Apple'), findsNothing);
+    expect(tokens.prepared, isEmpty, reason: 'no button, so nothing of Apple\'s fetched');
+
+    Entitlement.current = Entitlement(service: _service);
+    await Entitlement.current.load(me.publicKey);
+    await tester.pumpWidget(const SizedBox());
+    await openPage(tester);
+    expect(find.text('Sign in with Apple'), findsOneWidget);
+    expect(tokens.prepared, [Provider.apple]);
   });
 
   testWidgets("the page shows the account's sign-in as the service has it, not as this device last noted it", (tester) async {
