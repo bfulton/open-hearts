@@ -126,9 +126,13 @@ suite_e2e_house() { node e2e/house.mjs; }
 suite_e2e_offline() { node e2e/offline.mjs; }
 suite_e2e_site() { node e2e/site.mjs; }
 suite_e2e_move() { node e2e/move.mjs; }
+# The app under its Content-Security-Policy. It makes a build of its own,
+# the suites' with Apple's Services ID (e2e/build.sh --out), and not
+# again while that is unchanged.
+suite_e2e_csp() { node e2e/csp.mjs; }
 
 all_suites="engine deal table table_slow service relay_js functions site infra ops workers crypto scripts docs app_analyze app
-  e2e_build e2e_flows e2e_run e2e_house e2e_offline e2e_site e2e_move"
+  e2e_build e2e_flows e2e_run e2e_house e2e_offline e2e_site e2e_move e2e_csp"
 
 # ---- running them ----------------------------------------------------------
 
@@ -241,7 +245,12 @@ quick() {
     case $f in
       app/lib/*|app/test/*|app/web/*|app/worker/*|app/pubspec.yaml|app/analysis_options.yaml|app/l10n.yaml)
         add app_analyze app; app_files+=("$f")
-        case $f in app/web/*|app/worker/*) add workers ;; app/lib/net/buying.dart) add site ;; esac ;;
+        case $f in
+          app/web/*) add workers site e2e_csp ;;
+          app/worker/*) add workers ;;
+          app/lib/net/buying.dart) add site ;;
+          app/lib/net/provider_tokens_web.dart) add site e2e_csp ;;
+        esac ;;
       packages/engine/*) add engine ;;
       packages/deal/*) add deal ;;
       packages/table/*|packages/table_sim/*) add table ;;
@@ -256,6 +265,9 @@ quick() {
       service/functions/*) add functions ops ;;
       service/tool/*.mjs) add functions ops ;;
       service/*) add service ;;
+      # The app's Content-Security-Policy: held to the code, and the app
+      # loaded under it.
+      site/public/_headers|site/headers.mjs|site/headers.test.mjs) add site e2e_site e2e_csp ops ;;
       site/*) add site e2e_site ops ;;
       config/*) add site functions infra ops ;;
       infra/*) add infra ops ;;
@@ -263,6 +275,7 @@ quick() {
       observability/*) add infra ops ;;
       ops/*|oh) add ops ;;
       e2e/*.test.mjs) add workers ;;
+      e2e/csp.mjs) add scripts e2e_csp ;;
       e2e/*|*.sh|.github/*) add scripts ;;
       crypto/*) add crypto deal workers ;;
     esac
@@ -322,7 +335,7 @@ full() {
   local crypto="" s
   [ -d crypto/deal/target/release/.fingerprint ] && command -v cargo > /dev/null && crypto=crypto
   local plan=("table table_slow" "app_analyze app" "engine,deal" "relay_js,functions,site,infra,ops,workers,scripts,docs $crypto"
-    "e2e_build e2e_move,e2e_site service,e2e_house e2e_run,e2e_offline e2e_flows")
+    "e2e_build e2e_move,e2e_site service,e2e_house e2e_run,e2e_offline e2e_flows e2e_csp")
   # Every suite there is, in a lane: one left out would never run here.
   for s in $all_suites; do
     [ "$s" = crypto ] && [ -z "$crypto" ] && continue

@@ -23,18 +23,34 @@
 # And the house the suites start, compiled ahead of time once for
 # whatever service/ is at (drive.mjs, serviceProgram), so that suites
 # started together do not each compile it.
+#
+# --out <dir>, under app/ and build/e2e if not given, makes the app
+# somewhere else: for a build that differs from the suites' own by a flag
+# it is given as well. The CSP suite's is made with Apple's Services ID,
+# so that the sign-in buttons are on the screen (csp.mjs). Each
+# directory has a stamp of its own.
 set -euo pipefail
 cd "$(dirname "$0")/../app"
 ( cd .. && node --input-type=module -e "const d = await import('./e2e/drive.mjs'); await d.serviceProgram('house');" ) &
 programs=$!
 force=0
+out=build/e2e
 args=()
-for a in "$@"; do
-  if [ "$a" = --force ]; then force=1; else args+=("$a"); fi
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --force) force=1 ;;
+    --out)
+      [ $# -gt 1 ] || { echo "build: --out needs a directory" >&2; exit 2; }
+      out="$2"
+      shift
+      ;;
+    *) args+=("$1") ;;
+  esac
+  shift
 done
 flutter="${FLUTTER:-flutter}"
 sdk="$(dirname "$(command -v "$flutter")")/cache"
-stamp=build/e2e/.made-from
+stamp="$out/.made-from"
 made_from() {
   {
     cat "$sdk/flutter.version.json" "$sdk/engine.stamp" 2>/dev/null
@@ -44,20 +60,20 @@ made_from() {
   } | sha1sum | cut -c1-40
 }
 want=$(made_from)
-if [ $force = 0 ] && [ -f build/e2e/main.dart.js ] && [ "$(cat "$stamp" 2>/dev/null)" = "$want" ]; then
-  echo "build/e2e is up to date (made from ${want:0:12}); --force to make it again"
+if [ $force = 0 ] && [ -f "$out/main.dart.js" ] && [ "$(cat "$stamp" 2>/dev/null)" = "$want" ]; then
+  echo "$out is up to date (made from ${want:0:12}); --force to make it again"
   wait $programs
   exit 0
 fi
 rm -f "$stamp"
 "$flutter" build web \
-  -o build/e2e \
+  -o "$out" \
   --base-href / \
   --no-web-resources-cdn \
   --no-wasm-dry-run \
   --dart-define=OH_SERVICE_KEY=dff1d77f2a671c5f36183726db2341be58feae1da2deced843240f7b502ba659 \
   --dart-define=OH_HOUSE_KEY=dd308afec5777e13121fa72b9cc1b7cc0139715309b086c960e18fd969774eb8 \
   ${args[@]+"${args[@]}"}
-worker/build.sh build/e2e
+worker/build.sh "$out"
 echo "$want" > "$stamp"
 wait $programs

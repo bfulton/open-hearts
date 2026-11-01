@@ -258,8 +258,29 @@ policy (`site/public/_headers`), so no other page can frame the app and
 steer its one-tap buttons. One page is excepted: `openhearts.game/carry`,
 which hands a device's storage to `play.openhearts.game`. Only that
 origin may frame it, it has no buttons, and it answers only that origin
-([the device, carried over](service.md#the-device-carried-over)). The app loads these
-third-party scripts:
+([the device, carried over](service.md#the-device-carried-over)).
+
+The app's own files, everything under `/play/` in the Pages project (the
+root of play.openhearts.game), carry a policy of their own in the same
+header, which says what may run in the app:
+
+```
+frame-ancestors 'none'; script-src 'self' 'wasm-unsafe-eval' https://js-agent.newrelic.com https://appleid.cdn-apple.com; worker-src 'self' blob:
+```
+
+Scripts are the app's own files, WebAssembly (CanvasKit, the deal and
+the signature) and the third parties below; workers are the app's own
+files and one made from a blob, which is how the deal's worker is
+started (`packages/deal/lib/src/worker_web.dart`: its script is fetched
+once and started from memory). There is no inline script, no `eval` and
+no other origin, so a script that got into the page cannot load more of
+itself, and a blob cannot be a script. A worker has no `localStorage`.
+`site/headers.test.mjs` holds the policy to the code and to
+`config/openhearts.json`, and `e2e/csp.mjs` loads the real build under
+it in a browser, with a sign-in button on the screen, and sees nothing
+refused. The browser rig serves the same file's headers, as Pages does.
+
+The app loads these third-party scripts:
 
 - New Relic's browser agent, on every page of play.openhearts.game
   only, which its loader (`app/web/observability.js`) fetches from
@@ -269,13 +290,24 @@ third-party scripts:
   (`app/lib/net/provider_tokens_web.dart`): Apple's `appleid.auth.js`
   from `appleid.cdn-apple.com` in a build with `apple.servicesId`, and
   Google's client from `accounts.google.com` in a build with
-  `google.webClientId`. These are not pinned.
+  `google.webClientId`. These are not pinned. Apple's origin is in the
+  policy and Google's is not, because no build offers Google on the web:
+  setting `google.webClientId` (which an Android build needs as well)
+  makes the web build offer it, and its button would be refused until
+  the policy names the origin. `site/headers.test.mjs` fails first.
 
 Each runs in the app's own document, so it can read the app's storage,
-the device's secret key included. Cloudflare's Web Analytics and email
+the device's secret key included; the policy does not change that, only
+what else can join them. Cloudflare's Web Analytics and email
 obfuscation are off, since both inject scripts.
-Open: a fuller CSP (`script-src`) has not been set. The Flutter build
-needs `wasm-unsafe-eval`, and the policy has to be tested against it.
+
+Open: Apple's script is still in the policy and still runs in the app's
+document. Opening Apple's sign-in page in a popup of our own, and taking
+its answer from a `postMessage` of `https://appleid.apple.com` alone,
+would leave Apple's origin out of the policy and no sign-in provider's
+code in the document. It needs the popup's address and the shape of its
+answer, which only Apple's script knows and the repository does not, so
+it has to be seen once on a real sign-in before it is written.
 
 ## Secrets
 
