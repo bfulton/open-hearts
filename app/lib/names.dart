@@ -113,10 +113,14 @@ bool _refusedWords(List<String> words, {bool reservedOnly = false}) {
 /// [_notSent] in it. Any other is held to the lists as written, and with
 /// words run together as `ShitHead` parted; and for the reserved words,
 /// with look-alike letters read as the Latin ones they are drawn like.
+/// Words run together are parted after the combining marks and
+/// invisible characters the fold drops are taken out, so that one
+/// between the two letters does not keep them together (names.mjs,
+/// splitCamel).
 bool nameRefused(String name) {
   if (name.runes.length > longestName || _notSent.hasMatch(name)) return true;
   if (blockedSymbols.any(name.contains)) return true;
-  final parted = name.replaceAllMapped(_camel, (m) => '${m[1]} ${m[2]}');
+  final parted = name.replaceAll(_marks, '').replaceAllMapped(_camel, (m) => '${m[1]} ${m[2]}');
   if (_refusedWords(_foldedWords(name)) || _refusedWords(_foldedWords(parted))) return true;
   String latin(String s) => s.split('').map((ch) => _lookAlikes[ch] ?? ch).join();
   return _refusedWords(_foldedWords(latin(name)), reservedOnly: true) || _refusedWords(_foldedWords(latin(parted)), reservedOnly: true);

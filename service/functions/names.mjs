@@ -37,7 +37,8 @@ export const NAME_MOST = 60;
 /// names.dart, cleanName) that the filter would read as a break between
 /// words: control characters, and the line and paragraph separators.
 /// The others it takes out are format characters, which the filter
-/// drops too (name_fold.mjs).
+/// drops too, before it reads the words and before it parts words run
+/// together (name_fold.mjs).
 const NOT_SENT = /[\p{Cc}\u2028\u2029]/u;
 
 /// Words that would make a name pass for Open Hearts or its staff, in
