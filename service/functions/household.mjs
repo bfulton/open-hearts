@@ -302,28 +302,26 @@ export async function householdOp(op, store, { now = Date.now(), mail = null, ac
 /// Which of the hour's allowances [op] is counted against. An unlink is
 /// Apple's word, not the person's, and has an allowance of its own (the
 /// size of the changes'), so the person's own changes never stand in
-/// its way; an operator's order has no allowance at all. What a device
-/// asks on a licence the store where it asked does not back (licence.mjs,
-/// accountAsking) has one of its own too (the size of the reads'): a
-/// device dropped from the account still holds its licence until its
-/// day, and is refused here, but spends none of what the account's own
-/// devices have.
-const kindOf = (op) =>
-  op.op === 'order'
-    ? 'order'
-    : op.shown === true
-    ? 'shown'
-    : op.op === 'activate' || op.op === 'seen' || op.op === 'inUse'
-    ? 'active'
-    : op.op === 'record'
-      ? 'record'
-      : op.op === 'profile' && op.profile
-      ? 'profile'
-      : op.op === 'unlink'
-        ? 'unlink'
-        : op.op === 'list' || op.op === 'profile' || (op.op === 'backups' && op.rotate !== true)
-          ? 'read'
-          : 'change';
+/// its way; an operator's order has no allowance at all. A device coming
+/// in, with a code, a backup code or a sign-in, has one of its own too
+/// (the size of the changes'): anybody who has seen a code can ask with
+/// it, and what they ask spends nothing the account's own devices need.
+/// What a device asks on a licence the store where it asked does not
+/// back (licence.mjs, accountAsking) has one of its own too (the size of
+/// the reads'): a device dropped from the account still holds its
+/// licence until its day, and is refused here, but spends none of what
+/// the account's own devices have.
+function kindOf(op) {
+  if (op.op === 'order') return 'order';
+  if (op.shown === true) return 'shown';
+  if (op.op === 'activate' || op.op === 'seen' || op.op === 'inUse') return 'active';
+  if (op.op === 'record') return 'record';
+  if (op.op === 'profile') return op.profile ? 'profile' : 'read';
+  if (op.op === 'unlink') return 'unlink';
+  if (op.op === 'claim' || op.op === 'redeem' || op.op === 'join') return 'incoming';
+  if (op.op === 'list' || (op.op === 'backups' && op.rotate !== true)) return 'read';
+  return 'change';
+}
 
 /// Tells the relay's object for each of [tags] that [account]'s device
 /// in use is now the one of [epoch], so it closes the sockets of any

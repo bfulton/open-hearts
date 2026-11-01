@@ -52,8 +52,9 @@ export const SERVICE_DEFAULTS = Object.freeze({
   requestToleranceS: 300,
   // How old a webhook's own timestamp may be: a replay is not a payment.
   webhookToleranceS: 300,
-  // What one account may do in an hour: changes (a code, a claim, a
-  // drop) and readings of its list. Adding a phone takes a handful.
+  // What one account may do in an hour: changes (a code, a drop) and
+  // readings of its list. Devices coming in (a claim) have as many
+  // again of their own. Adding a phone takes a handful.
   householdChangesPerHour: 20,
   householdReadsPerHour: 60,
   // What one account's devices may ask of the account's turn in an hour

@@ -68,8 +68,11 @@ async function claimRoute(request, env) {
   const { key, body, signer } = asked;
   const store = storeOf(env);
   if (!store) return json(request, 503, notConfigured('OH_STORE'));
-  // In the account the code is for, which the code's row says; a code
-  // nobody made is said so here, without queueing anybody.
+  // In the account the code is for, which the code's row says. A code
+  // nobody made, or one the store here already shows spent or run out,
+  // is said so here, without queueing anybody: anybody who once saw a
+  // code could otherwise spend the account's allowance with it. The
+  // account's turn still decides.
   // A backup code, typed by a person, or a code off another device's
   // screen: sixteen characters of one alphabet, or thirty-two hex.
   const backup = backupCodeOf(body.ticket);
@@ -77,11 +80,15 @@ async function claimRoute(request, env) {
   if (backup) {
     const account = (await store.get(await backupRow(backup), 'META'))?.account;
     if (!isAccount(account)) return json(request, 404, { error: 'no such code' });
+    const mine = (await store.get(`ACCOUNT#${account}`, 'BACKUP'))?.codes?.find((c) => c.code === backup);
+    if (mine?.used_at) return json(request, 409, { error: 'that code has been used' });
     claimed = await inHousehold(env, account, { op: 'redeem', key, code: backup });
   } else {
     if (typeof body.ticket !== 'string' || !/^[0-9a-f]{2,64}$/.test(body.ticket)) return json(request, 400, { error: 'not a code' });
     const ticket = await store.get(`TICKET#${body.ticket}`, 'META');
     if (!isAccount(ticket?.account)) return json(request, 404, { error: 'no such code' });
+    if (ticket.used_at) return json(request, 409, { error: 'that code has been used' });
+    if (Date.parse(ticket.expires_at) <= Date.now()) return json(request, 410, { error: 'that code has run out' });
     claimed = await inHousehold(env, ticket.account, { op: 'claim', key, code: body.ticket });
   }
   if (claimed.status !== 200) return json(request, claimed.status, claimed.body);

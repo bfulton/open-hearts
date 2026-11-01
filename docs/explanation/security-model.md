@@ -133,7 +133,12 @@ product.
   size of the reads'. That covers a device just brought in, and one
   dropped from the household that still holds its licence, so a dropped
   device spends none of the household's
-  ([one account at a time](service.md#accounts)).
+  ([one account at a time](service.md#accounts)). A device coming in,
+  with a code, a backup code or a sign-in, has an allowance of its own
+  too, the size of the changes', and a code the store already shows as
+  spent or run out is turned away before the account's turn is asked:
+  whoever once saw a code can keep asking with it, and spends nothing
+  the household's own devices need.
 
 ## TURN
 

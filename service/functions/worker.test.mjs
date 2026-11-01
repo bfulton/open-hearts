@@ -1810,6 +1810,51 @@ test("a device dropped from its account, still holding its licence, is refused, 
   }
 });
 
+test("codes tried by somebody outside the account spend nothing of what the account's own devices need", async () => {
+  const store = await household(Date.now(), ADA.public);
+  const account = await accountOfSub(store, 'sub_9');
+  const { codes } = await makeBackups(store, account);
+  const { send } = serving(store);
+  const objects = watchedObjects(kvOf(store));
+  const held = { ...serving(store).held, HOUSEHOLD: objects };
+  const ask = async (pair, handler, more = {}) => worker.fetch(send(handler, await asking(pair, handler, more)), held);
+  const claim = (pair, code) => ask(pair, 'claim', { what: code, ticket: code });
+  // Bao comes in with a backup code, and comes in with a code off Ada's
+  // screen, and is dropped each time.
+  const used = codes[0].code;
+  assert.equal((await claim(BAO, used)).status, 200);
+  const { licence: hers } = await (await ask(ADA, 'licence')).json();
+  const drop = async () => assert.equal((await ask(ADA, 'devices', { what: BAO.public, drop: BAO.public, licence: hers })).status, 200);
+  await drop();
+  const { ticket } = await (await ask(ADA, 'ticket', { licence: hers })).json();
+  assert.equal((await claim(BAO, ticket)).status, 200);
+  await drop();
+  // Then he tries both codes again, and again: each is turned away as
+  // spent, and never reaches the account's turn.
+  objects.asked.length = 0;
+  for (let i = 0; i < SERVICE_DEFAULTS.householdChangesPerHour + 5; i++) {
+    assert.deepEqual(await (await claim(CY, used)).json(), { error: 'that code has been used' });
+    assert.equal((await claim(CY, ticket)).status, 409);
+  }
+  assert.deepEqual(objects.asked, [], 'no turn woken');
+  // The account's own devices change it as ever.
+  assert.equal((await ask(ADA, 'ticket', { licence: hers })).status, 200, 'a code for a new phone');
+  assert.equal((await ask(ADA, 'backups', { what: 'rotate', rotate: true, licence: hers })).status, 200, 'the codes replaced');
+
+  // A good code for a full account is refused in the account's turn,
+  // and counted apart from the account's own changes.
+  const full = await household(Date.now(), BAO.public);
+  for (const k of ['11', '22', '33', '44'].map((b) => b.repeat(32))) await claimWith(k, (await ticketFor(BAO.public, full)).body.ticket, full);
+  const spare = (await makeBackups(full, await accountOfSub(full, 'sub_9'))).codes[0].code;
+  const there = serving(full);
+  for (let i = 0; i < SERVICE_DEFAULTS.householdChangesPerHour + 5; i++) {
+    const tried = await worker.fetch(there.send('claim', await asking(CY, 'claim', { what: spare, ticket: spare })), there.held);
+    assert.equal(tried.status, i < SERVICE_DEFAULTS.householdChangesPerHour ? 409 : 429);
+  }
+  const rotated = await worker.fetch(there.send('backups', await asking(BAO, 'backups', { what: 'rotate', rotate: true })), there.held);
+  assert.equal(rotated.status, 200, "the full account's own device replaces its codes");
+});
+
 test('a sign-in binds only a key that asked to be bound, so nobody\'s account is put on somebody else\'s device', async () => {
   // The nonce is the caller's to choose, so a stranger can have the
   // provider sign his own account over Ada's key. Bound to her key, his
