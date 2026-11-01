@@ -10,6 +10,7 @@ void main() {
   test('a name keeps its text and loses what is not text, trimmed', () {
     expect(cleanName('  Ada Lovelace '), 'Ada Lovelace');
     expect(cleanName('A\nda\u0000\u0085'), 'Ada', reason: 'control characters');
+    expect(cleanName('A d a'), 'Ada', reason: 'line and paragraph separators');
     expect(cleanName('José 😀 Zoë'), 'José 😀 Zoë');
     expect(cleanName('👩\u200d👩\u200d👧'), '👩\u200d👩\u200d👧', reason: 'the joiner is part of the emoji');
     expect(cleanName('محمد'), 'محمد', reason: 'a name written right to left is still a name');

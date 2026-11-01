@@ -755,15 +755,15 @@ class _SubscribePageState extends State<SubscribePage> {
   /// A screen's code in fours, for a person to read across: the spaces
   /// are ignored where it is typed (net/household.dart, [codeIn]).
   static String _grouped(String code) => [for (var i = 0; i < code.length; i += 4) code.substring(i, i + 4 > code.length ? code.length : i + 4)].join(' ');
-
 }
 
 /// One provider's button: the provider's own where it insists on
 /// drawing it (Google's, on the web), and otherwise one drawn here —
 /// Apple's to Apple's own rules, Google's in the page's style.
-/// A sign-in with [provider]. The provider is got ready (on the web, its
-/// script fetched) when its button is first on the screen, and a page
-/// that shows no button, such as a suspended account's, fetches nothing.
+///
+/// The provider is prepared (on the web, its script fetched) when the
+/// button is first built, so a page that shows no button, such as a
+/// suspended account's, fetches nothing.
 class _SignInButton extends StatefulWidget {
   const _SignInButton({required this.provider, required this.nonce, required this.label, required this.enabled, required this.onAsked});
 
