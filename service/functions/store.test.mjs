@@ -13,9 +13,9 @@ import { signerOn } from './licence.mjs';
 import { objectsAt, seenFrom } from './places.fixtures.mjs';
 import { memoryStore } from './rows.mjs';
 import { forgetProviderKeys } from './signin.mjs';
-import { forgetPlayAccess, playPurchase, storeAccountOf } from './stores.mjs';
+import { appleTransaction, forgetPlayAccess, playPurchase, storeAccountOf } from './stores.mjs';
 import { record } from './stripe.mjs';
-import { APPLE_ROOT_G3, appleSigned, appleTransaction, certOf, forgetAppleRoots, signedBy, trustAppleRoots } from './x509.mjs';
+import { APPLE_ROOT_G3, appleSigned, certOf, forgetAppleRoots, signedBy, trustAppleRoots } from './x509.mjs';
 import { keys } from '../do/sign.mjs';
 import * as pki from './store.fixtures.mjs';
 
@@ -178,7 +178,7 @@ const assets = { fetch: async (url) => (String(url).endsWith('/play/schnorr.wasm
 const serving = (store, more = {}) => ({
   env: { ASSETS: assets, OH_SERVICE_SECRET: SERVICE_SECRET, OH_SERVICE_KEY: SERVICE_KEY, OH_STORE: kvOf(store), ...appleEnv, ...more },
   send: (what, body, headers = {}) =>
-    new Request(`https://dev.open-hearts.pages.dev/api/${what}`, { method: 'POST', headers, body: typeof body === 'string' ? body : JSON.stringify(body) }),
+    new Request(`https://play.openhearts.game/api/${what}`, { method: 'POST', headers, body: typeof body === 'string' ? body : JSON.stringify(body) }),
 });
 
 const bring = async (pair, store, proof) => ({ ...(await asking(pair, 'store', proof)), store, proof });
@@ -434,6 +434,25 @@ test('a Play token is asked of Play with the service account, and acknowledged o
   assert.equal(g.calls.some((c) => c.url.includes('oauth2.googleapis.com/token')), false, 'kept from the first ask');
 });
 
+test("an acknowledgement Play refuses, and a service account that does not read, are said in the log, and neither says the secret", async (t) => {
+  const logged = t.mock.method(console, 'log', () => {});
+  const said = () => logged.mock.calls.map((c) => c.arguments.join(' '));
+  forgetPlayAccess();
+  const g = google({ [TOKEN]: playing() });
+  const refusing = async (url, init) => (String(url).endsWith(':acknowledge') ? new Response('{}', { status: 403 }) : g(url, init));
+  assert.equal((await playPurchase(TOKEN, playEnv, refusing, { now })).paid, true, 'the purchase is taken all the same');
+  assert.deepEqual(said(), ['play acknowledge: 403']);
+  const down = async (url, init) => (String(url).endsWith(':acknowledge') ? Promise.reject(new TypeError('fetch failed')) : g(url, init));
+  await playPurchase(TOKEN, playEnv, down, { now });
+  assert.deepEqual(said().slice(1), ['play acknowledge: unreachable']);
+  logged.mock.resetCalls();
+  forgetPlayAccess();
+  for (const secret of ['private_key: MIIE not json', JSON.stringify({ client_email: 'play@x' })]) {
+    assert.equal((await playPurchase(TOKEN, { ...playEnv, OH_PLAY_SERVICE_ACCOUNT: secret }, g, { now })).status, 502, 'Play taken as not answering');
+  }
+  assert.deepEqual(said(), Array(2).fill('play: OH_PLAY_SERVICE_ACCOUNT does not parse, or lacks client_email or private_key'));
+});
+
 test('a Play token is ours only for this product, and paid only while Play says so', async () => {
   const states = {
     SUBSCRIPTION_STATE_ACTIVE: true,
@@ -481,7 +500,7 @@ async function pushToken(claims, key = rsa.privateKey) {
 
 test('Play\'s notifications, pushed by Pub/Sub: checked, then Play asked what the purchase is now', async () => {
   const store = memoryStore();
-  const push = { OH_PLAY_PUSH_AUDIENCE: 'https://dev.open-hearts.pages.dev/api/play', OH_PLAY_PUSH_EMAIL: 'pubsub@open-hearts.iam.gserviceaccount.com' };
+  const push = { OH_PLAY_PUSH_AUDIENCE: 'https://play.openhearts.game/api/play', OH_PLAY_PUSH_EMAIL: 'pubsub@open-hearts.iam.gserviceaccount.com' };
   const { env, send } = serving(store, { ...playEnv, ...push });
   const jwk = { ...(await crypto.subtle.exportKey('jwk', rsa.publicKey)), kid: 'push-1', alg: 'RS256', use: 'sig' };
   const claims = { iss: 'https://accounts.google.com', aud: push.OH_PLAY_PUSH_AUDIENCE, email: push.OH_PLAY_PUSH_EMAIL, email_verified: true, exp: Math.floor(now / 1000) + 600 };
@@ -497,6 +516,8 @@ test('Play\'s notifications, pushed by Pub/Sub: checked, then Play asked what th
     }
     const ok = await worker.fetch(send('play', note, auth(await pushToken(claims))), env);
     assert.equal(ok.status, 200);
+    // Google signs with either form of its issuer, as a sign-in is taken.
+    assert.equal((await worker.fetch(send('play', note, auth(await pushToken({ ...claims, iss: 'accounts.google.com' }))), env)).status, 200);
     const { recorded } = await ok.json();
     assert.equal(recorded.renews_at, new Date(now).toISOString().slice(0, 10), 'on hold is not paid for now');
     // Refunded: voided, and nothing more is asked.

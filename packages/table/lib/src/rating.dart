@@ -20,15 +20,10 @@ class Rating {
   final double mu;
 
   /// The deviation: 350 for a newcomer, settling towards [floor] with
-  /// every game and drifting back up with time away.
+  /// every game.
   final double phi;
 
   static const floor = 50.0;
-  static const ceiling = 350.0;
-
-  /// Deviation per period of absence; a month or so of not playing
-  /// takes a settled player halfway back to new.
-  static const drift = 35.0;
 
   int get shown => mu.round();
 
@@ -50,24 +45,20 @@ double _g(double phi) => 1 / sqrt(1 + 3 * _q * _q * phi * phi / (pi * pi));
 double _expected(Rating me, Rating them) => 1 / (1 + pow(10, -_g(them.phi) * (me.mu - them.mu) / 400));
 
 /// The Glicko update for one period.
-Rating rate(Rating me, List<Outcome> outcomes, {int periodsAway = 0}) {
-  // Time away widens the deviation.
-  var phi = min(sqrt(me.phi * me.phi + Rating.drift * Rating.drift * periodsAway), Rating.ceiling);
-  if (outcomes.isEmpty) return Rating(mu: me.mu, phi: phi);
-  final before = Rating(mu: me.mu, phi: phi);
+Rating rate(Rating me, List<Outcome> outcomes) {
+  if (outcomes.isEmpty) return me;
   var d2inv = 0.0;
   var sum = 0.0;
   for (final o in outcomes) {
     final g = _g(o.opponent.phi);
-    final e = _expected(before, o.opponent);
+    final e = _expected(me, o.opponent);
     d2inv += g * g * e * (1 - e);
     sum += g * (o.score - e);
   }
   d2inv *= _q * _q;
-  final denominator = 1 / (phi * phi) + d2inv;
+  final denominator = 1 / (me.phi * me.phi) + d2inv;
   final mu = me.mu + _q / denominator * sum;
-  phi = max(sqrt(1 / denominator), Rating.floor);
-  return Rating(mu: mu, phi: phi);
+  return Rating(mu: mu, phi: max(sqrt(1 / denominator), Rating.floor));
 }
 
 /// Pairwise scores for one seat in a finished game: lower total wins.

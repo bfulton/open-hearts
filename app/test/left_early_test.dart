@@ -137,6 +137,28 @@ void main() {
     expect(button(tester, 'Play live').onPressed, isNotNull);
   });
 
+  testWidgets('a time ahead of the clock is a clock set back since: the wait runs from when the door sees it', (tester) async {
+    SharedPreferences.setMockInitialValues({'live.leftEarlyAt': now + 24 * 60 * _minute});
+    await door(tester);
+    expect(find.text("You didn't finish your last live game: Play live opens again in 5:00."), findsOneWidget);
+    expect((await SharedPreferences.getInstance()).getInt('live.leftEarlyAt'), now, reason: 'kept from now on');
+    await second(tester);
+    expect(find.text("You didn't finish your last live game: Play live opens again in 4:59."), findsOneWidget,
+        reason: 'counted down, not held at the full wait for a day');
+  });
+
+  testWidgets('and the same when the clock is set back while the wait counts down', (tester) async {
+    SharedPreferences.setMockInitialValues({'live.leftEarlyAt': now - _minute});
+    await door(tester);
+    expect(find.text("You didn't finish your last live game: Play live opens again in 4:00."), findsOneWidget);
+    now -= 24 * 60 * _minute;
+    await second(tester);
+    expect(find.text("You didn't finish your last live game: Play live opens again in 5:00."), findsOneWidget,
+        reason: 'the whole wait, from now');
+    await second(tester);
+    expect(find.text("You didn't finish your last live game: Play live opens again in 4:59."), findsOneWidget);
+  });
+
   testWidgets('the wait is the operator\'s: none at all where it is set to none', (tester) async {
     SharedPreferences.setMockInitialValues({'live.leftEarlyAt': now - _minute});
     RemoteSettings.current.adopt(RemoteConfig.parse({'leftEarlyMin': 0}));

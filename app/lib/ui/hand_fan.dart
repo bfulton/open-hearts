@@ -177,7 +177,7 @@ class _HandFanState extends State<HandFan> with TickerProviderStateMixin {
     }
     // Whoever asked for no animation gets none: the cards are simply
     // where they now are.
-    if (MediaQuery.maybeOf(context)?.disableAnimations ?? false) return;
+    if (MediaQuery.maybeDisableAnimationsOf(context) ?? false) return;
     final now = widget.hand.toSet();
     final before = old.hand.toSet();
     _launch(before.difference(now), out: true);

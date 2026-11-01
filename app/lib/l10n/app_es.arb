@@ -156,7 +156,6 @@
   "yourPicture": "Tu imagen",
   "useIt": "Usarla",
   "cropHelp": "Arrastra para moverla, pellizca para agrandarla.\nLo que queda en el círculo es tu imagen.",
-  "pictureFlagged": "Este dispositivo pensó que no querrías ver esta imagen en la mesa. Es una suposición, hecha aquí, y puede equivocarse.",
   "showPicture": "Mostrar la imagen de {name}",
   "hidePicture": "Ocultar la imagen de {name}",
   "pictureChoiceNote": "Solo en este dispositivo, y solo su imagen: su nombre y su puntuación se quedan.",

@@ -48,8 +48,11 @@ class FakeTokens implements ProviderTokens {
   @override
   Widget? ownButton(Provider provider, String nonce, void Function(Asked asked) onAsked) => null;
 
+  /// The providers got ready, in order.
+  final prepared = <Provider>[];
+
   @override
-  void prepare(List<Provider> providers) {}
+  void prepare(List<Provider> providers) => prepared.addAll(providers);
 }
 
 FakeTokens offering(List<Provider> offered) {
@@ -119,8 +122,14 @@ void main() {
     expect(said.answer!.licence!.key, me.publicKey);
     final asked = sentTo(stand, 'attest');
     expect([asked['key'], asked['provider'], asked['token']], [me.publicKey, 'apple', 'local:ada']);
-    expect(schnorrVerifier(me.publicKey, requestDigest('attest', me.publicKey, asked['at'] as int), asked['sig'] as String), isTrue,
-        reason: 'the service binds only a key that asked to be bound');
+    // Signed over the provider and the token, so that a request taken off
+    // the wire is not sent again with another sign-in's token in it.
+    expect(schnorrVerifier(me.publicKey, requestDigest('attest', me.publicKey, asked['at'] as int, 'apple local:ada'), asked['sig'] as String), isTrue,
+        reason: 'the service binds only a key that asked to be bound, to the sign-in it asked for');
+    for (final other in ['', 'apple local:bao', 'google local:ada']) {
+      expect(schnorrVerifier(me.publicKey, requestDigest('attest', me.publicKey, asked['at'] as int, other), asked['sig'] as String), isFalse,
+          reason: 'not signed over "$other"');
+    }
 
     // Somebody else's licence, correctly signed, is not this device's.
     stand.says('attest', {'attested': '2026-10-06', 'licence': signedFor(SchnorrSigner.generate().publicKey)});
@@ -133,11 +142,12 @@ void main() {
     final account = '0a' * 16;
     stand.says('supersede', {'account': account, 'at': '2026-10-06', 'licence': signedFor(me.publicKey)});
     final said = await supersedeWith(me, Provider.google, 'local:ada', service: _service);
-    expect(said.answer!.account, account);
     expect(said.answer!.licence!.holdsFor(me.publicKey, service: _service), isTrue);
     final asked = sentTo(stand, 'supersede');
-    expect(schnorrVerifier(me.publicKey, requestDigest('supersede', me.publicKey, asked['at'] as int), asked['sig'] as String), isTrue,
-        reason: 'signed for supersede, so an attest cannot be spent as one');
+    expect(schnorrVerifier(me.publicKey, requestDigest('supersede', me.publicKey, asked['at'] as int, 'google local:ada'), asked['sig'] as String), isTrue,
+        reason: 'signed for supersede, so an attest cannot be spent as one, and over the sign-in it brings the device in by');
+    expect(schnorrVerifier(me.publicKey, requestDigest('supersede', me.publicKey, asked['at'] as int), asked['sig'] as String), isFalse,
+        reason: 'and not signed over nothing');
   });
 
   test('a refused sign-in says why, in words', () async {
@@ -182,6 +192,25 @@ void main() {
     expect(find.text('Your account'), findsNothing);
   });
 
+  testWidgets('a provider is got ready only once its button is on the screen, so a suspended account\'s page fetches nothing', (tester) async {
+    standUp();
+    final tokens = offering([Provider.apple]);
+    final me = await Identity.signer();
+    await Entitlement.current.load(me.publicKey);
+    await Entitlement.current.suspend();
+    await openPage(tester);
+    expect(find.text('Suspended from live play'), findsWidgets);
+    expect(find.text('Sign in with Apple'), findsNothing);
+    expect(tokens.prepared, isEmpty, reason: 'no button, so nothing of Apple\'s fetched');
+
+    Entitlement.current = Entitlement(service: _service);
+    await Entitlement.current.load(me.publicKey);
+    await tester.pumpWidget(const SizedBox());
+    await openPage(tester);
+    expect(find.text('Sign in with Apple'), findsOneWidget);
+    expect(tokens.prepared, [Provider.apple]);
+  });
+
   testWidgets("the page shows the account's sign-in as the service has it, not as this device last noted it", (tester) async {
     final stand = standUp();
     offering([Provider.apple, Provider.google]);
@@ -190,7 +219,7 @@ void main() {
     await licenceThisDevice();
     // Noted here once, and since taken away (Apple, the person no longer
     // using Sign in with Apple for the app).
-    await rememberSignIn(Provider.apple);
+    await noteSignIn('apple');
     stand.says('devices', {
       'devices': [
         {'key': me.publicKey, 'bound_at': '2026-09-01'},
@@ -233,6 +262,7 @@ void main() {
         {'key': me.publicKey, 'bound_at': '2026-10-06'},
       ],
       'most': 5,
+      'signIn': 'apple',
     });
     await press(tester, 'Sign in with Apple');
     expect(tokens.asked, ['apple ${signInNonce(me.publicKey)}'], reason: 'the token is asked for this device\'s key');
@@ -284,6 +314,13 @@ void main() {
     expect(stand.seen.where((s) => s.startsWith('/api/supersede')), isEmpty, reason: 'nothing moved yet');
 
     stand.says('supersede', {'account': '0a' * 16, 'at': '2026-10-06', 'licence': signedFor(me.publicKey)});
+    stand.says('devices', {
+      'devices': [
+        {'key': me.publicKey, 'bound_at': '2026-09-01'},
+      ],
+      'most': 5,
+      'signIn': 'google',
+    });
     await press(tester, 'Use that account here');
     expect(sentTo(stand, 'supersede')['provider'], 'google');
     expect(find.textContaining('Signed in with Google.'), findsOneWidget);

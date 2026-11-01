@@ -9,9 +9,11 @@ import {
   backupsFor,
   backupsMade,
   claimWith,
+  deviceOf,
   devicesOn,
   entitlementOf,
   joinAccount,
+  paidFor,
   redeemBackup,
   ticketFor,
 } from './accounts.mjs';
@@ -20,8 +22,9 @@ import { deleteAccount } from './deletion.mjs';
 import { attest, unlinkSignIn } from './logins.mjs';
 import { sendNotice } from './notices.mjs';
 import { profileRead, profileWritten } from './profile.mjs';
+import { REFUSED } from './refusals.mjs';
 import { storeOf } from './rows.mjs';
-import { S, SITE, notConfigured, settle } from './settings.mjs';
+import { SITE, loadServiceSettings, notConfigured, serviceSettings } from './settings.mjs';
 import { bindPurchase } from './subscriptions.mjs';
 import { SUSPENDED_WHY, carryOut } from './suspension.mjs';
 
@@ -98,7 +101,7 @@ async function heldIn(account, key, store, now) {
   // tells it, so that one the relay's word missed shuts live play at
   // its next renewal.
   if ((await store.get(`KEY#${key}`, 'ENTITLEMENT'))?.suspended) return { refused: { status: 403, body: { error: SUSPENDED_WHY, suspended: true } } };
-  return { refused: { status: 402, body: { error: 'no subscription' } } };
+  return { refused: { status: 402, body: { error: REFUSED.noSubscription } } };
 }
 
 /// The version of [account]'s profile, 0 for none: said with each
@@ -114,14 +117,22 @@ const profileVersion = async (store, account) => (await store.get(`ACCOUNT#${acc
 /// devices is in use.
 export async function seenAt(op, active) {
   const was = await active.get(op.account);
-  if (was?.suspended) return { status: 409, body: { error: SUSPENDED_WHY } };
-  if (!was || was.key !== op.key || was.epoch !== op.epoch) {
-    return { status: 409, body: { error: 'superseded: another device of this account is in use' } };
-  }
+  const refused = seenRefused(op, was);
+  if (refused) return refused;
   if (typeof op.tag === 'string' && op.tag && !(was.tags ?? []).includes(op.tag)) {
     await active.put(op.account, { ...was, tags: [...(was.tags ?? []), op.tag].slice(-MOST_TAGS) });
   }
   return { status: 200, body: { ok: true } };
+}
+
+/// Why [seenAt] says no to [op], given [was], the account's device in
+/// use: null when [op]'s activation is still the one in use.
+function seenRefused(op, was) {
+  if (was?.suspended) return { status: 409, body: { error: SUSPENDED_WHY } };
+  if (!was || was.key !== op.key || was.epoch !== op.epoch) {
+    return { status: 409, body: { error: 'superseded: another device of this account is in use' } };
+  }
+  return null;
 }
 
 /// Whether [op.key] is the account's device in use, and not seated at
@@ -151,9 +162,9 @@ async function dropActive(account, device, active, revoke) {
 /// dropped while it was the one in use is cut off at the relay at once.
 export async function dropDevice(key, device, store, { now = Date.now(), active = null, revoke = null } = {}) {
   const account = await accountOfKey(store, key);
-  if (!account) return { status: 402, body: { error: 'no subscription' } };
+  if (!account) return { status: 402, body: { error: REFUSED.noSubscription } };
   const devices = await devicesOn(store, account);
-  if (!devices.some((d) => d.key === device)) return { status: 404, body: { error: 'not a device on this subscription' } };
+  if (!devices.some((d) => d.key === device)) return { status: 404, body: { error: REFUSED.notADevice } };
   await store.del(`ACCOUNT#${account}`, `DEVICE#${device}`);
   // And the entitlement that device holds, which is gone rather than
   // run out: a licence is one read, and a row saying it is paid up to
@@ -164,7 +175,7 @@ export async function dropDevice(key, device, store, { now = Date.now(), active 
   const theirs = await store.get(`KEY#${device}`, 'ENTITLEMENT');
   if (theirs?.account === account) await store.del(`KEY#${device}`, 'ENTITLEMENT');
   if (active) await dropActive(account, device, active, revoke);
-  return { status: 200, body: { devices: (await devicesOn(store, account)).length, most: S().mostDevices } };
+  return { status: 200, body: { devices: (await devicesOn(store, account)).length, most: serviceSettings().mostDevices } };
 }
 
 // ---- one account at a time ----------------------------------------------
@@ -183,30 +194,33 @@ export async function dropDevice(key, device, store, { now = Date.now(), active 
 // turn — its account found or made — is an object of its own, named
 // `sub:` and the subscription.
 
+/// The setting that is each kind's allowance an hour ([kindOf]). Any
+/// other kind, a change, a device coming in or an unlink, has the
+/// changes' allowance, each counted apart.
+const ALLOWANCES = Object.freeze({
+  read: 'householdReadsPerHour',
+  shown: 'householdReadsPerHour',
+  active: 'activationsPerHour',
+  profile: 'profileWritesPerHour',
+  record: 'recordsPerHour',
+});
+
 /// One household's queue and its hour: everything asked of it runs in
 /// order, and what is over the hour's allowance is refused before it
-/// touches the store.
+/// touches the store. [free], where given, runs first in the turn, and
+/// an answer from it is given counted against nothing ([answeredFree]).
 export function sequencer({ now = Date.now } = {}) {
   let queue = Promise.resolve();
   const done = { change: [], read: [] };
-  return (kind, work) => {
+  return (kind, work, free = null) => {
     const run = queue.then(async () => {
+      const refused = await free?.();
+      if (refused) return refused;
       const t = now();
       const recent = (done[kind] = (done[kind] ?? []).filter((at) => t - at < 3600000));
       // An operator's order (suspension.mjs) is never held back by what
       // the account's own devices have asked for this hour.
-      const most =
-        kind === 'order'
-          ? Infinity
-          : kind === 'read' || kind === 'shown'
-          ? S().householdReadsPerHour
-          : kind === 'active'
-            ? S().activationsPerHour
-            : kind === 'profile'
-              ? S().profileWritesPerHour
-              : kind === 'record'
-                ? S().recordsPerHour
-                : S().householdChangesPerHour;
+      const most = kind === 'order' ? Infinity : serviceSettings()[ALLOWANCES[kind] ?? 'householdChangesPerHour'];
       if (recent.length >= most) return { status: 429, body: { error: 'too many at once: try again in a while' } };
       recent.push(t);
       return work();
@@ -218,6 +232,9 @@ export function sequencer({ now = Date.now } = {}) {
   };
 }
 
+/// The ops a device asks of its own account, in that account's turn.
+const FOR_THE_DEVICE = new Set(['ticket', 'list', 'drop', 'backups', 'attest', 'profile', 'delete']);
+
 /// What an account's turn is asked: {op: 'ticket' | 'claim' | 'drop' |
 /// 'list' | 'activate' | …, ...}. [active] is where the account's device
 /// in use is written ([activeInStore]); [revoke] tells relay objects a
@@ -225,6 +242,14 @@ export function sequencer({ now = Date.now } = {}) {
 /// sets, where the object runs in the relay worker
 /// (service/do/profile_pictures.mjs).
 export async function householdOp(op, store, { now = Date.now(), mail = null, active = activeInStore(store), revoke = null, pictures = null } = {}) {
+  // What a device asks for itself is done in the account whose turn this
+  // is, which the route names (op.account): a device the store has in
+  // another account, or in none, is refused, not acted for in that other
+  // account outside its turn. A site older than this names none, and the
+  // op finds the device's account by its row, as before.
+  if (FOR_THE_DEVICE.has(op.op) && typeof op.account === 'string' && !(await deviceOf(store, op.account, op.key))) {
+    return op.op === 'delete' ? { status: 404, body: { error: 'no account' } } : { status: 402, body: { error: REFUSED.noSubscription } };
+  }
   switch (op.op) {
     case 'ticket':
       return ticketFor(op.key, store, { now });
@@ -244,18 +269,21 @@ export async function householdOp(op, store, { now = Date.now(), mail = null, ac
       });
     case 'bind':
       return bindPurchase(op, store, { now });
+    case 'paid':
+      // A Stripe checkout paid for, in its subscription's turn.
+      return paidFor(store, op.subscription, op.key, { now });
     case 'drop':
       return dropDevice(op.key, op.device, store, { now, active, revoke });
     case 'list': {
       const account = await accountOfKey(store, op.key);
-      if (!account) return { status: 402, body: { error: 'no subscription' } };
+      if (!account) return { status: 402, body: { error: REFUSED.noSubscription } };
       const inUseNow = (await active.get(account))?.key ?? null;
       const devices = (await devicesOn(store, account)).map((d) => ({ ...d, ...(d.key === inUseNow ? { active: true } : {}) }));
       // Which sign-in the account is linked to, if any: the account's
       // word, so a device shows a link made on another device, or one
       // Apple has since taken away (appleIdNotice), as it is now.
       const signIn = (await store.get(`ACCOUNT#${account}`, 'LOGIN'))?.provider ?? null;
-      return { status: 200, body: { devices, most: S().mostDevices, signIn } };
+      return { status: 200, body: { devices, most: serviceSettings().mostDevices, signIn } };
     }
     case 'attest':
       return attest(op.who, op.key, store, op.login, { now });
@@ -286,28 +314,33 @@ export async function householdOp(op, store, { now = Date.now(), mail = null, ac
 /// Which of the hour's allowances [op] is counted against. An unlink is
 /// Apple's word, not the person's, and has an allowance of its own (the
 /// size of the changes'), so the person's own changes never stand in
-/// its way; an operator's order has no allowance at all. What a device
-/// asks on a licence the store where it asked does not back (licence.mjs,
-/// accountAsking) has one of its own too (the size of the reads'): a
-/// device dropped from the account still holds its licence until its
-/// day, and is refused here, but spends none of what the account's own
-/// devices have.
-const kindOf = (op) =>
-  op.op === 'order'
-    ? 'order'
-    : op.shown === true
-    ? 'shown'
-    : op.op === 'activate' || op.op === 'seen' || op.op === 'inUse'
-    ? 'active'
-    : op.op === 'record'
-      ? 'record'
-      : op.op === 'profile' && op.profile
-      ? 'profile'
-      : op.op === 'unlink'
-        ? 'unlink'
-        : op.op === 'list' || op.op === 'profile' || (op.op === 'backups' && op.rotate !== true)
-          ? 'read'
-          : 'change';
+/// its way; an operator's order has no allowance at all. A device coming
+/// in, with a code, a backup code or a sign-in, has one of its own too
+/// (the size of the changes'): anybody who has seen a code can ask with
+/// it, and what they ask spends nothing the account's own devices need.
+/// What a device asks on a licence the store where it asked does not
+/// back (licence.mjs, accountAsking) has one of its own too (the size of
+/// the reads'): a device dropped from the account still holds its
+/// licence until its day, and is refused here, but spends none of what
+/// the account's own devices have.
+function kindOf(op) {
+  if (op.op === 'order') return 'order';
+  if (op.shown === true) return 'shown';
+  if (op.op === 'activate' || op.op === 'seen' || op.op === 'inUse') return 'active';
+  if (op.op === 'record') return 'record';
+  if (op.op === 'profile') return op.profile ? 'profile' : 'read';
+  if (op.op === 'unlink') return 'unlink';
+  if (op.op === 'claim' || op.op === 'redeem' || op.op === 'join') return 'incoming';
+  if (op.op === 'list' || (op.op === 'backups' && op.rotate !== true)) return 'read';
+  return 'change';
+}
+
+/// What a turn answers without counting it against an allowance: the
+/// relay's 'seen' for an activation that is not the one in use. The
+/// relay asks at every socket a device opens, and a device the account
+/// no longer holds (superseded, or dropped) must not spend what the
+/// device in use renews from. Its answer reads only [active].
+const answeredFree = (op, active) => (op.op === 'seen' ? async () => seenRefused(op, await active.get(op.account)) : null);
 
 /// Tells the relay's object for each of [tags] that [account]'s device
 /// in use is now the one of [epoch], so it closes the sockets of any
@@ -493,11 +526,15 @@ export class Household {
     // terms (notices.mjs) only borrow the binding.
     if (op?.op === 'alert') return Response.json(await sendAlert(op, this.env));
     if (op?.op === 'notice') return Response.json(await sendNotice(op, this.env));
-    await settle(this.env);
+    await loadServiceSettings(this.env);
     const store = storeOf(this.env);
     if (!store) return Response.json({ status: 503, body: notConfigured('OH_STORE') });
     return Response.json(
-      await this.next(kindOf(op), () => householdOp(op, store, { mail: mailerOf(this.env), active: this.active, revoke: revokerOf(this.env), pictures: this.pictures })),
+      await this.next(
+        kindOf(op),
+        () => householdOp(op, store, { mail: mailerOf(this.env), active: this.active, revoke: revokerOf(this.env), pictures: this.pictures }),
+        answeredFree(op, this.active),
+      ),
     );
   }
 }
@@ -517,7 +554,7 @@ export async function inHousehold(env, name, op) {
   const store = storeOf(env);
   if (!store) return { status: 503, body: notConfigured('OH_STORE') };
   if (!households.has(name)) households.set(name, sequencer());
-  return households.get(name)(kindOf(op), () => householdOp(op, store, { mail: mailerOf(env) }));
+  return households.get(name)(kindOf(op), () => householdOp(op, store, { mail: mailerOf(env) }), answeredFree(op, activeInStore(store)));
 }
 
 /// [op] in [subscription]'s own turn: where its account is found, or

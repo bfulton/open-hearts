@@ -2,8 +2,9 @@
 // observability/apply.mjs: run it again rather than editing this. Only on
 // play.openhearts.game, so a fork or a local build reports nothing to us.
 if (location.hostname === "play.openhearts.game") {
-;window.NREUM||(NREUM={});NREUM.init={session_replay:{enabled:false},session_trace:{enabled:false},browser_consent_mode:{enabled:false},privacy:{cookies_enabled:false},performance:{capture_measures:true},ajax:{deny_list:["bam.nr-data.net"],capture_payloads:'none'}};
+;window.NREUM||(NREUM={});NREUM.init={browser_consent_mode:{enabled:false},privacy:{cookies_enabled:false},performance:{capture_measures:true},ajax:{deny_list:["bam.nr-data.net"],capture_payloads:'none'}};
 
+;Object.assign(NREUM.init,{session_replay:{enabled:false},session_trace:{enabled:false},logging:{enabled:false},user_actions:{enabled:false},obfuscate:[{regex:/\/room\/[A-Z0-9]{8}/g,replacement:"/room/*"},{regex:/\/table\/[0-9a-f]{32}/g,replacement:"/table/*"}]});
 ;NREUM.loader_config={accountID:"8577544",trustKey:"8577544",agentID:"653449983",licenseKey:"NRJS-fa56ccf6775b31c57d1",applicationID:"653449983"};
 ;NREUM.info={beacon:"bam.nr-data.net",errorBeacon:"bam.nr-data.net",licenseKey:"NRJS-fa56ccf6775b31c57d1",applicationID:"653449983",sa:1};
 ;/*! For license information please see nr-loader-full-1.324.1.min.js.LICENSE.txt */

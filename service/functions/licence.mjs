@@ -24,11 +24,11 @@
 
 import { accountOfKey, entitlementOf } from './accounts.mjs';
 import { inHousehold } from './household.mjs';
-import { dayAfter, dayOf, digestOf, earlier, hex, storeOf } from './rows.mjs';
-import { S, notConfigured } from './settings.mjs';
+import { REFUSED } from './refusals.mjs';
+import { dayAfter, dayOf, digestOf, earlier, hex, licenceStatement, storeOf } from './rows.mjs';
+import { notConfigured, serviceSettings } from './settings.mjs';
 import { SUSPENDED_WHY } from './suspension.mjs';
 
-const STATEMENT = 'oh-licence/2';
 const PLAN = 'year';
 
 /// The app's own BIP-340 wasm, which this worker serves as a static
@@ -102,7 +102,7 @@ async function serviceSigned(canonical, { signer, secret, service }) {
 
 /// The statement, signed: this device, its account, the last day.
 export async function licenceFor(key, account, until, keys) {
-  const sig = await serviceSigned(`${STATEMENT}\n${key}\n${account}\n${until}\n${PLAN}`, keys);
+  const sig = await serviceSigned(licenceStatement(key, account, until, PLAN), keys);
   return sig ? { key, account, until, plan: PLAN, sig } : null;
 }
 
@@ -121,7 +121,7 @@ export async function licensedAccount(licence, key, env, { signer, now = Date.no
   // in them fails the signature.
   const { account, until } = licence;
   if (typeof until !== 'string' || until < dayOf(now)) return null;
-  const digest = await digestOf(`${STATEMENT}\n${key}\n${account}\n${until}\n${PLAN}`);
+  const digest = await digestOf(licenceStatement(key, account, until, PLAN));
   return signer.verify(keys.service, digest, licence.sig) ? account : null;
 }
 
@@ -177,9 +177,9 @@ export async function licence(key, env, { signer, now = Date.now(), open = false
     // Said apart from having no subscription, so that the app says why
     // live play is shut rather than offering to sell it again.
     if ((written ?? (await store.get(`KEY#${key}`, 'ENTITLEMENT')))?.suspended) return { status: 403, body: { error: SUSPENDED_WHY, suspended: true } };
-    return { status: 402, body: { error: 'no subscription' } };
+    return { status: 402, body: { error: REFUSED.noSubscription } };
   }
-  const until = earlier(dayAfter(now, S().licenceDays), held.licensed_until);
+  const until = earlier(dayAfter(now, serviceSettings().licenceDays), held.licensed_until);
   const signed = await licenceFor(key, held.account, until, { signer, ...keys });
   if (!signed) return { status: 503, body: { error: 'the service key does not match its secret' } };
   return { status: 200, body: { licence: signed } };

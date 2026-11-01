@@ -25,7 +25,6 @@ import 'net/buying.dart';
 import 'net/copy.dart';
 import 'net/household.dart';
 import 'net/provider_tokens.dart';
-import 'net/share.dart';
 import 'net/sign_in.dart';
 import 'net/store_buying.dart';
 import 'pages.dart';
@@ -33,6 +32,7 @@ import 'start_afresh.dart';
 import 'theme.dart';
 import 'ui/qr_view.dart';
 import 'ui/reading_time.dart';
+import 'ui/share_or_copy.dart';
 
 Future<void> showSubscribe(BuildContext context) =>
     openPage<void>(context, AppPage.subscription);
@@ -75,14 +75,14 @@ class _SubscribePageState extends State<SubscribePage> {
   /// the foreground. One the service refused in its own words is not.
   Timer? _again;
   final _backoff = Backoff();
-  late final AppLifecycleListener _lifecycle = AppLifecycleListener(onResume: _listAgainNow);
+  late final AppLifecycleListener _lifecycle;
 
   @override
   void initState() {
     super.initState();
     Entitlement.current.addListener(_changed);
     StoreShop.current.addListener(_changed);
-    _lifecycle;
+    _lifecycle = AppLifecycleListener(onResume: _listAgainNow);
     unawaited(_load());
     // A store that has not said what it sells is asked again here,
     // where it is wanted.
@@ -126,8 +126,6 @@ class _SubscribePageState extends State<SubscribePage> {
       _me = me;
       _signedIn = signedIn;
     });
-    final offered = providerTokens.offered;
-    if (signedIn == null && offered.isNotEmpty) providerTokens.prepare(offered);
     if (!Entitlement.current.live) return;
     await _list(me);
   }
@@ -146,7 +144,7 @@ class _SubscribePageState extends State<SubscribePage> {
     if (asked != _asked) return;
     final household = said.answer;
     // The account's sign-in as the service has it, over the device's note.
-    final signedIn = household != null && household.toldSignIn ? await noteSignIn(household.signIn) : _signedIn;
+    final signedIn = household != null ? await noteSignIn(household.signIn) : _signedIn;
     if (!mounted) return;
     setState(() {
       _household = household;
@@ -218,41 +216,37 @@ class _SubscribePageState extends State<SubscribePage> {
     }
   }
 
-  Future<void> _showACode() async {
+  /// [call] to the service as this device, one at a time, the page busy
+  /// while it is asked: its answer, or null when the service refused
+  /// (which the page then says), when another is under way, or when
+  /// the page has gone.
+  Future<T?> _ask<T>(Future<Said<T>> Function(Signer me) call) async {
     final me = _me;
-    if (me == null || _working) return;
+    if (me == null || _working) return null;
     setState(() {
       _working = true;
       _refusal = null;
     });
-    final said = await askForCode(me);
-    if (!mounted) return;
+    final said = await call(me);
+    if (!mounted) return null;
     setState(() {
       _working = false;
-      _code = said.answer;
       _refusal = said.refusal?.say(context.l10n);
     });
+    return said.answer;
+  }
+
+  Future<void> _showACode() async {
+    final code = await _ask(askForCode);
+    if (mounted) setState(() => _code = code);
   }
 
   Future<void> _showBackups() async {
-    final me = _me;
-    if (me == null || _working) return;
-    setState(() {
-      _working = true;
-      _refusal = null;
-    });
-    final said = await backupCodes(me);
-    if (!mounted) return;
-    setState(() {
-      _working = false;
-      _backups = said.answer ?? _backups;
-      _refusal = said.refusal?.say(context.l10n);
-    });
+    if (await _ask(backupCodes) case final codes? when mounted) setState(() => _backups = codes);
   }
 
   Future<void> _replaceBackups() async {
-    final me = _me;
-    if (me == null || _working) return;
+    if (_me == null || _working) return;
     final sure = await showDialog<bool>(
       context: context,
       builder: (dialog) => AlertDialog(
@@ -265,35 +259,15 @@ class _SubscribePageState extends State<SubscribePage> {
       ),
     );
     if (sure != true || !mounted) return;
-    setState(() {
-      _working = true;
-      _refusal = null;
-    });
-    final said = await backupCodes(me, replace: true);
-    if (!mounted) return;
-    setState(() {
-      _working = false;
-      _backups = said.answer ?? _backups;
-      _refusal = said.refusal?.say(context.l10n);
-    });
-    if (said.answer != null) _say(context.l10n.codesMade);
+    if (await _ask((me) => backupCodes(me, replace: true)) case final codes? when mounted) {
+      setState(() => _backups = codes);
+      _say(context.l10n.codesMade);
+    }
   }
 
   Future<void> _emailBackups() async {
-    final me = _me;
-    if (me == null || _working) return;
-    setState(() {
-      _working = true;
-      _refusal = null;
-    });
-    final said = await backupCodes(me, send: true);
-    if (!mounted) return;
-    setState(() {
-      _working = false;
-      _backups = said.answer ?? _backups;
-      _refusal = said.refusal?.say(context.l10n);
-    });
-    if (said.answer case final sent?) {
+    if (await _ask((me) => backupCodes(me, send: true)) case final sent? when mounted) {
+      setState(() => _backups = sent);
       final l10n = context.l10n;
       _say(sent.emailed ? l10n.codesSent : (sent.unsent == 'no address' ? l10n.codesNoAddress : l10n.codesNotSent));
     }
@@ -366,7 +340,7 @@ class _SubscribePageState extends State<SubscribePage> {
       });
       return;
     }
-    await rememberSignIn(done.provider);
+    await noteSignIn(done.provider.name);
     _asked++;
     final wasLive = Entitlement.current.live;
     if (done.licence case final licence?) await Entitlement.current.adopt(licence);
@@ -392,22 +366,12 @@ class _SubscribePageState extends State<SubscribePage> {
     ..showSnackBar(SnackBar(content: Text(text, textAlign: TextAlign.center), duration: readingTime(text)));
 
   Future<void> _drop(PublicKey device) async {
-    final me = _me;
-    if (me == null || _working) return;
-    setState(() {
-      _working = true;
-      _refusal = null;
-    });
-    final said = await devicesOn(me, drop: device);
-    if (!mounted) return;
-    setState(() {
-      _working = false;
-      _household = said.answer ?? _household;
-      _refusal = said.refusal?.say(context.l10n);
-    });
+    final household = await _ask((me) => devicesOn(me, drop: device));
+    if (household == null || !mounted) return;
+    setState(() => _household = household);
     // Dropped this very device: its licence is not renewed, and there
     // is no reason to go on holding one it can no longer replace.
-    if (said.refusal == null && device == me.publicKey) {
+    if (device == _me?.publicKey) {
       await Entitlement.current.forget();
       if (mounted) Navigator.of(context).maybePop();
     }
@@ -478,11 +442,7 @@ class _SubscribePageState extends State<SubscribePage> {
     final refusal = _refusal ?? shop.refusal?.say(l10n);
     return Scaffold(
       backgroundColor: Felt.dark,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        foregroundColor: Palette.chromeDim,
-        title: Text(l10n.subscription, style: const TextStyle(fontSize: 16, color: Palette.chromeDim)),
-      ),
+      appBar: pageBar(l10n.subscription),
       body: Center(
         child: SingleChildScrollView(
           child: ConstrainedBox(
@@ -520,7 +480,7 @@ class _SubscribePageState extends State<SubscribePage> {
                     const SizedBox(height: 26),
                     FilledButton(
                       onPressed: waiting || shop.asking ? null : (inStore ? _buyInStore : unanswered ? _askStore : _buy),
-                      style: _gold(),
+                      style: goldButton,
                       child: waiting || shop.asking
                           ? const SizedBox(
                               width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2.2, color: Felt.dark))
@@ -652,7 +612,7 @@ class _SubscribePageState extends State<SubscribePage> {
       if (code == null)
         FilledButton(
           onPressed: _working || (house?.full ?? false) ? null : _showACode,
-          style: _gold(),
+          style: goldButton,
           child: _working
               ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2.2, color: Felt.dark))
               : Text(l10n.addDevice, style: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.w700)),
@@ -675,12 +635,9 @@ class _SubscribePageState extends State<SubscribePage> {
         _CodeLine(text: _grouped(code.code), onCopy: () => unawaited(_copy(code.code)), copy: l10n.copy),
         const SizedBox(height: 12),
         OutlinedButton(
-          onPressed: () => unawaited(_sendTheLink(code.code)),
-          style: OutlinedButton.styleFrom(
-            foregroundColor: Palette.gold,
-            side: BorderSide(color: Palette.gold.withValues(alpha: 0.5)),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          ),
+          // The same link, for a device with no camera pointed at this one.
+          onPressed: () => unawaited(shareOrCopy(context, Uri.parse(claimLink(code.code)))),
+          style: _outlined(),
           child: Text(l10n.sendLinkInstead),
         ),
       ],
@@ -731,11 +688,7 @@ class _SubscribePageState extends State<SubscribePage> {
         const SizedBox(height: 12),
         OutlinedButton(
           onPressed: () => unawaited(openLink(store.kind.manage)),
-          style: OutlinedButton.styleFrom(
-            foregroundColor: Palette.gold,
-            side: BorderSide(color: Palette.gold.withValues(alpha: 0.5)),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          ),
+          style: _outlined(),
           child: Text(l10n.manageSubscription),
         ),
       ] else if (canLeaveForStripe) ...[
@@ -744,11 +697,7 @@ class _SubscribePageState extends State<SubscribePage> {
         const SizedBox(height: 12),
         OutlinedButton(
           onPressed: _leaving ? null : _manage,
-          style: OutlinedButton.styleFrom(
-            foregroundColor: Palette.gold,
-            side: BorderSide(color: Palette.gold.withValues(alpha: 0.5)),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          ),
+          style: _outlined(),
           child: Text(l10n.manageSubscription),
         ),
       ],
@@ -797,20 +746,6 @@ class _SubscribePageState extends State<SubscribePage> {
     ];
   }
 
-  /// The same link, for a device with no camera pointed at this one:
-  /// the phone's share sheet where there is one, else the clipboard,
-  /// and said so — as the room's link goes (home_page.dart).
-  Future<void> _sendTheLink(String code) async {
-    final link = claimLink(code);
-    if (await shareLink(Uri.parse(link))) return;
-    await copyText(link);
-    if (!mounted) return;
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(
-          content: Text(context.l10n.linkCopied, textAlign: TextAlign.center), duration: const Duration(milliseconds: 1600), width: 200));
-  }
-
   static ButtonStyle _outlined() => OutlinedButton.styleFrom(
         foregroundColor: Palette.gold,
         side: BorderSide(color: Palette.gold.withValues(alpha: 0.5)),
@@ -820,19 +755,16 @@ class _SubscribePageState extends State<SubscribePage> {
   /// A screen's code in fours, for a person to read across: the spaces
   /// are ignored where it is typed (net/household.dart, [codeIn]).
   static String _grouped(String code) => [for (var i = 0; i < code.length; i += 4) code.substring(i, i + 4 > code.length ? code.length : i + 4)].join(' ');
-
-  static ButtonStyle _gold() => FilledButton.styleFrom(
-        backgroundColor: Palette.gold,
-        foregroundColor: Felt.dark,
-        padding: const EdgeInsets.symmetric(vertical: 13, horizontal: 18),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      );
 }
 
 /// One provider's button: the provider's own where it insists on
 /// drawing it (Google's, on the web), and otherwise one drawn here —
 /// Apple's to Apple's own rules, Google's in the page's style.
-class _SignInButton extends StatelessWidget {
+///
+/// The provider is prepared (on the web, its script fetched) when the
+/// button is first built, so a page that shows no button, such as a
+/// suspended account's, fetches nothing.
+class _SignInButton extends StatefulWidget {
   const _SignInButton({required this.provider, required this.nonce, required this.label, required this.enabled, required this.onAsked});
 
   final Provider provider;
@@ -841,13 +773,26 @@ class _SignInButton extends StatelessWidget {
   final bool enabled;
   final void Function(Asked asked) onAsked;
 
-  Future<void> _ask() async => onAsked(await providerTokens.ask(provider, nonce));
+  @override
+  State<_SignInButton> createState() => _SignInButtonState();
+}
+
+class _SignInButtonState extends State<_SignInButton> {
+  @override
+  void initState() {
+    super.initState();
+    providerTokens.prepare([widget.provider]);
+  }
+
+  Future<void> _ask() async => widget.onAsked(await providerTokens.ask(widget.provider, widget.nonce));
 
   @override
   Widget build(BuildContext context) {
-    final own = providerTokens.ownButton(provider, nonce, onAsked);
+    final enabled = widget.enabled;
+    final own = providerTokens.ownButton(widget.provider, widget.nonce, widget.onAsked);
     if (own != null) return IgnorePointer(ignoring: !enabled, child: own);
-    return switch (provider) {
+    final label = widget.label;
+    return switch (widget.provider) {
       Provider.apple => SignInWithAppleButton(
           onPressed: enabled ? () => unawaited(_ask()) : null,
           text: label,

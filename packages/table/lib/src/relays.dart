@@ -1,17 +1,13 @@
-/// Several relays, one client: listening on all of them, writing to one.
+/// A client's sockets to the relays in its list: one relay, ours, in a
+/// deployed build (docs/explanation/relay.md), though a test or the
+/// remote config may name more.
 ///
-/// Any relay can go down or start refusing a client's events, and a
-/// play that reaches nobody gets its seat booted for silence. So a
-/// client holds a short list (docs/explanation/relay.md). It keeps a
-/// subscription open on every relay in
-/// the list and writes each event to the first that has not refused it
-/// lately; a refusal moves the same event on to the next, and when
-/// every relay has refused, the client is told, so a table that is cut
-/// off can say so instead of looking alive. Writes cost what they did,
-/// one per event; reads reach whichever relay a peer chose, since every
-/// peer listens on all of them. The list's order is turned by a hash of
-/// what it serves — the table id, or a key — so tables spread over the
-/// relays and one relay's bad hour is not every table's.
+/// The client keeps its subscriptions open on every relay in the list
+/// and writes each event to every one that is up. A relay that refuses
+/// an event is kept out of the running for a while
+/// ([RelayGroup.refusalMs]), and when every relay an event went to has
+/// refused it, the client is told, so a table that is cut off can say
+/// so instead of looking alive.
 library;
 
 import 'dart:async';
@@ -20,7 +16,6 @@ import 'dart:convert';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 import 'nostr.dart';
-import 'relay_policy.dart';
 import 'signing.dart';
 
 /// How long a device may hear nothing at all, with something it sent
@@ -70,7 +65,29 @@ bool turnedAway(String reason) =>
     reason.startsWith('suspended:') ||
     reason.startsWith('deleted:');
 
-/// The list itself: parsed from text, turned by a key.
+/// The mark a relay wears in the list when it keeps one object per tag
+/// and wants the tag in the URL: `wss://our.relay/{tag}`.
+///
+/// It has to be marked and cannot be guessed at, in either direction.
+/// A relay that serves every tag on one socket at the root answers a
+/// path with a 404, so a client must not put a tag on one; a
+/// relay that shards has to be told which object to open before the
+/// first message crosses, so a client must put the tag on that one.
+/// Nobody else's URL carries the mark, so the list says which is which
+/// and nothing has to be inferred from a hostname.
+const tagMark = '{tag}';
+
+/// [relays] with [tag] put where each marked relay asks for it; every
+/// other relay is left exactly as it was.
+List<Uri> relaysForTag(List<Uri> relays, String tag) => [
+      for (final relay in relays)
+        if (relay.pathSegments.contains(tagMark))
+          relay.replace(pathSegments: [for (final s in relay.pathSegments) s == tagMark ? tag : s])
+        else
+          relay,
+    ];
+
+/// The list itself, parsed from text and written back.
 abstract final class Relays {
   /// `wss://a, wss://b` — commas, spaces or newlines between.
   static List<Uri> parse(String text) => [
@@ -79,24 +96,6 @@ abstract final class Relays {
       ];
 
   static String format(List<Uri> relays) => relays.join(', ');
-
-  /// The relays past the first [pinned] begun at the entry a hash of
-  /// [key] picks, the rest following in order: where a client writes
-  /// first among the interchangeable relays is a function of the table,
-  /// so tables spread over them. The [pinned] at the front stay first:
-  /// a primary relay, not spun out of place with the rest.
-  static List<Uri> turnedBy(List<Uri> relays, String key, {int pinned = 0}) {
-    if (relays.length - pinned < 2) return relays;
-    final tail = relays.sublist(pinned);
-    // FNV-1a over the key's code units: the same on every platform,
-    // which String.hashCode is not.
-    var h = 0x811c9dc5;
-    for (final u in key.codeUnits) {
-      h = ((h ^ u) * 0x01000193) & 0xffffffff;
-    }
-    final k = h % tail.length;
-    return [...relays.sublist(0, pinned), ...tail.sublist(k), ...tail.sublist(0, k)];
-  }
 }
 
 /// One socket to one relay. Connects, sends its subscriptions, hands
@@ -214,18 +213,7 @@ class RelayConnection {
   /// Resolves the first time the relay acknowledges the subscriptions.
   Future<void> get ready => _ready.future;
 
-  void publish(NostrEvent e) {
-    final ch = _channel;
-    if (ch == null || !_open) return;
-    try {
-      ch.sink.add(jsonEncode(['EVENT', e.toJson()]));
-      _unansweredSince ??= _nowMs;
-    } on StateError catch (err) {
-      // The socket closed under it; the drop reconnects, and what was
-      // not sent is said again by whoever is waiting on it.
-      log?.call('$url: not sent, the socket is closing: $err');
-    }
-  }
+  void publish(NostrEvent e) => sendRaw(['EVENT', e.toJson()]);
 
   /// Drops the socket and connects afresh: a relay that turned on this
   /// client's connection may take a new one.
@@ -347,8 +335,8 @@ class RelayConnection {
   }
 }
 
-/// A client's relays: its subscriptions on all of them, each of its
-/// events written to one.
+/// A client's relays: its subscriptions on all of them, and each of its
+/// events written to all of them.
 class RelayGroup {
   RelayGroup(
       {required List<Uri> urls,
@@ -401,17 +389,12 @@ class RelayGroup {
   final int refusalMs;
   static const defaultRefusalMs = 60000;
 
-  /// How long to wait for a relay's answer before forgetting the event.
-  static const pendingMs = 15000;
-
   final Set<String> _seen = {};
   final Map<Uri, int> _refusedUntil = {};
-  final Map<String, _Pending> _pending = {};
 
-  /// Events written to every relay at once, and which of those relays
-  /// have refused so far: a flood has no next relay to move on to, so
-  /// this is how the group still learns that nobody would take it.
-  final Map<String, ({Set<Uri> targets, Set<Uri> refused})> _flooded = {};
+  /// Events written, and which of the relays each went to have refused
+  /// it so far: how the group learns that nobody would take one.
+  final Map<String, ({Set<Uri> targets, Set<Uri> refused})> _sent = {};
 
   /// Waiting to hear whether an event was taken: see [taken].
   final Map<String, Completer<bool>> _taking = {};
@@ -471,71 +454,31 @@ class RelayGroup {
 
   void _answer(String id, bool taken) => _taking.remove(id)?.complete(taken);
 
-  /// Writes [e] to the first relay in order that is up and has not
-  /// refused this client lately; a refusal moves it on to the next.
-  /// Or, [everywhere], to every relay up and not refusing: for what
-  /// has to be seen by a peer that can read only some of the relays —
-  /// a lobby's beats, presence, a signal — one relay is not enough,
-  /// since the writer cannot tell which relay a reader has lost.
-  /// With [readBy], the relays the readers can read: the one relay
-  /// written to is the first in order among those, and when none of
-  /// them is up and taking events the event goes to every relay that
-  /// is, since a relay nobody can read is no place for it.
+  /// Writes [e] to every relay that is up and has not refused this
+  /// client lately. With none, the event goes nowhere: the protocol
+  /// repeats what matters, and while a refusal lasts a write would only
+  /// be refused again.
   ///
   /// [aside]: what becomes of [e] is its own business. A relay that
   /// turns it away is not taken to be refusing this client — not kept
   /// out of the running for [refusalMs], not said under the felt — since
   /// the table waits on nothing like it: a player's reaction
-  /// (reactions.dart). Gone is gone; it is not tried anywhere else.
-  void publish(NostrEvent e, {bool everywhere = false, Set<Uri>? readBy, bool aside = false}) {
+  /// (reactions.dart).
+  void publish(NostrEvent e, {bool aside = false}) {
     if (_closed) return;
+    final now = _nowMs;
+    final up = [for (final c in connections) if (c.connected && (_refusedUntil[c.url] ?? 0) <= now) c];
+    for (final c in up) {
+      c.publish(e);
+    }
     if (aside) {
       _aside.add(e.id);
       if (_aside.length > 200) _aside.remove(_aside.first);
-      for (final c in connections) {
-        if (c.connected && (_refusedUntil[c.url] ?? 0) <= _nowMs) c.publish(e);
-      }
-      return;
+    } else if (up.isEmpty) {
+      _answer(e.id, false);
+    } else {
+      _sent[e.id] = (targets: {for (final c in up) c.url}, refused: <Uri>{});
     }
-    final now = _nowMs;
-    final upUrls = [for (final c in connections) if (c.connected && (_refusedUntil[c.url] ?? 0) <= now) c.url];
-    if (floodWrite(upUrls, readBy, everywhere: everywhere)) {
-      final targets = <Uri>{};
-      for (final c in connections) {
-        if (c.connected && (_refusedUntil[c.url] ?? 0) <= now) {
-          targets.add(c.url);
-          c.publish(e);
-        }
-      }
-      if (targets.isNotEmpty) {
-        _flooded[e.id] = (targets: targets, refused: <Uri>{});
-      } else {
-        _answer(e.id, false);
-      }
-      return;
-    }
-    if (readBy == null) return _send(e, const {}, null);
-    _send(e, {for (final c in connections) if (!readBy.contains(c.url)) c.url}, null);
-  }
-
-  /// The relays this group is connected to right now.
-  Set<Uri> get reading => {for (final c in connections) if (c.connected) c.url};
-
-  void _send(NostrEvent e, Set<Uri> tried, String? lastReason) {
-    if (_closed) return;
-    final now = _nowMs;
-    for (final c in connections) {
-      if (!c.connected || tried.contains(c.url) || (_refusedUntil[c.url] ?? 0) > now) continue;
-      _pending[e.id] = _Pending(e, {...tried, c.url}, now);
-      c.publish(e);
-      return;
-    }
-    // Nothing up, or every relay up refusing: the event goes nowhere —
-    // the protocol repeats what matters, and while a refusal lasts a
-    // write would only be refused again. Refused everywhere just now
-    // is worth saying; refused earlier is already said.
-    _answer(e.id, false);
-    if (lastReason != null) _setRefusal(lastReason);
   }
 
   void _setRefusal(String? reason) {
@@ -566,33 +509,26 @@ class RelayGroup {
           if (!taken) log?.call('${from.url} refused ${id.substring(0, 8)}, said aside: $reason');
           return;
         }
-        final p = _pending.remove(id);
-        final flood = _flooded[id];
+        final sent = _sent[id];
         if (taken) {
           _refusedUntil.remove(from.url);
-          _flooded.remove(id);
+          _sent.remove(id);
           _answer(id, true);
           _setRefusal(null);
           return;
         }
         log?.call('${from.url} refused ${id.substring(0, 8)}: $reason');
         _refusedUntil[from.url] = _nowMs + refusalMs;
-        if (flood != null) {
-          // A flood has no next relay to try. It is worth saying only
-          // when every relay it went to has refused it: then nothing
-          // this device writes is getting out, which is the one thing
-          // the player can act on.
-          flood.refused.add(from.url);
-          if (flood.refused.containsAll(flood.targets)) {
-            _flooded.remove(id);
-            _answer(id, false);
-            _setRefusal(reason);
-          }
-          return;
+        // Worth saying only when every relay it went to has refused it:
+        // then nothing this device writes is getting out, which is the
+        // one thing the player can act on.
+        if (sent == null) return;
+        sent.refused.add(from.url);
+        if (sent.refused.containsAll(sent.targets)) {
+          _sent.remove(id);
+          _answer(id, false);
+          _setRefusal(reason);
         }
-        // Sent to one relay: on to the next. Given up on: the others
-        // have it.
-        if (p != null) _send(p.event, p.tried, reason);
       case 'NOTICE':
         log?.call('${from.url}: ${m.length > 1 ? m[1] : ''}');
     }
@@ -600,8 +536,7 @@ class RelayGroup {
 
   void _sweep() {
     final now = _nowMs;
-    _pending.removeWhere((_, p) => now - p.sentMs > pendingMs);
-    if (_flooded.length > 200) _flooded.clear();
+    if (_sent.length > 200) _sent.clear();
     // A relay's refusal has run out: a fresh connection, since one
     // that turned on this client may not turn back, and the next event
     // will try it.
@@ -625,11 +560,4 @@ class RelayGroup {
     }
     _refusals.close();
   }
-}
-
-class _Pending {
-  _Pending(this.event, this.tried, this.sentMs);
-  final NostrEvent event;
-  final Set<Uri> tried;
-  final int sentMs;
 }

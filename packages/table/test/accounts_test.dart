@@ -125,15 +125,14 @@ void main() {
       t.close();
     });
 
-    test('with a seat that shows none is not served by the house, fails at the house\'s first turn, and is not believed', () {
+    test('with a seat that shows none is not served by the house, which says so and ends the table, and is not believed', () {
       final t = table(without: 1)..start();
-      // The house is not there to say how it came out: the run waits for
-      // that word, and the table is over long before the limit.
-      t.run(limitMs: 10 * 60 * 1000);
+      expect(t.run(), isTrue, reason: 'over at the house\'s word, which the house let the table go after');
       expect(t.following.map((c) => c.state), everyElement(TableState.failed));
       expect(t.house!.serving, isEmpty, reason: 'the house let the table go');
       expect(t.results, isEmpty, reason: 'nobody is rated on it');
-      expect(t.referee.log.where((e) => e.event?.author == t.houseSigner.publicKey), isEmpty, reason: 'the house said nothing at it');
+      expect([for (final e in t.referee.log) if (e.event?.author == t.houseSigner.publicKey) e.event!.body], [t.clients.first.rules.refusal],
+          reason: 'the house said one thing at it: that it will not serve it (refusal_test.dart)');
       final verdict = verifyRecord(GameRecord(spec: t.spec, log: t.referee.log), crypto: crypto, house: t.houseSigner.publicKey, allowUnfinished: true);
       expect(verdict.ok, isFalse);
       expect(verdict.reason, 'seat 1 has no licence for its key');
@@ -148,7 +147,7 @@ void main() {
       const BotSeat(Persona.romeo),
       const BotSeat(Persona.juliet),
     ]);
-    final result = GameResult.of(spec, spec.seats, [10, 50, 60, 80]);
+    final result = GameResult(table: spec.id, rated: true, seats: GameResult.seatsOf(spec, spec.seats, [10, 50, 60, 80]), at: 0, v: 2);
     NostrEvent say(Signer s, Map<String, Object?> content, int at) =>
         NostrEvent.sign(s, kind: TableKinds.lobby, content: jsonEncode(content), tags: [
           ['t', GameResult.tag]
@@ -191,26 +190,22 @@ void main() {
     final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
     Map<String, Object?> beat(Signer s, Activation? a) => NostrEvent.sign(s, kind: TableKinds.presence, content: jsonEncode({
           'kind': 'here',
-          'status': 'online',
           'activation': ?a?.toJson(),
         }), tags: [
           ['t', RelayPresence.topic]
         ], createdAt: now).toJson();
 
     presence.receive(beat(other, activationFor(other.publicKey, _bao, 4)));
-    expect(presence.accountOf(other.publicKey), _bao);
-    expect(presence.accountOf(phone.publicKey), _ada, reason: 'its own, from its own activation');
-    // Somebody claiming an account with an activation the service did
-    // not sign is an account of one device: its own key.
+    // Somebody claiming the account with an activation the service did
+    // not sign takes nothing up, however late its epoch.
     final forged = Activation(account: _ada, key: laptop.publicKey, epoch: 9, until: now + 600, signature: 'ab' * 64);
     presence.receive(beat(laptop, forged));
-    expect(presence.accountOf(laptop.publicKey), laptop.publicKey);
+    await Future<void>.delayed(Duration.zero);
     expect(superseded, isEmpty);
 
     // The laptop takes the account up, and says so.
     presence.receive(beat(laptop, activationFor(laptop.publicKey, _ada, 2)));
     await Future<void>.delayed(Duration.zero);
-    expect(presence.accountOf(laptop.publicKey), _ada);
     expect(superseded.single.key, laptop.publicKey, reason: 'this device hears it has been superseded');
 
     // And of two devices of one account, the later is online and the
@@ -220,6 +215,8 @@ void main() {
     addTearDown(watcher.close);
     watcher.receive(beat(phone, mine));
     expect(watcher.online(withinMs: 15000), contains(phone.publicKey));
+    watcher.receive(beat(laptop, forged));
+    expect(watcher.online(withinMs: 15000), contains(phone.publicKey), reason: 'a forged activation outdoes nobody');
     watcher.receive(beat(laptop, activationFor(laptop.publicKey, _ada, 2)));
     expect(watcher.online(withinMs: 15000), contains(laptop.publicKey));
     expect(watcher.online(withinMs: 15000), isNot(contains(phone.publicKey)));

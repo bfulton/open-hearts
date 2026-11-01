@@ -23,11 +23,9 @@ import 'rules.dart';
 class SoloRecord {
   /// A record of a game dealt from [dealSeed], or by `Random` from
   /// [seed]: one of the two, never both.
-  SoloRecord({this.seed, this.dealSeed, required this.personas, this.humanSeat = humanSeatDefault, this.target = gameOverScore}) {
+  SoloRecord({this.seed, this.dealSeed, required this.personas, this.target = gameOverScore}) {
     if ((seed == null) == (dealSeed == null)) throw ArgumentError('a record names one seed: an int or a deal seed');
   }
-
-  static const humanSeatDefault = 0;
 
   /// The version of a record whose seed is an int: a game dealt by
   /// `Random`.
@@ -48,10 +46,9 @@ class SoloRecord {
   /// table asked for another target, so a game to fifty has no field.
   final int target;
 
-  /// Persona name per seat; the human's seat holds an empty string.
+  /// Persona name per seat; the human's seat ([humanSeat]) holds an
+  /// empty string.
   final List<String> personas;
-
-  final int humanSeat;
 
   /// The human's three passed cards per hand, or null on a hold hand.
   final List<List<Card>?> passes = [];
@@ -84,7 +81,7 @@ class SoloRecord {
       final personas = <String>[];
       var b = 0;
       for (var s = 0; s < seatCount; s++) {
-        personas.add(s == humanSeatDefault ? '' : bots[b++]);
+        personas.add(s == humanSeat ? '' : bots[b++]);
       }
       for (final name in personas) {
         if (name.isNotEmpty) Persona.named(name); // throws when unknown
@@ -116,7 +113,6 @@ class SoloRecord {
         s == humanSeat ? null : Bot(persona: Persona.named(personas[s])),
     ];
     final hands = <ReplayedHand>[];
-    final played = <Card>{};
     var handIndex = 0;
     var playIndex = 0;
     var tricks = <List<Play>>[];
@@ -135,7 +131,6 @@ class SoloRecord {
           for (var s = 0; s < seatCount; s++) {
             game.setPass(s, s == humanSeat ? pass : bots[s]!.choosePass(game.handOf(s)));
           }
-          played.clear();
         case Phase.playing:
           if (game.pendingTrick != null) {
             tricks.add(game.pendingTrick!.plays);
@@ -149,19 +144,9 @@ class SoloRecord {
             card = plays[playIndex++];
             if (!game.legalPlaysFor(seat).contains(card)) return Replay(hands, game, complete: false);
           } else {
-            final view = BotView(
-              seat: seat,
-              hand: game.handOf(seat),
-              trick: game.trick,
-              played: played,
-              heartsBroken: game.heartsBroken,
-              isFirstTrick: game.isFirstTrick,
-              taken: game.taken,
-            );
-            card = bots[seat]!.chooseCard(view, game.legalPlaysFor(seat));
+            card = bots[seat]!.chooseCard(BotView.of(game, seat), game.legalPlaysFor(seat));
           }
           game.play(seat, card);
-          played.add(card);
         case Phase.handOver:
           hands.add(ReplayedHand(handIndex, List.of(tricks), game.handScores, game.moonShooter, passed, dealt));
           tricks = [];
@@ -169,7 +154,6 @@ class SoloRecord {
           handIndex++;
           game.nextHand();
           dealt = _dealt(game);
-          played.clear();
         case Phase.gameOver:
           break;
         case Phase.dealing:

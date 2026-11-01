@@ -58,7 +58,7 @@ typedef ReportSender = Future<ReportSent> Function(Report report);
 
 /// Sends [report], signed by this device.
 Future<ReportSent> sendReport(Report report) async {
-  final answer = await askHandler('report', await Identity.signer(), report.toJson(), null, what: '${report.about} ${report.what.name}');
+  final answer = await askHandler('report', await Identity.signer(), report.toJson(), what: '${report.about} ${report.what.name}');
   return switch (answer?.status) {
     200 => ReportSent.sent,
     429 => ReportSent.tooMany,

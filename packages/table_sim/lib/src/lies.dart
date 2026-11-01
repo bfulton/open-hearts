@@ -6,10 +6,8 @@
 /// client given a [Lie] as its [TableClient.conduct] does.
 library;
 
-import 'dart:convert';
 import 'dart:math';
 
-import 'package:deal/deal.dart';
 import 'package:table/table.dart';
 
 enum Lie implements SeatConduct {
@@ -35,10 +33,10 @@ enum Lie implements SeatConduct {
   Map<String, Object?> declaration(Map<String, Object?> honest) =>
       this == declare ? {'seat': honest['seat'], 'position': -1} : honest;
 
-  /// Sealed to nothing anybody holds: the shape of a pass, and three
-  /// cards the receiver will never open.
+  /// The honest seals, each at another card's place: every one a real
+  /// seal with its argument, of the size an honest one is, so nothing
+  /// but the argument refuses it, and each opens to a token for a card
+  /// other than the one at its place, which opens nothing there.
   @override
-  List<String> sealedPass(List<String> sealed, Random random) => this != seal
-      ? sealed
-      : [for (final _ in sealed) base64.encode([for (var b = 0; b < sealedBytes; b++) random.nextInt(256)])];
+  List<String> sealedPass(List<String> sealed, Random random) => this != seal ? sealed : [...sealed.skip(1), sealed.first];
 }

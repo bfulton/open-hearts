@@ -1,6 +1,6 @@
 // Certificates, as little of X.509 as the App Store's chain needs.
 
-import { un64 } from './rows.mjs';
+import { bytesOf64, un64 } from './rows.mjs';
 
 /// One DER element at [at]: its tag, where its content starts and ends.
 function derAt(b, at) {
@@ -133,7 +133,7 @@ export async function signedBy(child, parent) {
 /// Apple Root CA - G3, as Apple publishes it
 /// (apple.com/certificateauthority/AppleRootCA-G3.cer; SHA-256
 /// 63:34:3A:BF:B8:9A:6A:03:EB:B5:7E:9B:3F:5F:A7:BE:7C:4F:5C:75:6F:30:17:B3:A8:C4:88:C3:65:3E:91:79).
-export const APPLE_ROOT_G3 = Uint8Array.from(atob('MIICQzCCAcmgAwIBAgIILcX8iNLFS5UwCgYIKoZIzj0EAwMwZzEbMBkGA1UEAwwSQXBwbGUgUm9vdCBDQSAtIEczMSYwJAYDVQQLDB1BcHBsZSBDZXJ0aWZpY2F0aW9uIEF1dGhvcml0eTETMBEGA1UECgwKQXBwbGUgSW5jLjELMAkGA1UEBhMCVVMwHhcNMTQwNDMwMTgxOTA2WhcNMzkwNDMwMTgxOTA2WjBnMRswGQYDVQQDDBJBcHBsZSBSb290IENBIC0gRzMxJjAkBgNVBAsMHUFwcGxlIENlcnRpZmljYXRpb24gQXV0aG9yaXR5MRMwEQYDVQQKDApBcHBsZSBJbmMuMQswCQYDVQQGEwJVUzB2MBAGByqGSM49AgEGBSuBBAAiA2IABJjpLz1AcqTtkyJygRMc3RCV8cWjTnHcFBbZDuWmBSp3ZHtfTjjTuxxEtX/1H7YyYl3J6YRbTzBPEVoA/VhYDKX1DyxNB0cTddqXl5dvMVztK517IDvYuVTZXpmkOlEKMaNCMEAwHQYDVR0OBBYEFLuw3qFYM4iapIqZ3r6966/ayySrMA8GA1UdEwEB/wQFMAMBAf8wDgYDVR0PAQH/BAQDAgEGMAoGCCqGSM49BAMDA2gAMGUCMQCD6cHEFl4aXTQY2e3v9GwOAEZLuN+yRhHFD/3meoyhpmvOwgPUnPWTxnS4at+qIxUCMG1mihDK1A3UT82NQz60imOlM27jbdoXt2QfyFMm+YhidDkLF1vLUagM6BgD56KyKA=='), (c) => c.charCodeAt(0));
+export const APPLE_ROOT_G3 = bytesOf64('MIICQzCCAcmgAwIBAgIILcX8iNLFS5UwCgYIKoZIzj0EAwMwZzEbMBkGA1UEAwwSQXBwbGUgUm9vdCBDQSAtIEczMSYwJAYDVQQLDB1BcHBsZSBDZXJ0aWZpY2F0aW9uIEF1dGhvcml0eTETMBEGA1UECgwKQXBwbGUgSW5jLjELMAkGA1UEBhMCVVMwHhcNMTQwNDMwMTgxOTA2WhcNMzkwNDMwMTgxOTA2WjBnMRswGQYDVQQDDBJBcHBsZSBSb290IENBIC0gRzMxJjAkBgNVBAsMHUFwcGxlIENlcnRpZmljYXRpb24gQXV0aG9yaXR5MRMwEQYDVQQKDApBcHBsZSBJbmMuMQswCQYDVQQGEwJVUzB2MBAGByqGSM49AgEGBSuBBAAiA2IABJjpLz1AcqTtkyJygRMc3RCV8cWjTnHcFBbZDuWmBSp3ZHtfTjjTuxxEtX/1H7YyYl3J6YRbTzBPEVoA/VhYDKX1DyxNB0cTddqXl5dvMVztK517IDvYuVTZXpmkOlEKMaNCMEAwHQYDVR0OBBYEFLuw3qFYM4iapIqZ3r6966/ayySrMA8GA1UdEwEB/wQFMAMBAf8wDgYDVR0PAQH/BAQDAgEGMAoGCCqGSM49BAMDA2gAMGUCMQCD6cHEFl4aXTQY2e3v9GwOAEZLuN+yRhHFD/3meoyhpmvOwgPUnPWTxnS4at+qIxUCMG1mihDK1A3UT82NQz60imOlM27jbdoXt2QfyFMm+YhidDkLF1vLUagM6BgD56KyKA==');
 
 /// The roots an App Store chain may end at: Apple's, unless a test says
 /// otherwise — no test can make a certificate Apple signed.
@@ -146,19 +146,20 @@ export const forgetAppleRoots = () => (appleRoots = [APPLE_ROOT_G3]);
 const APPLE_INTERMEDIATE = '1.2.840.113635.100.6.2.1';
 const APPLE_STORE_LEAF = '1.2.840.113635.100.6.11.1';
 
-/// What an App Store JWS says, once its chain ends at one of [roots] and
-/// its signature is the leaf's; null when it does not check out. The
+/// What an App Store JWS says, once its chain ends at one of Apple's
+/// roots and its signature is the leaf's; null when it does not check
+/// out. The
 /// certificates are checked at the moment the payload says it was
 /// signed, which is how Apple's own library checks them: what Apple
 /// signed while a certificate was good stays signed after it expires.
-export async function appleSigned(jws, { roots = appleRoots, now = Date.now() } = {}) {
+export async function appleSigned(jws, { now = Date.now() } = {}) {
   try {
     const parts = String(jws ?? '').split('.');
     if (parts.length !== 3) return null;
     const header = JSON.parse(new TextDecoder().decode(un64(parts[0])));
     if (header.alg !== 'ES256' || !Array.isArray(header.x5c) || header.x5c.length !== 3) return null;
-    const ders = header.x5c.map((c) => Uint8Array.from(atob(c), (ch) => ch.charCodeAt(0)));
-    if (!roots.some((r) => sameBytes(r, ders[2]))) return null;
+    const ders = header.x5c.map(bytesOf64);
+    if (!appleRoots.some((r) => sameBytes(r, ders[2]))) return null;
     const [leaf, middle, root] = ders.map(certOf);
     const payload = JSON.parse(new TextDecoder().decode(un64(parts[1])));
     const at = Number.isFinite(payload.signedDate) ? payload.signedDate : now;
@@ -174,30 +175,4 @@ export async function appleSigned(jws, { roots = appleRoots, now = Date.now() } 
   } catch {
     return null;
   }
-}
-
-/// A checked App Store transaction, as this service reads it: the
-/// subscription, when it runs to, whether it has ended, and whom it
-/// was bought for. {status, body} when it is not one of ours.
-export async function appleTransaction(jws, env, { roots, now = Date.now() } = {}) {
-  const bundle = env.OH_APPLE_BUNDLE_ID;
-  const product = env.OH_APPLE_PRODUCT;
-  if (!bundle || !product) return { status: 503, body: { error: 'the store is not set up yet' } };
-  const t = await appleSigned(jws, { roots, now });
-  if (!t) return { status: 401, body: { error: 'not from the store' } };
-  // Another app's, another product's, or not a subscription at all.
-  if (t.bundleId !== bundle || t.productId !== product || t.type !== 'Auto-Renewable Subscription') {
-    return { status: 401, body: { error: 'not from the store' } };
-  }
-  if (typeof t.originalTransactionId !== 'string' || !/^\d{1,32}$/.test(t.originalTransactionId) || !Number.isFinite(t.expiresDate)) {
-    return { status: 401, body: { error: 'not from the store' } };
-  }
-  return {
-    subscription: `apple:${t.originalTransactionId}`,
-    until: t.expiresDate,
-    gone: t.revocationDate != null,
-    account: typeof t.appAccountToken === 'string' ? t.appAccountToken.toLowerCase() : null,
-    created: Number.isFinite(t.signedDate) ? Math.floor(t.signedDate / 1000) : null,
-    txn_ref: typeof t.transactionId === 'string' ? t.transactionId : null,
-  };
 }

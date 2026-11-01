@@ -45,10 +45,10 @@ test('what became of each message is counted, and the counts are a line a minute
   assert.equal(points.length, 1, 'a minute on, one line');
   const [p] = points;
   assert.deepEqual(p.blobs, ['relay'], 'no tag, no key');
-  assert.equal(p.doubles.length, tallied.length + 1);
+  assert.equal(p.doubles.length, tallied.length);
   assert.equal(p.doubles[tallied.indexOf('events')], 1);
   assert.equal(p.doubles[tallied.indexOf('closed')], 1);
-  assert.equal(p.doubles.at(-1), 60, 'the seconds it covers');
+  assert.equal(p.doubles[tallied.indexOf('seconds')], 60, 'the seconds it covers');
   assert.ok(!JSON.stringify(p).includes(one.pubkey), 'never who');
 });
 
@@ -78,7 +78,24 @@ test('the last socket gone writes the counts so far, inside the minute', () => {
   assert.equal(points.length, 1, 'nobody left: written before the object can be evicted');
   assert.equal(points[0].doubles[tallied.indexOf('opened')], 2);
   assert.equal(points[0].doubles[tallied.indexOf('closed')], 2);
-  assert.equal(points[0].doubles.at(-1), 9, 'the seconds it covers');
+  assert.equal(points[0].doubles[tallied.indexOf('seconds')], 9, 'the seconds it covers');
+});
+
+test("each number keeps the column the operator's queries read it from, and a picture withheld is counted", () => {
+  // Analytics Engine names a line's numbers double1, double2, ... by
+  // their place, so a count added later goes after the seconds.
+  assert.deepEqual(tallied.slice(0, 13), ['opened', 'closed', 'events', 'delivered', 'subscriptions', 'rateLimited', 'invalid', 'refused', 'duplicate', 'tooBig', 'malformed', 'superseded', 'seconds']);
+  let t = 0;
+  const points = [];
+  const counts = tally({ writeDataPoint: (p) => points.push(p) }, { now: () => t });
+  counts.count('withheld');
+  counts.count('seconds', 99);
+  t = 4000;
+  counts.closed(0);
+  assert.equal(points.length, 1, 'a line with only a withheld picture in it is written');
+  const doubles = points[0].doubles;
+  assert.equal(doubles[tallied.indexOf('withheld')], 1);
+  assert.equal(doubles[12], 4, 'double13: the seconds, as before, never a count');
 });
 
 test('no dataset is no writing, and a quiet minute writes no line', () => {

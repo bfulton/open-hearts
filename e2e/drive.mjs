@@ -20,6 +20,7 @@ import { basename, dirname, extname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { format } from 'node:util';
 import { build as buildSite } from '../site/build.mjs';
+import { headersFor, parseHeaders } from '../site/headers.mjs';
 import { configOf } from '../service/functions/config.mjs';
 import { wakePath } from '../service/do/bench.mjs';
 
@@ -292,6 +293,9 @@ async function handlersFor(serve, records, store, config) {
   const env = {
     OH_SERVICE_SECRET: localService.secret,
     OH_SERVICE_KEY: localService.key,
+    // The house the rig's tables name, which a kept game's result is the
+    // word of (service/functions/records.mjs, keepRecord).
+    OH_HOUSE_KEY: rigHouse.key,
     OH_OPEN_HOUSE: '1',
     OH_STORE: {
       get: async (at, kind) => {
@@ -316,22 +320,32 @@ async function handlersFor(serve, records, store, config) {
 }
 
 /// The kept games' bucket (service/functions/records.mjs), in memory:
-/// what the site would keep in R2, custom metadata and listing too. A
-/// flow can look at it, or put a game in it to open (`app.records`).
-/// One to each rig.
+/// what the site would keep in R2, custom metadata, etags and listing
+/// too. A flow can look at it, or put a game in it to open
+/// (`app.records`). One to each rig.
 const recordsBucket = () => ({
   kept: new Map(),
   noted: new Map(),
+  etags: new Map(),
+  written: 0,
   async head(key) {
-    return this.kept.has(key) ? { key } : null;
+    return this.kept.has(key) ? { key, etag: this.etags.get(key), customMetadata: this.noted.get(key) } : null;
   },
   async get(key) {
     const body = this.kept.get(key);
-    return body ? { body: new Blob([body]).stream(), customMetadata: this.noted.get(key) } : null;
+    return body ? { body: new Blob([body]).stream(), etag: this.etags.get(key), customMetadata: this.noted.get(key) } : null;
   },
+  // As R2 writes: an `onlyIf` that does not hold writes nothing and
+  // answers null.
   async put(key, body, options = {}) {
+    const { etagMatches, etagDoesNotMatch } = options.onlyIf ?? {};
+    const here = this.kept.has(key);
+    if (etagMatches !== undefined && (!here || this.etags.get(key) !== etagMatches)) return null;
+    if (etagDoesNotMatch !== undefined && here && (etagDoesNotMatch === '*' || this.etags.get(key) === etagDoesNotMatch)) return null;
     this.kept.set(key, Buffer.from(body));
     this.noted.set(key, options.customMetadata);
+    this.etags.set(key, `rig-${++this.written}`);
+    return { key };
   },
   async list({ prefix, include = [] }) {
     const objects = [...this.kept.keys()].filter((k) => k.startsWith(prefix)).map((key) => ({
@@ -367,6 +381,10 @@ const recordsBucket = () => ({
 export async function serveApp({ relayPort = null, pace = null, config = null } = {}) {
   const site = mkdtempSync(join(tmpdir(), 'oh-site-'));
   buildSite(site);
+  // With the headers Pages gives them: the site's _headers, as built
+  // for the deploy, which is where the app's Content-Security-Policy is
+  // (headers.mjs; csp.mjs holds the app to it).
+  const headerRules = parseHeaders(readFileSync(join(site, '_headers'), 'utf8'));
   // Static files as a fetch, which is what the worker's own ASSETS
   // binding is, by Pages' rules: a directory is its index.html, an
   // address with no extension its .html.
@@ -378,7 +396,10 @@ export async function serveApp({ relayPort = null, pace = null, config = null } 
     else if (!extname(file)) file += '.html';
     try {
       const body = await readFile(file);
-      return new Response(body, { status: 200, headers: { 'content-type': types[extname(file)] ?? 'application/octet-stream' } });
+      return new Response(body, {
+        status: 200,
+        headers: { ...headersFor(headerRules, path), 'content-type': types[extname(file)] ?? 'application/octet-stream' },
+      });
     } catch {
       return new Response(null, { status: 404 });
     }

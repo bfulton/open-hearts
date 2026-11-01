@@ -11,8 +11,8 @@
 /// hand, no pass, no deal.
 ///
 /// A view is a player's account, signed by their key, not a proof:
-/// the proof is the record, checked when the game is over (record.dart,
-/// game_record.dart). So it is read strictly — a view that does not
+/// the proof is the record, checked when the game is over
+/// (record.dart). So it is read strictly — a view that does not
 /// parse is dropped — and believed only as far as a scoreboard is.
 ///
 /// Watching is live play, which is a subscription's: a watcher says it
@@ -29,6 +29,7 @@ import 'package:engine/engine.dart';
 
 import 'client.dart';
 import 'licence.dart';
+import 'names.dart';
 import 'signing.dart';
 import 'spec.dart';
 
@@ -155,8 +156,11 @@ class WatchedTable {
         return out;
       }
 
+      // At most [longestName] characters, the longest name kept
+      // (names.dart), counted in code points rather than UTF-16 units,
+      // so a name of emoji counts the same as one of letters.
       final names = [for (final n in m['names'] as List) n as String];
-      if (names.length != seatCount || names.any((n) => n.length > 60)) return null;
+      if (names.length != seatCount || names.any((n) => n.runes.length > longestName)) return null;
       final plays = <({int seat, Card card})>[];
       for (final p in m['plays'] as List) {
         final pair = p as List;
@@ -180,7 +184,7 @@ class WatchedTable {
         seq: m['seq'] as int,
         hand: m['hand'] as int,
         phase: Phase.values.byName(m['phase'] as String),
-        names: names,
+        names: [for (final n in names) cleanName(n)],
         totals: seats(m['totals']),
         taken: seats(m['taken'], most: 26),
         plays: plays,

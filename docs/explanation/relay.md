@@ -23,7 +23,8 @@ anything else sees it. Sockets hibernate, carrying their subscriptions
 through eviction, so an idle connection costs nothing.
 
 Each socket is held to limits on message size, request size and
-publishing rate. A table's limits are looser than presence's: a deal
+publishing rate, and subscribing or asking for a table's log counts
+against the rate as publishing does. A table's limits are looser than presence's: a deal
 sends its steps in bursts of tens of kilobytes, while presence is a
 small message every few seconds from every device online.
 
@@ -159,3 +160,8 @@ shows only the codes it knows, so a new reaction needs no new relay.
 A watcher's ask and a seated player's answer ride the table's own tag.
 The relay forwards both and stores neither, like the rest of a table's
 traffic ([watching a live game](live-play.md#watching-a-live-game)).
+Watchers believe a view, so once the table's start is in its log, the
+relay carries a view only from a key that holds a seat in person
+(`viewRefusal` in `service/do/relay.mjs`), and refuses anybody else's
+with the reason `blocked: a view of the table is one of its people's
+to say`.

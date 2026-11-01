@@ -9,8 +9,9 @@
 // payment (docs/explanation/service.md, "Payment").
 
 import { paidFor } from './accounts.mjs';
+import { REFUSED } from './refusals.mjs';
 import { dayOf, isAccount } from './rows.mjs';
-import { S, SITE, STRIPE_PRICE } from './settings.mjs';
+import { SITE, STRIPE_PRICE, serviceSettings } from './settings.mjs';
 import { dateSubscription } from './subscriptions.mjs';
 
 // ---- buying, on the web ------------------------------------------------
@@ -102,9 +103,44 @@ export async function shopPrice(named, secret, stated, fetchImpl = fetch, { now 
 /// Stripe refusing to say: its status.
 export class StripeRefused extends Error {
   constructor(status) {
-    super(`stripe prices ${status}`);
+    super(`stripe said ${status}`);
     this.status = status;
   }
+}
+
+/// [path] of Stripe's API, asked with [secret], as its JSON. With
+/// [missingIsNull], a 404 is null. Throws [StripeRefused] when Stripe
+/// says no, and whatever the fetch throws when it does not answer.
+export async function askStripe(secret, path, { method = 'GET', missingIsNull = false, fetchImpl = fetch } = {}) {
+  const res = await fetchImpl(`${STRIPE}${path}`, { method, headers: stripeAuth(secret) });
+  if (missingIsNull && res.status === 404) return null;
+  if (!res.ok) throw new StripeRefused(res.status);
+  return res.json();
+}
+
+/// A session Stripe opens at [path] for [form], a checkout or the
+/// billing portal: {status, body}, its {url}, or a 502 saying how Stripe
+/// failed, [gave] naming what it gave none of.
+async function stripeSession(path, form, secret, gave, fetchImpl) {
+  let res;
+  try {
+    res = await fetchImpl(`${STRIPE}${path}`, {
+      method: 'POST',
+      headers: { ...stripeAuth(secret), 'content-type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams(form).toString(),
+    });
+  } catch {
+    return { status: 502, body: { error: 'the shop is not answering' } };
+  }
+  if (!res.ok) return { status: 502, body: { error: `the shop said ${res.status}` } };
+  let session;
+  try {
+    session = await res.json();
+  } catch {
+    return { status: 502, body: { error: 'the shop talked nonsense' } };
+  }
+  if (typeof session.url !== 'string') return { status: 502, body: { error: `the shop gave no ${gave}` } };
+  return { status: 200, body: { url: session.url } };
 }
 
 /// The active price [named] stands for, as Stripe has it, asked now:
@@ -113,13 +149,8 @@ export class StripeRefused extends Error {
 /// the fetch throws when it does not answer.
 export async function priceLookup(named, secret, fetchImpl) {
   const one = named.startsWith('price_');
-  const url = one
-    ? `${STRIPE}/prices/${encodeURIComponent(named)}`
-    : `${STRIPE}/prices?${new URLSearchParams({ 'lookup_keys[]': named, active: 'true', limit: '1' })}`;
-  const res = await fetchImpl(url, { headers: stripeAuth(secret) });
-  if (one && res.status === 404) return null;
-  if (!res.ok) throw new StripeRefused(res.status);
-  const body = await res.json();
+  const path = one ? `/prices/${encodeURIComponent(named)}` : `/prices?${new URLSearchParams({ 'lookup_keys[]': named, active: 'true', limit: '1' })}`;
+  const body = await askStripe(secret, path, { missingIsNull: one, fetchImpl });
   const price = one ? body : body?.data?.[0];
   return typeof price?.id === 'string' && price.id.startsWith('price_') && price.active !== false ? price : null;
 }
@@ -165,10 +196,11 @@ export function checkoutFields(key, price, back, cancelled, lang) {
     'line_items[0][quantity]': '1',
     success_url: back,
     cancel_url: cancelled,
-    // Three places, because three different events carry it back: the
-    // session's own metadata, the reference on the session, and the
-    // subscription's metadata, which is what a renewal a year from now
-    // will have.
+    // The key is read back from the session's own metadata alone, which
+    // only this worker writes ([record]). The session's reference and the
+    // subscription's metadata carry it too, so that whoever reads the
+    // session or the subscription in Stripe's Dashboard, a year on
+    // included, sees which device it is for; nothing here reads them.
     'metadata[key]': key,
     client_reference_id: key,
     'subscription_data[metadata][key]': key,
@@ -206,26 +238,7 @@ export async function checkout(key, back, cancelled, env, fetchImpl = fetch, { l
   // A price that is not the terms' is not sold at: /api/health says
   // which (health.mjs), for the operator to put right.
   if (!sells.id) return { status: 503, body: { error: 'the shop is not open yet' } };
-  const form = new URLSearchParams(checkoutFields(key, sells.id, back, cancelled, lang));
-  let res;
-  try {
-    res = await fetchImpl(`${STRIPE}/checkout/sessions`, {
-      method: 'POST',
-      headers: { ...stripeAuth(secret), 'content-type': 'application/x-www-form-urlencoded' },
-      body: form.toString(),
-    });
-  } catch {
-    return { status: 502, body: { error: 'the shop is not answering' } };
-  }
-  if (!res.ok) return { status: 502, body: { error: `the shop said ${res.status}` } };
-  let session;
-  try {
-    session = await res.json();
-  } catch {
-    return { status: 502, body: { error: 'the shop talked nonsense' } };
-  }
-  if (typeof session.url !== 'string') return { status: 502, body: { error: 'the shop gave no checkout' } };
-  return { status: 200, body: { url: session.url } };
+  return stripeSession('/checkout/sessions', checkoutFields(key, sells.id, back, cancelled, lang), secret, 'checkout', fetchImpl);
 }
 
 /// Whether [header] signs [raw] with [secret], the way Stripe signs.
@@ -246,7 +259,7 @@ export async function webhookSigned(header, raw, secret, { now = Date.now() } = 
   }
   const t = Number(parts.t);
   if (!Number.isFinite(t) || !v1.length) return false;
-  if (Math.abs(now / 1000 - t) > S().webhookToleranceS) return false;
+  if (Math.abs(now / 1000 - t) > serviceSettings().webhookToleranceS) return false;
   const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, [
     'verify',
   ]);
@@ -266,7 +279,13 @@ export async function webhookSigned(header, raw, secret, { now = Date.now() } = 
 /// What a Stripe event means here, written down. Returns what was
 /// recorded, or null when the event is not one of ours — a webhook
 /// carries everything the account does, and most of it is not this.
-export async function record(event, store, { now = Date.now() } = {}) {
+/// [bind] puts a paid checkout's device into the subscription's account
+/// and answers {status, body} as [paidFor] does. The webhook passes one
+/// that runs in the subscription's own turn (household.mjs,
+/// inSubscription), so that two deliveries of one checkout at once make
+/// one account; the default runs here, for the tests that bind through
+/// this.
+export async function record(event, store, { now = Date.now(), bind = (subscription, key) => paidFor(store, subscription, key, { now }) } = {}) {
   const object = event?.data?.object ?? {};
   const today = dayOf(now);
   // A checkout this service made, and paid for. Made here: only a
@@ -285,8 +304,8 @@ export async function record(event, store, { now = Date.now() } = {}) {
     // The date is the subscription's to say, and its own event may not
     // have arrived yet: bound now, dated on the first ask after it has.
     await keepCustomer(store, subscription, object.customer);
-    const paid = await paidFor(store, subscription, key, { now });
-    return { bound: key, subscription, account: paid.body?.account ?? null };
+    const paid = await bind(subscription, key);
+    return { bound: key, subscription, account: paid.body?.account ?? null, status: paid.status };
   }
   if (event?.type?.startsWith('customer.subscription.')) {
     const subscription = object.id;
@@ -334,11 +353,7 @@ export async function endRefunded(charge, store, env, fetchImpl = fetch) {
   if (!(charge?.amount_refunded > 0) || typeof intent !== 'string' || !/^pi_[A-Za-z0-9]{1,64}$/.test(intent)) return { status: 200, body: { ended: null } };
   const secret = env.OH_STRIPE_SECRET;
   if (!secret) return { status: 503, body: { error: 'service not configured: OH_STRIPE_SECRET' } };
-  const ask = async (path, method = 'GET') => {
-    const res = await fetchImpl(`${STRIPE}${path}`, { method, headers: stripeAuth(secret) });
-    if (!res.ok) throw new StripeRefused(res.status);
-    return res.json();
-  };
+  const ask = (path) => askStripe(secret, path, { fetchImpl });
   try {
     // A payment is an invoice's, and an invoice its subscription's, in
     // this API version: neither the charge nor its payment names either.
@@ -364,16 +379,10 @@ export const webSubscriptionsOf = (meta) => [meta?.subscription, ...(Array.isArr
 /// name, which renews nothing: true when it ended here. Throws
 /// [StripeRefused] when Stripe says no, or the fetch's error.
 export async function endAtStripe(subscription, secret, comment, fetchImpl = fetch) {
-  const ask = async (path, method = 'GET') => {
-    const res = await fetchImpl(`${STRIPE}${path}`, { method, headers: stripeAuth(secret) });
-    if (res.status === 404 && method === 'GET') return null;
-    if (!res.ok) throw new StripeRefused(res.status);
-    return res.json();
-  };
   const at = `/subscriptions/${encodeURIComponent(subscription)}`;
-  const now = await ask(at);
+  const now = await askStripe(secret, at, { missingIsNull: true, fetchImpl });
   if (!now || FINAL.has(now.status)) return false;
-  await ask(`${at}?${new URLSearchParams({ 'cancellation_details[comment]': comment })}`, 'DELETE');
+  await askStripe(secret, `${at}?${new URLSearchParams({ 'cancellation_details[comment]': comment })}`, { method: 'DELETE', fetchImpl });
   return true;
 }
 
@@ -403,16 +412,15 @@ export async function manage(key, back, store, env, fetchImpl = fetch) {
   if (!secret) return { status: 503, body: { error: 'the shop is not open yet' } };
   const account = (await store.get(`KEY#${key}`, 'ENTITLEMENT'))?.account;
   // Bound to it, not merely once on it: a dropped device keeps no say.
-  if (!isAccount(account) || !(await store.get(`ACCOUNT#${account}`, `DEVICE#${key}`))) return { status: 402, body: { error: 'no subscription' } };
+  if (!isAccount(account) || !(await store.get(`ACCOUNT#${account}`, `DEVICE#${key}`))) return { status: 402, body: { error: REFUSED.noSubscription } };
   const subscription = (await store.get(`ACCOUNT#${account}`, 'META'))?.subscription;
-  if (!subscription) return { status: 402, body: { error: 'no subscription' } };
+  if (!subscription) return { status: 402, body: { error: REFUSED.noSubscription } };
   if (!subscription.startsWith('sub_')) return { status: 409, body: { error: 'not a web subscription' } };
-  const auth = stripeAuth(secret);
   let customer = (await store.get(`SUB#${subscription}`, 'CUSTOMER'))?.customer;
   if (!customer) {
     // No customer row for this subscription: Stripe knows.
     try {
-      const res = await fetchImpl(`${STRIPE}/subscriptions/${encodeURIComponent(subscription)}`, { headers: auth });
+      const res = await fetchImpl(`${STRIPE}/subscriptions/${encodeURIComponent(subscription)}`, { headers: stripeAuth(secret) });
       if (res.ok) customer = (await res.json())?.customer;
     } catch {
       return { status: 502, body: { error: 'the shop is not answering' } };
@@ -422,37 +430,14 @@ export async function manage(key, back, store, env, fetchImpl = fetch) {
     }
     await keepCustomer(store, subscription, customer);
   }
-  let res;
-  try {
-    res = await fetchImpl(`${STRIPE}/billing_portal/sessions`, {
-      method: 'POST',
-      headers: { ...auth, 'content-type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({ customer, return_url: back }).toString(),
-    });
-  } catch {
-    return { status: 502, body: { error: 'the shop is not answering' } };
-  }
-  if (!res.ok) return { status: 502, body: { error: `the shop said ${res.status}` } };
-  let session;
-  try {
-    session = await res.json();
-  } catch {
-    return { status: 502, body: { error: 'the shop talked nonsense' } };
-  }
-  if (typeof session.url !== 'string') return { status: 502, body: { error: 'the shop gave no portal' } };
-  return { status: 200, body: { url: session.url } };
+  return stripeSession('/billing_portal/sessions', { customer, return_url: back }, secret, 'portal', fetchImpl);
 }
 
-/// The email Stripe holds for the customer behind [subscription], or
-/// null: read when backup codes are sent, and not kept. The account's
-/// subscription, for an account.
-export async function payerEmail(store, subscription, env, fetchImpl = fetch) {
-  return (await payerLookup(store, subscription, env, fetchImpl)).email;
-}
-
-/// [payerEmail], with why there is none: {email, why}. The why goes to
-/// the household with the ask, which logs it beside the send it
-/// stopped (the relay's log is the one that can be read afterwards).
+/// The email Stripe holds for the customer behind [subscription], the
+/// account's, with why there is none: {email, why}. Read when backup
+/// codes are sent, and not kept. The why goes to the household with the
+/// ask, which logs it beside the send it stopped (the relay's log is
+/// the one that can be read afterwards).
 export async function payerLookup(store, subscription, env, fetchImpl = fetch) {
   const secret = env.OH_STRIPE_SECRET;
   if (!secret) return { email: null, why: 'no Stripe key' };

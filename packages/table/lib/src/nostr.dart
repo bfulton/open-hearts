@@ -107,9 +107,6 @@ class NostrEvent {
         'sig': sig,
       };
 
-  /// Kinds 20000–29999 are ephemeral: a relay forwards and forgets.
-  bool get ephemeral => kind >= 20000 && kind < 30000;
-
   @override
   String toString() => 'kind $kind by ${pubkey.substring(0, 6)} #${id.substring(0, 6)}';
 }
@@ -130,29 +127,6 @@ class Filter {
   /// Tag name (one letter) to accepted values.
   final Map<String, List<String>> tags;
 
-  static Filter? parse(Object? json) {
-    try {
-      final m = json as Map;
-      final tags = <String, List<String>>{};
-      for (final e in m.entries) {
-        final k = e.key as String;
-        if (k.length == 2 && k.startsWith('#')) tags[k.substring(1)] = [for (final v in e.value as List) v as String];
-      }
-      List<String>? strings(String key) => m[key] == null ? null : [for (final v in m[key] as List) v as String];
-      return Filter(
-        ids: strings('ids'),
-        authors: strings('authors'),
-        kinds: m['kinds'] == null ? null : [for (final v in m['kinds'] as List) v as int],
-        since: m['since'] as int?,
-        until: m['until'] as int?,
-        limit: m['limit'] as int?,
-        tags: tags,
-      );
-    } catch (_) {
-      return null;
-    }
-  }
-
   Map<String, Object?> toJson() => {
         if (ids != null) 'ids': ids,
         if (authors != null) 'authors': authors,
@@ -162,18 +136,6 @@ class Filter {
         if (limit != null) 'limit': limit,
         for (final e in tags.entries) '#${e.key}': e.value,
       };
-
-  bool matches(NostrEvent e) {
-    if (ids != null && !ids!.any(e.id.startsWith)) return false;
-    if (authors != null && !authors!.any(e.pubkey.startsWith)) return false;
-    if (kinds != null && !kinds!.contains(e.kind)) return false;
-    if (since != null && e.createdAt < since!) return false;
-    if (until != null && e.createdAt > until!) return false;
-    for (final t in tags.entries) {
-      if (!e.tags.any((x) => x.length >= 2 && x[0] == t.key && t.value.contains(x[1]))) return false;
-    }
-    return true;
-  }
 }
 
 /// The kinds the table uses. Ephemeral, all of them but the lobby: a

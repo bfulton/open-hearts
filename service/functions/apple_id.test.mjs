@@ -144,16 +144,20 @@ async function linked() {
     OH_ID_HMAC: 'pepper',
     OH_APPLE_AUDIENCE,
   };
-  const ask = async (pair, handler, more = {}) => {
+  const ask = async (pair, handler, more = {}, what = '') => {
     const at = Math.floor(Date.now() / 1000);
-    const sig = signer.sign(pair.secret, await sha(`oh-request/1\n${handler}\n${pair.public}\n${at}\n`));
+    const sig = signer.sign(pair.secret, await sha(`oh-request/1\n${handler}\n${pair.public}\n${at}\n${what}`));
     const res = await worker.fetch(
       new Request(`https://play.openhearts.game/api/${handler}`, { method: 'POST', body: JSON.stringify({ key: pair.public, at, sig, ...more }) }),
       env,
     );
     return { status: res.status, body: await res.json() };
   };
-  const signIn = async (pair, handler, sub = SUB) => ask(pair, handler, { provider: 'apple', token: await idToken(pair.public, sub) });
+  // Signed over the provider and the token, as the app signs them.
+  const signIn = async (pair, handler, sub = SUB) => {
+    const token = await idToken(pair.public, sub);
+    return ask(pair, handler, { provider: 'apple', token }, `apple ${token}`);
+  };
   const attested = await signIn(ADA, 'attest');
   assert.equal(attested.status, 200, 'linked, as the app links it');
   const login = await loginRow({ provider: 'apple', sub: SUB }, env);
@@ -322,12 +326,14 @@ test('appleIdNotice: what a notice says, read with the keys handed in', async ()
   assert.equal(await appleIdNotice(await notice('consent-revoked'), env, async () => new Response('down', { status: 503 })), null);
 });
 
-test('the handler is on the app\'s host and a preview\'s, and not the site\'s', async () => {
+test('the handler is on the app\'s host and a preview\'s, and not the site\'s nor a production deployment\'s own address', async () => {
   const { env } = await linked();
   const there = await tell(env, await notice('email-enabled'));
   assert.equal(there.status, 200);
-  const preview = await tell(env, await notice('email-enabled'), { host: 'dev.open-hearts.pages.dev' });
+  const preview = await tell({ ...env, OH_DEPLOYMENT: 'preview' }, await notice('email-enabled'), { host: 'dev.open-hearts.pages.dev' });
   assert.equal(preview.status, 200);
+  const pagesHost = await tell(env, await notice('email-enabled'), { host: 'open-hearts.pages.dev' });
+  assert.deepEqual(pagesHost, { status: 404, body: { error: 'no such handler' } });
   const site = await tell(env, await notice('account-deleted'), { host: 'openhearts.game' });
   assert.deepEqual(site, { status: 404, body: { error: 'the service has moved to play.openhearts.game' } });
   assert.equal((await tell(env, null, { method: 'GET' })).status, 405);

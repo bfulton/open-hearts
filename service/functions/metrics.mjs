@@ -2,7 +2,8 @@
 
 /// A request out of how many is written down, by handler: one in ten
 /// for the config, which every open app asks for each quarter of an
-/// hour; every one of the rest, which are a person doing something.
+/// hour, and for the health, which the monitors ask for over and over;
+/// every one of the rest, which are a person doing something.
 const SAMPLED = { config: 10, health: 10 };
 
 /// One line of numbers a request, for the operator (docs/explanation/service.md):

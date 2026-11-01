@@ -24,6 +24,7 @@
 import { CHECKERS, SHIELD } from './checkers.mjs';
 import { HOLD_DAYS } from '../functions/holds.mjs';
 import { forgottenKey } from '../functions/records.mjs';
+import { base64Of } from '../functions/rows.mjs';
 import { ACCOUNT_PICTURES_PREFIX, PICTURES_ORIGIN, PICTURES_ROW, allowedOf, changePicture, copyOf, currentOf, knownFlags, newestFirst, pictureUrl, settleCopies, stillAllowing, withheldOf, withholding } from '../functions/pictures.mjs';
 
 /// Where the copies are served (service/functions/pictures.mjs).
@@ -359,7 +360,7 @@ export async function reviewRun({ bucket, store, records = null, send = null, as
     if (c.known === 'clear' || c.known === 'unreadable') continue;
     const copy = await bucket.get(c.key);
     if (!copy) continue;
-    const jpeg = btoa(String.fromCharCode(...new Uint8Array(await copy.arrayBuffer())));
+    const jpeg = base64Of(new Uint8Array(await copy.arrayBuffer()));
     let answer;
     try {
       answer = await ask({ jpeg, account: c.account, key: null, shown: true, at: c.at || null });

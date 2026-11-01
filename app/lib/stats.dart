@@ -50,8 +50,8 @@ class PlayerStats {
   final bool reached;
 
   /// How long this device takes over a card, as it has measured itself
-  /// (pace_store.dart). Never on a relay: nobody else can agree on it,
-  /// and nobody else is told.
+  /// (pace_store.dart). Never on a relay: it is this device's own
+  /// measurement, and nobody else is told.
   final Pace pace;
 
   /// The games alone hand by hand: the recent scores and what the
@@ -63,24 +63,26 @@ class PlayerStats {
   /// while it meant the first would be giving an error nobody had.
   final bool asking;
 
-  PlayerStats withLive({required Rating rating, required int ratedGames, required Tally live}) =>
-      PlayerStats(rating: rating, ratedGames: ratedGames, live: live, alone: alone, reached: true, pace: pace, history: history);
-
-  PlayerStats withAlone(Tally alone, [SoloHistory? history]) => PlayerStats(
-      rating: rating,
-      ratedGames: ratedGames,
-      live: live,
-      alone: alone,
-      reached: reached,
-      pace: pace,
-      history: history ?? this.history,
-      asking: asking);
-
-  PlayerStats withPace(Pace pace) =>
-      PlayerStats(rating: rating, ratedGames: ratedGames, live: live, alone: alone, reached: reached, pace: pace, history: history, asking: asking);
-
-  PlayerStats withAsking(bool asking) =>
-      PlayerStats(rating: rating, ratedGames: ratedGames, live: live, alone: alone, reached: reached, pace: pace, history: history, asking: asking);
+  PlayerStats copyWith({
+    Rating? rating,
+    int? ratedGames,
+    Tally? live,
+    Tally? alone,
+    bool? reached,
+    Pace? pace,
+    SoloHistory? history,
+    bool? asking,
+  }) =>
+      PlayerStats(
+        rating: rating ?? this.rating,
+        ratedGames: ratedGames ?? this.ratedGames,
+        live: live ?? this.live,
+        alone: alone ?? this.alone,
+        reached: reached ?? this.reached,
+        pace: pace ?? this.pace,
+        history: history ?? this.history,
+        asking: asking ?? this.asking,
+      );
 }
 
 /// The games alone looked at hand by hand, for the profile's chart and
@@ -128,7 +130,7 @@ const runAtTheMoon = 10;
     final winner = trickWinner(trick);
     for (final play in trick) {
       if (play.card.suit == Suit.hearts) hearts[winner]++;
-      if (play.card.suit == Suit.spades && play.card.rank == Rank.queen) tookQueen = winner;
+      if (play.card == queenOfSpades) tookQueen = winner;
     }
   }
   final running = tookQueen;
@@ -154,7 +156,7 @@ const runAtTheMoon = 10;
     // A record that stops short is a game that was left, not one that
     // was played: there is no score to claim for it.
     if (!replay.complete) continue;
-    final me = record.humanSeat;
+    final me = humanSeat;
     final totals = replay.game.totals;
     final mine = totals[me];
     games++;
@@ -178,9 +180,14 @@ const runAtTheMoon = 10;
 }
 
 /// The live half: what a standing from the relays says about an
-/// account.
-PlayerStats fromStanding(PlayerStats onto, net.Standing standing, String me) =>
-    onto.withLive(rating: standing.mine, ratedGames: standing.ledger.gamesOf(me), live: Tally.of(me, standing.ledger.standing));
+/// account. The relays have answered, so nothing is still being asked.
+PlayerStats fromStanding(PlayerStats onto, net.Standing standing) => onto.copyWith(
+      rating: standing.mine,
+      ratedGames: standing.ledger.gamesOf(standing.me),
+      live: Tally.of(standing.me, standing.ledger.standing),
+      reached: true,
+      asking: false,
+    );
 
 /// Both halves, as they come. The device's own games are read first
 /// because they need nothing but the device; the relays answer when
@@ -191,18 +198,18 @@ PlayerStats fromStanding(PlayerStats onto, net.Standing standing, String me) =>
 /// question. A null [relays] with no [standing] says not to ask at
 /// all, which is a door that is deliberately offline.
 Stream<PlayerStats> playerStats({required RecordStore store, required Signer signer, List<Uri>? relays, net.Standing? standing}) async* {
-  var stats = const PlayerStats().withPace(await PaceStore.load());
+  final pace = await PaceStore.load();
   final alone = soloGames(await store.load());
-  stats = stats.withAlone(alone.tally, alone.history);
-  yield stats.withAsking(standing == null && relays != null);
+  final stats = PlayerStats(pace: pace, alone: alone.tally, history: alone.history);
+  yield stats.copyWith(asking: standing == null && relays != null);
   if (standing != null) {
-    yield fromStanding(stats, standing, standing.me);
+    yield fromStanding(stats, standing);
     return;
   }
   if (relays == null) return;
   try {
     final loaded = await net.Standing.load(relays, signer, account: Entitlement.current.licence?.account ?? signer.publicKey);
-    yield fromStanding(stats, loaded, loaded.me);
+    yield fromStanding(stats, loaded);
   } catch (_) {
     // No relay answered. The games played alone still stand, and the
     // rest is said to be missing rather than still coming.

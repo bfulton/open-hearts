@@ -1,10 +1,13 @@
 /// Finished games, kept to be looked at afterwards (router.dart,
 /// `/table/ID`; service/functions/records.mjs).
 ///
-/// A player's device sends its record when the game is over; the first
-/// copy is the one kept, so a table's other players sending theirs costs
-/// nothing. Whoever opens a game fetches it by the table's id and checks
-/// it themselves before showing a card of it (review_page.dart).
+/// A player's device sends its record when the game is over. The service
+/// keeps the copy that carries the house's word on how it came out, and
+/// from every copy its sender's own seat's name beside it: each device is
+/// the only one that says its own seat's name, so a table's other players
+/// sending theirs is how each seat gets a name, and costs nothing else.
+/// Whoever opens a game fetches it by the table's id and checks it
+/// themselves before showing a card of it (review_page.dart).
 ///
 /// Looking at a game is live play, which is a subscription's: the
 /// service shows a record only to an account's device in use, and not
@@ -24,11 +27,13 @@ import 'remote_config.dart' show waits;
 import 'seat_store.dart';
 
 /// Sends [record] to be kept, signed by [signer] for its table. True
-/// once it is kept, by this device or by another of the table's.
-Future<bool> keepGame(Signer signer, GameRecord record, {Uri? endpoint}) async {
+/// once it is kept, by this device or by another of the table's. Only
+/// this device's own seat's name is kept from it, whatever names it holds
+/// of the others'.
+Future<bool> keepGame(Signer signer, GameRecord record) async {
   final table = record.spec.id;
-  final answer = await askHandler('record', signer, {'table': table, 'record': jsonEncode(record.toJson())}, endpoint,
-      what: table, timeout: waits.record);
+  final answer =
+      await askHandler('record', signer, {'table': table, 'record': jsonEncode(record.toJson())}, what: table, timeout: waits.record);
   return answer?.status == 200;
 }
 
@@ -57,9 +62,9 @@ class GameNotShown implements Exception {
 /// KeptGame), and nothing of it shown until the check says so. Null when
 /// none is kept, or it cannot be reached, or what came back is not a
 /// record. Throws [GameNotShown] when the service will not show it here.
-Future<KeptGame?> gameOf(String table, {Signer? signer, Uri? endpoint}) async {
+Future<KeptGame?> gameOf(String table, {Signer? signer}) async {
   final asking = signer ?? await Identity.signer();
-  final answer = await askHandler('review', asking, {'table': table}, endpoint, what: table, timeout: waits.record);
+  final answer = await askHandler('review', asking, {'table': table}, what: table, timeout: waits.record);
   switch (answer?.status) {
     case 200:
       break;

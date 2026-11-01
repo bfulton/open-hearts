@@ -38,7 +38,7 @@ Every row is linked to the player's account, by the account's number. Nothing is
   - So do Project Arachnid and Microsoft's PhotoDNA. They are sent only a fingerprint of a picture.
   - A report to NCMEC is a legal obligation.
   - What live play shows other players is the player's own act of playing live: each of these is one of Google's exemptions from "shared".
-- **Encrypted in transit: yes.** Everything goes over HTTPS or secure WebSockets, and play between devices over WebRTC, which is always encrypted.
+- **Encrypted in transit: yes.** Everything goes over HTTPS or secure WebSockets.
 - **Can users ask for their data to be deleted: yes.**
   - In the app: menu › Subscription › Delete account.
   - Without a device: by email, as `https://openhearts.game/support#delete` says. That page is the data deletion URL Google asks for.
@@ -80,7 +80,6 @@ For Apple's age rating and Google's content rating (IARC):
 App Store Connect asks on each upload whether the app uses encryption, and Google Play asks too. The facts:
 
 - The apps use HTTPS and secure WebSockets, through the system.
-- They use WebRTC's DTLS between devices.
 - They sign every move with Schnorr signatures.
 - The fair deal encrypts each card so that only the player who holds it can read it ([the fair deal](../explanation/fair-deal.md)).
 - All of it is standard cryptography, and the source is public.

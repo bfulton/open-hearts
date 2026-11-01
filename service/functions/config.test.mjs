@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { readFileSync } from 'node:fs';
 import worker from './worker.mjs';
-import { CONFIG_DEFAULTS, LEFT_EARLY_BOUNDS, TABLE_TIMING_BOUNDS, WAITS_BOUNDS, configOf } from './config.mjs';
+import { CONFIG_DEFAULTS, LEFT_EARLY_BOUNDS, TABLE_TIMING_BOUNDS, WAITS_BOUNDS, WAITS_DEFAULTS, configOf } from './config.mjs';
 
 /// Cloudflare KV as the worker reads it: a JSON value by key.
 const kvWith = (rows) => ({
@@ -14,7 +14,7 @@ const kvWith = (rows) => ({
   },
 });
 
-const ask = (env, init) => worker.fetch(new Request('https://dev.open-hearts.pages.dev/api/config', init), env);
+const ask = (env, init) => worker.fetch(new Request('https://play.openhearts.game/api/config', init), env);
 
 test('no row, or no store, is the defaults: everything open, nothing said', async () => {
   for (const env of [{}, { OH_STORE: kvWith({}) }]) {
@@ -161,6 +161,15 @@ test('the waits\' bounds are the app\'s own', () => {
   const dart = readFileSync(new URL('../../app/lib/net/remote_config.dart', import.meta.url), 'utf8');
   const app = Object.fromEntries([...dart.matchAll(/'(\w+)': \((\d+), (\d+)\)/g)].map((m) => [m[1], [Number(m[2]), Number(m[3])]]));
   assert.deepEqual(app, { ...WAITS_BOUNDS });
+});
+
+test("the waits a field the row leaves out is compared at are the app's own", () => {
+  const dart = readFileSync(new URL('../../app/lib/net/remote_config.dart', import.meta.url), 'utf8');
+  const made = dart.slice(dart.indexOf('const AppWaits({'), dart.indexOf('});', dart.indexOf('const AppWaits({')));
+  const inUnits = ([, name, unit, n]) => (unit === 'seconds' ? [`${name}Ms`, Number(n) * 1000] : [`${name}Min`, Number(n)]);
+  const app = Object.fromEntries([...made.matchAll(/this\.(\w+) = const Duration\((seconds|minutes): (\d+)\)/g)].map(inUnits));
+  assert.deepEqual(app, { ...WAITS_DEFAULTS });
+  assert.deepEqual(Object.keys(WAITS_DEFAULTS).sort(), Object.keys(WAITS_BOUNDS).sort());
 });
 
 test('the wait after leaving a game early is served in whole minutes within its bounds, zero included, and only when set', () => {

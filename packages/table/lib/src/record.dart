@@ -24,6 +24,7 @@ import 'package:engine/engine.dart';
 import 'client.dart';
 import 'events.dart';
 import 'log.dart';
+import 'names.dart';
 import 'replay.dart';
 import 'rules.dart';
 import 'signing.dart';
@@ -82,7 +83,7 @@ class GameRecord {
         names: {
           for (final e in ((m['names'] as Map?) ?? const {}).entries)
             if (int.tryParse('${e.key}') case final seat? when seat >= 0 && seat < seatCount && e.value is String)
-              seat: (e.value as String).length > 40 ? (e.value as String).substring(0, 40) : e.value as String,
+              seat: cleanName(e.value as String, most: 40),
         },
       );
     } catch (_) {
@@ -153,7 +154,9 @@ RecordVerdict verifyRecord(GameRecord record, {DealCrypto? crypto, PublicKey? ho
     if (crypto == null) return no('a sealed game, and no deal here to check it with');
     if (house != null && spec.house != house) return no('the table names another house');
   }
-  final rules = TableRules(tableId: spec.id, crypto: crypto);
+  // Games are kept for good, and a game kept before a pass hid its
+  // proofs is read as it was made.
+  final rules = TableRules(tableId: spec.id, crypto: crypto, readsOldPasses: true);
   if (replay != null) {
     var shown = 0;
     void playsUpTo(int hand) {

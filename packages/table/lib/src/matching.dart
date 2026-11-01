@@ -23,16 +23,34 @@ library;
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
+import 'dart:typed_data';
 
 import 'package:engine/engine.dart';
 
 import 'licence.dart';
+import 'names.dart';
 import 'nostr.dart';
 import 'pace.dart';
 import 'relay_transport.dart';
 import 'signing.dart';
 import 'spec.dart';
 import 'timing.dart';
+
+/// What of the avatar a waiter says ([raw]) is read: its icon and its
+/// colour, as a device sends them (app/lib/avatar.dart, toJson), and
+/// nothing else; null for none. The house says it again in its
+/// seating, which the relay stores only up to a length
+/// (service/do/relay.mjs, storedMost). Anything more in it would let
+/// one waiter make the seating too long to store: refused, and the
+/// house would then sit that relay out for a minute
+/// (RelayGroup.refusalMs), seating nobody in the pool.
+Map<String, Object?>? waiterAvatar(Object? raw) => switch (raw) {
+      final Map<Object?, Object?> a => {
+          if (a['icon'] case final String icon when icon.length <= 32) 'icon': icon,
+          if (a['color'] case final int color) 'color': color,
+        },
+      _ => null,
+    };
 
 /// Someone waiting, as the others see them.
 class Waiter {
@@ -49,8 +67,8 @@ class Waiter {
   /// Who is waiting: the account, or the key where nothing names one.
   AccountId get account => licence?.account ?? key;
 
-  /// How they chose to look, as they said it — the app's business;
-  /// the table carries it to the seating unread.
+  /// How they chose to look: an icon and a colour, the app's business
+  /// ([waiterAvatar]), carried to the seating.
   final Map<String, Object?>? avatar;
 
   /// Their rating, as they state it — it decides who they sit with,
@@ -59,10 +77,10 @@ class Waiter {
   final int rating;
 
   /// Seconds they take over a card, as they state it — their own
-  /// device's account of itself, since no two peers can agree on a
-  /// number the record does not carry (pace.dart). Like the rating it
-  /// decides who they sit with and nothing else. Zero is a player who
-  /// has not played enough to know, and sits with anybody.
+  /// device's account of itself, checked for nothing but its range
+  /// (pace.dart). Like the rating it decides who they sit with and
+  /// nothing else. Zero is a player who has not played enough to know,
+  /// and sits with anybody.
   final int pace;
 
   /// When they started waiting, ms since the epoch: by their own clock
@@ -391,11 +409,11 @@ class WaitingRoom {
           e.pubkey,
           () => Waiter(
             key: e.pubkey,
-            name: (c['name'] as String?)?.trim() ?? '',
+            name: cleanName(c['name'] as String? ?? ''),
             rating: c['rating'] as int? ?? 1500,
             pace: switch (c['pace']) { final int p when p > 0 && p <= 120 => p, _ => 0 },
             since: c['since'] as int? ?? _now,
-            avatar: c['avatar'] is Map ? Map<String, Object?>.from(c['avatar'] as Map) : null,
+            avatar: waiterAvatar(c['avatar']),
             licence: licence,
           ),
         );
@@ -439,9 +457,8 @@ class WaitingRoom {
     // Every table a pool seats is sealed, and the house's to hold the
     // bots of and to say the end of: this build's.
     if (c['sealed'] != true || c['house'] != house) return;
-    // A house on an older build says nothing about the target, which
-    // means the game it seats runs to fifty.
-    if ((c['target'] as int? ?? gameOverScore) != target) return;
+    // Another pool's game.
+    if (c['target'] != target) return;
     final seats = <SeatHolder>[];
     final names = <int, String>{};
     final avatars = <int, Map<String, Object?>>{};
@@ -456,7 +473,7 @@ class WaitingRoom {
           final key = m['key'] as String;
           if (key == me) mine = true;
           seats.add(HumanSeat(key, licence: m['licence'] == null ? null : Licence.parse(m['licence']) ?? (throw const FormatException('licence'))));
-          names[s] = m['name'] as String? ?? 'Someone';
+          names[s] = cleanName(m['name'] as String? ?? 'Someone');
           if (m['avatar'] is Map) avatars[s] = Map<String, Object?>.from(m['avatar'] as Map);
         }
         s++;
@@ -520,6 +537,7 @@ class PoolHost {
     required this.relay,
     required this.pool,
     required this.bots,
+    required this.secret,
     this.target = gameOverScore,
     this.timing = TableTiming.standard,
     this.roundMs = poolRoundMs,
@@ -549,6 +567,11 @@ class PoolHost {
 
   final RelayTransport relay;
   final String pool;
+
+  /// The house's own secret (house.dart, House.secret): every table this
+  /// pool seats is salted with it ([seatingSalt]), which is how the
+  /// house knows a rated table for one it seated.
+  final Uint8List secret;
 
   /// The score the games this pool seats run to.
   final int target;
@@ -621,13 +644,13 @@ class PoolHost {
       e.pubkey,
       () => Waiter(
         key: e.pubkey,
-        name: (c['name'] as String?)?.trim() ?? '',
+        name: cleanName(c['name'] as String? ?? ''),
         rating: c['rating'] as int? ?? 1500,
         pace: switch (c['pace']) { final int p when p > 0 && p <= 120 => p, _ => 0 },
         // How long they have waited, by this clock: rounds, windows and
         // the wait before bots are all the house's.
         since: now,
-        avatar: c['avatar'] is Map ? Map<String, Object?>.from(c['avatar'] as Map) : null,
+        avatar: waiterAvatar(c['avatar']),
         licence: licence,
       ),
     );
@@ -664,24 +687,25 @@ class PoolHost {
     if (p.tables.isEmpty) return;
     log?.call('$pool round $round: ${all.length} waiting, ${p.tables.length} table(s)');
     for (final humans in p.tables) {
-      final salt = newSalt(_random);
       final seed = _random.nextInt(1 << 31);
       final mean = humans.map((w) => w.rating).reduce((a, b) => a + b) ~/ humans.length;
       final wanted = seatCount - humans.length;
       final picked = bots(mean, wanted, Random(seed));
-      final table = TableSpec(
-        seed: seed,
-        seats: [
-          for (var s = 0; s < seatCount; s++)
-            s < humans.length ? HumanSeat(humans[s].key, licence: humans[s].licence) : BotSeat(picked[s - humans.length]),
-        ],
-        rated: pool == 'rated',
-        sealed: true,
-        target: target,
-        timing: timing,
-        house: house,
-        salt: salt,
-      );
+      TableSpec spec({String? salt}) => TableSpec(
+            seed: seed,
+            seats: [
+              for (var s = 0; s < seatCount; s++)
+                s < humans.length ? HumanSeat(humans[s].key, licence: humans[s].licence) : BotSeat(picked[s - humans.length]),
+            ],
+            rated: pool == 'rated',
+            sealed: true,
+            target: target,
+            timing: timing,
+            house: house,
+            salt: salt,
+          );
+      final salt = seatingSalt(secret, spec());
+      final table = spec(salt: salt);
       relay.announce({
         'kind': 'match',
         'round': round,

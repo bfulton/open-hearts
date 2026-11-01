@@ -8,7 +8,7 @@ For why the relay works this way, see [the relay](../explanation/relay.md).
 
 | Build | Relay | Defined in |
 |---|---|---|
-| Deployed (web and phone) | `wss://relay.openhearts.game/{tag}`: the tag replaces `{tag}` (`tagMark` in `packages/table/lib/src/presence_relay.dart`) | `ourRelay` in `app/lib/net/relays.dart` |
+| Deployed (web and phone) | `wss://relay.openhearts.game/{tag}`: the tag replaces `{tag}` (`tagMark` in `packages/table/lib/src/relays.dart`) | `ourRelay` in `app/lib/net/relays.dart` |
 | Deployed, with `relays` in the remote config | Up to `MOST_RELAYS` relays on `openhearts.game` or a subdomain | [Remote config](configuration.md#remote-config) |
 | Served from a local host | `ws://127.0.0.1:7448/{tag}`, or the port in the page's `?relay=PORT` | `localRelay` and `localRelayAt` in `app/lib/net/relays.dart` |
 | Built with the `OH_RELAYS` define | That comma list | `devRelay` in `app/lib/net/relays.dart` |
@@ -44,7 +44,7 @@ The kind numbers are `TableKinds` in `packages/table/lib/src/nostr.dart`. Kinds 
 | 4250 | `TableKinds.log` | `t`: the table ID | A table event (`packages/table/lib/src/events.dart`) as JSON, for the table's log. The table's referee takes it, numbers it and stamps it with its time (`service/do/referee.mjs`), and sends it on only as an entry of the log. | No: kept in the table's log, and nowhere else |
 | 24243 | `TableKinds.signal` | `p`: the recipient; `t`: the table ID | A WebRTC offer, answer or ICE candidate, sealed to the recipient with NIP-44 v2 (`packages/table/lib/src/nip44.dart`) | Yes |
 | 24245 | `TableKinds.waiting` | `t`: the pool or room code | A beat: `wait` from a player waiting in a pool, `here` from a member of a friends' room | Yes |
-| 24246 | `TableKinds.presence` | `t`: `online` | JSON with a `kind`: `here` (status and activation) or `gone` | Yes |
+| 24246 | `TableKinds.presence` | `t`: `online` | JSON with a `kind`: `here` (with the device's activation) or `gone` | Yes |
 | 24247 | `TableKinds.watch` | `t`: the table ID | A watcher saying it is watching (`{"watching": true, "licence": …}`), or a seated player's view of the table (`WatchedTable` in `packages/table/lib/src/watch.dart`) | Yes |
 | 24248 | `TableKinds.react` | `t`: the table ID, and nothing else | A reaction. See [Reactions](#reactions). | Yes |
 
@@ -54,38 +54,39 @@ The relay speaks a subset of NIP-01, plus NIP-42's `AUTH` (`createRelay` in `ser
 
 | From | Message |
 |---|---|
-| Client | `EVENT`, `REQ`, `CLOSE`, `AUTH`; and on a table's tag `LOG` (the log, from an entry on, under a subscription id; asked again by a line that has heard nothing for five seconds, so that its answer shows the line still carries) and `TICK` (an entry with the referee's time in it, when a deadline is due) |
+| Client | `EVENT`, `REQ`, `CLOSE`, `AUTH`; and on a table's tag `LOG` (the log, from an entry on, under a subscription id; asked again by a line that has heard nothing for five seconds, so that its answer shows the line still carries) and `TICK` (an entry with the referee's time in it, when a deadline is due; taken only from the table's people and its house, until the house's result is in) |
 | Relay | `AUTH` (a challenge, as each socket opens), `OK`, `EVENT`, `EOSE`, `CLOSED`, `NOTICE`; and on a table's tag `LOG` (one entry of the log) and `LOGEND` (the end of the log as it stands, after which each entry comes as it is added) |
 
-A deployed relay object holds every socket's `EVENT`, `REQ` and `CLOSE` until the socket answers the challenge (`serviceGate`). It carries a socket only for a device with a current activation, which is the device in use of an account with a subscription, or for the house. While a socket's answer has run out, the relay holds what it says and sends it no entry of a table's log, and asks it again.
+A deployed relay object holds every socket's `EVENT`, `REQ`, `CLOSE`, `LOG` and `TICK` until the socket answers the challenge (`serviceGate`), up to `heldMost` messages and `heldMostChars` characters, and takes one answer to each challenge. It carries a socket only for a device with a current activation, which is the device in use of an account with a subscription, or for the house. While a socket's answer has run out, the relay holds what it says and sends it no entry of a table's log, and asks it again.
 
 The reason in a refusal starts with one of these words:
 
 | Prefix | Meaning |
 |---|---|
-| `rate-limited:` | The socket published more than its burst and rate allow. Checked before the signature. |
-| `invalid:` | A bad ID or signature, or a reaction of the wrong size or shape. |
-| `blocked:` | This tag's object does not carry this kind, or a reaction is on the wrong tag. |
+| `rate-limited:` | The socket published, subscribed, or asked for a table's log, more than its burst and rate allow. Checked before the signature. |
+| `invalid:` | A bad ID or signature, a table event whose ID is not the hash of what it says, or a reaction of the wrong size or shape. |
+| `blocked:` | This tag's object does not carry this kind, a reaction is on the wrong tag, or a person's events have filled their share of a table's log (`authorMost` in `service/do/referee.mjs`). |
 | `duplicate:` | The relay already has this event. The `OK` is `true`. |
 | `withheld:` | A picture the operator took down ([withheld pictures](../explanation/relay.md#withheld-pictures)). The `OK` is `true`, and the event is neither stored nor passed on. |
-| `auth-required:` | The socket has not answered the challenge, or its answer is stale or carries no current activation. |
+| `auth-required:` | The socket has not answered the challenge, or has answered it already, or its answer is stale or carries no current activation. |
 | `superseded:` | Another device of this account is in use. The relay closes the socket. |
 | `suspended:` | This account is suspended from live play. The relay closes the socket. |
 | `deleted:` | This account was deleted, from one of its devices. The relay closes the socket. |
-| `too big:` | A `NOTICE`: a message or `REQ` over its limit. |
+| `too big:` | A message or `REQ` over its limit, in a `NOTICE`; or an event to be stored that weighs more than `storedMost`. |
 
 ## Limits
 
-Each deployed tag's object holds every socket to these limits. `service/do/host.mjs` applies them only with `--object`, which is how `OH_RELAY=object` runs it.
+Each deployed tag's object holds every socket to these limits. `service/do/host.mjs` applies them only with `--object`, which is how the `service` tests run it (`service/lib/src/relay.dart`).
 
 | Limit | `online` | Every other tag |
 |---|---|---|
 | Longest message, in characters | `objectLimits.message` | `tableLimits.message` |
 | Longest `REQ`, in characters | `objectLimits.request` | `tableLimits.request` |
-| Events a socket may publish at once | `objectLimits.burst` | `tableLimits.burst` |
-| Events a socket may publish each second, after the burst | `objectLimits.perSecond` | `tableLimits.perSecond` |
+| Events a socket may publish, subscriptions it may make, and table logs it may ask for, at once | `objectLimits.burst` | `tableLimits.burst` |
+| The same each second, after the burst | `objectLimits.perSecond` | `tableLimits.perSecond` |
 | Subscriptions per socket; the oldest goes when a new one arrives | `maxSubscriptions` | `maxSubscriptions` |
 | Messages held while the challenge is unanswered | `heldMost` | `heldMost` |
+| Characters held while the challenge is unanswered | `heldMostChars` | `heldMostChars` |
 | Age of an answer to the challenge, in seconds | `answerFreshS` | `answerFreshS` |
 | Event IDs remembered to answer duplicates | `rememberedIds` | `rememberedIds` |
 
@@ -97,12 +98,12 @@ All are in `service/do/relay.mjs`. The operator can change the `online` limits w
 |---|---|---|
 | Ephemeral kinds, on any tag | Not stored: forwarded to matching subscriptions, then forgotten | `ephemeral` in `service/do/relay.mjs` |
 | Anything on `online` that is not ephemeral | Refused | `refusalFor` |
-| Kind 4244 on a pool, room code or table tag, tagged `t` with that same tag | A day, in the object's own storage; an alarm deletes older events | `KEPT_MS` and `SWEEP_EVERY_MS` in `service/do/tag_store.mjs` |
+| Kind 4244 on a pool, room code or table tag, tagged `t` with that same tag | A day from its date, in the object's own storage; an alarm deletes older events, and any dated more than `AHEAD_MOST_MS` ahead of the object's clock. | `KEPT_MS`, `SWEEP_EVERY_MS` and `AHEAD_MOST_MS` in `service/do/tag_store.mjs` |
 | A pool's seating (`match`) said by anybody but the house (`OH_HOUSE_KEY`), or by anybody with no house | Withheld: answered `OK` true with the reason, and neither stored nor sent on; one already stored is dropped as a subscription is served | `seatingHeld` in `service/do/pool.mjs` |
 | Kind 4244 on the results tag (`GameResult.tag`) | For good | `resultsTag` in `service/do/relay.mjs`; `tagStore` in `service/do/tag_store.mjs` |
 | Any other kind that is not ephemeral | Refused | `refusalFor` |
 
-A stored event survives the object being evicted. The object holds the newest `storedKeep(tag)` stored events in memory, and sends those that match to each new subscription before `EOSE`. A client reads a pool's seatings back only for `RelayTransport.poolHistorySeconds` (`packages/table/lib/src/relay_transport.dart`).
+A stored event survives the object being evicted. It weighs at most `storedMost`, which a picture fits in: its JSON's length, doubled once any character is past U+00FF, since the object then holds it at two bytes a character (`storedWeight`). The object holds the newest `storedKeep(tag)` stored events in memory, and sends those that match to each new subscription before `EOSE`. A client reads a pool's seatings back only for `RelayTransport.poolHistorySeconds` (`packages/table/lib/src/relay_transport.dart`).
 
 A pool's object wakes the house, at most once every `wakeEveryMs` (`wakeLimiter` in `service/do/referee.mjs`), when somebody's device says it is waiting there (24245) and no socket on the pool answered the challenge as the house. It stops wanting the house `poolWantsMs` after the last device said so (`poolWatch` in `service/do/pool.mjs`).
 

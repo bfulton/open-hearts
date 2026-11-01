@@ -103,6 +103,7 @@ test('a table wanting the house starts it, waits for it, and tells it of the tab
   assert.equal(c.started.length, 1);
   assert.deepEqual(c.bench.woken, ['tbl1', 'tbl2']);
   assert.equal((await bench.fetch(new Request('https://bench/wake', { method: 'POST' }))).status, 400, 'a wake names its table');
+  assert.equal((await bench.fetch(new Request('https://bench/status'))).status, 404, 'a wake is all it answers');
 });
 
 test('a pool wanting the house wakes it for the pool, and every wake says the operator\'s clocks', async () => {

@@ -83,10 +83,12 @@ export function withConfig(env, config) {
   return { ...laid, ...rest };
 }
 
-/// What a phone build is compiled with, out of the same file
-/// (`--dart-define-from-file`, build_phone.sh): the service key it takes
-/// a licence from, the sign-in providers' identifiers, and the store
-/// products. The web build is given the first three by deploy.sh.
+/// What a build of the app is compiled with, out of the same file
+/// (`--dart-define-from-file`, app/tool/defines.mjs): the service key it
+/// takes a licence from, the house's key, the app's origin, the sign-in
+/// providers' identifiers, and the store products. A phone build
+/// (build_phone.sh) and the web build (deploy.sh) are given the same; a
+/// preview's is made from [configFor]'s preview config.
 export function appDefines(config) {
   const { apple = {}, google = {} } = config ?? {};
   const named = {

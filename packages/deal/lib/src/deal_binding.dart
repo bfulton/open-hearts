@@ -134,7 +134,15 @@ class _Ffi implements DealCrypto {
   /// Runs [f] with the inputs copied into native memory and an output
   /// buffer of [outLen], and returns the bytes written (a negative
   /// result is an error).
-  Uint8List? _call(List<Uint8List> ins, int outLen, int Function(List<Pointer<Uint8>> ins, Pointer<Uint8> out) f) {
+  ///
+  /// [sizes] gives, input by input, how many bytes the Rust reads from
+  /// it, or null for an input whose length is passed beside it. The
+  /// Rust reads that many whatever it was given, so an input of any
+  /// other length is refused here, as null, and [f] is never called.
+  Uint8List? _call(List<Uint8List> ins, List<int?> sizes, int outLen, int Function(List<Pointer<Uint8>> ins, Pointer<Uint8> out) f) {
+    for (var k = 0; k < ins.length; k++) {
+      if (sizes[k] != null && ins[k].length != sizes[k]) return null;
+    }
     final ptrs = <Pointer<Uint8>>[];
     final out = malloc<Uint8>(outLen == 0 ? 1 : outLen);
     try {
@@ -156,32 +164,40 @@ class _Ffi implements DealCrypto {
 
   Uint8List _must(Uint8List? r, String what) => r ?? (throw StateError('$what failed'));
 
-  @override
-  Uint8List keygen(Uint8List secret) => _must(_call([secret], pointBytes, (i, o) => _keygen(i[0], o)), 'keygen');
+  /// Pieces of one size end to end, as the Rust takes a list of them;
+  /// null when any is not that size.
+  Uint8List? _joined(List<Uint8List> pieces, int size) =>
+      pieces.every((p) => p.length == size) ? Uint8List.fromList([for (final p in pieces) ...p]) : null;
 
   @override
-  Uint8List keyProof(Uint8List secret, Uint8List name, Uint8List seed) =>
-      _must(_call([secret, name, seed], keyProofBytes, (i, o) => _keyProof(i[0], i[1], name.length, i[2], o)), 'key proof');
+  Uint8List keygen(Uint8List secret) => _must(_call([secret], [scalarBytes], pointBytes, (i, o) => _keygen(i[0], o)), 'keygen');
+
+  @override
+  Uint8List keyProof(Uint8List secret, Uint8List name, Uint8List seed) => _must(
+      _call([secret, name, seed], [scalarBytes, null, seedBytes], keyProofBytes, (i, o) => _keyProof(i[0], i[1], name.length, i[2], o)),
+      'key proof');
 
   @override
   bool verifyKey(Uint8List pk, Uint8List name, Uint8List proof) =>
-      _call([pk, name, proof], 0, (i, o) => _verifyKey(i[0], i[1], name.length, i[2]) == 1 ? 0 : -1) != null;
+      _call([pk, name, proof], [pointBytes, null, keyProofBytes], 0, (i, o) => _verifyKey(i[0], i[1], name.length, i[2]) == 1 ? 0 : -1) != null;
 
   @override
   Uint8List aggregate(List<Uint8List> pks) {
-    final all = Uint8List.fromList([for (final p in pks) ...p]);
-    return _must(_call([all], pointBytes, (i, o) => _aggregate(i[0], pks.length, o)), 'aggregate');
+    final all = _must(_joined(pks, pointBytes), 'aggregate');
+    return _must(_call([all], [null], pointBytes, (i, o) => _aggregate(i[0], pks.length, o)), 'aggregate');
   }
 
   @override
-  Uint8List initialDeck(Uint8List joint) => _must(_call([joint], deckBytes, (i, o) => _initialDeck(i[0], o)), 'initial deck');
+  Uint8List initialDeck(Uint8List joint) => _must(_call([joint], [pointBytes], deckBytes, (i, o) => _initialDeck(i[0], o)), 'initial deck');
 
   @override
   ({Uint8List deck, Uint8List proof}) shuffle(Uint8List joint, Uint8List deck, Uint8List seed) {
     const proofCap = 16384;
     final deckOut = malloc<Uint8>(deckBytes);
     try {
-      final proof = _must(_call([joint, deck, seed], proofCap, (i, o) => _shuffle(i[0], i[1], i[2], deckOut, o, proofCap)), 'shuffle');
+      final proof = _must(
+          _call([joint, deck, seed], [pointBytes, deckBytes, seedBytes], proofCap, (i, o) => _shuffle(i[0], i[1], i[2], deckOut, o, proofCap)),
+          'shuffle');
       return (deck: Uint8List.fromList(deckOut.asTypedList(deckBytes)), proof: proof);
     } finally {
       malloc.free(deckOut);
@@ -190,34 +206,37 @@ class _Ffi implements DealCrypto {
 
   @override
   bool verifyShuffle(Uint8List joint, Uint8List before, Uint8List after, Uint8List proof) =>
-      _call([joint, before, after, proof], 0, (i, o) => _verifyShuffle(i[0], i[1], i[2], i[3], proof.length) == 1 ? 0 : -1) != null;
+      _call([joint, before, after, proof], [pointBytes, deckBytes, deckBytes, null], 0,
+          (i, o) => _verifyShuffle(i[0], i[1], i[2], i[3], proof.length) == 1 ? 0 : -1) !=
+      null;
 
   @override
-  Uint8List revealToken(Uint8List secret, Uint8List masked, Uint8List seed) =>
-      _must(_call([secret, masked, seed], tokenBytes, (i, o) => _revealToken(i[0], i[1], i[2], o)), 'reveal token');
+  Uint8List revealToken(Uint8List secret, Uint8List masked, Uint8List seed) => _must(
+      _call([secret, masked, seed], [scalarBytes, maskedBytes, seedBytes], tokenBytes, (i, o) => _revealToken(i[0], i[1], i[2], o)),
+      'reveal token');
 
   @override
   bool verifyToken(Uint8List pk, Uint8List masked, Uint8List token) =>
-      _call([pk, masked, token], 0, (i, o) => _verifyToken(i[0], i[1], i[2]) == 1 ? 0 : -1) != null;
+      _call([pk, masked, token], [pointBytes, maskedBytes, tokenBytes], 0, (i, o) => _verifyToken(i[0], i[1], i[2]) == 1 ? 0 : -1) != null;
 
   @override
   Uint8List split(Uint8List secret, Uint8List seed, {int shares = 2}) =>
-      _must(_call([secret, seed], shares * scalarBytes, (i, o) => _split(i[0], shares, i[1], o)), 'split');
+      _must(_call([secret, seed], [scalarBytes, seedBytes], shares * scalarBytes, (i, o) => _split(i[0], shares, i[1], o)), 'split');
 
   @override
   Uint8List openShared(Uint8List sealed, List<Uint8List> parts) {
     final all = Uint8List.fromList([for (final p in parts) ...Uint8List.sublistView(p, 0, pointBytes)]);
-    return _must(_call([sealed, all], pointBytes, (i, o) => _openShared(i[0], i[1], parts.length, o)), 'open shared');
+    return _must(_call([sealed, all], [sealedBytes, null], pointBytes, (i, o) => _openShared(i[0], i[1], parts.length, o)), 'open shared');
   }
 
   @override
   Uint8List shareBytes(Uint8List secret, {required int n, required int t, required Uint8List seed}) => _must(
-      _call([secret, seed], n * secret.length, (i, o) => _shareBytes(i[0], secret.length, n, t, i[1], o)), 'share bytes');
+      _call([secret, seed], [null, seedBytes], n * secret.length, (i, o) => _shareBytes(i[0], secret.length, n, t, i[1], o)), 'share bytes');
 
   @override
   int bytesLagrange(List<int> have, int index, {int at = 0}) {
     var c = -1;
-    _call([Uint8List.fromList(have)], 0, (i, o) {
+    _call([Uint8List.fromList(have)], [null], 0, (i, o) {
       c = _bytesLagrange(i[0], have.length, index, at);
       return 0;
     });
@@ -227,60 +246,69 @@ class _Ffi implements DealCrypto {
 
   @override
   Uint8List bytesScale(Uint8List share, int by) =>
-      _must(_call([share], share.length, (i, o) => _bytesScale(i[0], share.length, by, o)), 'bytes scale');
+      _must(_call([share], [null], share.length, (i, o) => _bytesScale(i[0], share.length, by, o)), 'bytes scale');
 
   @override
   Uint8List bytesSum(List<Uint8List> parts) {
     final len = parts.first.length;
-    return _must(
-        _call([Uint8List.fromList([for (final p in parts) ...p])], len, (i, o) => _bytesSum(i[0], parts.length, len, o)),
-        'bytes sum');
+    final all = _must(_joined(parts, len), 'bytes sum');
+    return _must(_call([all], [null], len, (i, o) => _bytesSum(i[0], parts.length, len, o)), 'bytes sum');
   }
 
   @override
-  Uint8List splitThreshold(Uint8List secret, {required int n, required int t, required Uint8List seed}) =>
-      _must(_call([secret, seed], n * scalarBytes, (i, o) => _splitThreshold(i[0], n, t, i[1], o)), 'split threshold');
+  Uint8List splitThreshold(Uint8List secret, {required int n, required int t, required Uint8List seed}) => _must(
+      _call([secret, seed], [scalarBytes, seedBytes], n * scalarBytes, (i, o) => _splitThreshold(i[0], n, t, i[1], o)), 'split threshold');
 
   @override
   Uint8List lagrange(List<int> have, int index, {int at = 0}) => _must(
-      _call([Uint8List.fromList(have)], scalarBytes, (i, o) => _lagrange(i[0], have.length, index, at, o)), 'lagrange');
+      _call([Uint8List.fromList(have)], [null], scalarBytes, (i, o) => _lagrange(i[0], have.length, index, at, o)), 'lagrange');
 
   @override
-  Uint8List scalarMul(Uint8List a, Uint8List b) => _must(_call([a, b], scalarBytes, (i, o) => _scalarMul(i[0], i[1], o)), 'scalar mul');
+  Uint8List scalarMul(Uint8List a, Uint8List b) =>
+      _must(_call([a, b], [scalarBytes, scalarBytes], scalarBytes, (i, o) => _scalarMul(i[0], i[1], o)), 'scalar mul');
 
   @override
-  Uint8List scalarSum(List<Uint8List> parts) => _must(
-      _call([Uint8List.fromList([for (final p in parts) ...p])], scalarBytes, (i, o) => _scalarSum(i[0], parts.length, o)), 'scalar sum');
+  Uint8List scalarSum(List<Uint8List> parts) {
+    final all = _must(_joined(parts, scalarBytes), 'scalar sum');
+    return _must(_call([all], [null], scalarBytes, (i, o) => _scalarSum(i[0], parts.length, o)), 'scalar sum');
+  }
 
   @override
   Uint8List pointScale(Uint8List point, Uint8List scalar) =>
-      _must(_call([point, scalar], pointBytes, (i, o) => _pointScale(i[0], i[1], o)), 'point scale');
+      _must(_call([point, scalar], [pointBytes, scalarBytes], pointBytes, (i, o) => _pointScale(i[0], i[1], o)), 'point scale');
 
   @override
-  Uint8List shareKey(Uint8List share) => _must(_call([share], pointBytes, (i, o) => _shareKey(i[0], o)), 'share key');
+  Uint8List shareKey(Uint8List share) => _must(_call([share], [scalarBytes], pointBytes, (i, o) => _shareKey(i[0], o)), 'share key');
 
   @override
-  Uint8List shareToken(Uint8List share, Uint8List masked, Uint8List seed) =>
-      _must(_call([share, masked, seed], tokenBytes, (i, o) => _shareToken(i[0], i[1], i[2], o)), 'share token');
+  Uint8List shareToken(Uint8List share, Uint8List masked, Uint8List seed) => _must(
+      _call([share, masked, seed], [scalarBytes, maskedBytes, seedBytes], tokenBytes, (i, o) => _shareToken(i[0], i[1], i[2], o)),
+      'share token');
 
   @override
   Uint8List revealTokens(Uint8List secret, Uint8List cards, Uint8List seed) {
     final n = cards.length ~/ maskedBytes;
-    return _must(_call([secret, cards, seed], tokensBytes(n), (i, o) => _revealTokens(i[0], i[1], n, i[2], o)), 'reveal tokens');
+    return _must(
+        _call([secret, cards, seed], [scalarBytes, n * maskedBytes, seedBytes], tokensBytes(n),
+            (i, o) => _revealTokens(i[0], i[1], n, i[2], o)),
+        'reveal tokens');
   }
 
   @override
   bool verifyTokens(Uint8List pk, Uint8List cards, Uint8List tokens) {
     final n = cards.length ~/ maskedBytes;
-    return _call([pk, cards, tokens], 0, (i, o) => _verifyTokens(i[0], i[1], n, i[2]) == 1 ? 0 : -1) != null;
+    return _call([pk, cards, tokens], [pointBytes, n * maskedBytes, tokensBytes(n)], 0,
+            (i, o) => _verifyTokens(i[0], i[1], n, i[2]) == 1 ? 0 : -1) !=
+        null;
   }
 
   @override
   int? unmask(List<Uint8List> pks, List<Uint8List> tokens, Uint8List masked) {
-    final allPks = Uint8List.fromList([for (final p in pks) ...p]);
-    final allTokens = Uint8List.fromList([for (final t in tokens) ...t]);
+    final allPks = _joined(pks, pointBytes);
+    final allTokens = _joined(tokens, pointBytes);
+    if (allPks == null || allTokens == null || tokens.length != pks.length) return null;
     int? card;
-    _call([allPks, allTokens, masked], 0, (i, o) {
+    _call([allPks, allTokens, masked], [null, null, maskedBytes], 0, (i, o) {
       final r = _unmask(i[0], i[1], pks.length, i[2]);
       card = r < 0 ? null : r;
       return 0;
@@ -290,15 +318,21 @@ class _Ffi implements DealCrypto {
 
   @override
   Uint8List seal(Uint8List secret, Uint8List pkTo, Uint8List masked, Uint8List seed) => _must(
-      _call([secret, pkTo, masked, seed], sealedBytes + sealProofBytes, (i, o) => _seal(i[0], i[1], i[2], i[3], o)), 'seal');
+      _call([secret, pkTo, masked, seed], [scalarBytes, pointBytes, maskedBytes, seedBytes], sealedBytes + sealProofBytes,
+          (i, o) => _seal(i[0], i[1], i[2], i[3], o)),
+      'seal');
 
   @override
   bool verifySeal(Uint8List pkOwner, Uint8List pkTo, Uint8List masked, Uint8List sealed) =>
-      _call([pkOwner, pkTo, masked, sealed], 0, (i, o) => _verifySeal(i[0], i[1], i[2], i[3]) == 1 ? 0 : -1) != null;
+      _call([pkOwner, pkTo, masked, sealed], [pointBytes, pointBytes, maskedBytes, sealedBytes + sealProofBytes], 0,
+          (i, o) => _verifySeal(i[0], i[1], i[2], i[3]) == 1 ? 0 : -1) !=
+      null;
 
   @override
-  Uint8List open(Uint8List secret, Uint8List sealed) => _must(_call([secret, sealed], pointBytes, (i, o) => _open(i[0], i[1], o)), 'open');
+  Uint8List open(Uint8List secret, Uint8List sealed) =>
+      _must(_call([secret, sealed], [scalarBytes, sealedBytes], pointBytes, (i, o) => _open(i[0], i[1], o)), 'open');
 
   @override
-  Uint8List sharedSecret(Uint8List secret, Uint8List pk) => _must(_call([secret, pk], 32, (i, o) => _shared(i[0], i[1], o)), 'shared secret');
+  Uint8List sharedSecret(Uint8List secret, Uint8List pk) =>
+      _must(_call([secret, pk], [scalarBytes, pointBytes], 32, (i, o) => _shared(i[0], i[1], o)), 'shared secret');
 }

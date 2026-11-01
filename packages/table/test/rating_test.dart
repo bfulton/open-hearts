@@ -36,7 +36,7 @@ void main() {
     ]);
     // b left; Cyrano finished the seat with the lowest total of all.
     final finalHolders = [HumanSeat(a), const BotSeat(Persona.romeo), const BotSeat(Persona.cyrano), const BotSeat(Persona.juliet)];
-    final r = GameResult.of(spec, finalHolders, [60, 90, 20, 100]);
+    final r = GameResult(table: spec.id, rated: true, seats: GameResult.seatsOf(spec, finalHolders, [60, 90, 20, 100]), at: 0, v: 2);
     expect(r.seats.length, 5);
     final ledger = Ledger()..apply(r);
     expect(ledger.of(a).mu, greaterThan(1500), reason: 'a beat everyone with a stake');
@@ -45,7 +45,7 @@ void main() {
     expect(ledger.gamesOf('Cyrano'), 0, reason: 'a replacement bot is not rated');
     expect(ledger.gamesOf('Romeo'), 1);
     // Unrated: nothing moves.
-    final unrated = Ledger()..apply(GameResult(table: 't2', rated: false, seats: r.seats, at: 0));
+    final unrated = Ledger()..apply(GameResult(table: 't2', rated: false, seats: r.seats, at: 0, v: 2));
     expect(unrated.gamesOf(a), 0);
   });
 
@@ -60,8 +60,10 @@ void main() {
       HumanSeat(c.publicKey),
       const BotSeat(Persona.westley),
     ]);
-    final honest = GameResult.of(spec, spec.seats, [10, 50, 60, 80]);
-    final forged = GameResult.of(spec, spec.seats, [80, 50, 60, 10]);
+    // The people's results, as they published them before the referee.
+    GameResult said(List<int> totals) => GameResult(table: spec.id, rated: true, seats: GameResult.seatsOf(spec, spec.seats, totals), at: 0, v: 2);
+    final honest = said([10, 50, 60, 80]);
+    final forged = said([80, 50, 60, 10]);
     NostrEvent say(Signer s, GameResult r, int at) => NostrEvent.sign(s, kind: TableKinds.lobby, content: jsonEncode(r.toJson()), tags: [
           ['t', GameResult.tag]
         ], createdAt: at);
@@ -81,6 +83,7 @@ void main() {
           table: table,
           rated: rated,
           at: 0,
+          v: GameResult.version,
           seats: [
             SeatResult(human: true, key: me, account: me, total: totals[0], fromStart: true, left: iLeft),
             SeatResult(human: true, key: you, account: you, total: totals[1], fromStart: true),

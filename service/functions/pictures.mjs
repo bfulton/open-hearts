@@ -13,6 +13,8 @@
 // review.mjs); one the operator puts back after it is listed as allowed,
 // so that the check does not hide it again.
 
+import { bytesOf64, hex } from './rows.mjs';
+
 /// Where the list is kept: `config|pictures`, {pictures: [{sha256,
 /// until}], allowed: [{sha256, until}]}, `until` in milliseconds;
 /// `allowed` only when something is.
@@ -162,8 +164,6 @@ export const WITHHELD_WHY = 'withheld: this picture was taken down';
 /// set, or not yet (service/do/profile_pictures.mjs, ownedScreen).
 export const NOT_THEIRS_WHY = "withheld: not this account's picture";
 
-const toHex = (bytes) => [...bytes].map((b) => b.toString(16).padStart(2, '0')).join('');
-
 /// The SHA-256 of the JPEG [base64] encodes, in hex: of the bytes, so
 /// that two spellings of the same picture are one. Null for anything
 /// that is not base64.
@@ -171,11 +171,11 @@ export async function pictureDigest(base64) {
   if (typeof base64 !== 'string' || !base64) return null;
   let bytes;
   try {
-    bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+    bytes = bytesOf64(base64);
   } catch {
     return null;
   }
-  return toHex(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)));
+  return hex(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)));
 }
 
 /// The picture a lobby event's [content] carries — a pool's or a

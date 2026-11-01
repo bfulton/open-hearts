@@ -39,6 +39,16 @@ function neverKept(url) {
   return url.pathname.endsWith('/build-info.json') || url.pathname.includes('/api/');
 }
 
+// Whether a URL names a file rather than a page of the app: a dot in
+// its last segment, the same rule the host uses
+// (service/functions/app_host.mjs, appPage). A file opened as a page
+// (robots.txt, or a missing file, which the site answers with its
+// front page) is not the app, so it is left to the network: kept under
+// the scope, it would open offline in the app's place.
+function isFile(url) {
+  return url.pathname.slice(url.pathname.lastIndexOf('/') + 1).includes('.');
+}
+
 // Every page in this scope is the one app, whatever its query — a
 // room, a code, `?e2e` — so a page is kept once, under the scope.
 function keyOf(request) {
@@ -84,6 +94,7 @@ self.addEventListener('fetch', (event) => {
   if (request.method !== 'GET') return;
   const url = new URL(request.url);
   if (url.origin !== self.location.origin || neverKept(url)) return;
+  if (request.mode === 'navigate' && isFile(url)) return;
   const key = keyOf(request);
   event.respondWith(
     fetch(request).then(

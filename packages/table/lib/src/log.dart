@@ -29,11 +29,12 @@ class LogEntry {
   final TableEvent? event;
 
   /// An event the referee took, signed by a key it takes from, that does
-  /// not read here: one of another shape, or whose id is not its bytes'.
-  /// The referee checks the signature on the id and no more — it cannot
-  /// make a Dart side's canonical bytes — so a person can put one in the
-  /// log. It is kept as it came and changes nothing, at every side alike;
-  /// the hash takes its id as it takes any event's.
+  /// not read here: of a kind or a shape this build does not know. The
+  /// referee takes an event only under the hash of its bytes
+  /// (service/do/referee.mjs), but a log kept before it checked that may
+  /// also hold one whose id is not its bytes'. Either is kept as it came
+  /// and changes nothing, at every side alike; the hash takes its id as
+  /// it takes any event's.
   final Map<String, Object?>? unread;
 
   /// A key whose first connection to the log opened.

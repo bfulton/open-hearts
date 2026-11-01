@@ -4,6 +4,7 @@ library;
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
+import 'dart:typed_data';
 
 import 'package:engine/engine.dart';
 import 'package:service/service.dart';
@@ -68,6 +69,7 @@ void main() {
   group('over the relay', () {
     late Relay relay;
     final house = SchnorrSigner.generate();
+    final houseSecret = Uint8List.fromList(List.generate(32, (i) => i));
     setUp(() async {
       relay = Relay(house: house.publicKey);
       await relay.serve();
@@ -92,6 +94,7 @@ void main() {
       final host = PoolHost(
           relay: t,
           pool: pool,
+          secret: houseSecret,
           target: target,
           bots: botsNear(Ledger(prior: botPrior)),
           timing: timing,
@@ -156,7 +159,50 @@ void main() {
       final specs = await Future.wait([a.$3, b.$3].map((f) => f.timeout(const Duration(seconds: 15))));
       expect(specs.map((s) => s.id).toSet().length, 1, reason: 'one table, the two of them and two bots');
       expect(specs.first.seats.whereType<HumanSeat>().length, 2);
+      expect(specs.first.salt, seatingSalt(houseSecret, specs.first), reason: 'salted with the house\'s secret, as a table it seated');
       closeAll([a, b, (h.$1, h.$2, null)]);
+    });
+
+    test('a name is seated as it may be shown: nothing in it that turns text round', () async {
+      final h = await seats();
+      // As long as a name the relay carries; a longer one it refuses
+      // (service/functions/names.mjs).
+      final a = await join('\u202ekcuf\u202c${'x' * (longestName - 6)}');
+      a.$2.playWithBots();
+      await a.$3.timeout(const Duration(seconds: 10));
+      expect(a.$2.seatNames.values, ['kcuf${'x' * (longestName - 6)}']);
+      closeAll([a, (h.$1, h.$2, null)]);
+    });
+
+    test("a waiter's avatar is seated as a device sends one, so nobody's keeps the house from seating the pool", () async {
+      final h = await seats();
+      // Waiting for bots at once, with an avatar padded past what the
+      // relay stores of a seating (service/do/relay.mjs, storedMost).
+      final x = RelayTransport(relays: [relay.url], signer: SchnorrSigner.generate(), table: poolTag('unrated', target: gameOverScore));
+      await x.ready;
+      final seating = x.lobby.where((e) => e.kind == TableKinds.lobby && e.pubkey == house.publicKey).first;
+      final since = DateTime.now().millisecondsSinceEpoch;
+      void say() => x.announce({
+            'kind': 'wait',
+            'name': 'X',
+            'rating': 1500,
+            'since': since,
+            'botsAfter': 0,
+            'avatar': {'icon': 'pets', 'color': 3, 'pad': 'x' * 30000},
+          }, ephemeral: true);
+      say();
+      final beat = Timer.periodic(const Duration(milliseconds: 500), (_) => say());
+      final seated = await seating.timeout(const Duration(seconds: 10));
+      beat.cancel();
+      final seat = ((jsonDecode(seated.content) as Map)['seats'] as List).first as Map;
+      expect(seat['avatar'], {'icon': 'pets', 'color': 3}, reason: 'the icon and the colour, and nothing else');
+      x.close();
+      // And the next to wait is seated as ever: the house was not told
+      // no, so it did not sit the relay out.
+      final a = await join('A');
+      a.$2.playWithBots();
+      await a.$3.timeout(const Duration(seconds: 10));
+      closeAll([a, (h.$1, h.$2, null)]);
     });
 
     test('a waiter who said nothing waits the pool\'s time, whatever another chose', () async {
@@ -343,6 +389,18 @@ void main() {
       t2.close();
       closeAll([...rooms, mine]);
       await other.close();
+    });
+
+    test('a seating that names no target is not sat at', () async {
+      final waiting = await join('W', botsAfterMs: 60000);
+      final t = RelayTransport(relays: [relay.url], signer: house, table: poolTag('unrated'));
+      await t.ready;
+      expect(await t.announceTaken(seating(newSalt(), [waiting.$2.me], house.publicKey)..remove('target')), isTrue);
+      expect(await waiting.$3.then((_) => true).timeout(const Duration(seconds: 2), onTimeout: () => false), isFalse);
+      expect(await t.announceTaken(seating(newSalt(), [waiting.$2.me], house.publicKey)), isTrue);
+      expect((await waiting.$3.timeout(const Duration(seconds: 5))).target, gameOverScore, reason: 'one that names it is');
+      t.close();
+      closeAll([waiting]);
     });
 
     test('the operator\'s clocks are the table\'s: as the house was last told them, whatever a device\'s say', () async {

@@ -4,6 +4,7 @@
 import { accountsNamed, accountsPaidBy } from '../functions/deletion.mjs';
 import { ACCOUNT_PICTURES_PREFIX, pictureDigest, pictureNamed, pictureParts } from '../functions/pictures.mjs';
 import { isAccount } from '../functions/rows.mjs';
+import { stripeAuth } from '../functions/stripe.mjs';
 
 /// The accounts [asked] names: as a name always, since one can have an
 /// @ in it; as an email address too when it could be one, which needs
@@ -32,7 +33,7 @@ export async function findAccounts(store, asked, { stripeKey = null, fetchImpl =
       notes.push('not looked for as an email address, which needs STRIPE_API_KEY');
     } else {
       const stripe = async (path) => {
-        const res = await fetchImpl(`https://api.stripe.com/v1${path}`, { headers: { authorization: `Bearer ${stripeKey}` } });
+        const res = await fetchImpl(`https://api.stripe.com/v1${path}`, { headers: stripeAuth(stripeKey) });
         if (!res.ok) throw new Error(`Stripe said ${res.status}`);
         return res.json();
       };

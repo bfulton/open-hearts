@@ -24,7 +24,8 @@
 // not kept: the others would see it.
 
 import { entitlementOf } from './accounts.mjs';
-import { nameRefused } from './names.mjs';
+import { NAME_MOST, nameRefused } from './names.mjs';
+import { REFUSED } from './refusals.mjs';
 import { isAccount } from './rows.mjs';
 
 /// The icons the app offers, by their keys (AvatarIcons.all).
@@ -36,8 +37,9 @@ export const PROFILE_ICONS = Object.freeze([
 /// How many colours the palette has (AvatarIcons.paletteSize).
 export const PROFILE_COLOURS = 10;
 
-/// The longest name, in characters.
-export const PROFILE_NAME_MOST = 60;
+/// The longest name, in characters: the longest the filter lets be
+/// (names.mjs).
+export const PROFILE_NAME_MOST = NAME_MOST;
 
 /// What the service says of a name the filter refuses (names.mjs),
 /// which the app knows (net/account_profile.dart) and does not send
@@ -120,7 +122,7 @@ async function profileAccount(store, key, now) {
 /// sends its own.
 export async function profileRead(op, store, { now = Date.now() } = {}) {
   const account = await profileAccount(store, op.key, now);
-  if (!account) return { status: 402, body: { error: 'no subscription' } };
+  if (!account) return { status: 402, body: { error: REFUSED.noSubscription } };
   const row = await store.get(`ACCOUNT#${account}`, 'PROFILE');
   return { status: 200, body: row ? profileShown(row) : { profile: null, version: 0 } };
 }
@@ -131,7 +133,7 @@ export async function profileRead(op, store, { now = Date.now() } = {}) {
 /// is given.
 export async function profileWritten(op, store, active, { now = Date.now(), pictures = null } = {}) {
   const account = await profileAccount(store, op.key, now);
-  if (!account) return { status: 402, body: { error: 'no subscription' } };
+  if (!account) return { status: 402, body: { error: REFUSED.noSubscription } };
   const checked = profileOf(op.profile);
   if (checked.error) return { status: 400, body: { error: checked.error } };
   // From the device in hand, and no other: a device that has stepped

@@ -107,12 +107,15 @@ agree on: the seats with their licences, the target score, whether it
 is rated, the table's clocks and the house. The table's id is the first
 128 bits of the SHA-256 of all of it, as it is written, with 128 bits of
 salt from the house so that nobody who saw the seats can work the id out
-(`TableSpec.id` in `spec.dart`). The id is the table's address: the tag
-its object on the relay is named by. A device seated works the id out
-again from the seating, and sits only at one whose id is its own. The
-referee takes the log's start only as the spec its table's id names
-([the referee](#the-referee)), so one person at a table cannot start it
-as anything but the table everybody was seated at.
+(`TableSpec.id` in `spec.dart`). The salt is a keyed hash of the rest
+under the house's own secret (`seatingSalt`), so the house knows a
+table it seated from the table alone ([ratings](#ratings)). The id is
+the table's address: the tag its object on the relay is named by. A
+device seated works the id out again from the seating, and sits only at
+one whose id is its own. The referee takes the log's start only as the
+spec its table's id names ([the referee](#the-referee)), so one person
+at a table cannot start it as anything but the table everybody was
+seated at.
 
 **Each player is seated once.** Whoever a seating names leaves the
 pool as it is said. The house hears nothing from them for
@@ -162,7 +165,9 @@ The leader's start says the same as a seating: the seats with their
 licences, the target score, the table's clocks and the house, with a
 salt, under the id their hash makes. A room's members say their licences
 in their beats, and a start whose seats do not check out, or whose
-table is not its spec's, is not sat at.
+table is not its spec's, is not sat at. Each seat at the table is shown
+under the name and look its own beats gave, whoever sent the start; the
+start's names count only for someone a device never heard.
 
 ## Bots
 
@@ -245,7 +250,18 @@ the totals, who was there from the deal and who left. Each person's
 line names the account and carries the licence that says the key it
 sat with is one of the account's devices, so anyone folding results can
 check whose it is. A result stands when it is the house's, the house
-this build was made with. Results from before the referee stood when a
+this build was made with.
+
+Any one of a table's people writes its start, so the house rates only
+what it seated. It serves a rated table only when the salt is its own:
+a start that says it is rated, naming people whose licences anyone can
+read, would otherwise be played out without them and rate them as having
+left. A friends' table is never rated, and the house publishes no result
+for one where a person seated there never said anything in the log:
+whoever started it chose who sat there, and nobody gets a game they
+never saw on their record.
+
+Results from before the referee stood when a
 majority of the accounts that sat down published the same one; they
 are folded as they always were, and no more are taken.
 
@@ -279,17 +295,31 @@ later comes to the same table too.
 The log begins with the table's start. Each seated person's device
 sends one, and the first the referee has is taken: from one of the
 table's people, naming this relay's house, and only as Dart wrote it.
-Its text must come out the same written again, its id must be the hash
-of what it says, and its spec must be the one the table's id names
-(`startRefusal`). A log that began with a start the sides could read
-two ways would be no table at all, for any of them.
+Its text must come out the same written again, and its spec must be the
+one the table's id names (`startRefusal`). A log that began with a
+start the sides could read two ways would be no table at all, for any
+of them.
 
 After the start, the referee takes events from the start's people and
-its house alone, each once, each signed by its author. It checks a
-signature on the event's id and no further: the id is the hash of the
-event's canonical bytes, which are Dart's to make (`events.dart`). An
-event whose id is not its bytes' is logged as it came and changes
-nothing, at every side alike (`LogEntry.unread`).
+its house alone, each once, each signed by its author. Every event's
+id, the start's too, must be the hash of the event's canonical bytes
+(`events.dart`, made the same way by `eventIdOf` in
+`service/functions/records.mjs`), so an id stands for one event and
+nobody can keep a seat's move out of the log by saying its id first. An
+event the rules do not read, of a kind or shape the build does not
+know, is logged as it came and changes nothing, at every side alike
+(`LogEntry.unread`).
+
+Each person's events may fill at most `authorMost` characters of the
+log, as much as a whole kept game may be (`recordMost`) and some five
+times a person's share of a game to a hundred. Past it the referee
+refuses that person's events, so their turns run out as a device's
+that has gone. The house's events are not held to it.
+
+No event nested deeper than 32 levels is taken (`deepest`); none a build
+writes goes past six, a start's licences. Every side walks an event to
+the bottom to read it and to write it out again, and one deep enough
+would overflow each of them, so the log would go no further for anyone.
 
 A socket is carried at all only once it answers the relay's challenge:
 a device in use, by the activation its account's service gave it, or
@@ -319,7 +349,12 @@ A deadline passes on the referee's clock, so the referee must be asked
 the time. A side that can see a deadline due asks for a tick (`TICK`) a
 moment past it, and again every second while nothing has moved the
 table. The referee adds one when its last entry is at least a quarter
-of a second old (`tickGapMs`).
+of a second old (`tickGapMs`), for one of the table's people or its
+house, until the house's word on how the game came out is in. It adds
+no more than `ticksInARowMost` in a row with no event between them, ten
+minutes of them, and none once the log holds `notesMost` ticks and
+connections noted, so a table whose house never says that word cannot
+be ticked on for ever.
 
 At a sealed table every bot seat is the house's to play. At an unsealed
 one, which only the simulator deals, every side works a bot's moves out
@@ -435,7 +470,10 @@ A device that is there and slow is timed by its clock, and a phone off
 the network for longer than the silence comes back to a bot in its seat
 if its turn came round meanwhile. Silence is answered at the seat's own
 turn and nowhere else, so a seat whose person is away holds nobody up
-until it is theirs to move.
+until it is theirs to move. Once the log holds `notesMost` ticks and
+connections noted, the referee notes no more connections closing, so a
+person who leaves after that is timed by their clock alone; one it
+noted gone before is still noted back when they return.
 
 A seat whose deal shows its person said they held the lead card nowhere
 is given up in the hand it broke, and the hand with it
@@ -471,7 +509,9 @@ longer run the deal, and an account taken up on another device
 The wait is the device's alone (`app/lib/live/left_early.dart`). It
 keeps the time of its last early leave until the wait after it is over;
 meanwhile Play live is shut and says until when, and `Lobby.play`
-refuses. Nothing else holds a device to it: matchmaking has nobody in
+refuses. A time kept ahead of the device's clock, which was set back
+since, counts from now instead, so the wait never runs longer than it
+says. Nothing else holds a device to it: matchmaking has nobody in
 charge to ask. A device whose storage was cleared, or a build changed
 to skip the wait, plays again at once. Like pace, it decides nothing
 anybody else has to trust.
@@ -518,7 +558,8 @@ says it (`House.pace`; [bots](#bots)).
 The house runs as one process for every table, in a Cloudflare
 Container the relay's Worker owns (`service/do/bench.mjs`). A table's
 object wakes it as the table starts, and again whenever the house is not
-on the log, at most once in twenty seconds (`wakeEveryMs`). The
+on the log, at most once in twenty seconds (`wakeEveryMs`), until the
+house has said a result there. The
 container is stopped once the house has had nothing to serve for ten
 minutes. Every bot seat's deal secret is made from the house's own
 secret, so a house started again reads the log from the start and goes
@@ -548,6 +589,33 @@ that runs out, its deadline and `houseGraceMs` after it, fails the game:
 it ends there, and nobody is rated on it. The screen says "Connection
 failure" over "The game's server stopped answering", and offers the way
 home, and the device tells the operator once.
+
+### When the house will not serve a table
+
+Any one of a table's people writes its start, so the house reads the
+start once and checks it against what does not change: the service's
+key and its own secret. It will not serve a table with a seat that has
+no licence the service signed for its key, held to the day the table
+began and not the day it is read, or with one account seated twice; and
+not a rated table whose salt is not its own
+([ratings](#ratings)). It says so once, in the table's log: a result of
+its saying `failed`, which names the log as it stood after its start
+(`TableRules.refusal`), whatever came into the log before the word.
+Every side ends the table there, failed, as when a turn of the house's
+runs out, but at once, and nobody is rated on it.
+
+The word is also what stops the table asking for the house. The
+referee asks for it, at most once in twenty seconds, until the house
+has said a result; a house that merely let such a table go was woken
+for it every twenty seconds until the log's notes ran out, some eleven
+days, and a subscriber who started many such tables could multiply
+that. The word goes in the table's own log and nowhere else: the house
+publishes nothing on the results tag for a table it will not serve, and
+reads nothing more of it once it has said the word.
+
+A table the house has not yet reached, or reached through a relay that
+was down, is not refused: the house says the word only of a table whose
+start it has read and checked, and what it checks never changes.
 
 ### What the house can see
 
@@ -627,8 +695,9 @@ every size, language and text size with one at every seat
 
 When a game is over, each player's device sends its record to be kept
 (`record.dart`, `app/lib/net/game_records.dart`, and the service's
-[game records](service.md#game-records)). The first copy is kept, so the
-others cost nothing. A record is the table's spec and the referee's
+[game records](service.md#game-records)). The copy kept is the one that
+carries the house's result, so a copy cut short does not stand in the
+way of the game. A record is the table's spec and the referee's
 log, every entry as it came, the house's word on the end among them.
 Each seat in the spec carries its licence, so the record says whose
 each seat was.
@@ -642,7 +711,9 @@ the house signed for, and does not verify. A copy that verifies is the
 game, whoever kept it. Opening one is live play: a device with a
 subscription, its account's device in use, and not one of the game's
 own players while it is being played. Names are kept beside the record
-unsigned, shown as what each device said it was called.
+unsigned, each put there by its own seat's device, and shown as that
+device said it was called; a seat whose device has not sent shows as a
+seat with no name does.
 
 A game kept before the referee, in the record's earlier forms, still
 opens, checked as it was then (`legacy/v2_record.dart`).
@@ -651,13 +722,13 @@ opens, checked as it was then (`legacy/v2_record.dart`).
 
 A picture comes from a stranger's device. A check on the sender's
 device would prove nothing, since it belongs to whoever is misusing it,
-so any check runs on the **viewer's** device (`app/lib/pictures.dart`).
-It fails open: with no model, or no answer within a few seconds, the
-picture shows, to be taken back if the answer later says so. Holding
-the badge offers a kept-off picture anyway. No model ships yet; one
-would be fetched from the app's origin and checked against a hash the
-app carries. Needing no model, holding another player's badge hides
-their picture on this device for good.
+so the service checks a picture once, when the account sets it, before
+any player is shown it ([the account's
+profile](service.md#the-accounts-profile)), and the relay carries only
+an account's checked picture ([an account's
+pictures](relay.md#an-accounts-pictures)). On the viewer's device,
+holding another player's badge hides their picture there for good,
+until it is shown again (`app/lib/pictures.dart`).
 
 ## Blocking and reporting
 
@@ -684,7 +755,44 @@ A device's identity is a keypair made on the device when first needed
 (`app/lib/identity.dart`): an x-only secp256k1 key with BIP-340 Schnorr
 signatures (`signing.dart`, and on the web the wasm built from
 `crypto/schnorr_wasm`). The key signs every move and never leaves the
-device. A person is an **account**, made when they subscribe
+device.
+
+That includes the phone's backups. A phone backs up an app's
+preferences, to its owner's Google or iCloud account and to the next
+phone, so on a phone the key is not kept among them
+(`app/lib/secret_store.dart`):
+
+- **Android** keeps it in a preferences file of its own, `identity.xml`.
+  `res/xml/data_extraction_rules.xml` (Android 12 and later: Google's
+  backup, and a transfer to a new phone) and `res/xml/backup_rules.xml`
+  (11 and earlier) leave that file out, and nothing else.
+- **The iPhone** keeps it in a file in Application Support marked as not
+  to be backed up (`IosSecretStore`, with two calls in
+  `app/ios/Runner/AppDelegate.swift`). The file is written only after it
+  is marked, and the app refuses a key its file does not say is marked.
+- Both go with the app when it is deleted, as the preferences did, so
+  deleting the app still removes the key. The Keychain is not used: its
+  items outlive the app.
+- The web keeps the key in the browser's storage, as before
+  ([the device, carried over](service.md#the-device-carried-over)).
+
+A phone restored from a backup, or moved to a new phone, comes back
+without its key, as a new player, and gets its account back with a
+backup code, a sign-in or Restore purchases. The rest of what the
+backup holds, the settings among it, comes back.
+
+A device that kept its key among the preferences before moves it at its
+first start (`Identity.signer`): the key is written to the store, read
+back, and taken out of the preferences only when the store gives back
+exactly what was written. A move that fails leaves the key where it was,
+still the device's key, and is tried again at the next start; no key is
+made while either place holds one, and a store that cannot be read is
+not taken for an empty one. A backup made before the move still carries
+the old copy, and a phone restored from it moves that key into its store
+at its first start. Starting afresh deletes the key from the store as
+well as clearing the preferences (`app/lib/start_afresh.dart`).
+
+A person is an **account**, made when they subscribe
 ([the service](service.md)), with a few devices (`mostDevices`, a
 [service setting](../reference/configuration.md)). The service's licence
 names a device's key beside its account's id, and every side checks it

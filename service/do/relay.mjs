@@ -2,19 +2,25 @@
 // speaks (docs/explanation/service.md), written as plain functions over
 // anything that can send a string. The Cloudflare object
 // (worker.mjs) and a plain node host (host.mjs) both drive this file,
-// so what the app meets on Cloudflare is what the Dart suites — the
-// same ones that run against the Dart relay — run against here.
+// so what the app meets on Cloudflare is what the Dart and browser
+// suites run against.
 //
-// Nothing is imported but the service's name filter, plain functions
-// too: no node, no Cloudflare. Signatures are checked by the wasm the
-// app already carries (app/web/schnorr.wasm, built from
-// crypto/schnorr_wasm), handed in already compiled, because a Worker
-// may not compile wasm at runtime and because BIP-340 is not worth a
-// second implementation in a third language.
+// What is imported is plain functions too — the service's name filter
+// and hashing, the kinds (kinds.mjs), a table's referee (referee.mjs)
+// and a pool's watch (pool.mjs) — with no node and no Cloudflare.
+// Signatures are checked by the wasm the app already carries
+// (app/web/schnorr.wasm, built from crypto/schnorr_wasm), handed in
+// already compiled, because a Worker may not compile wasm at runtime
+// and because BIP-340 is not worth a second implementation in a third
+// language.
 
 import { nameRefused } from '../functions/names.mjs';
+import { digestOf, hex } from '../functions/rows.mjs';
+import { lobbyKind, waitingKind, watchKind } from './kinds.mjs';
 import { logKind, tableReferee, tableTag } from './referee.mjs';
 import { isPoolTag, poolWatch, seatingHeld } from './pool.mjs';
+
+export { lobbyKind, watchKind };
 
 /// Kinds 20000–29999 are ephemeral: forwarded to whoever is listening
 /// and then forgotten. Every kind presence uses is one of these, which
@@ -35,14 +41,13 @@ export const maxSubscriptions = 8;
 /// without end; past the cap it drops back to the ids actually kept.
 export const rememberedIds = 40000;
 
-/// What the object (worker.mjs) holds one socket to. The node host under
-/// the suites carries whole tables, whose deal is the big one, and asks
-/// for no limits; the object carries presence, whose largest event is a
-/// beat with the device's activation in it, under a kilobyte, for
-/// everyone on the tag at once — and
-/// takes a socket from anybody. Cloudflare hands an object messages of
-/// up to 32 MiB, and an event that matches presence is sent on to
-/// every device listening, on the one thread they all share.
+/// What presence's object (worker.mjs, and host.mjs with --object) holds
+/// one socket to; every other tag's holds it to [tableLimits]. Presence's
+/// largest event is a beat with the device's activation in it, under a
+/// kilobyte, for everyone on the tag at once, and the tag takes a socket
+/// from anybody. Cloudflare hands an object messages of up to 32 MiB,
+/// and an event that matches presence is sent on to every device
+/// listening, on the one thread they all share.
 export const objectLimits = Object.freeze({
   /// The longest message read at all, in characters.
   message: 64 * 1024,
@@ -122,7 +127,6 @@ export function tagOf(pathname) {
 
 const hex64 = /^[0-9a-f]{64}$/;
 const hex128 = /^[0-9a-f]{128}$/;
-const encoder = new TextEncoder();
 
 /// BIP-340 verification through the wasm: `verify(pubkey, digest, sig)`
 /// over lowercase hex. Takes a compiled `WebAssembly.Module` — what a
@@ -165,9 +169,7 @@ export async function schnorrVerifier(wasm) {
 /// NIP-01's id: the SHA-256 of `[0, pubkey, created_at, kind, tags,
 /// content]` as compact JSON, in lowercase hex.
 export async function idOf(pubkey, createdAt, kind, tags, content) {
-  const canonical = encoder.encode(JSON.stringify([0, pubkey, createdAt, kind, tags, content]));
-  const digest = await crypto.subtle.digest('SHA-256', canonical);
-  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
+  return digestOf(JSON.stringify([0, pubkey, createdAt, kind, tags, content]));
 }
 
 const strings = (v) => Array.isArray(v) && v.every((s) => typeof s === 'string');
@@ -292,12 +294,6 @@ export function memoryStore(keep = 10000) {
 /// The kind of a device's answer to the relay's challenge (NIP-42).
 export const authKind = 22242;
 
-const toHex = (bytes) => [...bytes].map((b) => b.toString(16).padStart(2, '0')).join('');
-
-async function sha256Hex(text) {
-  return toHex(new Uint8Array(await crypto.subtle.digest('SHA-256', encoder.encode(text))));
-}
-
 /// The activation [raw] says, as {account, key, epoch, until}, when the
 /// service ([service], its public key) signed it and it has not run out
 /// at [nowS]; null otherwise. The statement is the service's
@@ -308,7 +304,7 @@ export async function activationOf(raw, service, verify, nowS) {
   if (typeof account !== 'string' || !/^[0-9a-f]{32}$/.test(account) || typeof key !== 'string' || !hex64.test(key)) return null;
   if (!Number.isSafeInteger(epoch) || epoch < 0 || !Number.isSafeInteger(until) || typeof sig !== 'string') return null;
   if (until <= nowS) return null;
-  const digest = await sha256Hex(`oh-active/1\n${account}\n${key}\n${epoch}\n${until}`);
+  const digest = await digestOf(`oh-active/1\n${account}\n${key}\n${epoch}\n${until}`);
   return verify(service, digest, sig) ? { account, key, epoch, until } : null;
 }
 
@@ -325,7 +321,7 @@ const houseSeconds = 24 * 60 * 60;
 /// one in use, answering a reason when it is not, or null.
 export function serviceGate({ service, verify, house = null, seen = null, now = Date.now }) {
   return {
-    challenge: () => toHex(crypto.getRandomValues(new Uint8Array(16))),
+    challenge: () => hex(crypto.getRandomValues(new Uint8Array(16))),
     async admit(event) {
       const said = (name) => event.tags.find((t) => t[0] === name)?.[1];
       if (house && event.pubkey === house) return { account: null, key: house, epoch: 0, until: Math.floor(now() / 1000) + houseSeconds };
@@ -343,10 +339,38 @@ export function serviceGate({ service, verify, house = null, seen = null, now = 
   };
 }
 
-/// How many messages a socket may say before its answer to the
-/// challenge is in: a client sends its subscriptions at once, and maybe
-/// an event; past this it is not a client waiting for an answer.
+/// [serviceGate]'s `seen` from the accounts' own objects ([household],
+/// their namespace; service/functions/household.mjs, seenAt): yes on a
+/// 200, no on a 409 with the reason it gives. Any other answer, or none
+/// at all, leaves the service's signature standing until its hour is
+/// up, and is logged with [log], since the device is then let in on the
+/// signature alone.
+export function householdSeen(household, tag, log = console.log) {
+  return async (who) => {
+    let answer;
+    try {
+      const stub = household.get(household.idFromName(who.account));
+      const op = { op: 'seen', account: who.account, key: who.key, epoch: who.epoch, tag };
+      answer = await (await stub.fetch('https://household/', { method: 'POST', body: JSON.stringify(op) })).json();
+    } catch (e) {
+      log(`gate: a device let in unchecked: ${e?.message ?? e}`);
+      return null;
+    }
+    if (answer?.status === 409) return answer.body?.error ?? supersededWhy;
+    if (answer?.status !== 200) log(`gate: a device let in unchecked: ${answer?.status} ${answer?.body?.error ?? ''}`.trim());
+    return null;
+  };
+}
+
+/// How many messages, and how many characters of them, a socket may say
+/// before its answer to the challenge is in: a client sends its
+/// subscriptions at once, and maybe the few events it has said that it
+/// has not yet seen taken (packages/table, relay_line.dart, `_opened`);
+/// past this it is not a client waiting for an answer. The characters
+/// bound what a socket that never answers makes the object hold: two of
+/// a table's longest messages.
 const heldMost = 32;
+const heldMostChars = 256 * 1024;
 
 /// How old a device's answer to the challenge may be, in seconds.
 const answerFreshS = 600;
@@ -375,18 +399,14 @@ const finalWhy = (why) => typeof why === 'string' && why.length <= 120 && /^(sup
 /// subscriptions it was carrying. [refuse] may answer with a promise:
 /// the node host asks the Dart test that installed the policy.
 ///
-/// [limits] is [objectLimits], or null for none; [now] is the clock
-/// the rate is measured by. [count], if given, is told what became of
-/// each message — `count('events')`, `count('delivered', n)` — and
-/// nothing about who sent it: what the operator watches (worker.mjs).
+/// [limits] is [objectLimits] or [tableLimits], or null for none; [now]
+/// is the clock the rate is measured by. [count], if given, is told what
+/// became of each message — `count('events')`, `count('delivered', n)` —
+/// and nothing about who sent it: what the operator watches (worker.mjs).
 ///
 /// [gate], when given, is who may use it ([serviceGate]): every socket
 /// is asked, and carried nothing until it has answered. A socket may
 /// then also have `close()`, for the relay to end it.
-///
-/// [heard], when given, is told of each event the relay took, after its
-/// OK, with who the gate let in to say it ({account, key, …}), or null
-/// where there is no gate.
 ///
 /// [withhold], when given, says of an event (or a promise of saying)
 /// why the relay keeps it to itself, or null: one the operator took
@@ -412,7 +432,7 @@ const finalWhy = (why) => typeof why === 'string' && why.length <= 120 && /^(sup
 /// (pool.mjs, poolWatch) from the relay's own `holds`: it is told of
 /// each event the relay took, and says whether the pool wants its house
 /// ([wantsHouse]).
-export function createRelay({ verify, store = memoryStore(), refuse = null, log = null, limits = null, now = Date.now, count = null, heard = null, kept = null, gate = null, withhold = null, screen = null, forget = null, referee = null, watcher = null }) {
+export function createRelay({ verify, store = memoryStore(), refuse = null, log = null, limits = null, now = Date.now, count = null, kept = null, gate = null, withhold = null, screen = null, forget = null, referee = null, watcher = null }) {
   /// socket -> subscription id -> {raw, filters}. The raw filters are
   /// kept beside the parsed ones because a hibernating socket has to
   /// carry them somewhere and JSON is what it can carry.
@@ -454,6 +474,13 @@ export function createRelay({ verify, store = memoryStore(), refuse = null, log 
 
   /// The table's referee, on a table's tag.
   const table = referee?.({ send: sendText, admitted }) ?? null;
+
+  /// Why [event] is not carried when it is a view of the table from a
+  /// key that holds no seat at it: a view is a seated player's to say
+  /// (packages/table, watch.dart), and the watchers believe it, so once
+  /// the start says who sits there, nobody else's is carried.
+  const viewRefusal = (event) =>
+    table && event.kind === watchKind && table.seated(event.pubkey) === false && namingContent(event)?.view !== undefined ? VIEW_NOT_SEATED_WHY : null;
 
   /// Whether a socket that answered the gate as [key], for no account,
   /// is carried now: the house, on this tag. Nobody, with no gate.
@@ -507,15 +534,21 @@ export function createRelay({ verify, store = memoryStore(), refuse = null, log 
     }
   }
 
-  /// [socket]'s answer to its challenge.
+  /// [socket]'s answer to its challenge. An answer is the one message a
+  /// socket can send that has its signatures checked before anything has
+  /// let it in, so only one that names the socket's challenge is
+  /// checked, and the challenge is answered once, taken or not: a socket
+  /// that answers it again is told no without a signature checked.
   async function authenticate(socket, json) {
     const a = auths.get(socket);
     if (!gate || !a) return send(socket, ['NOTICE', 'this relay asks nobody who they are']);
-    const event = await checkEvent(json, verify);
+    const answering = !!a.challenge && Array.isArray(json?.tags) && json.tags.some((t) => Array.isArray(t) && t[0] === 'challenge' && t[1] === a.challenge);
+    if (answering) a.challenge = null;
+    const event = answering ? await checkEvent(json, verify) : null;
     const id = event?.id ?? (json && typeof json === 'object' && typeof json.id === 'string' ? json.id : '');
     let who = null;
     let why = null;
-    if (!event || event.kind !== authKind || !a.challenge || !event.tags.some((t) => t[0] === 'challenge' && t[1] === a.challenge)) {
+    if (!event || event.kind !== authKind) {
       why = 'auth-required: not an answer to this relay\'s challenge';
     } else if (Math.abs(nowS() - event.created_at) > answerFreshS) {
       why = 'auth-required: an old answer';
@@ -538,7 +571,6 @@ export function createRelay({ verify, store = memoryStore(), refuse = null, log 
     }
     if (who.account) supersede(who.account, who.epoch);
     a.who = who;
-    a.challenge = null;
     a.refused = null;
     send(socket, ['OK', id, true, '']);
     for (const raw of held) await handle(socket, raw);
@@ -553,7 +585,8 @@ export function createRelay({ verify, store = memoryStore(), refuse = null, log 
     // the activation it has been given since.
     if (a?.who) a = challenge(socket);
     if (a && !a.refused) {
-      if (a.held.length >= heldMost) return send(socket, ['NOTICE', 'auth-required: answer the challenge first']), true;
+      const chars = a.held.reduce((n, r) => n + r.length, raw.length);
+      if (a.held.length >= heldMost || chars > heldMostChars) return send(socket, ['NOTICE', 'auth-required: answer the challenge first']), true;
       a.held.push(raw);
       return true;
     }
@@ -567,9 +600,9 @@ export function createRelay({ verify, store = memoryStore(), refuse = null, log 
     return true;
   }
 
-  /// Whether [socket] may publish one more event now, taking it if so.
-  /// The bucket refills with time; a socket that went quiet has its
-  /// whole burst back.
+  /// Whether [socket] may publish one more event, subscribe once more,
+  /// or ask for a table's log once more, now, taking it if so. The bucket refills with time;
+  /// a socket that went quiet has its whole burst back.
   function spend(socket) {
     if (!limits) return true;
     const t = now();
@@ -604,7 +637,7 @@ export function createRelay({ verify, store = memoryStore(), refuse = null, log 
       if (!ok) log?.(`not logged ${event.id.slice(0, 6)}: ${why}`);
       return send(from, ['OK', event.id, ok, why]);
     }
-    const why = await refuse?.(event);
+    const why = viewRefusal(event) ?? (await refuse?.(event));
     if (why) {
       count?.('refused');
       log?.(`refused ${event.id.slice(0, 6)}: ${why}`);
@@ -637,9 +670,6 @@ export function createRelay({ verify, store = memoryStore(), refuse = null, log 
       for (const id of stored) seen.add(id);
     }
     send(from, ['OK', event.id, true, '']);
-    // Whatever the host wants to know of an event it took, and from
-    // whom.
-    heard?.(event, auths.get(from)?.who ?? null);
     watching?.heard(event);
     // Written out once, not once a listener: the same text either way.
     const wire = JSON.stringify(event);
@@ -697,7 +727,7 @@ export function createRelay({ verify, store = memoryStore(), refuse = null, log 
     // Not read at all past the limit: parsing it is the cost.
     if (limits && raw.length > limits.message) {
       count?.('tooBig');
-      return send(socket, ['NOTICE', 'too big: this relay carries presence']);
+      return send(socket, ['NOTICE', 'too big: over this tag\'s message limit']);
     }
     let message;
     try {
@@ -728,6 +758,12 @@ export function createRelay({ verify, store = memoryStore(), refuse = null, log 
           count?.('tooBig');
           return send(socket, ['NOTICE', 'too big: a subscription is carried through hibernation']);
         }
+        // A subscription is answered with what the tag holds, so asking
+        // costs what publishing does, as LOG does.
+        if (!spend(socket)) {
+          count?.('rateLimited');
+          return send(socket, ['CLOSED', message[1], 'rate-limited: slow down']);
+        }
         count?.('subscriptions');
         return request(socket, message);
       case 'CLOSE':
@@ -742,10 +778,16 @@ export function createRelay({ verify, store = memoryStore(), refuse = null, log 
           return send(socket, ['NOTICE', 'LOG takes an id and the first entry wanted']);
         }
         if (!table) return send(socket, ['CLOSED', message[1], 'blocked: only a table\'s tag keeps a log']);
+        // The log from where it is asked for is the most a short message
+        // makes the relay send, so asking costs what publishing does.
+        if (!spend(socket)) {
+          count?.('rateLimited');
+          return send(socket, ['CLOSED', message[1], 'rate-limited: slow down']);
+        }
         return table.follow(socket, message[1], message[2], auths.get(socket)?.who?.key ?? null);
       case 'TICK':
         if (!table) return send(socket, ['NOTICE', 'blocked: only a table\'s tag keeps a log']);
-        table.tick();
+        table.tick(auths.get(socket)?.who?.key ?? null);
         return;
       default:
         return send(socket, ['NOTICE', `unknown message ${message[0]}`]);
@@ -831,7 +873,7 @@ export function createRelay({ verify, store = memoryStore(), refuse = null, log 
     },
 
     /// The table's log, on a table's tag.
-    get log() {
+    get entries() {
       return table?.entries ?? null;
     },
 
@@ -867,8 +909,8 @@ export function createRelay({ verify, store = memoryStore(), refuse = null, log 
 /// only where pictures are put out: a lobby's tag, never presence or the
 /// results.
 ///
-/// A table's tag keeps the table's log besides (referee.mjs): [log] is
-/// the log as kept, [keepEntry] is told of each entry added to it, to
+/// A table's tag keeps the table's log besides (referee.mjs): [entries]
+/// is the log as kept, [keepEntry] is told of each entry added to it, to
 /// write it down, and [wanted] each time the table wants its house and
 /// the house is not there. [house] is this relay's house: the key a
 /// sealed table's spec has to name, and the one key the results are
@@ -879,7 +921,7 @@ export function createRelay({ verify, store = memoryStore(), refuse = null, log 
 /// waits there and the house is not there.
 export function objectRelay(
   verify,
-  { tag = presenceTag, now = Date.now, count = null, limits = null, store = null, kept = null, also = null, gate = null, withhold = null, screen = null, forget = null, house = null, log = null, keepEntry = null, wanted = null, say = null } = {},
+  { tag = presenceTag, now = Date.now, count = null, limits = null, store = null, kept = null, also = null, gate = null, withhold = null, screen = null, forget = null, house = null, entries = null, keepEntry = null, wanted = null, log = null } = {},
 ) {
   const presence = tag === presenceTag;
   const own = refusalFor(tag, { house });
@@ -888,8 +930,8 @@ export function objectRelay(
   return createRelay({
     verify,
     gate,
-    log: say,
-    referee: tableTag.test(tag) ? ({ send, admitted }) => tableReferee({ table: tag, verify, house, now, entries: log ?? [], keep: keepEntry, wanted, send, admitted }) : null,
+    log,
+    referee: tableTag.test(tag) ? ({ send, admitted }) => tableReferee({ table: tag, verify, house, now, entries: entries ?? [], keep: keepEntry, wanted, send, admitted }) : null,
     watcher: pool ? ({ holds }) => poolWatch({ house, here: () => holds(house), wanted, now }) : null,
     // Presence keeps nothing; a table's tag keeps its lobby.
     store: presence ? null : (store ?? memoryStore(storedKeep(tag))),
@@ -916,8 +958,8 @@ export const presenceTag = 'online';
 export function tagLabel(tag) {
   if (tag === presenceTag) return 'presence';
   if (typeof tag !== 'string') return 'unknown';
-  if (tag.startsWith('queue:')) return 'queue';
-  if (/^[0-9a-f]{32}$/.test(tag)) return `table:${tag.slice(0, 8)}`;
+  if (isPoolTag(tag)) return 'queue';
+  if (tableTag.test(tag)) return `table:${tag.slice(0, 8)}`;
   return 'room';
 }
 
@@ -940,11 +982,6 @@ export function socketLine(what, { tag, who = null, code, clean, why, openedAt, 
   };
 }
 
-/// The one kind this relay stores: the lobby — a room announced, a
-/// pool's seating, a table started, a player's picture, a game's result
-/// (packages/table, nostr.dart, TableKinds.lobby; docs/explanation/relay.md).
-export const lobbyKind = 4244;
-
 /// The tag game results are written under (packages/table, results.dart,
 /// GameResult.tag): kept, since the ratings are folded from all of them.
 /// Everything else stored is kept a day (worker.mjs, the sweep).
@@ -957,6 +994,29 @@ export const resultsTag = 'standings';
 /// inside an object's memory, and the point at which ratings should be
 /// folded by the service rather than by every device.
 export const storedKeep = (tag) => (tag === resultsTag ? 20000 : 2000);
+
+/// The most an event a tag stores may weigh, in bytes as the object
+/// holds it ([storedWeight]). The longest a device stores is a picture,
+/// PROFILE_PICTURE_MOST bytes in base64 (some 16,000 characters); a
+/// seating of four is a few thousand, and a result less. So a room's or
+/// a pool's object holds its [storedKeep] in some 50 MB at the most,
+/// inside the 128 MB an object has. Held only to [tableLimits]'
+/// message, one subscriber's 2,000 events would be twice that or more,
+/// and the object would fail each time it woke and read them back.
+export const storedMost = 24 * 1024;
+
+/// What [event] weighs against [storedMost]: its JSON's length, and
+/// twice that once any of its strings holds a character past U+00FF,
+/// since V8 then holds that string at two bytes a character. The
+/// strings themselves are looked at, not the JSON: a lone surrogate is
+/// written there as six characters of ASCII (`\ud800`), but kept as one
+/// that makes its string two bytes a character.
+export function storedWeight(event) {
+  const wide = (s) => /[^\u0000-\u00ff]/.test(s);
+  const strings = [event.id, event.pubkey, event.content, event.sig, ...event.tags.flat()];
+  const n = JSON.stringify(event).length;
+  return strings.some(wide) ? n * 2 : n;
+}
 
 /// A player's quick reaction at a live table (packages/table,
 /// reactions.dart): 👍, 😬 and the rest, as a short code and the moment
@@ -1004,7 +1064,7 @@ export function reactionRefusal(tag, event) {
 /// The kinds whose content names players (packages/table, nostr.dart,
 /// TableKinds): the lobby, waiting in a pool or a room, and a watched
 /// table.
-const namingKinds = new Set([lobbyKind, 24245, 24247]);
+const namingKinds = new Set([lobbyKind, waitingKind, watchKind]);
 
 /// [event]'s content as an object, for a kind that names players, or
 /// null.
@@ -1019,15 +1079,18 @@ function namingContent(event) {
 }
 
 /// The names [event] shows the others: its content's `name` (waiting),
-/// each of its seats' (a table started or seated) and a watched table's
-/// `names`.
+/// each of its seats' (a table started or seated), its `names`, and a
+/// watched table's, which a seated player says as `{"view": {"names":
+/// [...]}}` (packages/table, watch.dart).
 export function namesIn(event) {
   const said = namingContent(event);
   if (!said) return [];
   const names = [];
   if (typeof said.name === 'string') names.push(said.name);
   for (const seat of Array.isArray(said.seats) ? said.seats : []) if (typeof seat?.name === 'string') names.push(seat.name);
-  for (const name of Array.isArray(said.names) ? said.names : []) if (typeof name === 'string') names.push(name);
+  for (const list of [said.names, said.view?.names]) {
+    for (const name of Array.isArray(list) ? list : []) if (typeof name === 'string') names.push(name);
+  }
   return names;
 }
 
@@ -1052,12 +1115,20 @@ export const RESULT_NOT_HOUSE_WHY = 'blocked: a result is the house\'s word';
 /// (service/functions/names.mjs): the app never sends one.
 export const NAME_REFUSED_WHY = 'blocked: a name that is not allowed';
 
+/// An event to be stored that weighs more than [storedMost].
+export const STORED_TOO_BIG_WHY = 'too big: a stored event is longer than this relay keeps';
+
+/// Why a view of a table said by a key that holds no seat at it is not
+/// carried.
+export const VIEW_NOT_SEATED_WHY = 'blocked: a view of the table is one of its people\'s to say';
+
 /// What a tag's object refuses. Presence: anything but the ephemeral
 /// kinds. A table's or a lobby's tag: anything but the ephemeral kinds
 /// and the lobby kind tagged for this very tag — an object stores what
 /// belongs to it, and nobody writes into one tag's store through
 /// another's. A reaction anywhere but a table's own tag, or in any
-/// shape but a reaction's ([reactionRefusal]). And anything that shows
+/// shape but a reaction's ([reactionRefusal]). An event to be stored
+/// that weighs more than [storedMost]. And anything that shows
 /// the others a name the filter refuses ([namesIn]), or a picture
 /// anywhere but in a picture of its own ([pictureInAvatar]).
 ///
@@ -1075,6 +1146,7 @@ export function refusalFor(tag, { house = null } = {}) {
         ? 'blocked: presence carries ephemeral kinds only'
         : `blocked: this tag stores only kind ${lobbyKind}, tagged ${tag}`;
     }
+    if (!ephemeral(event.kind) && storedWeight(event) > storedMost) return STORED_TOO_BIG_WHY;
     if (pictureInAvatar(event)) return PICTURE_IN_AVATAR_WHY;
     return namesIn(event).some(nameRefused) ? NAME_REFUSED_WHY : null;
   };
@@ -1092,10 +1164,13 @@ export const tableLimits = Object.freeze({
   perSecond: 20,
 });
 
-/// What one object has seen since it last said so, in the order the
-/// operator's query reads the numbers (docs/explanation/service.md):
-/// counts, never who.
-export const tallied = ['opened', 'closed', 'events', 'delivered', 'subscriptions', 'rateLimited', 'invalid', 'refused', 'duplicate', 'tooBig', 'malformed', 'superseded'];
+/// The numbers in each line an object writes, in the order the
+/// operator's query reads them (docs/explanation/service.md): what it
+/// has seen since its last line, and the seconds that covers. Counts,
+/// never who. A count added later goes at the end, so that no column
+/// moves: `withheld` comes after the seconds.
+export const tallied = ['opened', 'closed', 'events', 'delivered', 'subscriptions', 'rateLimited', 'invalid', 'refused', 'duplicate', 'tooBig', 'malformed', 'superseded', 'seconds', 'withheld'];
+const counted = tallied.filter((k) => k !== 'seconds');
 
 /// [fn] in [ms], as a cancel: a timer node does not wait for, so a
 /// test's tally does not hold its process open.
@@ -1115,21 +1190,21 @@ function later(fn, ms) {
 /// minute: an object whose sockets are open hibernates once nothing is
 /// pending, and what it holds in memory goes with it.
 export function tally(sink, { every = 60000, now = Date.now, after = later } = {}) {
-  let counts = Object.fromEntries(tallied.map((k) => [k, 0]));
+  let counts = Object.fromEntries(counted.map((k) => [k, 0]));
   let since = now();
   let pending = null;
   const flush = () => {
     pending?.();
     pending = null;
     const t = now();
-    if (sink && tallied.some((k) => counts[k] > 0)) {
+    if (sink && counted.some((k) => counts[k] > 0)) {
       try {
-        sink.writeDataPoint({ indexes: ['relay'], blobs: ['relay'], doubles: [...tallied.map((k) => counts[k]), (t - since) / 1000] });
+        sink.writeDataPoint({ indexes: ['relay'], blobs: ['relay'], doubles: tallied.map((k) => (k === 'seconds' ? (t - since) / 1000 : counts[k])) });
       } catch {
         // What is watched never stops what is watched.
       }
     }
-    counts = Object.fromEntries(tallied.map((k) => [k, 0]));
+    counts = Object.fromEntries(counted.map((k) => [k, 0]));
     since = t;
   };
   const count = (what, n = 1) => {

@@ -35,7 +35,10 @@ export function foldedWords(name, folds) {
 }
 
 /// [name] with a space where a small letter meets a capital, so that
-/// words run together as `ShitHead` are read as two.
+/// words run together as `ShitHead` are read as two. The combining marks
+/// and invisible characters [foldName] drops are dropped first, so that
+/// one between the two letters does not keep them together:
+/// `Shit\u200eHead` is shown as `ShitHead`.
 export function splitCamel(name) {
-  return name.replace(CAMEL, '$1 $2');
+  return name.replace(MARKS, '').replace(CAMEL, '$1 $2');
 }

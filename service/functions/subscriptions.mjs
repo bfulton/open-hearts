@@ -2,7 +2,8 @@
 // (dateSubscription) — Stripe, the App Store or Google Play alike — and
 // a store's checked purchase put into an account (bindPurchase).
 
-import { accountFor, joinAccount, paidFor } from './accounts.mjs';
+import { accountFor, devicesWithRows, joinAccount, paidFor } from './accounts.mjs';
+import { REFUSED } from './refusals.mjs';
 import { dayOf, isAccount } from './rows.mjs';
 
 /// What a store says of a subscription, written down — Stripe, the App
@@ -38,12 +39,7 @@ export async function dateSubscription(store, subscription, { source, txn_ref = 
   // subscription.
   const account = gone ? (await store.get(`SUB#${subscription}`, 'ACCOUNT'))?.account : null;
   if (isAccount(account) && (await store.get(`ACCOUNT#${account}`, 'META'))?.subscription === subscription) {
-    for (const sk of await store.under(`ACCOUNT#${account}`, 'DEVICE#')) {
-      const key = sk.slice('DEVICE#'.length);
-      const row = await store.get(`KEY#${key}`, 'ENTITLEMENT');
-      if (row?.account !== account) continue;
-      await store.put(`KEY#${key}`, 'ENTITLEMENT', { ...row, licensed_until: today, at: today });
-    }
+    for (const { key, row } of await devicesWithRows(store, account)) await store.put(`KEY#${key}`, 'ENTITLEMENT', { ...row, licensed_until: today, at: today });
   }
   return { subscription, renews_at };
 }
@@ -64,7 +60,7 @@ export async function bindPurchase(op, store, { now = Date.now() } = {}) {
     created: op.created ?? null,
     now,
   });
-  if (op.gone || !op.paid || !(op.until > now)) return { status: 402, body: { error: 'not paid' } };
+  if (op.gone || !op.paid || !(op.until > now)) return { status: 402, body: { error: REFUSED.notPaid } };
   if (op.buyer === true) return paidFor(store, op.subscription, op.key, { now });
   const account = await accountFor(store, op.subscription, { buyer: op.key, make: true, now });
   return joinAccount(op.key, account, store, { now });

@@ -40,16 +40,25 @@ machine rather than at Cloudflare.
 
 ## Knowing which build is running
 
-The build's identity is compiled in. `deploy.sh` generates
-`app/lib/build_info.g.dart` with the short commit hash, the date and the
-update check turned on, and restores the committed placeholder
-afterwards. It also writes `play/build-info.json` with the same hash.
+The build's identity is compiled in, as the defines `OH_BUILD_TAG` (the
+short commit hash) and `OH_BUILD_DATE` (the UTC date) that
+`app/lib/build_info.dart` reads. `app/tool/defines.mjs` writes both,
+with `OH_UPDATE_CHECK` to turn the update check on, for every deployed
+build: the web build `deploy.sh` makes, and the phone builds of
+`build_phone.sh` and the `ios` workflow. `deploy.sh` also writes
+`play/build-info.json` with the same hash. A build without them, such
+as a local run or a test, says `dev`.
 
 - The About page shows the hash and the date.
-- A deployed build fetches `build-info.json` at launch and whenever it
-  returns to the foreground. If the published hash differs from its own,
-  it shows a tap-to-reload pill. Local runs, tests and CI keep the
-  placeholder, so the pill never appears there.
+- The remote config's `update` notice compares the date, so it reaches
+  phone builds as well as the web. A phone build's date is the day it
+  was built, before store review, not the day the store published it.
+- A deployed web build fetches `build-info.json` at launch and whenever
+  it returns to the foreground. If the published hash differs from its
+  own, it shows a tap-to-reload pill. A phone build has the check on
+  too, but no `build-info.json` to fetch, so the pill never shows there.
+  Local runs and tests build without `OH_UPDATE_CHECK`, so it never
+  appears there either.
 - `site/public/_headers` marks the entry points `no-store`, so a cached
   bootstrap cannot load an old build.
 - A hash ending in `+` was deployed from a tree with uncommitted
@@ -62,7 +71,9 @@ worker, `app/web/offline_worker.js`, from `app/web/flutter_bootstrap.js`.
 The worker fetches from the network first and keeps a copy of each file.
 It falls back to the copy only when the network fails, so online
 behaviour is unchanged and offline the last loaded build opens.
-`build-info.json` and the service's handlers are never cached. At
+`build-info.json` and the service's handlers are never cached, and a
+file opened as a page, such as `robots.txt`, is left to the network, so
+it never takes the app's place offline. At
 `play.openhearts.game` the worker's scope is the whole host; at a
 preview it is `/play/`. The `offline` browser suite checks this
 ([test suites](../reference/test-suites.md)).

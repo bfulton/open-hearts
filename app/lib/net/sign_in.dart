@@ -39,12 +39,9 @@ String signInNonce(PublicKey key) => sha256Hex(utf8.encode('oh-signin/1\n$key'))
 
 /// What a sign-in the service took came to.
 class SignedIn {
-  const SignedIn({required this.provider, this.account, this.licence});
+  const SignedIn({required this.provider, this.licence});
 
   final Provider provider;
-
-  /// The account the sign-in is linked to, which this device is in now.
-  final String? account;
 
   /// The licence this device is owed now, if any: the account's.
   final Licence? licence;
@@ -54,29 +51,30 @@ class SignedIn {
 /// Refused with `accountElsewhere` when the sign-in is linked to another
 /// account — [supersedeWith] brings this device into that one — and with
 /// `otherSignIn` when this account is linked to another sign-in.
-Future<Said<SignedIn>> attestWith(Signer signer, Provider provider, String token, {Uri? endpoint, String service = serviceKey}) =>
-    _signIn('attest', signer, provider, token, endpoint, service);
+Future<Said<SignedIn>> attestWith(Signer signer, Provider provider, String token, {String service = serviceKey}) =>
+    _signIn('attest', signer, provider, token, service);
 
 /// Brings this device into the account the sign-in [token] names is
 /// linked to. Refused with `accountNowhere` when it is linked to none,
 /// and as a backup code is refused otherwise: a full account, or this
 /// device in another that is still paid for.
-Future<Said<SignedIn>> supersedeWith(Signer signer, Provider provider, String token, {Uri? endpoint, String service = serviceKey}) =>
-    _signIn('supersede', signer, provider, token, endpoint, service);
+Future<Said<SignedIn>> supersedeWith(Signer signer, Provider provider, String token, {String service = serviceKey}) =>
+    _signIn('supersede', signer, provider, token, service);
 
-Future<Said<SignedIn>> _signIn(String handler, Signer signer, Provider provider, String token, Uri? endpoint, String service) async {
-  // The token is not part of what is signed: it names this key itself,
-  // in its nonce, and the provider signed that.
-  final answer = await askHandler(handler, signer, {'provider': provider.name, 'token': token}, endpoint);
+Future<Said<SignedIn>> _signIn(String handler, Signer signer, Provider provider, String token, String service) async {
+  // The request signs the provider and the token (`<provider> <token>`,
+  // service/functions/worker.mjs, signInRoute). The token names this key
+  // in its nonce, but whoever asked the provider chose the nonce, so a
+  // request taken off the wire could otherwise be sent again with
+  // another sign-in's token in it.
+  final answer = await askHandler(handler, signer, {'provider': provider.name, 'token': token}, what: '${provider.name} $token');
   if (answer?.status != 200) return (answer: null, refusal: refusalOf(answer));
-  final json = jsonDecode(answer!.body);
+  final json = jsonOf(answer!.body);
   if (json is! Map) return (answer: null, refusal: const Refused('unreachable'));
   final licence = Licence.parse(json['licence']);
-  final account = json['account'];
   return (
     answer: SignedIn(
       provider: provider,
-      account: account is String ? account : null,
       licence: licence != null && licence.holdsFor(signer.publicKey, service: service) ? licence : null,
     ),
     refusal: null,
@@ -88,20 +86,16 @@ const _stored = 'signedInWith';
 /// The provider this device last signed in with, or null. Only which
 /// provider: the account itself is the service's to know, and only as
 /// a hash.
-Future<Provider?> signedInWith() async {
-  final name = (await SharedPreferences.getInstance()).getString(_stored);
-  return Provider.values.where((p) => p.name == name).firstOrNull;
-}
+Future<Provider?> signedInWith() async => _providerNamed((await SharedPreferences.getInstance()).getString(_stored));
 
-Future<void> rememberSignIn(Provider provider) async =>
-    (await SharedPreferences.getInstance()).setString(_stored, provider.name);
+Provider? _providerNamed(String? name) => Provider.values.where((p) => p.name == name).firstOrNull;
 
 /// The device's note brought in line with what the service says the
 /// account is linked to ([Household.signIn]): a link made on another of
 /// the account's devices, or one taken away — by Apple, when the person
 /// stops using Sign in with Apple here. Returns what is noted now.
 Future<Provider?> noteSignIn(String? said) async {
-  final provider = Provider.values.where((p) => p.name == said).firstOrNull;
+  final provider = _providerNamed(said);
   final prefs = await SharedPreferences.getInstance();
   if (provider == null) {
     await prefs.remove(_stored);

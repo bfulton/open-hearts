@@ -7,7 +7,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { KNOWN_ROW, PHOTODNA, SHIELD, anyChecker, checkerIn, checkersOf, knownSettingsOf, listed, verdictOf } from './checkers.mjs';
+import { KNOWN_ROW, PHOTODNA, SHIELD, anyChecker, checkerIn, checkerOf, knownSettingsOf, listed, verdictOf } from './checkers.mjs';
 
 const shield = { OH_ARACHNID_ENDPOINT: 'https://shield.example', OH_ARACHNID_USERNAME: 'user', OH_ARACHNID_PASSWORD: 'pass' };
 const photoDna = { OH_PHOTODNA_ENDPOINT: 'https://photodna.example', OH_PHOTODNA_KEY: 'pkey' };
@@ -17,23 +17,24 @@ const edgeHasher = () => ['h'];
 const kv = (rows = {}) => ({ get: async (k, type) => (k in rows ? (type === 'json' ? rows[k] : JSON.stringify(rows[k])) : null) });
 
 test('what was said comes to: a match, then harmful, then clear, whichever checker said it; unreadable only for the one in use; else nothing yet', () => {
-  for (const [by, on, said] of [
-    [{}, [SHIELD], null],
-    [{ shield: 'clear' }, [SHIELD], 'clear'],
-    [{ shield: 'clear' }, [PHOTODNA], 'clear'],
-    [{ photodna: 'match' }, [SHIELD], 'match'],
-    [{ shield: 'harmful' }, [PHOTODNA], 'harmful'],
-    [{ shield: 'harmful', photodna: 'match' }, [SHIELD], 'match'],
-    [{ shield: 'clear', photodna: 'match' }, [SHIELD], 'match'],
-    [{ shield: 'clear', photodna: 'harmful' }, [SHIELD], 'harmful'],
-    [{ shield: 'clear', photodna: 'unreadable' }, [PHOTODNA], 'clear'],
-    [{ shield: 'unreadable' }, [SHIELD], 'unreadable'],
-    [{ shield: 'unreadable' }, [PHOTODNA], null],
-    [{ operator: 'match' }, [SHIELD], 'match'],
-    [{ shield: 'clear' }, [], 'clear'],
-    [{}, [], null],
+  for (const [by, inUse, said] of [
+    [{}, SHIELD, null],
+    [{ shield: 'clear' }, SHIELD, 'clear'],
+    [{ shield: 'clear' }, PHOTODNA, 'clear'],
+    [{ photodna: 'match' }, SHIELD, 'match'],
+    [{ shield: 'harmful' }, PHOTODNA, 'harmful'],
+    [{ shield: 'harmful', photodna: 'match' }, SHIELD, 'match'],
+    [{ shield: 'clear', photodna: 'match' }, SHIELD, 'match'],
+    [{ shield: 'clear', photodna: 'harmful' }, SHIELD, 'harmful'],
+    [{ shield: 'clear', photodna: 'unreadable' }, PHOTODNA, 'clear'],
+    [{ shield: 'unreadable' }, SHIELD, 'unreadable'],
+    [{ shield: 'unreadable' }, PHOTODNA, null],
+    [{ operator: 'match' }, SHIELD, 'match'],
+    [{ shield: 'clear' }, null, 'clear'],
+    [{ shield: 'unreadable' }, null, null],
+    [{}, null, null],
   ]) {
-    assert.equal(verdictOf(by, on), said, `${JSON.stringify(by)} with ${on}`);
+    assert.equal(verdictOf(by, inUse), said, `${JSON.stringify(by)} with ${inUse}`);
   }
 });
 
@@ -50,20 +51,20 @@ test('the checker in use is the one the run-time row names, and Shield for anyth
 });
 
 test('the one in use checks pictures once it has what it needs; the other is never asked, whatever it has', () => {
-  const ids = (env, checker, more = {}) => checkersOf(env, { checker, edgeHasher, ...more }).on.map((c) => c.id);
-  assert.deepEqual(ids({ ...shield, ...photoDna }, SHIELD), [SHIELD]);
-  assert.deepEqual(ids({ ...shield, ...photoDna }, PHOTODNA), [PHOTODNA]);
-  assert.deepEqual(ids(shield, SHIELD), [SHIELD]);
-  assert.deepEqual(ids(photoDna, PHOTODNA), [PHOTODNA]);
-  assert.deepEqual(ids({ ...shield, ...photoDna }, PHOTODNA, { edgeHasher: null }), [], 'PhotoDNA without the module');
-  assert.deepEqual(ids({}, SHIELD), []);
-  assert.deepEqual(checkersOf({}, { checker: SHIELD }).missing, [], 'nothing set: nothing to tell');
-  assert.deepEqual(checkersOf(photoDna, { checker: PHOTODNA, edgeHasher }).missing, []);
-  assert.deepEqual(checkersOf({ ...shield, ...photoDna }, { checker: SHIELD, edgeHasher: null }).missing, [], "the other's lack is nothing while it is not in use");
+  const id = (env, checker, more = {}) => checkerOf(env, { checker, edgeHasher, ...more }).checker?.id ?? null;
+  assert.equal(id({ ...shield, ...photoDna }, SHIELD), SHIELD);
+  assert.equal(id({ ...shield, ...photoDna }, PHOTODNA), PHOTODNA);
+  assert.equal(id(shield, SHIELD), SHIELD);
+  assert.equal(id(photoDna, PHOTODNA), PHOTODNA);
+  assert.equal(id({ ...shield, ...photoDna }, PHOTODNA, { edgeHasher: null }), null, 'PhotoDNA without the module');
+  assert.equal(id({}, SHIELD), null);
+  assert.equal(checkerOf({}, { checker: SHIELD }).missing, null, 'nothing set: nothing to tell');
+  assert.equal(checkerOf(photoDna, { checker: PHOTODNA, edgeHasher }).missing, null);
+  assert.equal(checkerOf({ ...shield, ...photoDna }, { checker: SHIELD, edgeHasher: null }).missing, null, "the other's lack is nothing while it is not in use");
 });
 
 test('what the one in use lacks is told, and nothing is checked', () => {
-  const missing = (env, checker, more = {}) => checkersOf(env, { checker, edgeHasher, ...more });
+  const missing = (env, checker, more = {}) => checkerOf(env, { checker, edgeHasher, ...more });
   for (const [env, checker, more, said] of [
     [{ ...shield, OH_ARACHNID_PASSWORD: undefined }, SHIELD, {}, /OH_ARACHNID_USERNAME is set but OH_ARACHNID_PASSWORD is not, so no picture is checked/],
     [{ ...shield, OH_ARACHNID_ENDPOINT: undefined }, SHIELD, {}, /OH_ARACHNID_USERNAME is set but arachnid.endpoint in config\/openhearts.json is not/],
@@ -72,10 +73,9 @@ test('what the one in use lacks is told, and nothing is checked', () => {
     [photoDna, PHOTODNA, { edgeHasher: null }, /OH_PHOTODNA_KEY is set but the relay was deployed without the PhotoDNA module, so no picture is checked \(docs\/how-to\/update-the-photodna-module.md\)/],
     [shield, PHOTODNA, {}, /PhotoDNA is the checker in use, and OH_PHOTODNA_KEY is not set, so no picture is checked; Arachnid Shield has its credentials/],
   ]) {
-    const { on, missing: lacks } = missing(env, checker, more);
-    assert.deepEqual(on, []);
-    assert.equal(lacks.length, 1);
-    assert.match(lacks[0], said);
+    const { checker: on, missing: lacks } = missing(env, checker, more);
+    assert.equal(on, null);
+    assert.match(lacks, said);
   }
 });
 

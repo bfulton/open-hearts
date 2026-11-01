@@ -588,15 +588,11 @@ class Persona {
     estella,
   ];
 
-  /// The roster plus any character still being measured before it is
-  /// let in.
-  static const candidates = roster;
-
   /// A persona by [id]: a name, or `name/level`.
   static Persona named(String id) {
     final slash = id.indexOf('/');
     final name = slash < 0 ? id : id.substring(0, slash);
-    final persona = candidates.firstWhere((p) => p.name == (_renamed[name] ?? name));
+    final persona = roster.firstWhere((p) => p.name == (_renamed[name] ?? name));
     return slash < 0 ? persona : persona.at(int.parse(id.substring(slash + 1)));
   }
 

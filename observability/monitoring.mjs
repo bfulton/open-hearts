@@ -14,6 +14,10 @@ export const app = {
   name: 'Open Hearts',
 };
 
+/// NerdGraph's address for the account's region, NEW_RELIC_REGION: EU,
+/// in any case, or US, the default.
+export const newRelicEndpoint = (region) => ((region ?? 'US').toUpperCase() === 'EU' ? 'https://api.eu.newrelic.com/graphql' : 'https://api.newrelic.com/graphql');
+
 /// From outside, once a minute, from two places: the cheapest kind of
 /// check (a ping monitor, which New Relic does not count against its
 /// synthetic checks), each with text the answer must carry, so a page
@@ -38,10 +42,12 @@ export const synthetics = {
 
 /// From inside: New Relic Browser in the app's page, for what people's
 /// own browsers meet — errors, load times, the service's calls failing.
-/// No cookies, no session replay, no session traces: what a page did,
-/// not what a person did. apply.mjs writes the loader New Relic gives it
-/// to app/web/observability.js, which runs only on the production host,
-/// so a fork or a local build reports nothing to us.
+/// No cookies, no session replay or traces, no console lines, clicks or
+/// keys, and a room's code and a table's id masked (apply.mjs,
+/// pinnedInit): what a page did, not what a person did. apply.mjs writes
+/// the loader New Relic gives it to app/web/observability.js, which runs
+/// only on the production host, so a fork or a local build reports
+/// nothing to us.
 export const browser = {
   // The web build's; a phone build is an app of its own.
   name: 'web',

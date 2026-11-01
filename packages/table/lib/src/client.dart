@@ -63,12 +63,12 @@ class TableClient {
     Random? random,
     this.trace,
   }) : _random = random ?? Random.secure() {
-    if (role == Role.person && spec == null) throw ArgumentError('a person sits at the table they were seated at');
+    if (role == Role.person && spec?.id != tableId) throw ArgumentError('a person sits at the table they were seated at');
     if (role == Role.houseSeat && (seat == null || houseSecret == null)) throw ArgumentError('the house plays a seat with a secret of its own');
     rules = TableRules(
       tableId: tableId,
       crypto: crypto,
-      myKey: role == Role.person || role == Role.houseSeat || role == Role.houseFollower ? signer.publicKey : null,
+      myKey: signer.publicKey,
       mySeat: role == Role.person ? spec!.seatOf(signer.publicKey) : (role == Role.houseSeat ? seat : null),
       wrap: signer.sharedSecretWith,
       secretFor: _secretFor,
@@ -246,6 +246,15 @@ class TableClient {
     if (_closed) return;
     _lastT = e.t;
     _lastAt = clock.nowMs;
+    if (_refusal != null) {
+      // A table the house will not serve is read no further: only for
+      // its word to come back.
+      if (e.event?.id == _refusal) {
+        _refusalIn = true;
+        _notify();
+      }
+      return;
+    }
     rules.feed(e);
   }
 
@@ -260,9 +269,6 @@ class TableClient {
 
   void _changed() {
     if (_closed) return;
-    if (started && role == Role.person && jsonEncode(rules.spec!.toJson()) != jsonEncode(spec!.toJson())) {
-      _trace('the log started a table other than the one seated');
-    }
     if (rules.cannotDeal != null && role == Role.person && amSeated && !_left) leave();
     _act();
     _release();
@@ -346,7 +352,7 @@ class TableClient {
         });
         return;
       }
-      _sayPlay(s, TableRules.botCard(g, s, rules.played, holders: rules.holders));
+      _sayPlay(s, TableRules.botCard(g, s, rules.played, persona));
     }
   }
 
@@ -421,10 +427,11 @@ class TableClient {
     _send(kind, body);
   }
 
-  void _send(EventKind kind, Map<String, Object?> body) {
+  TableEvent _send(EventKind kind, Map<String, Object?> body) {
     final e = TableEvent.sign(signer, table: tableId, kind: kind, body: body);
     rules.made(e);
     line.send(e);
+    return e;
   }
 
   /// This side's piece of each departed person's secret the table is
@@ -454,8 +461,29 @@ class TableClient {
       'n': rules.endN!,
       'hash': rules.endHash!,
       'state': rules.state.name,
-      'totals': started ? rules.game.totals : const [0, 0, 0, 0],
+      'totals': rules.game.totals,
     });
+  }
+
+  /// The id of the house's word that it will not serve this table, once
+  /// it has said it.
+  String? _refusal;
+  bool _refusalIn = false;
+
+  /// Whether the log has carried the house's refusal back: the house has
+  /// nothing more to say at the table, and no more of it to read.
+  bool get refusalIn => _refusalIn;
+
+  /// The house's word that it will not serve this table, in place of
+  /// its word on how a game came out (packages/table, rules.dart,
+  /// [TableRules.refusal]): said once, whatever the log has by now, and
+  /// from here nothing more of the log is read but for the word coming
+  /// back. Every side ends the table at it, and the referee stops
+  /// waiting on the house for it (service/do/referee.mjs).
+  void refuse() {
+    if (role != Role.houseFollower || _resulted || !started) return;
+    _resulted = true;
+    _refusal = _send(EventKind.result, rules.refusal!).id;
   }
 
   // ---- the deal's slow calls ----------------------------------------------
@@ -474,11 +502,14 @@ class TableClient {
       if (c.has(job)) continue;
       all = false;
       if (!_working.add(job.key)) continue;
+      // A failed job's key stays in [_working]. A dead worker fails a
+      // job at once, so a house seat, which never leaves, would ask
+      // again from inside the failure, without end.
       w.run(job, done: (answer) {
         _working.remove(job.key);
         c.put(job, answer);
         _act();
-      }, failed: (why) => _trace('cannot make a step of the deal: $why'));
+      }, failed: rules.workerFailed);
     }
     return all;
   }

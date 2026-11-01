@@ -25,11 +25,7 @@ class AboutPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Felt.dark,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        foregroundColor: Palette.chromeDim,
-        title: Text(context.l10n.about, style: const TextStyle(fontSize: 16, color: Palette.chromeDim)),
-      ),
+      appBar: pageBar(context.l10n.about),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 380),

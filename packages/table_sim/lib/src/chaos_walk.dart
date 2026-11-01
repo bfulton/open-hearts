@@ -206,7 +206,7 @@ String? tableProblems(SimTable t,
     if (first != null && first.result == null) return 'the house\'s word not taken: $word';
     // And the result it published for the ratings is the one the log
     // comes to, said once.
-    final made = GameResult.ofTable(v);
+    final made = t.house!.resultOf(v);
     if (t.results.length != (made == null ? 0 : 1)) return 'the house published ${t.results.length} results';
     if (made != null && jsonEncode(GameResult.parse(t.results.single)?.toJson()) != jsonEncode(made.toJson())) {
       return 'the house published another result: ${t.results.single.content}';

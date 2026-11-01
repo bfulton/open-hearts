@@ -46,7 +46,9 @@ export function parse(command, argv) {
       if (takes.has(name)) flags[name] = true;
       else if (takes.has(`${name}=`)) {
         const value = argv[++i];
-        if (value === undefined || value.startsWith('--')) throw new Usage(`--${name} takes a value`);
+        // An empty value is most likely an unset shell variable: refused,
+        // not taken as no value at all.
+        if (value === undefined || value === '' || value.startsWith('--')) throw new Usage(`--${name} takes a value`);
         flags[name] = value;
       } else throw new Usage(`${command.words.join(' ')} takes no --${name}`);
     } else positional.push(a);
@@ -153,13 +155,15 @@ export async function main(argv, ctx = context()) {
       ctx.log(c ? helpOf(c) : overview());
       return 0;
     }
-    const words = argv.filter((a) => !a.startsWith('--'));
-    const c = commandOf(words);
+    // The command's words come first: a flag among them is not dropped
+    // but refused, since a dropped --preview or --full would change what
+    // is done.
+    const c = commandOf(argv);
     if (!c) {
       const near = COMMANDS.filter((x) => x.words[0] === argv[0]).map((x) => ['oh', ...x.words].join(' '));
       throw new Usage(`no command ${argv.join(' ')}${near.length ? `; did you mean ${near.join(', ')}?` : '; oh help lists them'}`);
     }
-    const after = argv.slice(argv.indexOf(c.words.at(-1)) + 1);
+    const after = argv.slice(c.words.length);
     if (after.includes('--help') && !(c.rest && after.indexOf('--') >= 0 && after.indexOf('--') < after.indexOf('--help'))) {
       ctx.log(helpOf(c));
       return 0;

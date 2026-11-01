@@ -5,7 +5,7 @@ library;
 import 'dart:convert';
 import 'dart:math';
 
-import 'package:crypto/crypto.dart' show sha256;
+import 'package:crypto/crypto.dart' show Hmac, sha256;
 import 'package:engine/engine.dart';
 
 import 'licence.dart';
@@ -51,6 +51,20 @@ String newSalt([Random? random]) {
   return List.generate(8, (_) => rng.nextInt(1 << 16).toRadixString(16).padLeft(4, '0')).join();
 }
 
+/// The salt of a table the house seats in a pool (matching.dart,
+/// PoolHost), in place of a drawn one: the first 128 bits of an
+/// HMAC-SHA256, keyed by the house's own secret (house.dart,
+/// House.secret), of everything else [spec] says. Nobody without the
+/// secret can make it or guess it, so it hides the table's id as well
+/// as [newSalt] does, and the house can tell a table it seated from its
+/// spec alone, after a restart too.
+String seatingSalt(List<int> secret, TableSpec spec) {
+  final rest = spec.toJson()
+    ..remove('id')
+    ..remove('salt');
+  return Hmac(sha256, secret).convert(utf8.encode('open-hearts/house/seating\n${jsonEncode(rest)}')).toString().substring(0, 32);
+}
+
 /// Whether [id] has a table id's shape: 32 hex digits.
 bool validTableId(String id) => RegExp(r'^[0-9a-f]{32}$').hasMatch(id);
 
@@ -92,10 +106,12 @@ class TableSpec {
   /// table as anything but the table everybody was seated at.
   final String id;
 
-  /// 128 random bits, as 32 hex digits ([newSalt]), drawn by whoever
-  /// seats the table: what keeps its id unguessable to somebody who
-  /// knows everything else about it — the seats, which a pool
-  /// publishes, and the options. None in a simulator's table.
+  /// 128 bits, as 32 hex digits, from whoever seats the table: drawn
+  /// ([newSalt]) by a device that starts one, and the house's
+  /// [seatingSalt] at a table it seats in a pool. What keeps its id
+  /// unguessable to somebody who knows everything else about it — the
+  /// seats, which a pool publishes, and the options. None in a
+  /// simulator's table.
   final String? salt;
 
   /// Whether the cards come from the verifiable deal (docs/explanation/fair-deal.md) rather
@@ -106,20 +122,22 @@ class TableSpec {
 
   /// Whether the record counts for the players' ratings. A pool the
   /// player chose; carried in the table so every seat and the record
-  /// agree.
+  /// agree. The house serves a rated table only when its salt is the
+  /// house's own ([seatingSalt]): only a pool's tables are rated.
   final bool rated;
 
-  /// The score the game runs to. The player who starts the table
-  /// chooses it; it rides in the signed start event because a table
-  /// whose seats disagree about when the game ends forks at the end of
-  /// a hand.
+  /// The score the game runs to: a pool's, which its tag names, or the
+  /// one chosen by the player who starts a friends' table. It rides in
+  /// the signed start event because a table whose seats disagree about
+  /// when the game ends forks at the end of a hand.
   final int target;
 
   /// The table's clocks: a person's grace and bank, the house's
   /// deadlines, how long a closed connection is waited for
-  /// (timing.dart). Chosen like [target], by the device that seats the
-  /// table from its remote config, and carried in the start for the same
-  /// reason: sides that disagreed about when a deadline passed would
+  /// (timing.dart). The house's at a pool's table, as the operator last
+  /// told it, and at a friends' table those of the starting device's
+  /// remote config. Carried in the start for the same reason as
+  /// [target]: sides that disagreed about when a deadline passed would
   /// come to different tables.
   final TableTiming timing;
 

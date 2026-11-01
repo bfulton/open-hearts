@@ -1,7 +1,6 @@
 import 'dart:convert';
 
 import 'package:table/table.dart';
-import 'package:table_sim/table_sim.dart';
 import 'package:test/test.dart';
 
 void main() {
@@ -30,26 +29,8 @@ void main() {
     expect(utf8.decode(canonical), '[0,"${'a' * 64}",1700000000,1,[],"x"]');
   });
 
-  test('filters match on kinds, authors, tags and time', () {
-    final a = FakeSigner('a');
-    final b = FakeSigner('b');
-    final e = NostrEvent.sign(a, kind: TableKinds.log, content: '{}', tags: [
-      ['t', 'T']
-    ], createdAt: 1000);
-    expect(const Filter(kinds: [TableKinds.log]).matches(e), isTrue);
-    expect(const Filter(kinds: [1]).matches(e), isFalse);
-    expect(Filter(authors: [a.publicKey]).matches(e), isTrue);
-    expect(Filter(authors: [b.publicKey]).matches(e), isFalse);
-    expect(const Filter(tags: {'t': ['T', 'U']}).matches(e), isTrue);
-    expect(const Filter(tags: {'t': ['U']}).matches(e), isFalse);
-    expect(const Filter(tags: {'p': ['T']}).matches(e), isFalse);
-    expect(const Filter(since: 1000).matches(e), isTrue);
-    expect(const Filter(since: 1001).matches(e), isFalse);
-    expect(const Filter(until: 999).matches(e), isFalse);
-    final parsed = Filter.parse(jsonDecode(jsonEncode(const Filter(kinds: [1, 2], since: 5, tags: {'t': ['x']}).toJson())));
-    expect(parsed, isNotNull);
-    expect(parsed!.kinds, [1, 2]);
-    expect(parsed.since, 5);
-    expect(parsed.tags, {'t': ['x']});
+  test('a filter is written as NIP-01 has it, each tag as #x after the rest', () {
+    expect(jsonEncode(const Filter(kinds: [1, 2], since: 5, tags: {'p': ['k'], 't': ['x']}).toJson()),
+        '{"kinds":[1,2],"since":5,"#p":["k"],"#t":["x"]}');
   });
 }

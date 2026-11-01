@@ -5,7 +5,7 @@
 /// voice and video chat among friends that is planned (ROADMAP.md),
 /// where every channel is to go through TURN and nowhere else, so that
 /// nobody at a table learns another's address. The credentials come
-/// from the service's turn-creds handler (docs/explanation/service.md;
+/// from the service's `turn` handler (docs/explanation/service.md;
 /// service/functions/turn.mjs) — Cloudflare's TURN in production, the
 /// rig's own on this machine — short-lived, and fetched when they are
 /// wanted. With none to give, there are none.

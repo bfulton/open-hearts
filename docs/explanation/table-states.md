@@ -42,15 +42,21 @@ It ends:
 - **finished**, when somebody reaches the target and the last hand is
   audited;
 - **ended**, when no person is left at it;
-- **failed**, when a turn of the house's runs out, or when the log's
-  first entry is not a start this side can read as its table. Nobody is
-  rated on a failed game. The referee takes no such start
+- **failed**, when a turn of the house's runs out, when the house says
+  it will not serve the table
+  ([when the house will not serve a table](live-play.md#when-the-house-will-not-serve-a-table)),
+  or when the log's first entry is not a start this side can read as
+  its table. Nobody is rated on a failed game. The referee takes no
+  such start
   ([what the referee takes](live-play.md#what-the-referee-takes)), so
   only a log kept wrongly fails that way.
 
 Once it is over, the house says how it came out: an entry naming the
 log by its length and hash as it stood at the end, the state and the
-totals. The rules take it only when it names that log.
+totals. The rules take it only when it names that log. The one word of
+the house's they take while the table is still being played is that it
+will not serve it: an entry saying `failed` and naming the log as it
+stood after its start. The table ends there.
 
 While a departed person's hand is opened, every clock stops
 (`TableRules.paused`). That is a reading of the hand, not a state of the

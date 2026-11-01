@@ -6,9 +6,10 @@
 /// piece of every person's escrow and says it when that person goes, and
 /// says how the game came out once it is over: the totals, and the log's
 /// hash as it stood then (log.dart), which is what a kept game and a
-/// rating are checked against. One key does all of it. The service runs
-/// it as one process for every table (service/bin/house.dart); the
-/// simulator runs it on its clock.
+/// rating are checked against. A table it will not serve it says so
+/// once, in the table's log, and lets go of ([House._refuse]). One key
+/// does all of it. The service runs it as one process for every table
+/// (service/bin/house.dart); the simulator runs it on its clock.
 library;
 
 import 'dart:math';
@@ -35,7 +36,6 @@ class House {
     required this.clock,
     this.crypto,
     this.dealWorker,
-    this.onOver,
     this.onResult,
     this.random,
     this.onSide,
@@ -45,8 +45,10 @@ class House {
 
   final Signer signer;
 
-  /// The house's own secret, every bot seat's deal secret is made from:
-  /// the same after a restart, so a table carries on from its log.
+  /// The house's own secret, every bot seat's deal secret is made from,
+  /// and the salt of every table it seats in a pool (spec.dart,
+  /// seatingSalt): the same after a restart, so a table carries on from
+  /// its log.
   final Uint8List secret;
 
   /// A line to the referee of the table named, one per side the house
@@ -57,14 +59,10 @@ class House {
   final DealCrypto? crypto;
   final DealWorker? dealWorker;
 
-  /// Told when a table is over and the house's word on it is in the log:
-  /// where the service publishes the result for the ratings.
-  final void Function(TableClient follower)? onOver;
-
   /// Told the result of every game the house saw through to a finish or
-  /// an end, signed, once its word on the end is in the log: what the
-  /// service publishes on the results tag for the ratings (results.dart).
-  /// None for a game that failed: nobody is rated on it.
+  /// an end ([resultOf]), signed, once its word on the end is in the
+  /// log: what the service publishes on the results tag for the ratings
+  /// (results.dart).
   final void Function(GameResult result, NostrEvent signed)? onResult;
 
   /// What the house's sides draw from: a secure generator but in the
@@ -130,17 +128,45 @@ class House {
   void _look(_Served s) {
     final f = s.follower!;
     if (!f.started) return;
-    if (f.rules.spec!.house != signer.publicKey) {
-      trace?.call(s.table, 'house: the table names another house; not served');
-      return _drop(s);
+    // A table it will not serve is let go once the log has its word.
+    if (s.refused) {
+      if (f.refusalIn) _drop(s);
+      return;
     }
-    // A seat whose licence is not the service's word for its key, held
-    // to it as the table began, as every device holds a seating to it
-    // before it sits: a table nobody would sit at is not served either.
-    final unlicensed = f.rules.spec!.licenceProblem(at: DateTime.fromMillisecondsSinceEpoch(f.rules.log.first.t));
-    if (unlicensed != null) {
-      trace?.call(s.table, 'house: $unlicensed; not served');
-      return _drop(s);
+    // The spec is the log's start, which never changes: it is checked
+    // once. What it is checked against does not change either: the
+    // service's key and the house's own secret, both fixed as the
+    // process starts. So a table that fails a check here fails it for
+    // good, and the house says so ([_refuse]).
+    if (!s.checked) {
+      final spec = f.rules.spec!;
+      // Not its table: the referee takes a start that names its own
+      // relay's house alone (service/do/referee.mjs, writersOf), and
+      // this house is not that one, so nothing it said would be taken.
+      // Only a house run with a key other than its relay's gets here
+      // (service/bin/house.dart does not start with one named).
+      if (spec.house != signer.publicKey) {
+        trace?.call(s.table, 'house: the table names another house; not served');
+        return _drop(s);
+      }
+      // A seat whose licence is not the service's word for its key, held
+      // to it as the table began, as every device holds a seating to it
+      // before it sits: a table nobody would sit at is not served either.
+      final unlicensed = spec.licenceProblem(at: DateTime.fromMillisecondsSinceEpoch(f.rules.log.first.t));
+      if (unlicensed != null) {
+        trace?.call(s.table, 'house: $unlicensed; not served');
+        return _refuse(s);
+      }
+      // Only a pool seats a rated table. Any one of a table's people
+      // can write its start, so a start that says it is rated, naming
+      // people whose licences anyone can read, would otherwise be played
+      // out without them and rated as left. The house's salt is what
+      // says the house seated it.
+      if (spec.rated && spec.salt != seatingSalt(secret, spec)) {
+        trace?.call(s.table, 'house: a rated table the house did not seat; not served');
+        return _refuse(s);
+      }
+      s.checked = true;
     }
     // A side for every seat a bot holds or will hold: the house plays it
     // in every hand it holds it from, and follows the table before that.
@@ -166,11 +192,41 @@ class House {
     }
     if (f.done && f.rules.result != null && !s.told) {
       s.told = true;
-      onOver?.call(f);
-      final result = GameResult.ofTable(f.rules);
+      final result = resultOf(f.rules);
       if (result != null) onResult?.call(result, result.signedBy(signer));
       _drop(s);
     }
+  }
+
+  /// The result the house publishes for a table [rules] has over
+  /// (GameResult.ofTable), or null for none: none for a game that
+  /// failed, and none for a table the house did not seat where one of
+  /// the people never said anything in the log. Whoever started such a
+  /// table chose who sat at it, and a person who never said a word there
+  /// never sat down: the house puts no game they never saw on their
+  /// record.
+  GameResult? resultOf(TableRules rules) {
+    final spec = rules.spec;
+    if (spec == null) return null;
+    if (spec.salt != seatingSalt(secret, spec)) {
+      final spoke = {for (final e in rules.log) if (e.event case final said?) said.author};
+      if (spec.seats.any((h) => h is HumanSeat && !spoke.contains(h.key))) return null;
+    }
+    return GameResult.ofTable(rules);
+  }
+
+  /// Says, in the table's log, that the house will not serve it
+  /// ([TableClient.refuse]). Every side ends the table there, failed and
+  /// unrated, and the referee, which asks for the house until it has
+  /// said its word on the table, stops asking (service/do/referee.mjs):
+  /// a house that merely let such a table go would be woken for it every
+  /// twenty seconds until the log's notes ran out. The word goes in the
+  /// table's own log and nowhere else: nothing is told to [onResult],
+  /// so nothing reaches the results tag, which a subscriber who can make
+  /// tables of this kind must not be able to fill.
+  void _refuse(_Served s) {
+    s.refused = true;
+    s.follower!.refuse();
   }
 
   void _drop(_Served s) {
@@ -193,6 +249,13 @@ class _Served {
   final String table;
   TableClient? follower;
   final Map<int, TableClient> seats = {};
+
+  /// Whether the spec has been checked and the table is the house's to
+  /// serve.
+  bool checked = false;
+
+  /// Whether the house has said it will not serve the table.
+  bool refused = false;
   bool told = false;
 }
 

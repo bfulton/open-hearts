@@ -112,12 +112,7 @@ class _NoticeState extends State<_Notice> {
                     const SizedBox(height: 26),
                     FilledButton(
                       onPressed: _busy ? null : () => _useHere(take: playing),
-                      style: FilledButton.styleFrom(
-                        backgroundColor: Palette.gold,
-                        foregroundColor: Felt.dark,
-                        padding: const EdgeInsets.symmetric(vertical: 13, horizontal: 18),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
+                      style: goldButton,
                       child: _busy
                           ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Felt.dark))
                           : Text(playing ? l10n.continueHere : l10n.useItHere,

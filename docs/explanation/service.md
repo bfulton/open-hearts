@@ -182,7 +182,8 @@ automatic renewal law asks for all of it. A Managed Payments checkout
 takes no custom text, so the box's words are Stripe's, and it takes the
 box only while Checkout's Legal policies setting is on; Stripe refuses
 a checkout otherwise, which `./oh verify` shows. The webhook binds the device once the
-session is paid, and the subscription's own events carry its dates.
+session is paid, in the subscription's own turn ([one account at a
+time](#accounts)), and the subscription's own events carry its dates.
 `stripePrice` in `config/openhearts.json` names the Stripe price, by id
 or lookup key. A checkout sells it only when it is the price the terms
 state, a year at `price` (`shopPrice` in `service/functions/stripe.mjs`);
@@ -302,7 +303,11 @@ service signed that licence, and it names the account:
 - A handler that asks the account's object next asks the account the
   licence names, and the object, which knows the device, decides. These
   are taking the account up, the profile, the devices, the backup codes,
-  a code for another device, and linking a sign-in.
+  a code for another device, and linking a sign-in. The object acts only
+  for its own devices: one the store has in another account is refused,
+  never acted for in that account outside its turn. Emailing the backup
+  codes asks Stripe for the payer's address only once the device is
+  known to be the account's.
 - A handler that decides by itself goes by the store, as before, where
   the store backs the licence. Where the store names another account or
   none, it asks that account's object whether the device holds live
@@ -368,11 +373,11 @@ subscription is paid to.
 
 **The relay enforces it, rather than asking.** A device told to stop
 could be a modified one that does not. So the relay asks every socket
-who it is (NIP-42: a challenge, answered by an event the device's key
-signs, carrying its activation), holds whatever the socket sends until
-the answer is in, and carries nothing for a socket without a current
-one (`serviceGate` in `service/do/relay.mjs`). Three things keep a
-superseded device off it:
+who it is (NIP-42: a challenge, answered once by an event the device's
+key signs, carrying its activation), holds what the socket sends until
+the answer is in, up to a bound, and carries nothing for a socket
+without a current one (`serviceGate` in `service/do/relay.mjs`). Three
+things keep a superseded device off it:
 
 - Each relay object keeps the newest epoch it has seen of each account,
   so showing a later activation closes every socket of that account's
@@ -382,7 +387,9 @@ superseded device off it:
   remembers which relay objects the device was seen at. When the account
   is taken up, it tells each of them (`/revoke`) to close the old
   device's sockets at once, wherever the old device is: presence, a
-  pool, a table or a watch.
+  pool, a table or a watch. If the account's object gives no answer,
+  the activation stands until its hour is up, and the relay logs
+  `gate: a device let in unchecked` (`householdSeen`).
 - An activation runs out within the hour, and an answer that has run
   out is asked for again.
 
@@ -478,7 +485,9 @@ Spanish, Portuguese, German or French, or one of a few words refused
 even inside another word. So is a name that would pass for Open Hearts
 itself or the people who run it: the game's name, and words such as
 *admin*, *moderator*, *support*, *staff*, *official* and *operator* in
-the same five languages. Words are compared in lower case, with
+the same five languages, whether written in Latin letters or in the
+Cyrillic and Greek letters drawn like them, as in *Аdmin* with a
+Cyrillic *А*. Words are compared in lower case, with
 accents folded and with digits and signs written for letters read as
 letters, so `5h1t` is read as *shit*. Words are matched whole, so
 *Cassandra*, *Scunthorpe*, *Staffan* and *Supporter* stay names. Entries that would refuse
@@ -496,9 +505,23 @@ answers by one file of cases (`service/functions/names.vectors.json`):
 - **In the service** (`service/functions/names.mjs`), a profile with a
   refused name is not kept: the write is refused with
   `not an allowed name`, which the app does not send again. A kept
-  game is kept without a refused name beside it.
+  game is kept without a refused name beside it, or one that could not
+  be a profile's name, and a record with more names than seats is not
+  kept at all.
 - **At the relay**, an event naming somebody with a refused name is not
   carried ([refused names](relay.md#refused-names)).
+
+The filter reads a name with its invisible characters taken out, so the
+app also takes out the ones that change the direction text is drawn in
+before it shows any name, its own or one another device sent
+(`cleanName`, `packages/table/lib/src/names.dart`). A name with a
+right-to-left override in it would otherwise show a refused word spelled
+backwards as the word itself, or reverse the sentence around it. The
+app takes out control characters and line breaks too, and cuts a name
+to sixty characters, so a name with one of those in it, or a longer
+one, is refused outright: the app never sends one, and what it would
+show is not the name the filter read, as a control character between
+*Ad* and *min* would show *Admin*.
 
 ### Deleting an account's data
 
@@ -523,7 +546,10 @@ use, profile, and any suspension or name and picture held), each
 device's `ENTITLEMENT`, the rows its codes and sign-in are found by, and
 the `SUB#` rows of every subscription it has had, which its `META` row
 names, the one before a lapsed subscriber paid again among them
-(`before`).
+(`before`), with the notes that each was told of a change to the terms
+or the privacy policy (`NOTICE#`). From the app, the account's turn is
+told which changes those can be, from the ledger the site was deployed
+with.
 
 From the app (`deleteRoute` in `service/functions/worker.mjs`), the
 service first ends in Stripe each web subscription of the account still
@@ -547,13 +573,19 @@ that a late event about it is turned away. Under a legal hold
 (`holds.mjs`), nothing is deleted or ended: the asking is noted, and the
 app is answered as for a deletion.
 
-From the operator's command, a subscription still paid up is cancelled
-first. Where the `Household` object runs, its note of the device in use
-(its key, the epoch, times, the table it said it sat at, the relay
-objects it was seen at, and whether the account was suspended) is in the
-object's own storage and is not reached from outside. It is written over
-the next time the account is taken up, which after deletion is never,
-and it holds no name or picture.
+From the operator's command, a web subscription still running is ended
+in Stripe first, as above, with nothing refunded, before any row that
+names it is deleted; a store subscription still paid up and not
+cancelled is refused, since only its owner can cancel it. A store
+subscription cancelled but still running keeps its notes of the changes
+it was told of, so that `oh terms notify` does not write to it about them
+again. Under a legal hold the command ends and changes nothing. Where the
+`Household` object runs, its note of the device in use (its key, the
+epoch, times, the table it said it sat at, the relay objects it was seen
+at, and whether the account was suspended) is in the object's own
+storage and is not reached from outside. It is written over the next
+time the account is taken up, which after deletion is never, and it
+holds no name or picture.
 
 Either way, its results stay on the relay, under its account number,
 which nothing left in the service ties to the person; a result cannot be
@@ -637,16 +669,40 @@ address ([multiplayer](multiplayer.md)).
 
 ## Game records
 
-A player at a finished table can send its record to be kept. The first
-copy is kept, gzipped, in R2 (`OH_RECORDS`). Who may send one, and how
-many an hour, is in the
+A player at a finished table can send its record to be kept, gzipped, in
+R2 (`OH_RECORDS`). Who may send one, and how many an hour, is in the
 [service reference](../reference/service-api.md#handlers). Looking at one
 is live play: `review` serves it only to a device with a subscription
 that is its account's device in use, and not while the account sits at
 that table. The worker keeps only seats the app would show: each
 person's carries the service's licence for its key, as every seating
-does, which is what ties a name beside the record to an account. It
-vouches for nothing else. Every viewer replays the record through the
+does, which is what ties a name beside the record to an account.
+
+Which copy is kept is the one that carries the house's checked result.
+Any player at the table can send a copy before the game is over, which
+nobody could open, so the first copy is kept only while none carries
+that result. A copy does when its log is the one the house signed for:
+the house's `result` names the log by its length and hash
+(`LogHash`; `logHashes` in `service/functions/records.mjs`, held to the
+app's by a file of cases both read), every event in it is shaped as the
+referee takes one, from a person at the table or its house, with an id
+that is the hash of what it says and a signature that checks, and the
+record has nothing in it the app does not write. An event the table
+does not read (one of a kind no build knows, or of a kind it knows with
+the body of none) counts like any: every side skips it and the house's
+hash names its id, so a person who puts one in the log leaves the copies
+of the game marked, and the game opens. The copy kept is marked
+`vouched` beside it in R2. A copy that carries the result replaces one
+kept that does not, on the etag it read, so that two devices sending at
+once cannot put one over the other unseen, and nothing replaces one that
+does. A game that failed has no result, and stays first come.
+
+A name beside a record is unsigned, and is kept from no one but its own
+seat. Each copy brings its sender's seat's name, and the names of the
+other seats in it are dropped; each other seat's device puts its own
+beside the copy kept when it sends (a write on the etag read, like
+a replacement), and until it has, the game shows that seat as it shows
+any seat with no name. Every viewer replays the record through the
 verifier before showing a card
 ([game records](live-play.md#game-records)).
 
@@ -745,7 +801,9 @@ From outside, New Relic (`observability/monitoring.mjs`) pings the
 site, the app, `/api/health` and the relay, and tells the operator when
 one is down. Its browser agent reports errors, load times and the
 service's calls from people's own browsers, on `play.openhearts.game`
-only, with no cookies, session replay or session traces. The New Relic
+only, with no cookies, session replay, session traces, console lines,
+clicks or keys, and with a room's code and a table's id masked in the
+addresses it sends (`pinnedInit` in `observability/apply.mjs`). The New Relic
 account may hold other apps, so everything of ours is named
 `Open Hearts: …`, tagged `app: open-hearts` and gathered in a workload
 of its own, and the script reads and writes only what carries that tag
@@ -813,7 +871,9 @@ NIP-44 v2, since an ICE candidate carries an address.
 **The house** ([live play](live-play.md#the-house)). A sealed table's
 object wakes the house as the table starts, and again whenever the
 house is not on the table's log, at most once every twenty seconds
-(`wakeLimiter` in `service/do/referee.mjs`). The wake goes to the
+(`wakeLimiter` in `service/do/referee.mjs`), until the house has said a
+result there: how the game came out, or that it will not serve the table
+([live play](live-play.md#when-the-house-will-not-serve-a-table)). The wake goes to the
 `Bench` object (`service/do/bench.mjs`), which starts a Cloudflare
 Container running `service/bin/house.dart` if it is not running, waits
 for it to answer, and tells it of the table. The house reads the table's
@@ -836,13 +896,20 @@ The `Household` object is the relay worker's, built from
 change to what an account's turn can be asked deploys the relay first,
 then the site ([deploy](../how-to/deploy.md)). The other way round, the
 new handler asks an object that does not know the question yet, which
-answers 400, and the app asks again later.
+answers 400, and the app asks again later. Stripe's webhook does not ask
+again by itself: it binds a paid checkout in the subscription's turn
+(`paid`), and answers Stripe 503, so that Stripe sends the event again,
+when the turn answers 400, is over its allowance (429) or fails (5xx).
+So a site deployed before a relay that knows `paid` has the purchase
+sent again until the relay knows it, for as long as Stripe tries, which
+is up to three days.
 
 Secrets are set by hand and checked only by name. Everything else that
 is not secret is in `config/openhearts.json`, committed: the service's
 public keys (production's, and the one previews have), the TURN key's
 id, the Stripe price, and the store and sign-in identifiers. `deploy.sh`
-compiles the build's from it and ships the file to the worker, which
+compiles the build's from it, and from nothing else
+(`app/tool/defines.mjs`), and ships the file to the worker, which
 reads it beneath the project's settings
 (`service/functions/deployment.mjs`): a variable of the same name set on
 the project wins, as one set by a test does. A field left null is a
@@ -864,7 +931,9 @@ production's. Every preview build is made with the same key, and talks
 to the preview relay (`deploy.sh`).
 
 A preview runs whatever branch was deployed to it, so its secrets are
-its own ([secrets](security-model.md#secrets)). Nobody buys anything on
+its own ([secrets](security-model.md#secrets)). Deploying one runs that
+branch's own tooling with the operator's Cloudflare token, so it is
+deployed only from a branch the operator has read. Nobody buys anything on
 a preview: the operator invites the people who play there (`oh preview
 invite`), each invitation an account on the previews' store that is
 nobody's purchase, good for a year, which a device joins with one of

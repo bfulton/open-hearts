@@ -1040,12 +1040,6 @@ abstract class AppLocalizations {
   /// **'Drag to move it, pinch to make it bigger.\nWhat is in the circle is your picture.'**
   String get cropHelp;
 
-  /// When another player's picture has been hidden automatically.
-  ///
-  /// In en, this message translates to:
-  /// **'This device thought this picture was one you would not want at the table. It is a guess, made here, and it can be wrong.'**
-  String get pictureFlagged;
-
   /// Button: show another player's picture.
   ///
   /// In en, this message translates to:

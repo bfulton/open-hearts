@@ -4,6 +4,7 @@
 
 import { inHousehold } from './household.mjs';
 import { linkedAccount } from './logins.mjs';
+import { REFUSED } from './refusals.mjs';
 import { dayOf, digestOf, un64 } from './rows.mjs';
 import { notConfigured } from './settings.mjs';
 
@@ -23,10 +24,19 @@ import { notConfigured } from './settings.mjs';
 // KEY# side leads back to the provider — the key is what public records
 // carry (docs/explanation/service.md).
 
+/// Each provider's issuers, the key set its tokens are signed by, and
+/// the setting that names our audiences. Google signs its tokens with
+/// either form of its issuer, and every check of one of its tokens, a
+/// sign-in's or Play's push (stores.mjs), takes both.
 export const PROVIDERS = {
-  apple: { iss: 'https://appleid.apple.com', jwks: 'https://appleid.apple.com/auth/keys', audience: 'OH_APPLE_AUDIENCE' },
-  google: { iss: 'https://accounts.google.com', jwks: 'https://www.googleapis.com/oauth2/v3/certs', audience: 'OH_GOOGLE_AUDIENCE' },
+  apple: { issuers: ['https://appleid.apple.com'], jwks: 'https://appleid.apple.com/auth/keys', audience: 'OH_APPLE_AUDIENCE' },
+  google: { issuers: ['https://accounts.google.com', 'accounts.google.com'], jwks: 'https://www.googleapis.com/oauth2/v3/certs', audience: 'OH_GOOGLE_AUDIENCE' },
 };
+
+/// Our audiences for [provider]'s tokens, from [env]: one or several,
+/// comma-separated, since Apple's token names the bundle on an iPhone
+/// and the Services ID on the web, and both are us.
+const audiencesOf = (env, provider) => String(env[PROVIDERS[provider].audience] ?? '').split(',').map((a) => a.trim()).filter(Boolean);
 
 /// How long a fetched key set is kept. The providers rotate slowly and
 /// publish ahead of it; a miss re-fetches anyway.
@@ -71,14 +81,11 @@ export async function whoSignedIn(provider, token, key, env, fetchImpl = fetch, 
     const sub = token.slice('local:'.length);
     return sub && PROVIDERS[provider] ? { provider, sub } : null;
   }
-  const known = PROVIDERS[provider];
-  // One audience or several, comma-separated: Apple's token names the
-  // bundle on an iPhone and the Services ID on the web, and both are us.
-  const audiences = known ? String(env[known.audience] ?? '').split(',').map((a) => a.trim()).filter(Boolean) : [];
+  const audiences = Object.hasOwn(PROVIDERS, provider) ? audiencesOf(env, provider) : [];
   if (!audiences.length) return null;
   const claims = await jwtOf(provider, token, fetchImpl, { now });
   if (!claims) return null;
-  if (claims.iss !== known.iss) return null;
+  if (!PROVIDERS[provider].issuers.includes(claims.iss)) return null;
   const aud = Array.isArray(claims.aud) ? claims.aud : [claims.aud];
   if (!aud.some((a) => audiences.includes(a))) return null;
   if (!(typeof claims.exp === 'number') || claims.exp * 1000 <= now) return null;
@@ -139,7 +146,7 @@ export async function jwtOf(provider, token, fetchImpl = fetch, { now = Date.now
 export async function supersede(who, key, store, env, login, { now = Date.now() } = {}) {
   if (!login) return { status: 503, body: notConfigured('OH_ID_HMAC') };
   const account = await linkedAccount(store, login);
-  if (!account) return { status: 404, body: { error: 'that sign-in is not linked to an account' } };
+  if (!account) return { status: 404, body: { error: REFUSED.accountNowhere } };
   const joined = await inHousehold(env, account, { op: 'join', key, account, now });
   if (joined.status !== 200) return joined;
   return { status: 200, body: { account, at: dayOf(now) }, entitlement: joined.body.entitlement };
@@ -182,11 +189,11 @@ const APPLE_ID_NOTICE_S = 24 * 60 * 60;
 /// notification at all, such as an ID token from a sign-in, which is
 /// signed by the same keys for the same audience but carries no events.
 export async function appleIdNotice(payload, env, fetchImpl = fetch, { now = Date.now() } = {}) {
-  const audiences = String(env[PROVIDERS.apple.audience] ?? '').split(',').map((a) => a.trim()).filter(Boolean);
+  const audiences = audiencesOf(env, 'apple');
   if (!audiences.length) return null;
   const claims = await jwtOf('apple', payload, fetchImpl, { now });
   if (!claims) return null;
-  if (claims.iss !== PROVIDERS.apple.iss) return null;
+  if (!PROVIDERS.apple.issuers.includes(claims.iss)) return null;
   const aud = Array.isArray(claims.aud) ? claims.aud : [claims.aud];
   if (!aud.some((a) => audiences.includes(a))) return null;
   const until = typeof claims.exp === 'number' ? claims.exp : typeof claims.iat === 'number' ? claims.iat + APPLE_ID_NOTICE_S : null;

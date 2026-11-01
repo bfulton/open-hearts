@@ -37,7 +37,7 @@
 
 import wasm from '../../app/web/schnorr.wasm';
 
-import { limitsFrom, objectRelay, presenceTag, schnorrVerifier, serviceGate, socketLine, tagOf, tally } from './relay.mjs';
+import { householdSeen, limitsFrom, objectRelay, presenceTag, schnorrVerifier, serviceGate, socketLine, tagOf, tally } from './relay.mjs';
 import { wakeLimiter } from './referee.mjs';
 import { tagStore } from './tag_store.mjs';
 import { pictureScreen } from './withheld.mjs';
@@ -137,17 +137,17 @@ export class TagRelay {
 
   /// The sockets this object already holds are handed back to the new
   /// relay with the subscriptions they were carrying. What the relay
-  /// takes from each of them is bounded (relay.mjs, objectLimits): the
-  /// tag is open to anybody, and every device on it shares this one
-  /// thread.
+  /// takes from each of them is bounded (relay.mjs, objectLimits on
+  /// presence, tableLimits elsewhere): the tag is open to anybody, and
+  /// every device on it shares this one thread.
   async build() {
     const [verify, limits] = await Promise.all([schnorrVerifier(wasm), limitsFrom(this.env)]);
-    const tag = (this.tag ??= (await this.state.storage.get('tag')) ?? presenceTag);
+    const tag = await this.storedTag();
     const presence = tag === presenceTag;
     // A table's or a lobby's tag keeps the lobby kind (docs/explanation/relay.md):
     // what an evicted object held comes back from its own storage.
-    const kept = tagStore(this.state.storage, tag);
-    const [store, log] = await Promise.all([kept.load(), kept.loadLog()]);
+    const rows = tagStore(this.state.storage, tag);
+    const [store, entries] = await Promise.all([rows.load(), rows.loadLog()]);
     const house = /^[0-9a-f]{64}$/.test(this.env.OH_HOUSE_KEY ?? '') ? this.env.OH_HOUSE_KEY : null;
     const relay = objectRelay(verify, {
       tag,
@@ -155,20 +155,19 @@ export class TagRelay {
       // The operator's limits are presence's; a table's are the relay's own.
       limits: presence ? limits : null,
       store,
-      kept: (event, gone) => this.state.waitUntil(kept.keep(event, gone)),
+      kept: (event, gone) => this.state.waitUntil(rows.keep(event, gone)),
       withhold: (event) => this.pictures.withheld(event),
       screen: this.owned,
-      forget: (event) => this.state.waitUntil(kept.forget(event)),
+      forget: (event) => this.state.waitUntil(rows.forget(event)),
       gate: this.gate(verify, tag, house),
       house,
-      log,
-      keepEntry: (entry) => this.state.waitUntil(kept.keepEntry(entry)),
+      entries,
+      keepEntry: (entry) => this.state.waitUntil(rows.keepEntry(entry)),
       wanted: () => this.wakeHouse(),
     });
     for (const socket of this.state.getWebSockets()) {
       const carried = socket.deserializeAttachment();
-      const v2 = carried?.v === 2;
-      relay.open(socket, v2 ? carried.subs : carried, v2 ? carried.auth : null, v2 ? (carried.log ?? null) : null);
+      relay.open(socket, carried?.subs, carried?.auth, carried?.log);
     }
     // Whoever the log says is there and has no socket now was cut off
     // while the object was gone.
@@ -180,42 +179,31 @@ export class TagRelay {
   /// current activation from the service whose key the deployment names
   /// (OH_SERVICE_KEY), still its account's device in use as the
   /// account's own object says — or the house, by its key (OH_HOUSE_KEY).
-  /// Without the service's key nobody is: a relay that carried anybody
-  /// would be live play without a subscription.
+  /// Without the service's key no device is: a relay that carried
+  /// anybody would be live play without a subscription.
   gate(verify, tag, house) {
     const env = this.env;
-    const service = /^[0-9a-f]{64}$/.test(env.OH_SERVICE_KEY ?? '') ? env.OH_SERVICE_KEY : '0'.repeat(64);
     return serviceGate({
-      service,
+      service: /^[0-9a-f]{64}$/.test(env.OH_SERVICE_KEY ?? '') ? env.OH_SERVICE_KEY : null,
       verify,
       house,
-      seen: env.HOUSEHOLD
-        ? async (who) => {
-            try {
-              const stub = env.HOUSEHOLD.get(env.HOUSEHOLD.idFromName(who.account));
-              const answer = await (
-                await stub.fetch('https://household/', {
-                  method: 'POST',
-                  body: JSON.stringify({ op: 'seen', account: who.account, key: who.key, epoch: who.epoch, tag }),
-                })
-              ).json();
-              return answer.status === 409 ? answer.body?.error ?? 'superseded: another device of this account is in use' : null;
-            } catch {
-              // The account's object out of reach: the service's
-              // signature stands, until its hour is up or the object
-              // says otherwise.
-              return null;
-            }
-          }
-        : null,
+      seen: env.HOUSEHOLD ? householdSeen(env.HOUSEHOLD, tag) : null,
     });
+  }
+
+  /// The tag this object is for, as its first socket said it (fetch,
+  /// below): an object cannot read its own name, and an alarm has no
+  /// request to read it from.
+  async storedTag() {
+    this.tag ??= await this.state.storage.get('tag');
+    if (typeof this.tag !== 'string' || !this.tag) throw new Error('this relay object was never told its tag');
+    return this.tag;
   }
 
   /// A day's stored events gone; the relay in memory built again from
   /// storage at the next message.
   async alarm() {
-    if (this.tag === undefined) this.tag = (await this.state.storage.get('tag')) ?? presenceTag;
-    if (await tagStore(this.state.storage, this.tag).sweep()) this.relay = null;
+    if (await tagStore(this.state.storage, await this.storedTag()).sweep()) this.relay = null;
   }
 
   async fetch(request) {
@@ -232,10 +220,10 @@ export class TagRelay {
       }
       return new Response('this is a relay: open a websocket\n', { status: 426 });
     }
-    // The tag this object is for, said once and kept: an object cannot
-    // read its own name, and an alarm has no request to read it from.
+    // The tag this object is for, said once and kept ([storedTag]). The
+    // worker below hands an object only a path that names a tag.
     if (this.tag === undefined) {
-      const tag = tagOf(new URL(request.url).pathname) || presenceTag;
+      const tag = tagOf(new URL(request.url).pathname);
       this.tag = tag;
       if ((await this.state.storage.get('tag')) !== tag) await this.state.storage.put('tag', tag);
     }

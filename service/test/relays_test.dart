@@ -1,10 +1,11 @@
-/// Several relays under one client: listening on all, writing to one,
-/// moving on when a relay refuses — over real sockets to two local
-/// relays, one of which can be told to refuse.
+/// Several relays under one client: listening on all and writing to all,
+/// a relay that refuses kept out for a while — over real sockets to two
+/// local relays, either of which can be told to refuse.
 library;
 
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:service/service.dart';
 import 'package:table/table.dart';
@@ -32,12 +33,10 @@ void main() {
   test('peers writing to different relays hear each other, listening on both', () async {
     final a = SchnorrSigner.generate();
     final b = SchnorrSigner.generate();
-    // Opposite orders: whichever way the table id turns them, the two
-    // write to different relays first.
+    // Opposite orders: the order of the list decides nothing.
     final ta = RelayTransport(relays: [r1.url, r2.url], signer: a, table: 'both');
     final tb = RelayTransport(relays: [r2.url, r1.url], signer: b, table: 'both');
     await Future.wait([ta.allReady, tb.allReady]).timeout(const Duration(seconds: 5));
-    expect(ta.relays.first, isNot(tb.relays.first));
 
     final heardByB = next(tb);
     ta.sayWatch({'n': 1});
@@ -54,14 +53,11 @@ void main() {
   test('a lobby announcement and a signal reach a peer that reads only one of the relays', () async {
     final a = SchnorrSigner.generate();
     final b = SchnorrSigner.generate();
-    // a writes its table events to the first relay it gets; b can read
-    // only the other. What forms a room, and what sets up a channel,
-    // goes to every relay, so b hears it anyway.
+    // b can read only one of the relays a writes to: a writes
+    // everything to both, so b hears it anyway.
     final ta = RelayTransport(relays: [r1.url, r2.url], signer: a, table: 'half-deaf');
     await ta.allReady.timeout(const Duration(seconds: 5));
-    // b reads only the relay a does not write its table events to.
-    final other = ta.relays.first == r1.url ? r2.url : r1.url;
-    final tb = RelayTransport(relays: [other], signer: b, table: 'half-deaf');
+    final tb = RelayTransport(relays: [r2.url], signer: b, table: 'half-deaf');
     await tb.allReady.timeout(const Duration(seconds: 5));
 
     final beat = tb.lobby.first.timeout(const Duration(seconds: 5));
@@ -75,7 +71,25 @@ void main() {
     tb.close();
   });
 
-  test('a relay that refuses is moved past, and the event still arrives', () async {
+  test('a signal nobody listens for is not opened', () async {
+    final a = SchnorrSigner.generate();
+    final b = _Counting(SchnorrSigner.generate());
+    final ta = RelayTransport(relays: [r1.url], signer: a, table: 'unheard');
+    final tb = RelayTransport(relays: [r1.url], signer: b, table: 'unheard');
+    await Future.wait([ta.allReady, tb.allReady]).timeout(const Duration(seconds: 5));
+    final offer = Signal(from: a.publicKey, type: 'offer', payload: const {'sdp': 'x'});
+    ta.signal(b.publicKey, offer);
+    await Future<void>.delayed(const Duration(milliseconds: 300));
+    expect(b.exchanges, 0, reason: 'opening a signal costs a key exchange with whoever sent it');
+    final heard = tb.signals.first.timeout(const Duration(seconds: 5));
+    ta.signal(b.publicKey, offer);
+    expect((await heard).type, 'offer');
+    expect(b.exchanges, 1);
+    ta.close();
+    tb.close();
+  });
+
+  test('a relay that refuses is left out for a while, and the event still arrives', () async {
     r1.refuse = (_) => 'pow: 28 bits needed';
     final a = SchnorrSigner.generate();
     final b = SchnorrSigner.generate();
@@ -84,9 +98,8 @@ void main() {
     final tb = RelayTransport(relays: relays, signer: b, table: 'one-refusing');
     await Future.wait([ta.allReady, tb.allReady]).timeout(const Duration(seconds: 5));
 
-    // Whichever relay comes first for this table, r1 refuses and r2
-    // takes; the message gets through either way, and with one relay
-    // taking it, nothing is reported.
+    // r1 refuses and r2 takes: the message gets through, and with one
+    // relay taking it, nothing is reported.
     final heard = next(tb);
     ta.sayWatch({'n': 1});
     expect(await heard, {'n': 1});
@@ -202,4 +215,27 @@ void main() {
     pa.close();
     pb.close();
   });
+}
+
+/// [inner], counting the key exchanges a signal is opened with.
+class _Counting implements Signer {
+  _Counting(this.inner);
+
+  final Signer inner;
+  int exchanges = 0;
+
+  @override
+  PublicKey get publicKey => inner.publicKey;
+
+  @override
+  String sign(String digestHex) => inner.sign(digestHex);
+
+  @override
+  Uint8List sharedSecretWith(PublicKey other) => inner.sharedSecretWith(other);
+
+  @override
+  Uint8List sharedXWith(PublicKey other) {
+    exchanges++;
+    return inner.sharedXWith(other);
+  }
 }

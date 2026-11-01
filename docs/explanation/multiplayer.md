@@ -74,9 +74,11 @@ anyone can check a kept game, every entry of its log, after the fact.
 ## Through TURN, never direct
 
 Nothing of a game goes over WebRTC. Voice and video among friends are
-planned (`ROADMAP.md`), and the pieces for them are kept: a call will
-go between devices over WebRTC through Cloudflare's TURN and nowhere
-else (`iceTransportPolicy: 'relay'`), so that nobody on a call learns
+planned (`ROADMAP.md`), and the service's pieces for them are kept (the
+TURN credentials and the relay's signalling); the app carries no WebRTC
+library until a call is built. A call will go between devices over
+WebRTC through Cloudflare's TURN and nowhere else
+(`iceTransportPolicy: 'relay'`), so that nobody on a call learns
 another's address. The credentials are short-lived, from the service's
 turn handler (`app/lib/net/turn.dart`, [the service](service.md#turn)).
 TURN is billed by the gigabyte delivered, and carrying every byte of a

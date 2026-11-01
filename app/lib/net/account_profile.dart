@@ -33,6 +33,7 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:table/table.dart' show cleanName;
 
 import '../avatar.dart';
 import '../entitlement.dart';
@@ -165,7 +166,7 @@ class AccountProfile extends ChangeNotifier {
     // One made for another account stays with that account's past.
     if (unsent != null) await prefs.remove(_unsent);
     final signer = await Identity.signer();
-    final answer = await askHandler('profile', signer, const {}, null);
+    final answer = await askHandler('profile', signer, const {});
     if (answer == null || answer.status != 200) return;
     final json = jsonDecode(answer.body);
     if (json is! Map) return;
@@ -193,11 +194,11 @@ class AccountProfile extends ChangeNotifier {
   Future<void> _send(String account) async {
     final changes = _changes;
     // A name the others may not see goes as none (Identity.playable).
-    final name = Identity.playable(Identity.nameOf(await Identity.name() ?? ''));
+    final name = Identity.playable(cleanName(await Identity.name() ?? ''));
     final text = jsonEncode({'name': name, ...(await Identity.avatar()).toJson()});
     final signer = await Identity.signer();
     // The text is what is signed: nobody else's request writes it.
-    final answer = await askHandler('profile', signer, {'profile': text}, null, what: text);
+    final answer = await askHandler('profile', signer, {'profile': text}, what: text);
     // Unanswered, superseded, or over the hour's allowance: still
     // unsent, and tried again.
     if (answer == null) return;

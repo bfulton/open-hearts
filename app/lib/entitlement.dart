@@ -36,7 +36,7 @@ class Entitlement extends ChangeNotifier {
   final String service;
 
   /// How the service is asked: [askLicence], unless a test stands in.
-  final Future<LicenceAnswer> Function(Signer signer, {Uri? endpoint, String service}) ask;
+  final Future<LicenceAnswer> Function(Signer signer, {String service}) ask;
 
   Licence? _licence;
   PublicKey? _device;
@@ -99,8 +99,8 @@ class Entitlement extends ChangeNotifier {
   /// (`waits.licence`). One that answers after that is still taken when
   /// it does: a slow network is not a refusal, and a subscriber whose
   /// licence came back in the seventh second is a subscriber.
-  Future<bool> refresh(Signer signer, {Uri? endpoint}) {
-    final asked = ask(signer, endpoint: endpoint, service: service).then((said) async {
+  Future<bool> refresh(Signer signer) {
+    final asked = ask(signer, service: service).then((said) async {
       if (said.licence != null) await adopt(said.licence!);
       if (said.suspended) await suspend();
       if (said.answered) _heard();

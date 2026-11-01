@@ -38,7 +38,6 @@ import 'live/lobby.dart';
 import 'net/account_profile.dart';
 import 'net/address.dart';
 import 'net/buying.dart';
-import 'net/copy.dart';
 import 'net/household.dart';
 import 'net/in_use.dart';
 import 'net/online.dart';
@@ -59,6 +58,7 @@ import 'ui/doorway.dart';
 import 'ui/folding_heart.dart';
 import 'ui/header.dart';
 import 'ui/player_icon.dart';
+import 'ui/share_or_copy.dart';
 import 'ui/update_pill.dart';
 
 /// The deal a solo game starts from, for a browser test that needs a
@@ -446,18 +446,6 @@ class _HomePageState extends State<HomePage> {
     await chosen.save();
   }
 
-  /// The link to this room: the phone's share sheet where there is
-  /// one, else onto the clipboard, and said so.
-  Future<void> _share(String code) async {
-    final link = roomLink(code);
-    if (await shareLink(link)) return;
-    await copyText(link.toString());
-    if (!mounted) return;
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(context.l10n.linkCopied, textAlign: TextAlign.center), duration: const Duration(milliseconds: 1600), width: 200));
-  }
-
   @override
   Widget build(BuildContext context) {
     final room = _lobby.room;
@@ -497,7 +485,7 @@ class _HomePageState extends State<HomePage> {
                                       ledger: _lobby.standing?.ledger,
                                       pictures: _lobby.pictures,
                                       onLeave: _lobby.leave,
-                                      onShare: () => _share(room.code),
+                                      onShare: () => shareOrCopy(context, roomLink(room.code)),
                                     ),
                           if (_lobby.cutOff != null && (queue != null || room != null)) ...[
                             const SizedBox(height: 14),
@@ -567,7 +555,7 @@ class _HomePageState extends State<HomePage> {
       children: [
         FilledButton(
           onPressed: () => context.push<void>(located(soloPath), extra: SoloGame(target: _playsTo ?? _options.target, seed: _dealtFrom)),
-          style: _primary(),
+          style: goldButton,
           child: Text(l10n.playSolo, style: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.w700)),
         ),
         if (_offerLearning) ...[
@@ -618,13 +606,8 @@ class _HomePageState extends State<HomePage> {
     // A game left early is waited out before Play live seats this device
     // again (live/left_early.dart); the rest of the door is as ever.
     final wait = _lobby.leftEarlyWait;
-    return Container(
+    return Panel(
       padding: const EdgeInsets.fromLTRB(14, 10, 14, 14),
-      decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.13),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -666,7 +649,7 @@ class _HomePageState extends State<HomePage> {
           // neither is the lesser of them.
           FilledButton(
             onPressed: _lobby.busy ? null : _lobby.enter,
-            style: _primary(),
+            style: goldButton,
             child: _Trying(busy: _lobby.opening == Opening.friends, label: l10n.playFriends, weight: FontWeight.w700, size: 15.5),
           ),
         ],
@@ -674,12 +657,6 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  static ButtonStyle _primary() => FilledButton.styleFrom(
-        backgroundColor: Palette.gold,
-        foregroundColor: Felt.dark,
-        padding: const EdgeInsets.symmetric(vertical: 13, horizontal: 18),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      );
 
   /// A way on that is not the door's own: gold, since it is something
   /// you can do, but drawn rather than filled, so that a screen has one
@@ -833,7 +810,7 @@ class _PlayLive extends StatelessWidget {
     final spoken = n == null ? l10n.playLive : l10n.playLiveSpoken(n);
     return FilledButton(
       onPressed: disabled ? null : onTap,
-      style: _HomePageState._primary(),
+      style: goldButton,
       child: Semantics(
         label: spoken,
         child: ExcludeSemantics(
@@ -860,13 +837,8 @@ class _Finishing extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    return Container(
+    return Panel(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
-      decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.13),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-      ),
       child: Row(
         children: [
           if (waiting) ...[
@@ -885,6 +857,9 @@ class _Finishing extends StatelessWidget {
   }
 }
 
+/// The heading of a panel that says live play is not open here.
+const _livePlayHeading = TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Palette.chrome, letterSpacing: 0.2);
+
 /// Live play, not open here. The padlock is not the point: what live
 /// play is and what it costs is, and the way to it — gold, like every
 /// way on, but drawn rather than filled: Play solo is what the door is
@@ -898,13 +873,8 @@ class _LiveLocked extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    return Container(
+    return Panel(
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
-      decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.13),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -912,7 +882,7 @@ class _LiveLocked extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(l10n.livePlay,
-                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Palette.chrome, letterSpacing: 0.2)),
+                    style: _livePlayHeading),
               ),
               Text(l10n.pricePerYear(priceShown),
                   style: const TextStyle(fontSize: 13, color: Palette.chrome, fontWeight: FontWeight.w600)),
@@ -946,18 +916,13 @@ class _LiveElsewhere extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    return Container(
+    return Panel(
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
-      decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.13),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(l10n.livePlay,
-              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Palette.chrome, letterSpacing: 0.2)),
+              style: _livePlayHeading),
           const SizedBox(height: 4),
           Text(l10n.liveOpenElsewhere, style: const TextStyle(fontSize: 12, height: 1.4, color: Palette.chromeDim)),
           const SizedBox(height: 12),
@@ -980,18 +945,13 @@ class _LivePaused extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    return Container(
+    return Panel(
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
-      decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.13),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(l10n.livePlay,
-              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Palette.chrome, letterSpacing: 0.2)),
+              style: _livePlayHeading),
           const SizedBox(height: 4),
           Text(l10n.livePaused, style: const TextStyle(fontSize: 12, color: Palette.chromeDim)),
         ],
@@ -1009,8 +969,7 @@ class _LivePaused extends StatelessWidget {
 class OperatorNotes extends StatefulWidget {
   const OperatorNotes({super.key, this.published = buildDate});
 
-  /// The day this build was published: the build's own, unless a test
-  /// says.
+  /// The day this build was made: the build's own, unless a test says.
   final String published;
 
   @override
@@ -1178,7 +1137,7 @@ class _WaitingView extends StatelessWidget {
         ],
         if (choosing) ...[
           const SizedBox(height: 22),
-          FilledButton(onPressed: onPlayWithBots, style: _HomePageState._primary(), child: Text(l10n.playNowWithBots)),
+          FilledButton(onPressed: onPlayWithBots, style: goldButton, child: Text(l10n.playNowWithBots)),
           const SizedBox(height: 10),
           OutlinedButton(onPressed: onWaitForPerson, style: _HomePageState._secondary(), child: Text(l10n.waitForPerson)),
           const SizedBox(height: 6),
@@ -1229,7 +1188,7 @@ class RoomView extends StatelessWidget {
     bool blocked(RoomMember m) => m.key != room.me && (pictures?.isBlocked(idOf(m)) ?? false);
     Avatar avatarOf(RoomMember m) {
       final picture = m.avatar.picture;
-      if (m.key == room.me || picture == null || pictures == null || pictures.allows(idOf(m), picture)) return m.avatar;
+      if (m.key == room.me || picture == null || pictures == null || pictures.allows(idOf(m))) return m.avatar;
       return m.avatar.copyWith(clearPicture: true);
     }
 
@@ -1263,6 +1222,8 @@ class RoomView extends StatelessWidget {
                     i < members.length
                         ? (members[i].key == room.me ? l10n.nameIsYou(members[i].name) : blocked(members[i]) ? l10n.blockedPlayer : members[i].name)
                         : l10n.emptySeat,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       fontSize: 15,
                       color: i < members.length ? Palette.chrome : Palette.chromeDim,
@@ -1282,7 +1243,7 @@ class RoomView extends StatelessWidget {
         if (room.amLeader)
           FilledButton(
             onPressed: members.length >= 2 ? room.start : null,
-            style: _HomePageState._primary(),
+            style: goldButton,
             child: Text(l10n.startNow, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
           ),
         const SizedBox(height: 8),

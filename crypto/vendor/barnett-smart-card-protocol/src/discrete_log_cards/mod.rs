@@ -58,6 +58,12 @@ impl<C: TranscriptCurve> Parameters<C> {
             generator,
         }
     }
+
+    // Open Hearts: the generator every key is made with (pk = sk·G), for
+    // the arguments the deal makes beside the protocol's own.
+    pub fn enc_generator(&self) -> C::Affine {
+        self.enc_parameters.generator
+    }
 }
 
 pub type PublicKey<C> = el_gamal::PublicKey<C>;

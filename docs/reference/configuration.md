@@ -11,19 +11,18 @@ The non-secret configuration, committed and the same for every deployment.
 - The Pages worker reads it beneath its own settings: `service/functions/entry.mjs` passes the file to `withConfig` in `service/functions/deployment.mjs`, which maps each field to an `OH_` name (`configEnv`). A variable of the same name that is set on the project or by a test wins, except `OH_PRICE`: the price is the file's alone. The entry also hands the worker `site/ledger.json` as `OH_LEDGER` (see [Change the terms](../how-to/change-the-terms.md)).
 - The relay worker reads it the same way (`service/do/worker.mjs`).
 - Where the environment says it is a preview (`OH_DEPLOYMENT` is `preview`), the file is read as a preview has it (`configFor`): `serviceKey` is `preview.serviceKey` and `houseKey` is `preview.houseKey`, or none while there is none, never production's.
-- `deploy.sh` compiles `serviceKey` and `houseKey` (a preview's: `preview.serviceKey` and `preview.houseKey`), `google.webClientId` and `apple.servicesId` into the web build.
-- `app/tool/defines.mjs` writes the phone build's `--dart-define-from-file` from it (`appDefines`).
+- `app/tool/defines.mjs` writes a build's `--dart-define-from-file` from it (`appDefines`), and from nothing in the environment: the phone build's, and the web build's that `deploy.sh` makes. A preview's web build takes the file as a preview has it (`configFor`), and the preview relay as `OH_RELAYS`. The build's commit and date go beside them.
 - A field that is `null` is left out, so the feature that needs it stays off.
 
 | Field | Worker name (`configEnv`) | Build define (`appDefines`) | What it is |
 |---|---|---|---|
 | `appOrigin` | `OH_APP_ORIGIN`, which the relay orders a termination at (`service/do/known.mjs`) | `OH_APP_ORIGIN` | The app's origin. A phone build calls the service there and builds shared links on it (`app/lib/net/address_io.dart`). `app/tool/defines.mjs` refuses a file without it. |
 | `serviceKey` | `OH_SERVICE_KEY` | `OH_SERVICE_KEY` | The service's public key, 64 hex characters. Licences and activations are checked against it. A production deploy and a phone build refuse to run without it. |
-| `houseKey` | `OH_HOUSE_KEY` | `OH_HOUSE_KEY` | The house's public key, 64 hex characters: the house every live table the app seats names, which deals and plays its bot seats and says how the game came out (`app/lib/net/licence.dart`). The relay carries the house on this key alone, referees sealed tables for it and takes results from it. `./oh house key --apply` writes it, and sets its secret on the relay worker as `OH_HOUSE_SECRET`. A production deploy and a phone build refuse to run without it. |
+| `houseKey` | `OH_HOUSE_KEY` | `OH_HOUSE_KEY` | The house's public key, 64 hex characters: the house every live table the app seats names, which deals and plays its bot seats and says how the game came out (`app/lib/net/licence.dart`). The relay carries the house on this key alone, referees sealed tables for it and takes results from it, and the site's worker marks a kept game as carrying the house's result only if the result was said by this key (`keepRecord` in `service/functions/records.mjs`). `./oh house key --apply` writes it, and sets its secret on the relay worker as `OH_HOUSE_SECRET`. A production deploy and a phone build refuse to run without it. |
 | `preview.houseKey` | `OH_HOUSE_KEY`, on a preview | `OH_HOUSE_KEY`, in a preview's build | The previews' house, never production's. `./oh preview secrets` writes it, with the preview relay's `OH_HOUSE_SECRET`. |
 | `preview.serviceKey` | `OH_SERVICE_KEY`, on a preview | `OH_SERVICE_KEY`, in a preview's build | The public key previews sign with, which is never production's: licences and activations on previews are checked against it. `./oh preview secrets` writes it ([Play live on a preview](../how-to/deploy.md#play-live-on-a-preview)). A preview without it licenses nobody, and the preview relay refuses to deploy. |
 | `turnKeyId` | `OH_TURN_KEY_ID` | none | The Cloudflare Realtime TURN key that the worker mints credentials with. `infra/cloudflare.mjs` (`turnKeys`) defines the same key. |
-| `stripePrice` | `OH_STRIPE_PRICE` | none | The Stripe price, as a price ID or lookup key, that a checkout sells. A checkout sells it only when it is a year at `price`. |
+| `stripePrice` | `OH_STRIPE_PRICE` | none | The Stripe price, as a price ID or lookup key, that a checkout sells. A checkout sells it only when it is a year at `price`. `./oh infra` keeps the price under its lookup key, so it refuses a price ID here. |
 | `price` | `OH_PRICE` (`"599 usd"`), which no project setting overrides | none | What a year costs on the web: `{"amount": <cents>, "currency": "usd"}`. The terms and the front page state it (`{{price}}`, `site/build.mjs`), Stripe's price is made at it (`infra/stripe.mjs`), and a checkout sells at it and no other. `priceAmount` in `app/lib/net/buying.dart` is held to it by `site/ledger.test.mjs`. Changed only as [Change the terms](../how-to/change-the-terms.md#change-the-price) says. |
 | `apple.bundleId` | `OH_APPLE_BUNDLE_ID`, and part of `OH_APPLE_AUDIENCE` | none | The iOS bundle ID. App Store notifications for another bundle are ignored. |
 | `apple.product` | `OH_APPLE_PRODUCT` | `OH_APPLE_PRODUCT` | The App Store subscription product. |
@@ -49,15 +48,15 @@ The app also reads `OH_PLAY_PACKAGE` as a build define (`app/lib/net/store_buyin
 
 ### Pages project secrets
 
-Defined by name in `pages.environments` in `infra/cloudflare.mjs`. `./oh infra` checks that each one is set, and never reads a value. `./oh secret set` sets one in each environment that lists it (`secrets`); a preview's own, which is never production's (`ownSecrets`), is made by `./oh preview secrets`.
+Defined by name in `pages.environments` in `infra/cloudflare.mjs`. `./oh infra` checks that each one is set, and never reads a value. `./oh secret set` sets one in each environment that lists it (`secrets`), which is production alone, but for `OH_SERVICE_SECRET`, which `./oh key mint` makes with its key (`madeBy`); a preview's own, which is never production's (`ownSecrets`), is made by `./oh preview secrets`.
 
 | Secret | Production | Preview | Read by | Without it |
 |---|---|---|---|---|
 | `OH_SERVICE_SECRET` | Yes | Its own, the secret half of `preview.serviceKey` (`./oh preview secrets`) | `serviceSigned` in `service/functions/licence.mjs`: signs licences (`licenceFor`) and activations (`activationFor`) | Handlers that sign answer 503. A secret that does not match `OH_SERVICE_KEY` also answers 503. |
-| `OH_ID_HMAC` | Yes | Yes | `loginRow`: the HMAC key a sign-in's subject is stored under | `attest`, `supersede` and `apple-id` answer 503. |
+| `OH_ID_HMAC` | Yes | Its own (`./oh preview secrets`) | `loginRow`: the HMAC key a sign-in's subject is stored under | `attest`, `supersede` and `apple-id` answer 503. |
 | `OH_STRIPE_SECRET` | Yes | No | `checkout`, `manage`, `payerLookup`, `endRefunded`, `healthOf` | `checkout` and `manage` answer 503. `health` reports Stripe as not configured. Backup codes are not emailed. A refund's webhook answers 503, so Stripe sends it again. |
 | `OH_STRIPE_WEBHOOK_SECRET` | Yes | No | `webhookSigned` | The `stripe` webhook answers 400 to every delivery. |
-| `OH_TURN_API_TOKEN` | Yes | Yes | `mint` | `turn` answers 503, and the app plays over the relay. |
+| `OH_TURN_API_TOKEN` | Yes | No | `mint` | `turn` answers 503, and the app plays over the relay. |
 | `OH_PLAY_SERVICE_ACCOUNT` | When the config names Play (`playSecrets`) | No | `playToken`: the Google service account's JSON key for the Play Developer API | `store` answers 503 for a Play purchase. `play` answers a subscription notification with 200 and records nothing. |
 
 The worker calls these Stripe endpoints, in the API version `STRIPE_VERSION` in `service/functions/stripe.mjs` names, which is the webhook's, so `OH_STRIPE_SECRET` needs access to each: `GET /v1/prices` and `GET /v1/prices/{id}`, `POST /v1/checkout/sessions`, `GET /v1/subscriptions/{id}` (with its customer expanded, for a notice of a change to the terms), `POST /v1/billing_portal/sessions`, `GET /v1/customers/{id}`, and, to end a refunded subscription, `GET /v1/invoice_payments`, `GET /v1/invoices/{id}` and `DELETE /v1/subscriptions/{id}`. As a restricted key: Prices, Products, Customers and Invoices read; Checkout Sessions, Customer Portal and Subscriptions write.
@@ -137,8 +136,6 @@ Its schedule (`triggers.crons`) runs once a day at 13:00 UTC. With a checker's c
 | `NEW_RELIC_API_KEY` | `observability/apply.mjs` (required) | A New Relic User key. |
 | `NEW_RELIC_ACCOUNT_ID` | `observability/apply.mjs` (required) | The New Relic account. |
 | `NEW_RELIC_REGION` | `observability/apply.mjs` | `US` (the default) or `EU`. |
-| `OH_SERVICE_KEY`, `OH_GOOGLE_CLIENT_ID`, `OH_APPLE_SERVICE_ID` | `deploy.sh` | Override the values from `config/openhearts.json` for one build. |
-| `OH_RELAYS` | `deploy.sh` | Passed to the web build as a define. Leave it unset so that the build uses its own relay list. |
 | `FLUTTER` | `deploy.sh`, `build_phone.sh`, `e2e/build.sh`, `app/worker/build.sh` | The `flutter` command to run. |
 | `DART` | `app/worker/build.sh` | The `dart` command to run. |
 | `ANDROID_NDK_HOME`, `ANDROID_HOME`, `ANDROID_SDK_ROOT` | `crypto/build_android.sh` | Where to find the Android NDK. |
@@ -146,12 +143,12 @@ Its schedule (`triggers.crons`) runs once a day at 13:00 UTC. With a checker's c
 
 What each script does with the Cloudflare API token, which is what the token needs to allow:
 
-- `deploy.sh` publishes to the Pages project and, with `--prune`, lists and deletes its deployments.
+- `deploy.sh` publishes to the Pages project. `./oh deploy site` (before a production deploy) and `./oh deploy prune` list and delete its deployments.
 - `./oh account delete` reads and deletes rows in `OH_STORE` (Workers KV Storage: Edit), and reads and rewrites kept games in `OH_RECORDS` (Workers R2 Storage: Edit).
 - The other `./oh account` acts read rows and write orders in `OH_STORE` (Workers KV Storage: Edit), and, to take a name off, read and rewrite kept games in `OH_RECORDS` (Workers R2 Storage: Edit). `./oh account find` reads the notes of which accounts set a picture in `OH_PICTURES`, and `./oh account hold` and `./oh account release` copy pictures from it into `OH_RECORDS` and delete them there (Workers R2 Storage: Edit). `./oh config` and `./oh picture` read and write rows in `OH_STORE`.
 - `./oh photodna put` and `./oh photodna get` write and read the PhotoDNA module in `open-hearts-private` (Workers R2 Storage: Edit).
 - `infra/apply.mjs` reads every resource that `infra/cloudflare.mjs` defines, and with `--apply` changes them.
-- The relay's deploy (`./oh deploy relay`, which runs `npx wrangler deploy` in `service/do`) reads the PhotoDNA module from `open-hearts-private` (Workers R2 Storage: Edit), and uploads the relay worker with its Durable Objects, its container image and its custom domain.
+- The relay's deploy (`./oh deploy relay`, which runs `wrangler deploy` in `service/do`) reads the PhotoDNA module from `open-hearts-private` (Workers R2 Storage: Edit), and uploads the relay worker with its Durable Objects, its container image and its custom domain.
 
 No script checks the token's permissions first. A missing permission shows as Cloudflare's own error, or for `infra/apply.mjs` as an `unread:` line.
 
@@ -175,12 +172,14 @@ Compile-time values the app reads with `String.fromEnvironment`. They are not en
 
 | Define | Read in | Set by |
 |---|---|---|
-| `OH_SERVICE_KEY` | `app/lib/net/licence.dart` | `deploy.sh`, `app/tool/defines.mjs`, `e2e/build.sh` |
-| `OH_HOUSE_KEY` | `app/lib/net/licence.dart` (`houseKey`) | `deploy.sh`, `app/tool/defines.mjs`, `e2e/build.sh` |
+| `OH_SERVICE_KEY` | `app/lib/net/licence.dart` | `app/tool/defines.mjs`, `e2e/build.sh` |
+| `OH_HOUSE_KEY` | `app/lib/net/licence.dart` (`houseKey`) | `app/tool/defines.mjs`, `e2e/build.sh` |
 | `OH_APP_ORIGIN` | `app/lib/net/address_io.dart` | `app/tool/defines.mjs` |
-| `OH_GOOGLE_CLIENT_ID`, `OH_APPLE_SERVICE_ID` | `app/lib/net/provider_tokens.dart` | `deploy.sh`, `app/tool/defines.mjs` |
+| `OH_GOOGLE_CLIENT_ID`, `OH_APPLE_SERVICE_ID` | `app/lib/net/provider_tokens.dart` | `app/tool/defines.mjs` |
 | `OH_APPLE_PRODUCT`, `OH_PLAY_PRODUCT`, `OH_PLAY_PACKAGE` | `app/lib/net/store_buying.dart` | `app/tool/defines.mjs` (not `OH_PLAY_PACKAGE`) |
-| `OH_RELAYS` | `app/lib/net/relays.dart` | `deploy.sh`: empty for production, and the preview relay for a preview. A comma list replaces the build's relays, and the remote config's. |
+| `OH_RELAYS` | `app/lib/net/relays.dart` | `app/tool/defines.mjs`: unset for production, and the preview relay for a preview. A comma list replaces the build's relays, and the remote config's. |
+| `OH_BUILD_TAG`, `OH_BUILD_DATE` | `app/lib/build_info.dart` | `app/tool/defines.mjs`: the short commit, with `+` for a tree with uncommitted changes, and the UTC date. Without them a build says `dev`. |
+| `OH_UPDATE_CHECK` | `app/lib/build_info.dart` | `app/tool/defines.mjs`: `true`, which turns the "new build" pill on for a deployed web build. |
 
 ## Remote config
 
@@ -193,7 +192,7 @@ The row `config|app` in `OH_STORE`, which the `config` handler serves to every d
 | `offer` | Boolean | `true` | `false` hides the paid tier from devices that have not bought it. |
 | `relays` | 1 to `MOST_RELAYS` `wss:` URLs on `openhearts.game` or a subdomain, with no user info. All must pass, or none is taken. | The build's (`ourRelay` in `app/lib/net/relays.dart`) | Replaces the build's relays, read at app start. A build served from a local host, or built with `OH_RELAYS`, ignores it. |
 | `banner` | `id` matching `^[\w.-]{1,64}$`; `level` `warn` (anything else is `info`); `text` by two-letter language code, English required, each up to `LONGEST_SAY` characters | None | A line on the front door. |
-| `update` | `before` as `YYYY-MM-DD`; optional `text` as for `banner` | None | Asks builds published before that day to update. |
+| `update` | `before` as `YYYY-MM-DD`; optional `text` as for `banner` | None | Asks builds made before that day to update. A web build is made the day `deploy.sh` deploys it, and a phone build the day `build_phone.sh` or the `ios` workflow ran, which is before store review. So set `before` no later than the day the version in the stores was built, or that version is asked to update while the stores have nothing newer. |
 | `feedback` | An `https:` URL or a `mailto:` address | The project's issues | Where "Tell us what's broken" sends a report. |
 | `table` | See [Table clocks](#table-clocks). All fields pass, or none is served. | The standard table | The clocks of the tables the house seats in the pools, and of a friends' table this device starts. |
 | `waits` | See the next table. | The app's own | How long the app waits on the network. |
@@ -234,7 +233,7 @@ Two groups go together. When a group breaks its rule, the worker drops every fie
 
 ## Service settings
 
-The row `config|service` in `OH_STORE`. It is never served. The Pages worker and the `Household` object read it at most once a minute per isolate (`settle`, `SETTINGS_KEPT_MS`). Each number is taken when it is a whole number within its bounds, and otherwise keeps its default (`serviceSettingsOf`).
+The row `config|service` in `OH_STORE`. It is never served. The Pages worker and the `Household` object read it at most once a minute per isolate (`loadServiceSettings`, `SETTINGS_KEPT_MS`). Each number is taken when it is a whole number within its bounds, and otherwise keeps its default (`serviceSettingsOf`).
 
 Defaults and bounds: `SERVICE_DEFAULTS` and `SERVICE_BOUNDS` in `service/functions/settings.mjs`.
 
@@ -247,9 +246,9 @@ Defaults and bounds: `SERVICE_DEFAULTS` and `SERVICE_BOUNDS` in `service/functio
 | `turnTtlS` | How long TURN credentials last, in seconds. |
 | `requestToleranceS` | How far a signed request's time may be from the service's clock, in seconds. |
 | `webhookToleranceS` | How old a Stripe webhook's timestamp may be, in seconds. |
-| `householdChangesPerHour` | An account's changes in an hour: everything asked of its queue that is not counted below, such as codes, claims, drops, backup-code rotations and sign-in links. Apple's unlinks have a separate allowance of the same size. |
+| `householdChangesPerHour` | An account's changes in an hour: everything asked of its queue that is not counted below, such as codes, drops, backup-code rotations and sign-in links. Apple's unlinks have a separate allowance of the same size, and so do devices coming in (a code, a backup code or a sign-in claimed). |
 | `householdReadsPerHour` | An account's reads in an hour: device lists, profile reads, and backup codes shown or emailed. Also how much a device may ask of an account in an hour on a licence that the store where it asks doesn't back ([signed requests](service-api.md#signed-requests)). |
-| `activationsPerHour` | An account's activations in an hour, counting the relay's checks for it and `review`'s. |
+| `activationsPerHour` | An account's activations in an hour, counting the relay's checks for it and `review`'s. A relay's check of an activation that is no longer the one in use is refused without being counted. |
 | `profileWritesPerHour` | Writes of an account's profile in an hour. |
 | `recordsPerHour` | Game records an account may send to be kept in an hour. |
 

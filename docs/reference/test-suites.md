@@ -17,7 +17,7 @@ For why the checks are split this way, see [how Open Hearts is tested](../explan
 - With `CHECK_PLAN` set to any non-empty value, `check.sh` prints the lanes it would run, and runs nothing.
 - Each suite's output is in `build/check/<suite>.log`. A table of suites, results and times follows the run. The exit code is the verdict.
 - The suites `engine`, `deal`, `table`, `table_slow`, `app`, `app_analyze` and `crypto` run at the lowest priority (`patient` in `check.sh`).
-- Before any of `engine`, `deal`, `table`, `table_slow`, `service`, `service_js` or `service_object`, the step `deps` runs `dart pub get` in `packages/engine`, `packages/deal`, `packages/table_sim`, `packages/table` and `service`, as CI does: `dart analyze` doesn't fetch dependencies itself, and the three service suites, side by side in one package, would each fetch them at once. It has a row in the table and a log, `build/check/deps.log`.
+- Before any of `engine`, `deal`, `table`, `table_slow` or `service`, the step `deps` runs `dart pub get` in `packages/engine`, `packages/deal`, `packages/table_sim`, `packages/table` and `service`, as CI does: `dart analyze` doesn't fetch dependencies itself, and `table` and `table_slow`, side by side in one package, would each fetch them at once. It has a row in the table and a log, `build/check/deps.log`.
 - `<cores>` below is the machine's core count.
 
 ## Suites
@@ -30,17 +30,15 @@ Each suite is a `suite_<name>` function in `check.sh`, run from the repository's
 | `deal` | `dart analyze --fatal-infos` and `dart test -j <cores>` in `packages/deal` |
 | `table` | `dart analyze --fatal-infos` and `dart test -j <cores>` in `packages/table_sim`, then `dart analyze --fatal-infos` and `dart test -j <cores> -x slow` in `packages/table`: the fast tier |
 | `table_slow` | `dart test -j <cores> -t slow` in `packages/table`: the slow tier |
-| `service` | `dart analyze --fatal-infos` and `dart test -j <cores>` in `service`, against the Dart relay |
-| `service_js` | The `service` tests with `OH_RELAY=js`: against the relay the Cloudflare object runs |
-| `service_object` | The `service` tests with `OH_RELAY=object`: against that relay under the object's own rules |
+| `service` | `dart analyze --fatal-infos` and `dart test -j <cores>` in `service`, against the relay the Cloudflare object runs, under its own rules (`service/do/host.mjs --object`) |
 | `relay_js` | `node --test service/do/*.test.mjs` |
 | `functions` | `node --test service/functions/*.test.mjs` |
-| `site` | `node --test site/*.test.mjs`: every page in every language, the terms and the privacy policy against `site/ledger.json` and main's copy of it, and the store listings' words against each store's limits |
+| `site` | `node --test site/*.test.mjs`: every page in every language, the terms and the privacy policy against `site/ledger.json` and main's copy of it, the store listings' words against each store's limits, and the app's Content-Security-Policy in `site/public/_headers` against the code and `config/openhearts.json` |
 | `infra` | `node --test infra/*.test.mjs` |
 | `ops` | `node --test ops/*.test.mjs`: [the oh command](oh.md), its reference against its table, and each command against fakes of the store, Stripe and the programs it starts |
 | `workers` | `node --test` on `e2e/deal_worker.test.mjs`, `e2e/deal_golden.test.mjs`, `e2e/offline_worker.test.mjs`, `e2e/carry.test.mjs` and `crypto/schnorr_wasm/vectors.test.mjs`: the page's workers, against the committed wasm |
 | `crypto` | `cargo clippy` with warnings as errors, and `cargo test`, in `crypto/deal` and `crypto/schnorr`; `cargo test` in `crypto/vendor`; `cargo clippy` for the wasm target in `crypto/schnorr_wasm` |
-| `scripts` | `bash -n` on `check.sh`, `deploy.sh`, `build_phone.sh`, `oh`, `e2e/*.sh`, `crypto/*.sh`, `app/ios/*.sh` and `service/bench/build.sh`; `node --check` on `e2e/*.mjs` and `app/tool/*.mjs`; `CHECK_PLAN=1 ./check.sh full`, which fails if a suite is in none of its lanes; and, when Python has `yaml`, a parse of `.github/workflows/*.yml` |
+| `scripts` | `bash -n` on `check.sh`, `deploy.sh`, `build_phone.sh`, `oh`, `ops/wrangler/wrangler`, `e2e/*.sh`, `crypto/*.sh`, `app/ios/*.sh` and `service/bench/build.sh`; `node --check` on `e2e/*.mjs` and `app/tool/*.mjs`; `CHECK_PLAN=1 ./check.sh full`, which fails if a suite is in none of its lanes; and, when Python has `yaml`, a parse of `.github/workflows/*.yml` |
 | `docs` | `node --test docs/links.test.mjs`, then `node docs/links.mjs` |
 | `app_analyze` | `flutter analyze` in `app` |
 | `app` | `flutter test -j <cores>` in `app`, then `flutter test --platform chrome test/web`. Chrome is `CHROME_EXECUTABLE`, else one on the `PATH`, else one in macOS's Applications, else Playwright's Chromium. |
@@ -51,6 +49,7 @@ Each suite is a `suite_<name>` function in `check.sh`, run from the repository's
 | `e2e_offline` | `node e2e/offline.mjs` |
 | `e2e_site` | `node e2e/site.mjs` |
 | `e2e_move` | `node e2e/move.mjs` |
+| `e2e_csp` | `node e2e/csp.mjs`, which makes its own build first |
 
 ## What quick runs
 
@@ -58,17 +57,19 @@ Each suite is a `suite_<name>` function in `check.sh`, run from the repository's
 
 | Changed path | Suites added |
 |---|---|
-| `app/lib/`, `app/test/`, `app/web/`, `app/worker/`, `app/pubspec.yaml`, `app/analysis_options.yaml`, `app/l10n.yaml` | `app_analyze`, `app`; `workers` for `app/web/` and `app/worker/`; and `site` for `app/lib/net/buying.dart`, whose price the site's tests hold to the config |
+| `app/lib/`, `app/test/`, `app/web/`, `app/worker/`, `app/pubspec.yaml`, `app/analysis_options.yaml`, `app/l10n.yaml` | `app_analyze`, `app`; `workers` for `app/web/` and `app/worker/`; `site` for `app/lib/net/buying.dart`, whose price the site's tests hold to the config; and `site` and `e2e_csp` for `app/web/` and `app/lib/net/provider_tokens_web.dart`, whose scripts the Content-Security-Policy is held to |
 | `packages/engine/` | `engine` |
 | `packages/deal/` | `deal` |
 | `packages/table/`, `packages/table_sim/` | `table` |
-| `service/do/` | `relay_js`, `service_js`, `service_object` |
+| `service/do/` | `relay_js`, `service` |
 | `service/functions/` | `functions`, `ops` |
 | `service/tool/*.mjs` | `functions`, `ops` |
 | Any other path under `service/` | `service` |
+| `site/public/_headers`, `site/headers.mjs`, `site/headers.test.mjs` | `site`, `e2e_site`, `e2e_csp`, `ops` |
 | `site/` | `site`, `e2e_site`, `ops` |
 | `config/` | `site`, `functions`, `infra`, `ops` |
 | `infra/` | `infra`, `ops` |
+| `observability/` | `infra`, `ops` |
 | `ops/`, `oh` | `ops` |
 | `e2e/*.test.mjs` | `workers` |
 | Any other path under `e2e/`, any other `*.sh` file, `.github/` | `scripts` |
@@ -92,7 +93,7 @@ For the `app` suite, `quick` passes `-x slow`, and runs only the test files that
 | 2 | `app_analyze`, then `app` (every tier) |
 | 3 | `engine` and `deal` |
 | 4 | `relay_js`, `functions`, `site`, `infra`, `ops`, `workers`, `scripts` and `docs`; then `crypto`, only where `crypto/deal` has been built with cargo here and `cargo` is on the `PATH`. Otherwise `full` says that `crypto` didn't run. |
-| 5 | `e2e_build`; then `e2e_move` and `e2e_site`; then `service`, `service_js`, `service_object` and `e2e_house`; then `e2e_run` and `e2e_offline`; then `e2e_flows` |
+| 5 | `e2e_build`; then `e2e_move` and `e2e_site`; then `service` and `e2e_house`; then `e2e_run` and `e2e_offline`; then `e2e_flows`; then `e2e_csp`, last because it compiles a second build of the app, which would slow the suites whose timings matter |
 
 
 ## Tiers and test settings
@@ -114,13 +115,14 @@ The scripts in `e2e/`. Each suite exits non-zero on failure. For what they need 
 
 | Script | What it drives | Flags | Suite |
 |---|---|---|---|
-| `e2e/build.sh` | Builds the app the suites drive into `app/build/e2e`, compiled to take licences from the rig's own service, and compiles the house that the suites start. Does nothing while its inputs are unchanged. | `--force` builds anyway; other arguments go to `flutter build web` | `e2e_build` |
+| `e2e/build.sh` | Builds the app the suites drive into `app/build/e2e`, compiled to take licences from the rig's own service, and compiles the house that the suites start. Does nothing while its inputs are unchanged. | `--force` builds anyway; `--out <dir>` builds into a directory under `app/` other than `build/e2e` (each has its own stamp); other arguments go to `flutter build web` | `e2e_build` |
 | `e2e/flows.mjs` | Every flow one device can drive: the front door, game options, a solo game and its record, a room to share, the phone turned. Uses a real pointer as well as the accessibility tree. | `--only <text>`, `--jobs <n>`, `--serial`, `--app-dir <path>` | `e2e_flows` |
 | `e2e/run.mjs` | Four browsers matched in a pool, and in a friends' room at one referee with the house; then one browser closed between hands, one person whose clock runs out, and one browser closed off its turn, and the last person plays the hand out with three bots | `--app-dir <path>` | `e2e_run` |
 | `e2e/house.mjs` | The house as a process of its own. At a table of one person and three bots, the house is stopped mid-hand; the relay wants it back, it is started again, goes on from the log, and the hand finishes. At a table of two people, one leaves mid-hand, and their seat is opened from the escrow and played out. | `--app-dir <path>` | `e2e_house` |
 | `e2e/offline.mjs` | The network, the relays and the site's worker taken away one at a time, or left silent. Solo play must keep working, and every wait must end in words on the screen. Leaves a screenshot of each flow in `app/build/offline/`. | `--only <text>`, `--jobs <n>`, `--serial`, `--app-dir <path>` | `e2e_offline` |
 | `e2e/move.mjs` | The hosts as production routes them: `openhearts.game/play/` and the site host's `/api/` answer 404; a device's storage is carried from `openhearts.game` through `/carry`; a key already at the app's host is kept; a device with nothing to carry is not held up; a carry that never answers holds the app up only briefly; a preview serves the app at `/play/` | `--only <text>`, `--app-dir <path>` | `e2e_move` |
 | `e2e/site.mjs` | The marketing site in each language: the language redirect, a chosen language kept, and every page fitting a phone | None | `e2e_site` |
+| `e2e/csp.mjs` | The app under the Content-Security-Policy production serves it with (`site/public/_headers`, which the rig serves too): the front door, a hand dealt, the Subscription page with its sign-in button and Apple's script, and New Relic's loader under production's hostname all load with nothing refused, every file carries the policy, and a script from another origin, an inline script, a blob script, `eval` and a data worker are each refused. Makes its own build, with Apple's Services ID, in `app/build/e2e-signin`. | `--app-dir <path>` (a build that has Apple's Services ID) | `e2e_csp` |
 | `e2e/shots.mjs` | Not a check. Screenshots of the table at the shapes in [screens](../explanation/screens.md), into `app/build/shots/`. | `--app-dir <path>` | None |
 | `e2e/site_shots.mjs` | Not a check. The site's pictures of the game in each language, into `site/public/img/`. | `--app-dir <path>` | None |
 | `e2e/store_shots.mjs` | Not a check. The App Store's and Google Play's screenshots in each language and size, and Google Play's feature graphic and icon, into `app/build/store/`. | `--size <name>`, `--lang <code>`, `--only <picture>`, `--app-dir <path>` | None |
@@ -151,10 +153,10 @@ Runs on pull requests and on pushes to `main`. A newer push to the same pull req
 | `app` | Builds and tests the Rust crates in `crypto/deal` and `crypto/schnorr`, and tests `crypto/vendor`. Then the engine's and deal's analysis and tests, `flutter analyze`, `flutter test -j 4` (every tier), and `flutter test --platform chrome test/web`. | `engine`, `deal`, `app_analyze`, `app`, and the tests of `crypto` |
 | `web` | `flutter build web` as `deploy.sh` makes it, then `app/worker/build.sh` | None |
 | `table` | Builds the Rust libraries, then the simulator's analysis and tests in `packages/table_sim`, and `dart test -x slow` and `dart test -t slow` in `packages/table` | `table`, `table_slow` |
-| `service` | Builds the Rust libraries, then the `service` tests three ways (`OH_RELAY` unset, `js` and `object`) and `node --test service/do/*.test.mjs` | `service`, `service_js`, `service_object`, `relay_js` |
+| `service` | Builds the Rust libraries, then the `service` tests and `node --test service/do/*.test.mjs` | `service`, `relay_js` |
 | `wasm` | `cargo clippy` on `crypto/deal`, `crypto/schnorr` and `crypto/schnorr_wasm`; builds both wasm files with `crypto/deal/build.sh` and `crypto/schnorr_wasm/build.sh`; fails if `app/web/deal.wasm` or `app/web/schnorr.wasm` differ from what was committed | The clippy part of `crypto` |
 | `node` | The handlers', site's, infrastructure's and page workers' node tests, `./check.sh scripts` and `./check.sh docs` | `functions`, `site`, `infra`, `workers`, `scripts`, `docs` |
-| `e2e` | Three runners: `flows`; `run`; and `escrow`, `offline`, `move` and `site`. Each installs coturn and Playwright, builds with `./e2e/build.sh` (cached by its sources), and runs `node e2e/<suite>.mjs` for each suite. | `e2e_build` and the browser suites |
+| `e2e` | Three runners: `flows`; `run`; and `house`, `offline`, `move`, `site` and `csp`. Each installs Playwright, builds the Rust libraries the house loads, builds with `./e2e/build.sh` (cached by its sources), and runs `node e2e/<suite>.mjs` for each suite. | `e2e_build` and the browser suites |
 
 The `workers` step of the `node` job leaves out `crypto/schnorr_wasm/vectors.test.mjs`, which `crypto/schnorr_wasm/build.sh` runs in the `wasm` job.
 
@@ -166,7 +168,7 @@ One job, `ios`, on macOS. It runs when started by hand, and on pull requests and
 |---|---|
 | `third_party/flutter/simulator_log_stream.patch`, applied to the Flutter it sets up, and the tool built again | Nothing itself. It is Flutter's fix for the tool waiting with no end on a simulator, which no release carries yet (`third_party/flutter/README.md`). It fails if the patch no longer applies, or the tool built again does not have it. |
 | `crypto/build_ios.sh` | The deal and Schnorr libraries build as XCFrameworks. |
-| `flutter test integration_test/native_libs_test.dart` on a simulator, once it has booted, for at most 25 minutes | The libraries load as the app loads them (`app/integration_test/native_libs_test.dart`). When it fails or hangs, the next step prints the end of the Flutter tool's log, the simulator's state, a sample of the app's threads, and the app's log on the simulator. |
+| `flutter test integration_test/native_libs_test.dart` on a simulator, once it has booted, for at most 25 minutes | The libraries load as the app loads them, and the app's store for the device's secret key keeps a secret and gives it back, through the native call that marks its file as not to be backed up (`app/integration_test/native_libs_test.dart`). When it fails or hangs, the next step prints the end of the Flutter tool's log, the simulator's state, a sample of the app's threads, and the app's log on the simulator. |
 | `flutter build ios --release --no-codesign`, without the service key | The release build is refused (`app/ios/release_check.sh`). |
 | `node app/tool/defines.mjs`, then the unsigned release build | The release builds with what `config/openhearts.json` names, as `build_phone.sh` makes it. |
 | `otool` and `lipo` on the built frameworks | What the release carries. |

@@ -33,6 +33,11 @@ abstract final class LeftEarly {
     await prefs.setInt(_key, atMs);
   }
 
+  /// Starts the wait over from [atMs], replacing whatever was kept. Used
+  /// when the kept time is ahead of the device's clock (the clock was set
+  /// back), so the wait counts down again instead of never ending.
+  static Future<void> reset(int atMs) async => (await SharedPreferences.getInstance()).setInt(_key, atMs);
+
   /// The wait is over: nothing kept.
   static Future<void> clear() async => (await SharedPreferences.getInstance()).remove(_key);
 

@@ -1,4 +1,4 @@
-/// The ICE servers a device takes to a table: from the turn-creds
+/// The ICE servers a device takes to a table: from the service's `turn`
 /// handler, STUN alone when it has none, nothing on localhost.
 library;
 

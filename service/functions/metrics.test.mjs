@@ -18,7 +18,7 @@ const KEY = 'ab'.repeat(32);
 test('a request is a line: the handler, its status, how long — and nothing about who asked', async () => {
   const OH_METRICS = dataset();
   const env = { OH_METRICS, ASSETS: { fetch: async () => new Response('asset') } };
-  const ask = (path, init) => worker.fetch(new Request(`https://dev.open-hearts.pages.dev${path}`, init), env);
+  const ask = (path, init) => worker.fetch(new Request(`https://play.openhearts.game${path}`, init), env);
 
   await ask('/api/licence', { method: 'POST', body: JSON.stringify({ key: KEY, at: 1, sig: 'x' }), headers: { 'x-forwarded-for': '203.0.113.9' } });
   await ask('/api/nothing-here-' + KEY);
@@ -53,6 +53,14 @@ test('the config, which every open app asks for, is one in ten and says so', () 
 test('nothing bound, nothing written; a dataset that throws stops nothing', async () => {
   measure({}, 'licence', 200, 1);
   const env = { OH_METRICS: { writeDataPoint: () => { throw new Error('quota'); } } };
-  const answer = await worker.fetch(new Request('https://dev.open-hearts.pages.dev/api/config'), env);
+  const answer = await worker.fetch(new Request('https://play.openhearts.game/api/config'), env);
   assert.equal(answer.status, 200);
+});
+
+test('a handler that throws is counted as the 500 the runtime answers, and still throws', async () => {
+  const OH_METRICS = dataset();
+  const OH_STORE = { get: async () => { throw new Error('KV down'); } };
+  const order = new Request('https://play.openhearts.game/api/order', { method: 'POST', body: JSON.stringify({ order: 'e'.repeat(32) }) });
+  await assert.rejects(worker.fetch(order, { OH_METRICS, OH_STORE }), /KV down/);
+  assert.deepEqual(OH_METRICS.points.map((p) => p.blobs), [['order', '500']]);
 });

@@ -24,17 +24,16 @@ import { createHash } from 'node:crypto';
 
 import { readFile, writeFile } from 'node:fs/promises';
 
-import { alerts, app, browser, synthetics } from './monitoring.mjs';
+import { alerts, app, browser, newRelicEndpoint, synthetics } from './monitoring.mjs';
 
 const write = process.argv.includes('--apply');
 const key = process.env.NEW_RELIC_API_KEY;
 const account = Number(process.env.NEW_RELIC_ACCOUNT_ID);
-const region = (process.env.NEW_RELIC_REGION ?? 'US').toUpperCase();
 if (!key || !account) {
   console.error('apply: needs NEW_RELIC_API_KEY and NEW_RELIC_ACCOUNT_ID');
   process.exit(2);
 }
-const endpoint = region === 'EU' ? 'https://api.eu.newrelic.com/graphql' : 'https://api.newrelic.com/graphql';
+const endpoint = newRelicEndpoint(process.env.NEW_RELIC_REGION);
 
 const prefix = `${app.name}: `;
 const managed = [
@@ -315,6 +314,17 @@ async function applyNotifications(policyId) {
 // ---- the browser -------------------------------------------------------
 
 const browserName = prefix + browser.name;
+
+/// What the page's agent may do, whatever New Relic's own init says: no
+/// session replay or traces, no console lines (`logging`, which would
+/// carry the relay's addresses and so a room's code), no clicks or keys
+/// (`user_actions`), and a room's code and a table's id masked in every
+/// address it sends (app/lib/pages.dart, roomPath and tablePath). The
+/// privacy policy lists only errors, load times, the service's calls and
+/// the browser.
+const pinnedInit =
+  'Object.assign(NREUM.init,{session_replay:{enabled:false},session_trace:{enabled:false},logging:{enabled:false},user_actions:{enabled:false},' +
+  'obfuscate:[{regex:/\\/room\\/[A-Z0-9]{8}/g,replacement:"/room/*"},{regex:/\\/table\\/[0-9a-f]{32}/g,replacement:"/table/*"}]});';
 const browserSettings = {
   browserMonitoring: { privacy: { cookiesEnabled: false }, distributedTracing: { enabled: false } },
   sessionReplay: { enabled: false, autoStart: false },
@@ -361,12 +371,13 @@ async function applyBrowser() {
   }
   if (!loader) throw new Error('browser: New Relic gave no loader script');
   // And off in the page itself, not only in New Relic's settings: what
-  // the page may do is decided here, where it is read.
+  // the page may do is decided here, where it is read. Set over New
+  // Relic's own init, so that nothing in it turns them back on.
   const script = loader
     .replace(/^\s*<script[^>]*>/i, '')
     .replace(/<\/script>\s*$/i, '')
-    .replace('NREUM.init={', 'NREUM.init={session_replay:{enabled:false},session_trace:{enabled:false},');
-  if (!script.includes('session_trace:{enabled:false}')) throw new Error('browser: the loader is not the shape expected; look at it');
+    .replace(';NREUM.loader_config=', `;${pinnedInit}\n;NREUM.loader_config=`);
+  if (!script.includes(pinnedInit) || !script.includes('NREUM.init={')) throw new Error('browser: the loader is not the shape expected; look at it');
   const file = [
     '// New Relic Browser (observability/monitoring.mjs, `browser`), written by',
     '// observability/apply.mjs: run it again rather than editing this. Only on',

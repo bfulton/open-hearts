@@ -95,12 +95,20 @@ class TableEvent {
     );
   }
 
+  /// How deep an event may nest, counting itself, as the referee holds
+  /// it to (service/do/referee.mjs, deepest). No build writes one deeper
+  /// than six: a start's licences.
+  static const deepest = 32;
+
   /// Parses a received event and checks its hash and signature. Returns
-  /// null for anything malformed or unsigned by its claimed author.
-  /// With [verifySignature] off only the hash is checked — for an
-  /// event already seen, whose signature was checked the first time:
-  /// the same id is the same bytes.
+  /// null for anything malformed or unsigned by its claimed author, or
+  /// nested deeper than [deepest], which the referee takes from nobody:
+  /// working out the id of one deep enough would overflow the stack.
+  /// With [verifySignature] off only the hash is checked: for an event
+  /// already in hand, as the simulator's referee reads again each one it
+  /// takes (the same id is the same bytes).
   static TableEvent? parse(Map<String, Object?> json, {bool verifySignature = true}) {
+    if (!_shallow(json)) return null;
     try {
       final table = json['table'] as String;
       final author = json['author'] as String;
@@ -163,6 +171,22 @@ class TableEvent {
   /// same bytes).
   static Uint8List _canonical(String table, PublicKey author, EventKind kind, Map<String, Object?> body) =>
       Uint8List.fromList(utf8.encode(jsonEncode([table, author, kind.name, _inOrder(body)])));
+
+  /// Whether [json] nests no deeper than [deepest], counted without
+  /// recursion, so that no depth can overflow the count itself.
+  static bool _shallow(Object? json) {
+    final stack = [(json, 1)];
+    while (stack.isNotEmpty) {
+      final (value, depth) = stack.removeLast();
+      final inside = value is Map ? value.values : (value is List ? value : null);
+      if (inside == null) continue;
+      if (depth > deepest) return false;
+      for (final v in inside) {
+        stack.add((v, depth + 1));
+      }
+    }
+    return true;
+  }
 
   static Object? _inOrder(Object? json) {
     if (json is List) return [for (final e in json) _inOrder(e)];

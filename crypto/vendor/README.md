@@ -72,6 +72,22 @@ crosses a wire. (`to_bytes.rs` now writes the normal form whatever
 coordinates it is given; the normalisation stays, so a proof holds what
 it always held.)
 
+**A shuffle argument's vectors are checked for length before they are
+indexed** (`proof-essentials/src/zkp/arguments/hadamard_product/proof.rs`,
+`.../zero_value_bilinear_map/proof.rs` and
+`.../multi_exponentiation/proof.rs`, as the single-value argument
+already did). An argument comes from another seat, and the length of
+each vector in it is whatever that seat wrote. A short one panicked, and
+under `panic = "abort"` that ended the process that was checking it.
+Now it fails the argument. An honest argument has exactly these lengths,
+so it is checked as before.
+
+**`Parameters::enc_generator`**
+(`barnett-smart-card-protocol/src/discrete_log_cards/mod.rs`): the
+generator every key is made with, which the deal's own arguments (the
+token batch and the sealed token, `crypto/deal/src/ops.rs`) are made
+over. The parameters kept it private.
+
 **No `getrandom` `js` feature on wasm** (`proof-essentials/Cargo.toml`).
 The deal takes every random value as a seed the caller drew, and the
 feature pulled wasm-bindgen imports into a module the app loads bare.

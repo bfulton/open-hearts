@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- What Android 11 and earlier back up (android:fullBackupContent):
+     everything but the preferences file the device's secret key is in,
+     as data_extraction_rules.xml says for Android 12 and later. -->
+<full-backup-content>
+    <exclude domain="sharedpref" path="identity.xml"/>
+</full-backup-content>

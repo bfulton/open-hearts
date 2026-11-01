@@ -49,32 +49,32 @@ export const listed = (names) => (names.length < 2 ? names.join('') : `${names.s
 
 /// Whether [env] has any checker's credentials, so that a picture is
 /// asked about at all, and anything the one in use lacks is told
-/// (checkersOf, missing).
+/// (checkerOf, missing).
 export const anyChecker = (env) => !!(env.OH_ARACHNID_USERNAME || env.OH_PHOTODNA_KEY);
 
-/// The checker [checker] (an id) as [env] has it: {on, missing}. [on]
-/// is it, once it has what it needs, as {id, name, ask}, where ask(jpeg,
-/// digest) says of the JPEG [jpeg] (its bytes) 'match', 'harmful'
-/// (Shield knows it as a harmful or abusive image of a child) or
-/// 'clear', throws Unreadable (jpeg.mjs) for a picture it cannot hash,
-/// and throws anything else when the service does not answer; [] until
-/// then. [missing] says what it lacks, when it lacks anything but has
-/// its credentials, or when another checker has credentials and it has
-/// none. [pdq] makes a picture's PDQ hash (arachnid.mjs, pictureHash);
-/// [edgeHasher] its PhotoDNA Edge Hashes, from the module the relay was
-/// deployed with (photodna.mjs, jpegHasher), or null without it; [log]
-/// is told of a match with either service's test pictures, which is no
-/// match.
-export function checkersOf(env, { checker = SHIELD, fetchImpl = fetch, pdq = pictureHash, edgeHasher = null, log = () => {} } = {}) {
-  const on = [];
-  const missing = [];
+/// The checker [checker] (an id) as [env] has it: {checker, missing}.
+/// [checker] is it, once it has what it needs, as {id, name, ask}, where
+/// ask(jpeg, digest) says of the JPEG [jpeg] (its bytes) 'match',
+/// 'harmful' (Shield knows it as a harmful or abusive image of a child)
+/// or 'clear', throws Unreadable (jpeg.mjs) for a picture it cannot
+/// hash, and throws anything else when the service does not answer;
+/// null until then. [missing] says what it lacks, when it lacks
+/// anything but has its credentials, or when the other checker has
+/// credentials and it has none; else null. [pdq] makes a picture's PDQ
+/// hash (arachnid.mjs, pictureHash); [edgeHasher] its PhotoDNA Edge
+/// Hashes, from the module the relay was deployed with (photodna.mjs,
+/// jpegHasher), or null without it; [log] is told of a match with
+/// either service's test pictures, which is no match.
+export function checkerOf(env, { checker = SHIELD, fetchImpl = fetch, pdq = pictureHash, edgeHasher = null, log = () => {} } = {}) {
+  const lacking = (missing) => ({ checker: null, missing });
   if (checker === SHIELD) {
     const { OH_ARACHNID_ENDPOINT: endpoint, OH_ARACHNID_USERNAME: username, OH_ARACHNID_PASSWORD: password } = env;
-    if (!username && env.OH_PHOTODNA_KEY) missing.push('Arachnid Shield is the checker in use, and OH_ARACHNID_USERNAME is not set, so no picture is checked; PhotoDNA has its key: `./oh config set known` (docs/how-to/handle-abuse-material.md)');
-    else if (username && !password) missing.push('OH_ARACHNID_USERNAME is set but OH_ARACHNID_PASSWORD is not, so no picture is checked');
-    else if (username && !endpoint) missing.push('OH_ARACHNID_USERNAME is set but arachnid.endpoint in config/openhearts.json is not, so no picture is checked');
-    else if (username) {
-      on.push({
+    if (!username && env.OH_PHOTODNA_KEY) return lacking('Arachnid Shield is the checker in use, and OH_ARACHNID_USERNAME is not set, so no picture is checked; PhotoDNA has its key: `./oh config set known` (docs/how-to/handle-abuse-material.md)');
+    if (!username) return lacking(null);
+    if (!password) return lacking('OH_ARACHNID_USERNAME is set but OH_ARACHNID_PASSWORD is not, so no picture is checked');
+    if (!endpoint) return lacking('OH_ARACHNID_USERNAME is set but arachnid.endpoint in config/openhearts.json is not, so no picture is checked');
+    return {
+      checker: {
         id: SHIELD,
         name: CHECKERS[SHIELD].name,
         async ask(jpeg, digest) {
@@ -87,16 +87,18 @@ export function checkersOf(env, { checker = SHIELD, fetchImpl = fetch, pdq = pic
           if (said === TEST) log(`known pictures: ${digest} matched Arachnid Shield's test pictures, and nobody is acted on for it`);
           return said === CSAM ? 'match' : said === HARMFUL ? 'harmful' : 'clear';
         },
-      });
-    }
+      },
+      missing: null,
+    };
   }
   if (checker === PHOTODNA) {
     const { OH_PHOTODNA_ENDPOINT: endpoint, OH_PHOTODNA_KEY: key } = env;
-    if (!key && env.OH_ARACHNID_USERNAME) missing.push('PhotoDNA is the checker in use, and OH_PHOTODNA_KEY is not set, so no picture is checked; Arachnid Shield has its credentials: `./oh config set known` (docs/how-to/handle-abuse-material.md)');
-    else if (key && !endpoint) missing.push('OH_PHOTODNA_KEY is set but photodna.endpoint in config/openhearts.json is not, so no picture is checked');
-    else if (key && !edgeHasher) missing.push('OH_PHOTODNA_KEY is set but the relay was deployed without the PhotoDNA module, so no picture is checked (docs/how-to/update-the-photodna-module.md)');
-    else if (key) {
-      on.push({
+    if (!key && env.OH_ARACHNID_USERNAME) return lacking('PhotoDNA is the checker in use, and OH_PHOTODNA_KEY is not set, so no picture is checked; Arachnid Shield has its credentials: `./oh config set known` (docs/how-to/handle-abuse-material.md)');
+    if (!key) return lacking(null);
+    if (!endpoint) return lacking('OH_PHOTODNA_KEY is set but photodna.endpoint in config/openhearts.json is not, so no picture is checked');
+    if (!edgeHasher) return lacking('OH_PHOTODNA_KEY is set but the relay was deployed without the PhotoDNA module, so no picture is checked (docs/how-to/update-the-photodna-module.md)');
+    return {
+      checker: {
         id: PHOTODNA,
         name: CHECKERS[PHOTODNA].name,
         async ask(jpeg, digest) {
@@ -104,20 +106,21 @@ export function checkersOf(env, { checker = SHIELD, fetchImpl = fetch, pdq = pic
           if (test && !match) log(`known pictures: ${digest} matched only Microsoft's test pictures, and nobody is acted on for it`);
           return match ? 'match' : 'clear';
         },
-      });
-    }
+      },
+      missing: null,
+    };
   }
-  return { on, missing };
+  return lacking(null);
 }
 
-/// What the checkers' answers [by] ({id: said}) come to, [on] being the
-/// ids of those in use now: 'match' when any matched the picture, else
-/// 'harmful' when any knows it as harmful, else 'clear' when any cleared
-/// it, whether or not it is in use now; else 'unreadable' when one in
-/// use cannot hash it. Null while none of that is said, and one in use
-/// is to be asked.
-export function verdictOf(by, on) {
+/// What the checkers' answers [by] ({id: said}) come to, [inUse] being
+/// the id of the one in use now, or null: 'match' when any matched the
+/// picture, else 'harmful' when any knows it as harmful, else 'clear'
+/// when any cleared it, whether or not it is in use now; else
+/// 'unreadable' when the one in use cannot hash it. Null while none of
+/// that is said, and the one in use is to be asked.
+export function verdictOf(by, inUse) {
   const said = Object.values(by);
   for (const settled of ['match', 'harmful', 'clear']) if (said.includes(settled)) return settled;
-  return on.some((id) => by[id] === 'unreadable') ? 'unreadable' : null;
+  return inUse && by[inUse] === 'unreadable' ? 'unreadable' : null;
 }

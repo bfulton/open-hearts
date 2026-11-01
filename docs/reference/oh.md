@@ -148,9 +148,9 @@ Puts back what remove held. A name taken off kept games stays off them.
 oh account delete <account> [--apply]
 ```
 
-Deletes an account's data on its owner's request: its name off its kept games, and every row the service keeps for it. Refuses an account whose subscription is still paid up: cancel it first.
+Deletes an account's data on its owner's request: its name off its kept games, and every row the service keeps for it. A web subscription still running is ended in Stripe first, as the app's own deletion ends it, with nothing refunded; its notes of the changes it was told of go with the rest. Refuses an account whose store subscription is still paid up and not cancelled: its owner cancels it in the store. Refuses an account under a legal hold, ending nothing.
 
-- **Needs:** `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, (Workers R2 Storage Edit)
+- **Needs:** `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, (Workers R2 Storage Edit), STRIPE_API_KEY (for a web subscription still running)
 - **How-to:** [delete-an-accounts-data.md](../how-to/delete-an-accounts-data.md)
 - **Example:** `oh account delete 0123456789abcdef0123456789abcdef --apply`
 
@@ -292,7 +292,7 @@ Putting the relay worker and the site into production, and checking production a
 oh deploy relay [--apply] [--preview]
 ```
 
-Deploys the relay worker, and the house's container with it, from main; with --preview, the preview relay, from what is checked out. Needs Docker running, Dart and Cargo. Production is refused unless HEAD is origin/main with nothing uncommitted. It is built first (wrangler deploy --dry-run: the house and its image, nothing uploaded), and if the deploy then fails after its upload, the version that served before is put back. The preview relay is what every preview plays on: it reaches nothing of production's, and is refused until config/openhearts.json has the previews' service key (oh preview secrets).
+Deploys the relay worker, and the house's container with it, from main; with --preview, the preview relay, from what is checked out. Needs Docker running, Dart and Cargo. Production is refused unless HEAD is origin/main with nothing uncommitted. It is built first (wrangler deploy --dry-run: the house and its image, nothing uploaded), and if the deploy then fails after its upload, the version that served before is put back. The preview relay is what every preview plays on: it reaches nothing of production's, but deploying it runs the checkout's own build with your Cloudflare token, so deploy it only from a branch you have read. It is refused until config/openhearts.json has the previews' service key (oh preview secrets).
 
 - **Needs:** `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`
 - **How-to:** [deploy.md](../how-to/deploy.md)
@@ -304,7 +304,7 @@ Deploys the relay worker, and the house's container with it, from main; with --p
 oh deploy site [--apply] [--label <label>]
 ```
 
-Builds and publishes the site, the web app and the service's handlers: to production from main, or to a preview. The label names the preview; it is `main` (production) on main and `dev` elsewhere unless given. Production is refused unless HEAD is origin/main with nothing uncommitted, and unless the terms and the privacy policy are as the ledger says, with what a change needs done (oh terms status). It emails nobody: a change that matters to subscribers is emailed to them by oh terms notify.
+Builds and publishes the site, the web app and the service's handlers: to production from main, or to a preview. The label names the preview; it is `main` (production) on main and `dev` elsewhere unless given. Production is refused unless HEAD is origin/main with nothing uncommitted, and unless the terms and the privacy policy are as the ledger says, with what a change needs done (oh terms status). Before publishing production, it deletes old deployments as oh deploy prune --apply does; if that fails, it says so and deploys anyway. A preview's deploy deletes nothing, and runs the checkout's own code with your Cloudflare token: deploy one only from a branch you have read. It emails nobody: a change that matters to subscribers is emailed to them by oh terms notify.
 
 - **Needs:** `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`
 - **How-to:** [deploy.md](../how-to/deploy.md)
@@ -328,10 +328,10 @@ Deploys production in the order that keeps devices playing: the relay, then the 
 oh deploy prune [--apply] [--keep <keep>]
 ```
 
-Deletes old preview deployments, keeping the newest few (5 unless --keep says) and anything live.
+Deletes the site's old deployments, keeping the newest previews (5 unless --keep says), the newest 3 of production's, as many again of each that succeeded, and every live one. A live deployment is one with an alias: production's on its domains, and the newest of each preview branch on its branch's address. Every production deploy of the site does the same first, keeping 5 previews.
 
 - **Needs:** `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`
-- **How-to:** [deploy.md](../how-to/deploy.md#sweep-up-old-previews)
+- **How-to:** [deploy.md](../how-to/deploy.md#sweep-up-old-deployments)
 - **Example:** `oh deploy prune --keep 5 --apply`
 
 ### oh verify
@@ -356,7 +356,7 @@ Playing live on a preview of the app: the secrets previews keep for themselves, 
 oh preview secrets [--apply]
 ```
 
-Makes the secrets previews keep for themselves, new, and shows them to nobody: the service key pair previews sign with, and the key pair of the previews' house. The service pair's secret is set on the Pages project's preview environment as OH_SERVICE_SECRET, the house's on the preview relay as OH_HOUSE_SECRET, and their public halves written to config/openhearts.json as preview.serviceKey and preview.houseKey: commit them. None of them is production's, since a preview runs whatever branch was deployed to it. A preview built before keeps the keys it was built with: deploy the preview relay and each preview again afterwards.
+Makes the secrets previews keep for themselves, new, and shows them to nobody: the service key pair previews sign with, the key sign-ins are stored under, and the key pair of the previews' house. The service pair's secret is set on the Pages project's preview environment as OH_SERVICE_SECRET, the sign-ins' key beside it as OH_ID_HMAC, the house's on the preview relay as OH_HOUSE_SECRET, and the pairs' public halves written to config/openhearts.json as preview.serviceKey and preview.houseKey: commit them. None of them is production's, since a preview runs whatever branch was deployed to it. A sign-in linked on a preview before has to be linked again. A preview built before keeps the keys it was built with: deploy the preview relay and each preview again afterwards.
 
 - **Needs:** `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, Dart, and dart pub get in service/
 - **How-to:** [deploy.md](../how-to/deploy.md#play-live-on-a-preview)
@@ -460,7 +460,7 @@ Keeps the PhotoDNA module in the private bucket, every file in <dir> named by it
 oh photodna get <dir>
 ```
 
-Fetches the PhotoDNA module config/openhearts.json pins, from the private bucket into <dir>, to change it. Each file is checked against its pin. Keep <dir> outside this repository.
+Fetches the PhotoDNA module config/openhearts.json pins, from the private bucket into <dir>, to change it. Each file is checked against its pin. A <dir> inside this repository is refused.
 
 - **Needs:** `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, (Workers R2 Storage Edit)
 - **How-to:** [update-the-photodna-module.md](../how-to/update-the-photodna-module.md)
@@ -472,11 +472,11 @@ Fetches the PhotoDNA module config/openhearts.json pins, from the private bucket
 oh secret set <name> [--apply]
 ```
 
-Sets a secret wherever infra/cloudflare.mjs says it lives, from what you type (not shown) or pipe in. Production's, and those previews share with it. The secrets previews keep for themselves are made by oh preview secrets.
+Sets a secret wherever infra/cloudflare.mjs says it lives, from what you type (not shown) or pipe in. Production's alone: previews share none of them, and keep secrets of their own, which oh preview secrets makes. A secret made with its key is refused, and the command that makes it named: OH_SERVICE_SECRET (oh key mint) and OH_HOUSE_SECRET (oh house key).
 
 - **Needs:** `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`
-- **How-to:** [rotate-the-service-key.md](../how-to/rotate-the-service-key.md)
-- **Example:** `oh secret set OH_SERVICE_SECRET --apply`
+- **How-to:** [apply-infrastructure.md](../how-to/apply-infrastructure.md#apply-the-cloudflare-and-stripe-definitions)
+- **Example:** `oh secret set OH_STRIPE_WEBHOOK_SECRET --apply`
 
 ### oh house key
 
@@ -493,14 +493,14 @@ Makes the house a new key pair and shows its secret to nobody: set on the relay 
 ### oh key mint
 
 ```bash
-oh key mint
+oh key mint [--apply]
 ```
 
-Makes a new service key pair and prints both halves once, keeping neither.
+Makes the service a new key pair and shows its secret to nobody: set on the Pages project's production environment as OH_SERVICE_SECRET, its public half written to config/openhearts.json as serviceKey. The live deployment goes on signing with the old pair until the site is next deployed, and the old secret is kept nowhere: commit config/openhearts.json, and deploy only from that commit, in the order the how-to gives.
 
-- **Needs:** Dart, and dart pub get in service/
+- **Needs:** `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, Dart, and dart pub get in service/
 - **How-to:** [rotate-the-service-key.md](../how-to/rotate-the-service-key.md)
-- **Example:** `oh key mint`
+- **Example:** `oh key mint --apply`
 
 ### oh phone
 
@@ -508,7 +508,7 @@ Makes a new service key pair and prints both halves once, keeping neither.
 oh phone <platform> [-- <flutter build options>]
 ```
 
-Builds a store release of the app, with the deal's native libraries and what config/openhearts.json names. Anything after `--` goes to flutter build as it is.
+Builds a store release of the app, with the deal's native libraries and what config/openhearts.json names. A store release is production: it is refused unless HEAD is origin/main with nothing uncommitted. Anything after `--` goes to flutter build as it is.
 
 - **Needs:** Xcode on a Mac (iOS), or the Android NDK and app/android/key.properties (Android)
 - **How-to:** [cut-a-phone-release.md](../how-to/cut-a-phone-release.md)

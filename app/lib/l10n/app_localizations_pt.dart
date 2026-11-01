@@ -781,10 +781,6 @@ class AppLocalizationsPt extends AppLocalizations {
       'Arraste para mover, use dois dedos para aumentar.\nO que está no círculo é a sua imagem.';
 
   @override
-  String get pictureFlagged =>
-      'Este aparelho achou que você não ia querer esta imagem na mesa. É um palpite, feito aqui, e pode estar errado.';
-
-  @override
   String showPicture(String name) {
     return 'Mostrar a imagem de $name';
   }

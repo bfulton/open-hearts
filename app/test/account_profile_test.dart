@@ -361,6 +361,6 @@ void main() {
     expect(await here(), (name: 'Solo', avatar: const Avatar(icon: 'cake')));
     // And a name is kept as a table carries one: trimmed, and no longer.
     await AccountProfile.current.keep('${'x' * 70}  ', Avatar.none);
-    expect(await Identity.name(), 'x' * Identity.longestName);
+    expect(await Identity.name(), 'x' * longestName);
   });
 }

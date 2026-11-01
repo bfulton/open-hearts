@@ -154,12 +154,10 @@ PhoneStore? storeHere() => platform.storeHere();
 /// for, or why not. As a household code is claimed (household.dart,
 /// [claimCode]), and signed over the proof, so the proof cannot be
 /// carried to another key.
-Future<Said<Licence>> presentProof(Signer signer, StoreKind store, String proof,
-    {Uri? endpoint, String service = serviceKey}) async {
+Future<Said<Licence>> presentProof(Signer signer, StoreKind store, String proof, {String service = serviceKey}) async {
   // The service asks the store in turn, which is slower than a
   // household's question: the wait is a checkout's.
-  final answer =
-      await askHandler('store', signer, {'store': store.name, 'proof': proof}, endpoint, what: proof, timeout: waits.buy);
+  final answer = await askHandler('store', signer, {'store': store.name, 'proof': proof}, what: proof, timeout: waits.buy);
   if (answer?.status != 200) return (answer: null, refusal: refusalOf(answer));
   Licence? licence;
   try {
@@ -206,6 +204,11 @@ class StoreShop extends ChangeNotifier {
   bool _bought = false;
   Refused? _refusal;
   int _restored = 0;
+  Completer<void>? _nextBatch;
+
+  /// How long a restore waits for what the store found, before saying
+  /// it found nothing.
+  static const _restoreWait = Duration(seconds: 5);
 
   /// The product, once the store has said what it costs.
   StoreProduct? get product => _product;
@@ -248,6 +251,9 @@ class StoreShop extends ChangeNotifier {
     // One at a time, in the order the store said them; and one that
     // fell over does not stop the next being heard.
     _listening = store.purchases.listen((purchases) {
+      final heard = _nextBatch;
+      _nextBatch = null;
+      heard?.complete();
       _queue = _queue.then((_) => _handle(purchases)).catchError((Object error, StackTrace stack) {
         reportError(error, stack, where: 'store purchases');
       });
@@ -304,12 +310,17 @@ class StoreShop extends ChangeNotifier {
     if (store == null || _signer == null || _busy) return;
     _set(busy: true, clear: true);
     _restored = 0;
+    // What the store found comes on the stream, not back from the call,
+    // as one batch, empty when there was nothing: on Android before the
+    // call returns, and on iOS after it, since the StoreKit 2 plugin
+    // answers first and hands the transactions over on the main thread
+    // after (in_app_purchase_storekit, restorePurchases). So the batch
+    // is waited for, and then the service's answer about it, before
+    // saying whether there was anything.
+    final batch = _nextBatch = Completer<void>();
     try {
       await store.restore();
-      // What the store found comes on the stream, not back from the
-      // call: give it the turn to arrive, and then the service its
-      // turn to answer, before saying whether there was anything.
-      await Future<void>.delayed(Duration.zero);
+      await batch.future.timeout(_restoreWait, onTimeout: () {});
       await _queue;
       if (_restored == 0) {
         _set(busy: false, refusal: const Refused('nothingToRestore'));

@@ -19,11 +19,11 @@
 // for a moment and no longer: the app boots whatever happens, and a
 // device with nothing to bring along makes its key as it always did.
 //
-// window.ohCarried is the promise flutter_bootstrap.js waits on, and
-// window.ohCarry what came of it: 'carried', 'nothing' (asked, and the
-// old origin had nothing), 'kept' (a key is here already, the carry was
-// done before, or the device was started afresh), 'timed out', 'not
-// here' (no older origin to ask: a preview, a local run) or 'failed'.
+// window.ohCarried is the promise flutter_bootstrap.js waits on, and it
+// resolves to what came of it: 'carried', 'nothing' (asked, and the old
+// origin had nothing), 'kept' (a key is here already, the carry was done
+// before, or the device was started afresh), 'timed out', 'not here' (no
+// older origin to ask: a preview, a local run) or 'failed'.
 (() => {
   'use strict';
   const KEY = 'flutter.identity_secret';
@@ -114,10 +114,5 @@
   } catch (_) {
     started = Promise.resolve('failed');
   }
-  window.ohCarried = started
-    .catch(() => 'failed')
-    .then((outcome) => {
-      window.ohCarry = outcome;
-      return outcome;
-    });
+  window.ohCarried = started.catch(() => 'failed');
 })();

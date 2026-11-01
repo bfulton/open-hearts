@@ -11,13 +11,9 @@
 #                (the worker routes by host, docs/explanation/service.md)
 #
 # Publishing is for looking at, not for keeping: every upload is a
-# deployment Cloudflare keeps for ever, and a few dozen of them make
-# the project's own list useless. So publish when there is something to
-# look at, and sweep up after:
-#
-#   ./deploy.sh --prune [keep]   deletes the older previews, keeping the
-#                                newest [keep] (5) and anything live
-#   ./deploy.sh --prune -n       says what it would delete and stops
+# deployment Cloudflare keeps until it is deleted. ./oh deploy site
+# deletes the old ones before each production deploy, and
+# ./oh deploy prune does it on its own (ops/release.mjs, sweep).
 #
 # Usage:  ./deploy.sh [branch-label], or better, ./oh deploy site
 # (docs/reference/oh.md), which says first what stands in the way.
@@ -36,159 +32,50 @@ for need in CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID; do
   [ -n "${!need:-}" ] || { echo "deploy: $need is not set" >&2; exit 1; }
 done
 
-PROJECT=open-hearts
+PROJECT=$(node --input-type=module -e "import { pages } from './infra/cloudflare.mjs'; process.stdout.write(pages.project)")
 FLUTTER=${FLUTTER:-flutter}
-WRANGLER_VERSION=4.130.0
 STAGE=build/publish
 
 branch_of_git() {
   git rev-parse --abbrev-ref HEAD 2>/dev/null || echo dev
 }
 
-# ---- sweeping up old deployments ---------------------------------------
-# The alias — dev.open-hearts.pages.dev — always points at the newest
-# deployment of its branch, so deleting older previews takes nothing
-# down. Production keeps the live deployment and the two before it.
-prune() {
-  local keep=${1:-5} dry=${2:-}
-  local api="https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects/$PROJECT/deployments"
-  local page=1 skip=$keep pskip=3 ids all=""
-  # A page at a time, newest first, until a page comes back empty: the
-  # newest [keep] are left alone and everything after them goes.
-  while :; do
-    ids=$(curl -sS "$api?per_page=25&page=$page" -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" |
-      python3 -c "
-import json, sys
-page = json.load(sys.stdin)
-if not page.get('success'):
-    sys.exit('cloudflare said no: ' + json.dumps(page.get('errors')))
-found = page['result']
-print('#', len(found))
-previews = [x for x in found if x['environment'] != 'production'][$skip:]
-# Production keeps the live one and the two before it, to roll back to.
-production = [x for x in found if x['environment'] == 'production'][$pskip:]
-for d in previews + [x for x in production if not x.get('aliases')]:
-    print(d['id'], d['created_on'][:19], (d.get('deployment_trigger') or {}).get('metadata', {}).get('branch', '?'))
-")
-    [ "$(echo "$ids" | head -1 | cut -d' ' -f2)" = 0 ] && break
-    all="$all
-$(echo "$ids" | tail -n +2)"
-    page=$((page + 1))
-    skip=0
-    pskip=0
-    [ "$page" -gt 20 ] && break
-  done
-  all=$(echo "$all" | sed '/^$/d')
-  if [ -z "$all" ]; then
-    echo "nothing to sweep: $keep or fewer previews, 3 or fewer production"
-    return
-  fi
-  # Every one is tried; the sweep fails if any of them was not deleted.
-  local failed=0 said
-  while read -r id made branch; do
-    if [ -n "$dry" ]; then
-      echo "would delete $id  $made  $branch"
-    else
-      # Said deleted only when Cloudflare says so.
-      said=$(curl -sS -X DELETE "$api/$id" -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" || true)
-      if echo "$said" | python3 -c 'import json, sys; sys.exit(0 if json.load(sys.stdin).get("success") else 1)' 2> /dev/null; then
-        echo "deleted $id  $made  $branch"
-      else
-        echo "not deleted $id  $made  $branch: ${said:-no answer}" >&2
-        failed=$((failed + 1))
-      fi
-    fi
-  done <<<"$all"
-  if [ "$failed" -gt 0 ]; then
-    echo "$failed not deleted" >&2
-    return 1
-  fi
-}
-
-if [ "${1:-}" = --prune ]; then
-  shift
-  DRY=
-  KEEP=5
-  for arg in "$@"; do
-    case "$arg" in
-      -n) DRY=1 ;;
-      *) KEEP=$arg ;;
-    esac
-  done
-  prune "$KEEP" "$DRY"
-  exit
-fi
-
 LABEL=${1:-}
+case "$LABEL" in
+  # Not a branch: the sweep this took once (--prune) is ./oh deploy prune.
+  -*) echo "deploy: $LABEL is not a label; old deployments are swept by ./oh deploy prune" >&2; exit 2 ;;
+esac
 if [ -z "$LABEL" ]; then
   LABEL=$([ "$(branch_of_git)" = main ] && echo main || echo dev)
 fi
 
-# What is not secret comes from config/openhearts.json, committed: the
-# service's public key and the sign-in providers' identifiers for the
-# build, and the whole file for the worker (service/functions/deployment.mjs).
-# A variable of the same name set here still wins, for a one-off build.
-config_of() { node -p "const c = require('./config/openhearts.json'); String(($1) ?? '')"; }
-if [ "$LABEL" = main ]; then
-  OH_SERVICE_KEY=${OH_SERVICE_KEY:-$(config_of c.serviceKey)}
-  OH_HOUSE_KEY=${OH_HOUSE_KEY:-$(config_of c.houseKey)}
-else
-  # A preview is a deployment of its own (docs/how-to/deploy.md): its app
-  # takes licences signed with the key previews have (preview.serviceKey),
-  # never production's, and plays on the preview relay, never
-  # production's: the host service/do/wrangler.toml routes [env.preview]
-  # to. Its worker takes the same key from the same file, since its
-  # environment says it is a preview (OH_DEPLOYMENT, infra/cloudflare.mjs).
-  OH_SERVICE_KEY=${OH_SERVICE_KEY:-$(config_of c.preview?.serviceKey)}
-  OH_HOUSE_KEY=${OH_HOUSE_KEY:-$(config_of c.preview?.houseKey)}
-  PREVIEW_RELAY="wss://$(node --input-type=module -e "import { relayHost } from './ops/env.mjs'; process.stdout.write(await relayHost('preview'))")/{tag}"
-  OH_RELAYS=${OH_RELAYS:-$PREVIEW_RELAY}
-fi
-OH_GOOGLE_CLIENT_ID=${OH_GOOGLE_CLIENT_ID:-$(config_of c.google?.webClientId)}
-OH_APPLE_SERVICE_ID=${OH_APPLE_SERVICE_ID:-$(config_of c.apple?.servicesId)}
-
-# Production without the service's key is a build with live play shut
-# for everyone, subscribers included (it trusts no licence), so it is
-# refused here.
 # Production only from main as it was reviewed, and only when nothing
 # else stands in the way (ops/gate.mjs), whether or not oh started this.
 if [ "$LABEL" = main ]; then
   node ops/gate.mjs site || { echo "deploy: not deployed to production" >&2; exit 1; }
 fi
 
-if [ "$LABEL" = main ] && ! [[ "${OH_SERVICE_KEY:-}" =~ ^[0-9a-f]{64}$ ]]; then
-  echo "deploy: production needs the service's public key (64 hex), serviceKey in config/openhearts.json" >&2
-  exit 1
-fi
-# And without the house's, a build that seats nobody at a live table:
-# every table it seats names the house (packages/table, matching.dart).
-if [ "$LABEL" = main ] && ! [[ "${OH_HOUSE_KEY:-}" =~ ^[0-9a-f]{64}$ ]]; then
-  echo "deploy: production needs the house's public key (64 hex), houseKey in config/openhearts.json (./oh house key --apply)" >&2
-  exit 1
-fi
+# What the app is built with comes from config/openhearts.json, committed,
+# and from nothing in the environment (app/tool/defines.mjs, as for a
+# phone build). Production's is refused without the service's key, since
+# a build that trusts no licence has live play shut for everyone, and
+# without the house's, since a build without it seats nobody live. A
+# preview is a deployment of its own (docs/how-to/deploy.md): its app
+# takes licences signed with the key previews have (preview.serviceKey),
+# never production's, and plays on the preview relay, never
+# production's. Its worker takes the same key from the same file, since
+# its environment says it is a preview (OH_DEPLOYMENT, infra/cloudflare.mjs).
+mkdir -p app/build
+node app/tool/defines.mjs app/build/defines.json "$([ "$LABEL" = main ] && echo production || echo preview)"
 
-# "+" marks a dirty tree: the deploy holds work newer than the sha it
-# claims. Committing first is the habit; the suffix catches the misses.
-SHA=$(git rev-parse --short HEAD)
-DIRTY=$([ -n "$(git status --porcelain)" ] && echo true || echo false)
-BUILD_TAG="$SHA$([ "$DIRTY" = true ] && echo '+' || true)"
-BUILD_DATE=$(date -u +%Y-%m-%d)
-
-# The running build's identity is compiled in — a build cannot fetch
-# its own sha — by generating app/lib/build_info.g.dart for this build
-# and restoring the committed placeholder afterwards, whatever happens.
-# The same file turns the "new build is up" pill on, which only a
-# deployed build has: a local run, a test and CI keep the placeholder's
-# "dev" and the pill off, so it never floats over the widget tests.
-GEN=app/lib/build_info.g.dart
-restore_gen() { git checkout -- "$GEN" 2>/dev/null || true; }
-trap restore_gen EXIT
-cat > "$GEN" <<GENEOF
-// Generated by deploy.sh for build $BUILD_TAG; restored after the build.
-const generatedBuildTag = '$BUILD_TAG';
-const generatedBuildDate = '$BUILD_DATE';
-const generatedUpdateCheck = true;
-GENEOF
+# The build's identity, as defines.mjs wrote it for the build, so the
+# pill's build-info.json below names exactly what was compiled in. "+"
+# marks a dirty tree: the deploy holds work newer than the sha it claims.
+define_of() { node -p "require('./app/build/defines.json').$1"; }
+BUILD_TAG=$(define_of OH_BUILD_TAG)
+BUILD_DATE=$(define_of OH_BUILD_DATE)
+SHA=${BUILD_TAG%+}
+DIRTY=$([ "$SHA" != "$BUILD_TAG" ] && echo true || echo false)
 
 echo "==> building $BUILD_TAG -> $LABEL"
 
@@ -197,8 +84,8 @@ mkdir -p "$STAGE"
 node site/build.mjs "$STAGE"
 # The service's handlers (docs/explanation/service.md) run as the Pages worker:
 # _worker.js/ at the root of what is published answers /api/…, and
-# hands everything else to the static assets. Its secrets — the TURN
-# key — are the project's, set in the Pages dashboard, never here.
+# hands everything else to the static assets. Its secrets are the Pages
+# project's (infra/cloudflare.mjs), set with ./oh, never here.
 # A directory rather than one file: the entry imports the signature
 # wasm as a module, which Cloudflare compiles at upload — it refuses to
 # compile wasm from bytes while running (service/functions/entry.mjs).
@@ -224,10 +111,15 @@ cp app/web/schnorr.wasm "$STAGE/_worker.js/schnorr.wasm"
 node --input-type=module -e "await import('file://$(cd "$STAGE" && pwd)/_worker.js/worker.mjs')" ||
   { echo "deploy: the staged worker does not load" >&2; exit 1; }
 
-# OH_RELAYS is left empty for production, so the build uses its own
-# relay list (app/lib/net/relays.dart); a preview's names the preview
-# relay, as the local rig's names its bridges. The build's identity comes
-# from the generated file above, not a flag.
+# The defines, app/build/defines.json above:
+#
+# OH_RELAYS is not set for production, so the build uses its own relay
+# list (app/lib/net/relays.dart); a preview's names the preview relay,
+# as the local rig's names its bridges.
+# OH_BUILD_TAG and OH_BUILD_DATE are the build's identity, compiled in
+# since a build cannot fetch its own (app/lib/build_info.dart): the About
+# page shows them, and the remote config's update notice compares the
+# date. OH_UPDATE_CHECK turns on the "new build is up" pill.
 #
 # OH_SERVICE_KEY (serviceKey in the config, preview.serviceKey for a
 # preview) names the service this build will take a licence from, and no
@@ -249,7 +141,8 @@ node --input-type=module -e "await import('file://$(cd "$STAGE" && pwd)/_worker.
 # apple.servicesId in the config) are the sign-in providers' identifiers
 # (docs/explanation/service.md, app/lib/net/provider_tokens.dart).
 # Neither is a secret. A build without one offers no sign-in with that
-# provider.
+# provider. The rest, the app's origin and the store products, are read
+# only by a phone build.
 #
 # The base is / : production serves the app at the root of
 # play.openhearts.game. A preview, which has no such host, serves the
@@ -263,11 +156,7 @@ node --input-type=module -e "await import('file://$(cd "$STAGE" && pwd)/_worker.
     --source-maps \
     --no-web-resources-cdn \
     --base-href / \
-    --dart-define=OH_RELAYS="${OH_RELAYS:-}" \
-    --dart-define=OH_SERVICE_KEY="${OH_SERVICE_KEY:-}" \
-    --dart-define=OH_HOUSE_KEY="${OH_HOUSE_KEY:-}" \
-    --dart-define=OH_GOOGLE_CLIENT_ID="${OH_GOOGLE_CLIENT_ID:-}" \
-    --dart-define=OH_APPLE_SERVICE_ID="${OH_APPLE_SERVICE_ID:-}" )
+    --dart-define-from-file=build/defines.json )
 FLUTTER="$FLUTTER" app/worker/build.sh app/build/web
 
 mkdir -p "$STAGE/play"
@@ -278,7 +167,7 @@ printf '{"build": "%s", "date": "%s"}\n' "$BUILD_TAG" "$BUILD_DATE" \
   > "$STAGE/play/build-info.json"
 
 echo "==> publishing to $PROJECT ($LABEL)"
-npx --yes "wrangler@$WRANGLER_VERSION" pages deploy "$STAGE" \
+ops/wrangler/wrangler pages deploy "$STAGE" \
     --project-name "$PROJECT" \
     --branch "$LABEL" \
     --commit-hash "$SHA" \
@@ -290,5 +179,5 @@ echo "app   https://$LABEL.$PROJECT.pages.dev/play/"
 if [ "$LABEL" = main ]; then
   echo "      https://play.openhearts.game/ (production, and its /api/)"
 else
-  echo "live  on $OH_RELAYS, with the people you invite (./oh preview invite)"
+  echo "live  on the preview relay, with the people you invite (./oh preview invite)"
 fi

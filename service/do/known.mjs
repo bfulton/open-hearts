@@ -40,12 +40,12 @@
 
 import { heldPictureKey, hold, keepHeldPictures } from '../functions/holds.mjs';
 import { bodyOf } from '../functions/http.mjs';
-import { NcmecRefused, fileDetailsXml, fileReport, reportXml } from '../functions/ncmec.mjs';
+import { fileDetailsXml, fileReport, reportXml } from '../functions/ncmec.mjs';
 import { pictureHash } from './arachnid.mjs';
-import { CHECKERS, SHIELD, anyChecker, checkerIn, checkersOf, listed, verdictOf } from './checkers.mjs';
+import { CHECKERS, SHIELD, anyChecker, checkerIn, checkerOf, listed, verdictOf } from './checkers.mjs';
 import { Unreadable } from './jpeg.mjs';
 import { PICTURES_ROW, deleteCopy, pictureDigest, pictureKey, withheldOf, withholding } from '../functions/pictures.mjs';
-import { isAccount, storeOf } from '../functions/rows.mjs';
+import { base64Of, bytesOf64, isAccount, storeOf } from '../functions/rows.mjs';
 import { orderOf } from '../functions/suspension.mjs';
 import { accountsWith } from '../tool/find.mjs';
 import { placeOrder } from '../tool/suspend.mjs';
@@ -70,8 +70,6 @@ export const HOW_MOST = 300;
 /// How long before a step that failed is tried again: a minute, then
 /// doubling, to six hours at the most.
 export const retryAfter = (tries) => Math.min(6 * 60 * 60 * 1000, 60 * 1000 * 2 ** Math.max(0, tries - 1));
-
-const bytesOf = (base64) => Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
 
 /// Who said a picture the operator reported is a match, as its row
 /// keeps what was said of it (KnownPictures, `pic:`).
@@ -267,9 +265,9 @@ export class KnownPictures {
   }
 
   /// The checker in use, once it checks pictures, and what it lacks
-  /// (checkers.mjs, checkersOf): {on, missing}.
-  async checkers() {
-    return checkersOf(this.env, { checker: await checkerIn(this.env), fetchImpl: this.http, pdq: this.hasher, edgeHasher: this.edgeHasher, log: this.log });
+  /// (checkers.mjs, checkerOf): {checker, missing}.
+  async checker() {
+    return checkerOf(this.env, { checker: await checkerIn(this.env), fetchImpl: this.http, pdq: this.hasher, edgeHasher: this.edgeHasher, log: this.log });
   }
 
   /// [what] failed, with [error]: the operator emailed, once in a while
@@ -331,13 +329,13 @@ export class KnownPictures {
   /// it, as when it was set before the checker had said, [at] (ISO)
   /// then.
   async check({ jpeg, account = null, key = null, shown = false, at = null }) {
-    const { on, missing } = await this.checkers();
-    for (const m of missing) await this.problem('config', m);
-    if (!on.length) return { said: 'off' };
+    const { checker, missing } = await this.checker();
+    if (missing) await this.problem('config', missing);
+    if (!checker) return { said: 'off' };
     const digest = await pictureDigest(jpeg);
     if (!digest) return { said: 'off' };
-    const { said, answers, failures } = await this.consult(digest, jpeg, on);
-    for (const f of failures) await this.problem(f.id, `a picture was let through unchecked, to be asked about again: ${f.message}`);
+    const { said, answers, failure } = await this.consult(digest, jpeg, checker);
+    if (failure) await this.problem(checker.id, `a picture was let through unchecked, to be asked about again: ${failure}`);
     const receipt = said ? receiptOf(answers, said) : {};
     if (said === 'match' || said === 'harmful') {
       // A picture let through before, while the checker did not answer,
@@ -353,39 +351,32 @@ export class KnownPictures {
   }
 
   /// What is said of the picture [jpeg] (base64), [digest]: what either
-  /// checker said of it before, or else what the checkers [on] (the one
-  /// in use) say now: {said, answers, failures}. [said] is what it comes
-  /// to (checkers.mjs, verdictOf), null while nothing is; [answers] what
-  /// each said, and when (answersOf); and [failures] each in [on] that
-  /// did not answer, {id, message}. What each answers is kept, so that
-  /// it is asked once.
-  async consult(digest, jpeg, on) {
+  /// checker said of it before, or else what [checker], the one in use,
+  /// says now: {said, answers, failure}. [said] is what it comes to
+  /// (checkers.mjs, verdictOf), null while nothing is; [answers] what
+  /// each said, and when (answersOf); and [failure] why the checker did
+  /// not answer, or null. What it answers is kept, so that it is asked
+  /// once.
+  async consult(digest, jpeg, checker) {
     const answers = answersOf(await this.storage.get(`pic:${digest}`));
     const { by, at } = answers;
-    const ids = on.map((c) => c.id);
-    const failures = [];
-    const asking = verdictOf(by, ids) === null ? on.filter((c) => !Object.hasOwn(by, c.id)) : [];
-    if (asking.length) {
-      const bytes = bytesOf(jpeg);
-      const said = await Promise.all(
-        asking.map(async (c) => {
-          try {
-            return [c.id, await c.ask(bytes, digest)];
-          } catch (e) {
-            if (e instanceof Unreadable) return [c.id, 'unreadable'];
-            failures.push({ id: c.id, message: e?.message ?? `${e}` });
-            return null;
-          }
-        }),
-      );
-      const answered = said.filter(Boolean);
-      for (const [id, s] of answered) {
-        by[id] = s;
-        at[id] = new Date(this.now()).toISOString();
+    let failure = null;
+    if (verdictOf(by, checker.id) === null && !Object.hasOwn(by, checker.id)) {
+      const bytes = bytesOf64(jpeg);
+      let said = null;
+      try {
+        said = await checker.ask(bytes, digest);
+      } catch (e) {
+        if (e instanceof Unreadable) said = 'unreadable';
+        else failure = e?.message ?? `${e}`;
       }
-      if (answered.length) await this.storage.put(`pic:${digest}`, { by, at });
+      if (said) {
+        by[checker.id] = said;
+        at[checker.id] = new Date(this.now()).toISOString();
+        await this.storage.put(`pic:${digest}`, { by, at });
+      }
     }
-    return { said: verdictOf(by, ids), answers, failures };
+    return { said: verdictOf(by, checker.id), answers, failure };
   }
 
   /// The report the operator's tool wrote ([asked], its row and [id],
@@ -428,17 +419,16 @@ export class KnownPictures {
   /// (suspension.mjs, HELD). Null for none.
   async copyOf(digest, accounts) {
     const env = this.env;
-    const b64 = (bytes) => btoa(String.fromCharCode(...bytes));
     const read = async (bucket, key) => (bucket ? await r2Objects(bucket).read(key) : null);
     const others = env.OH_PICTURES ? await accountsWith(r2Objects(env.OH_PICTURES), digest) : [];
     for (const account of new Set([...accounts, ...others])) {
       const copy = await read(env.OH_PICTURES, pictureKey(account, digest));
-      if (copy) return b64(copy);
+      if (copy) return base64Of(copy);
     }
     const store = storeOf(env);
     for (const account of accounts) {
       const held = await read(env.OH_RECORDS, heldPictureKey(account, digest));
-      if (held) return b64(held);
+      if (held) return base64Of(held);
       const taken = (await store?.get(`ACCOUNT#${account}`, 'HELD'))?.picture;
       if (taken && (await pictureDigest(taken)) === digest) return taken;
     }
@@ -511,15 +501,15 @@ export class KnownPictures {
   async work() {
     let next = null;
     const later = (at) => (next = next === null ? at : Math.min(next, at));
-    const { on } = await this.checkers();
-    for (const [id, waiting] of on.length ? await this.storage.list({ prefix: 'retry:' }) : []) {
+    const { checker } = await this.checker();
+    for (const [id, waiting] of checker ? await this.storage.list({ prefix: 'retry:' }) : []) {
       if (waiting.next > this.now()) {
         later(waiting.next);
         continue;
       }
       const digest = id.slice('retry:'.length);
-      const { said, answers, failures } = await this.consult(digest, waiting.jpeg, on);
-      for (const f of failures) await this.problem(f.id, `a picture let through earlier is still unchecked: ${f.message}`);
+      const { said, answers, failure } = await this.consult(digest, waiting.jpeg, checker);
+      if (failure) await this.problem(checker.id, `a picture let through earlier is still unchecked: ${failure}`);
       if (said === 'match' || said === 'harmful') await this.matchedLate(digest, waiting, { said, answers, receipt: receiptOf(answers, said) });
       if (said === null) {
         const tries = waiting.tries + 1;
@@ -567,7 +557,7 @@ export class KnownPictures {
       await attempt('held', async () => {
         if (!store || !env.OH_RECORDS) throw new Error('no store or OH_RECORDS');
         await hold(store, c.account, { now });
-        await env.OH_RECORDS.put(heldPictureKey(c.account, c.digest), bytesOf(c.jpeg), { httpMetadata: { contentType: 'image/jpeg' } });
+        await env.OH_RECORDS.put(heldPictureKey(c.account, c.digest), bytesOf64(c.jpeg), { httpMetadata: { contentType: 'image/jpeg' } });
         if (env.OH_PICTURES) await keepHeldPictures(r2Objects(env.OH_PICTURES), r2Objects(env.OH_RECORDS), c.account);
       });
       await attempt('ended', async () => {
@@ -600,7 +590,7 @@ export class KnownPictures {
           username: ncmec.username,
           password: ncmec.password,
           report,
-          jpeg: bytesOf(c.jpeg),
+          jpeg: bytesOf64(c.jpeg),
           fileName,
           details: (reportId, fileId) => fileDetailsXml({ reportId, fileId, fileName, at: c.at, digest: c.digest, shown: c.shown, viewed: !!c.viewed }),
           fetchImpl: this.http,
@@ -638,5 +628,3 @@ export class KnownPictures {
     return after;
   }
 }
-
-export { NcmecRefused };

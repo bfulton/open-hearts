@@ -70,7 +70,7 @@ async function twoDevices() {
   const env = { ASSETS: assets, OH_SERVICE_SECRET: SERVICE_SECRET, OH_SERVICE_KEY: SERVICE_KEY, OH_STORE: kvOf(store) };
   const ask = async (pair, handler, more = {}) => {
     const res = await worker.fetch(
-      new Request(`https://dev.open-hearts.pages.dev/api/${handler}`, { method: 'POST', body: JSON.stringify(await asking(pair, handler, more)) }),
+      new Request(`https://play.openhearts.game/api/${handler}`, { method: 'POST', body: JSON.stringify(await asking(pair, handler, more)) }),
       env,
     );
     return { status: res.status, body: await res.json() };
@@ -196,8 +196,8 @@ test('the app and the service agree on the icons, the colours, the picture\'s si
   assert.deepEqual(icons, [...PROFILE_ICONS]);
   assert.equal(Number(/static const paletteSize = (\d+);/.exec(avatar)[1]), PROFILE_COLOURS);
   assert.equal(Number(/static const maxPictureBytes = (\d+);/.exec(avatar)[1]), PROFILE_PICTURE_MOST);
-  const identity = await readFile(new URL('../../app/lib/identity.dart', import.meta.url), 'utf8');
-  assert.equal(Number(/static const longestName = (\d+);/.exec(identity)[1]), PROFILE_NAME_MOST);
+  const names = await readFile(new URL('../../packages/table/lib/src/names.dart', import.meta.url), 'utf8');
+  assert.equal(Number(/^const longestName = (\d+);/m.exec(names)[1]), PROFILE_NAME_MOST);
   // A refused name is one the app does not send again.
   const profile = await readFile(new URL('../../app/lib/net/account_profile.dart', import.meta.url), 'utf8');
   assert.ok(/static const _malformed = \{[^}]*'not an allowed name'/.test(profile) && NAME_REFUSED === 'not an allowed name');

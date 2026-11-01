@@ -138,7 +138,7 @@ class InUse extends ChangeNotifier {
     final signer = _signer!;
     final seated = _seated;
     final more = <String, Object?>{'want': want, if (place) 'seated': seated};
-    final answer = await askHandler('activate', signer, more, null, what: '$want ${place ? (seated ?? '') : ''}', timeout: waits.licence);
+    final answer = await askHandler('activate', signer, more, what: '$want ${place ? (seated ?? '') : ''}', timeout: waits.licence);
     if (answer == null) {
       _unanswered = DateTime.now();
       return _standing;

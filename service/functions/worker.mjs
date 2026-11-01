@@ -17,7 +17,7 @@
 
 import { accountOfKey, backupCodeOf, backupRow, entitlementOf } from './accounts.mjs';
 import { alertReport, alertSubscribed, alertUnwritten, alertWaiting, reportOf } from './alerts.mjs';
-import { appHostFor, serveStatic } from './app_host.mjs';
+import { APP_HOST, appHostFor, serveStatic } from './app_host.mjs';
 import { CONFIG_ROW, configOf } from './config.mjs';
 import { healthOf } from './health.mjs';
 import { holdOf } from './holds.mjs';
@@ -26,18 +26,19 @@ import { MOST_BODY, MOST_EVENT, cors, json, preflight, signedFor, textOf } from 
 import { ACTIVATION_S, accountAsking, activationFor, heldAccount, licence, serviceKeys } from './licence.mjs';
 import { loginRow } from './logins.mjs';
 import { measure } from './metrics.mjs';
-import { carryOutNotice, noticesOf } from './notices.mjs';
+import { carryOutNotice, noticesOf, toldVersions } from './notices.mjs';
 import { MOST_PROFILE_BODY } from './profile.mjs';
 import { anonymizeGames, keepRecord, keptGames, markForgotten, recordMost, recordResponse, tableIdShape } from './records.mjs';
-import { isAccount, storeOf } from './rows.mjs';
-import { S, notConfigured, openHouse, settle } from './settings.mjs';
+import { REFUSED } from './refusals.mjs';
+import { bytesOf64, isAccount, storeOf } from './rows.mjs';
+import { isLocal, loadServiceSettings, notConfigured, openHouse, serviceSettings } from './settings.mjs';
 import { APPLE_ID_GONE, PROVIDERS, appleIdNotice, supersede, unlinkFromAccount, whoSignedIn } from './signin.mjs';
-import { playPurchase, playSubscriptionOf, pushedByPlay, storeAccountOf } from './stores.mjs';
+import { appleTransaction, playPurchase, playSubscriptionOf, pushedByPlay, storeAccountOf } from './stores.mjs';
 import { checkout, endAtStripe, endRefunded, manage, payerLookup, record, sameSite, webSubscriptionsOf, webhookSigned } from './stripe.mjs';
 import { dateSubscription } from './subscriptions.mjs';
 import { SUSPENDED_WHY, isOrder, orderRow } from './suspension.mjs';
 import { LOCAL_TURN, mint } from './turn.mjs';
-import { appleSigned, appleTransaction } from './x509.mjs';
+import { appleSigned } from './x509.mjs';
 
 async function ticketRoute(request, env) {
   const pre = preflight(request, 'POST');
@@ -52,8 +53,8 @@ async function ticketRoute(request, env) {
   // accountAsking), whose object decides: so for each handler that
   // asks it next.
   const { account, shown } = await accountAsking(store, key, body, env, { signer });
-  if (!account) return json(request, 402, { error: 'no subscription' });
-  const { status, body: out } = await inHousehold(env, account, { op: 'ticket', key, shown });
+  if (!account) return json(request, 402, { error: REFUSED.noSubscription });
+  const { status, body: out } = await inHousehold(env, account, { op: 'ticket', key, account, shown });
   return json(request, status, out);
 }
 
@@ -68,20 +69,27 @@ async function claimRoute(request, env) {
   const { key, body, signer } = asked;
   const store = storeOf(env);
   if (!store) return json(request, 503, notConfigured('OH_STORE'));
-  // In the account the code is for, which the code's row says; a code
-  // nobody made is said so here, without queueing anybody.
+  // In the account the code is for, which the code's row says. A code
+  // nobody made, or one the store here already shows spent or run out,
+  // is said so here, without queueing anybody: anybody who once saw a
+  // code could otherwise spend the account's allowance with it. The
+  // account's turn still decides.
   // A backup code, typed by a person, or a code off another device's
   // screen: sixteen characters of one alphabet, or thirty-two hex.
   const backup = backupCodeOf(body.ticket);
   let claimed;
   if (backup) {
     const account = (await store.get(await backupRow(backup), 'META'))?.account;
-    if (!isAccount(account)) return json(request, 404, { error: 'no such code' });
+    if (!isAccount(account)) return json(request, 404, { error: REFUSED.noSuchCode });
+    const mine = (await store.get(`ACCOUNT#${account}`, 'BACKUP'))?.codes?.find((c) => c.code === backup);
+    if (mine?.used_at) return json(request, 409, { error: REFUSED.codeUsed });
     claimed = await inHousehold(env, account, { op: 'redeem', key, code: backup });
   } else {
-    if (typeof body.ticket !== 'string' || !/^[0-9a-f]{2,64}$/.test(body.ticket)) return json(request, 400, { error: 'not a code' });
+    if (typeof body.ticket !== 'string' || !/^[0-9a-f]{2,64}$/.test(body.ticket)) return json(request, 400, { error: REFUSED.notACode });
     const ticket = await store.get(`TICKET#${body.ticket}`, 'META');
-    if (!isAccount(ticket?.account)) return json(request, 404, { error: 'no such code' });
+    if (!isAccount(ticket?.account)) return json(request, 404, { error: REFUSED.noSuchCode });
+    if (ticket.used_at) return json(request, 409, { error: REFUSED.codeUsed });
+    if (Date.parse(ticket.expires_at) <= Date.now()) return json(request, 410, { error: REFUSED.codeRunOut });
     claimed = await inHousehold(env, ticket.account, { op: 'claim', key, code: body.ticket });
   }
   if (claimed.status !== 200) return json(request, claimed.status, claimed.body);
@@ -103,12 +111,19 @@ async function backupsRoute(request, env) {
   const store = storeOf(env);
   if (!store) return json(request, 503, notConfigured('OH_STORE'));
   const { account, shown } = await accountAsking(store, key, body, env, { signer });
-  if (!account) return json(request, 402, { error: 'no subscription' });
+  if (!account) return json(request, 402, { error: REFUSED.noSubscription });
   const rotate = body.rotate === true;
   const send = !rotate && body.send === true;
+  // Stripe is asked for the payer's address only for a device of the
+  // account: one the store here backs, or else one the account's turn
+  // holds, as for a device just brought in.
+  if (send && (shown || !(await store.get(`ACCOUNT#${account}`, `DEVICE#${key}`)))) {
+    const held = await inHousehold(env, account, { op: 'held', key, account, shown });
+    if (held.status !== 200) return json(request, held.status, held.body);
+  }
   const subscription = (await store.get(`ACCOUNT#${account}`, 'META'))?.subscription;
   const payer = send ? await payerLookup(store, subscription, env) : { email: null, why: null };
-  const { status, body: out } = await inHousehold(env, account, { op: 'backups', key, rotate, send, email: payer.email, why: payer.why, shown });
+  const { status, body: out } = await inHousehold(env, account, { op: 'backups', key, account, rotate, send, email: payer.email, why: payer.why, shown });
   return json(request, status, out);
 }
 
@@ -130,7 +145,7 @@ async function reviewRoute(request, env) {
   // names where the store here has yet to hear of it (licence.mjs,
   // heldAccount): so for each handler that decides here.
   const account = await heldAccount(store, key, body, env, { signer });
-  if (!account) return json(request, 402, { error: 'no subscription' });
+  if (!account) return json(request, 402, { error: REFUSED.noSubscription });
   const ok = await inHousehold(env, account, { op: 'inUse', key, account, table: body.table });
   if (ok.status !== 200) return json(request, ok.status, ok.body);
   return recordResponse(env.OH_RECORDS, body.table, cors(request));
@@ -160,9 +175,8 @@ async function activateRoute(request, env) {
   // The account its licence names, or the store's: a device just brought
   // in shows the one, before the store here has the other.
   const { account, shown } = await accountAsking(store, key, body, env, { signer, now });
-  if (!account) return json(request, 402, { error: 'no subscription' });
-  const seated = body.seated === undefined ? undefined : body.seated;
-  const took = await inHousehold(env, account, { op: 'activate', key, account, want: body.want, ...(seated !== undefined ? { seated } : {}), shown });
+  if (!account) return json(request, 402, { error: REFUSED.noSubscription });
+  const took = await inHousehold(env, account, { op: 'activate', key, account, want: body.want, ...(body.seated !== undefined ? { seated: body.seated } : {}), shown });
   if (took.status !== 200) return json(request, took.status, took.body);
   // An hour, and never past the end of the day the subscription is paid
   // to.
@@ -191,12 +205,15 @@ async function recordRoute(request, env) {
   const store = storeOf(env);
   if (!store) return json(request, 503, notConfigured('OH_STORE'));
   const account = await heldAccount(store, key, sent, env, { signer });
-  if (!account) return json(request, 402, { error: 'no subscription' });
+  if (!account) return json(request, 402, { error: REFUSED.noSubscription });
   const ok = await inHousehold(env, account, { op: 'record', key, account });
   if (ok.status !== 200) return json(request, ok.status, ok.body);
   const { status, body } = await keepRecord(env.OH_RECORDS, key, sent.table, sent.record, {
     verify: (k, d, s) => signer.verify(k, d, s),
     service: serviceKeys(env)?.service,
+    // The house a game's result is the house's by: this deployment's
+    // (deployment.mjs, configEnv), as the app's build names it.
+    house: env.OH_HOUSE_KEY,
   });
   return json(request, status, body);
 }
@@ -213,12 +230,12 @@ async function devicesRoute(request, env) {
   const drop = body.drop;
   if (typeof drop === 'string' && !/^[0-9a-f]{64}$/.test(drop)) return json(request, 400, { error: 'a table key, 64 hex' });
   const { account, shown } = await accountAsking(store, key, body, env, { signer });
-  if (!account) return json(request, 402, { error: 'no subscription' });
+  if (!account) return json(request, 402, { error: REFUSED.noSubscription });
   if (typeof drop === 'string') {
-    const { status, body: out } = await inHousehold(env, account, { op: 'drop', key, device: drop, shown });
+    const { status, body: out } = await inHousehold(env, account, { op: 'drop', key, account, device: drop, shown });
     if (status !== 200) return json(request, status, out);
   }
-  const { status, body: out } = await inHousehold(env, account, { op: 'list', key, shown });
+  const { status, body: out } = await inHousehold(env, account, { op: 'list', key, account, shown });
   return json(request, status, out);
 }
 
@@ -240,8 +257,8 @@ async function profileRoute(request, env) {
   const store = storeOf(env);
   if (!store) return json(request, 503, notConfigured('OH_STORE'));
   const { account, shown } = await accountAsking(store, key, body, env, { signer });
-  if (!account) return json(request, 402, { error: 'no subscription' });
-  const { status, body: out } = await inHousehold(env, account, { op: 'profile', key, ...(body.profile !== undefined ? { profile: body.profile } : {}), shown });
+  if (!account) return json(request, 402, { error: REFUSED.noSubscription });
+  const { status, body: out } = await inHousehold(env, account, { op: 'profile', key, account, ...(body.profile !== undefined ? { profile: body.profile } : {}), shown });
   return json(request, status, out);
 }
 
@@ -255,14 +272,21 @@ async function signInRoute(request, env, move) {
   // The token names the key its nonce was made for, and the nonce is
   // whoever asked the provider's to choose: a stranger can have his
   // own account signed over somebody else's key. The key signing the
-  // request is what says it wanted that account.
-  const asked = await signedFor(request, env, move ? 'supersede' : 'attest');
+  // request is what says it wanted that account, so it signs the
+  // provider and the token themselves (`<provider> <token>`): a request
+  // somebody captured cannot be sent again with a token of their own
+  // choosing in its place, nor one signed as these were when they
+  // signed nothing.
+  const asked = await signedFor(request, env, move ? 'supersede' : 'attest', (body) => `${body.provider} ${body.token}`);
   if (asked instanceof Response) return asked;
   const { key, body, signer } = asked;
+  // What is signed is the text of the two, so a token that is not text
+  // (an array of one, which would read as it) is not one.
+  if (typeof body.provider !== 'string' || typeof body.token !== 'string') return json(request, 401, { error: REFUSED.signInRefused });
   const store = storeOf(env);
   if (!store) return json(request, 503, notConfigured('OH_STORE'));
   const who = await whoSignedIn(body.provider, body.token, key, env, fetch, { open: openHouse(env, request) });
-  if (!who) return json(request, 401, { error: 'that sign-in does not check out' });
+  if (!who) return json(request, 401, { error: REFUSED.signInRefused });
   const login = await loginRow(who, env);
   // In local mode a device nobody has heard of has an account, as it
   // asks for anything.
@@ -271,8 +295,8 @@ async function signInRoute(request, env, move) {
   const { status, body: out, entitlement } = move
     ? await supersede(who, key, store, env, login)
     : mine
-      ? await inHousehold(env, mine, { op: 'attest', who, key, login, shown })
-      : { status: 402, body: { error: 'no subscription' } };
+      ? await inHousehold(env, mine, { op: 'attest', who, key, account: mine, login, shown })
+      : { status: 402, body: { error: REFUSED.noSubscription } };
   if (status !== 200) return json(request, status, out);
   // Straight back with the licence it is owed, if any: a device that
   // has just proved who it is should not have to ask twice. One brought
@@ -361,13 +385,21 @@ async function orderRoute(request, env) {
   const { status, body } = await inHousehold(env, order.account, { op: 'order', account: order.account, order: id });
   if (status !== 200 || order.act !== 'terminate' || order.endWeb !== true) return json(request, status, body);
   const web = webSubscriptionsOf(await store.get(`ACCOUNT#${order.account}`, 'META'));
+  return (await endWebSubscriptions(request, env, web, 'terminated under the terms')) ?? json(request, 200, { ...body, endedWeb: web });
+}
+
+/// Each of [web], an account's web subscriptions, ended in Stripe with
+/// [comment] as the reason: null once they are, or the answer when they
+/// could not be, 503 without the Stripe key and 502 when Stripe did not
+/// answer, so that the asker asks again.
+async function endWebSubscriptions(request, env, web, comment) {
   if (web.length && !env.OH_STRIPE_SECRET) return json(request, 503, notConfigured('OH_STRIPE_SECRET'));
   try {
-    for (const sub of web) await endAtStripe(sub, env.OH_STRIPE_SECRET, 'terminated under the terms');
+    for (const sub of web) await endAtStripe(sub, env.OH_STRIPE_SECRET, comment);
   } catch {
     return json(request, 502, { error: 'the shop is not answering' });
   }
-  return json(request, 200, { ...body, endedWeb: web });
+  return null;
 }
 
 async function manageRoute(request, env) {
@@ -407,7 +439,10 @@ async function stripeRoute(request, env, ctx) {
     const ended = await endRefunded(event.data?.object, store, env);
     return json(request, ended.status, ended.status === 200 ? { ok: true } : ended.body);
   }
-  const done = await record(event, store);
+  // A paid checkout is bound in its subscription's own turn, where its
+  // account is found or made once, however many deliveries overlap.
+  const done = await record(event, store, { bind: (subscription, key) => inSubscription(env, subscription, { op: 'paid', subscription, key }) });
+  if (done?.bound && triedAgain(done.status)) return json(request, 503, { error: 'not bound yet' });
   if (done?.bound) await after(ctx, alertSubscribed(env, store, { subscription: done.subscription, source: 'stripe', key: done.bound }));
   // A subscription just paid for: its account's backup codes, sent to
   // the email the checkout was paid with, with what it paid. Not kept:
@@ -416,12 +451,21 @@ async function stripeRoute(request, env, ctx) {
     const paid = event.data?.object;
     const email = paid?.customer_details?.email ?? null;
     const charge = Number.isSafeInteger(paid?.amount_total) && typeof paid?.currency === 'string' ? { amount: paid.amount_total, currency: paid.currency } : null;
-    await inHousehold(env, done.account, { op: 'made', account: done.account, subscription: done.subscription, email, charge });
+    const made = await inHousehold(env, done.account, { op: 'made', account: done.account, subscription: done.subscription, email, charge });
+    if (triedAgain(made.status)) return json(request, 503, { error: 'backup codes not made yet' });
   }
   // Anything not ours is still a delivery taken: a webhook that gets an
   // error back is a webhook Stripe keeps sending.
   return json(request, 200, { ok: true });
 }
+
+/// Whether an account's turn answering [status] is worth Stripe sending
+/// the event again: over the hour's allowance, the turn failing, or a
+/// relay deployed before this site that does not know the op yet (400,
+/// which the ops asked here never answer otherwise). A refusal that would
+/// come out the same, such as a full account, is taken as the answer.
+/// Every step of a delivery can run twice.
+const triedAgain = (status) => status === 400 || status === 429 || status >= 500;
 
 async function licenceRoute(request, env, ctx) {
   const pre = preflight(request, 'POST');
@@ -454,7 +498,7 @@ async function waitingRoute(request, env, ctx) {
   const store = storeOf(env);
   if (!store) return json(request, 503, notConfigured('OH_STORE'));
   const account = await heldAccount(store, key, body, env, { signer });
-  if (!account) return json(request, 402, { error: 'no subscription' });
+  if (!account) return json(request, 402, { error: REFUSED.noSubscription });
   if (!openHouse(env, request)) await after(ctx, alertWaiting(env, store, { key, account, pool: body.pool, target: body.target }));
   return json(request, 200, { ok: true });
 }
@@ -473,7 +517,7 @@ async function reportRoute(request, env) {
   const store = storeOf(env);
   if (!store) return json(request, 503, notConfigured('OH_STORE'));
   const account = await heldAccount(store, asked.key, asked.body, env, { signer: asked.signer });
-  if (!account) return json(request, 402, { error: 'no subscription' });
+  if (!account) return json(request, 402, { error: REFUSED.noSubscription });
   if (report.about === account) return json(request, 400, { error: 'a report is of somebody else' });
   // Local mode tells nobody, as for a wait.
   if (openHouse(env, request)) return json(request, 200, { ok: true });
@@ -510,13 +554,8 @@ async function deleteRoute(request, env) {
   const account = await accountOfKey(store, asked.key);
   if (!account || !(await store.get(`ACCOUNT#${account}`, `DEVICE#${asked.key}`))) return json(request, 404, { error: 'no account' });
   if (!(await holdOf(store, account))) {
-    const web = webSubscriptionsOf(await store.get(`ACCOUNT#${account}`, 'META'));
-    if (web.length && !env.OH_STRIPE_SECRET) return json(request, 503, notConfigured('OH_STRIPE_SECRET'));
-    try {
-      for (const sub of web) await endAtStripe(sub, env.OH_STRIPE_SECRET, 'account deleted');
-    } catch {
-      return json(request, 502, { error: 'the shop is not answering' });
-    }
+    const unended = await endWebSubscriptions(request, env, webSubscriptionsOf(await store.get(`ACCOUNT#${account}`, 'META')), 'account deleted');
+    if (unended) return unended;
     if (env.OH_RECORDS) {
       await markForgotten(env.OH_RECORDS, account);
       const unwritten = [];
@@ -524,7 +563,9 @@ async function deleteRoute(request, env) {
       await alertUnwritten(env, { account, keys: unwritten });
     }
   }
-  const { status, body } = await inHousehold(env, account, { op: 'delete', key: asked.key });
+  // With the changes a subscription may have been told of, from the
+  // ledger this deploy published, which the account's turn has not.
+  const { status, body } = await inHousehold(env, account, { op: 'delete', key: asked.key, account, notices: toldVersions(env.OH_LEDGER) });
   return json(request, status, body);
 }
 
@@ -533,19 +574,20 @@ async function turn(request, env) {
   if (pre) return pre;
   if (request.method !== 'POST') return json(request, 405, { error: 'POST' }, { allow: 'POST, OPTIONS' });
   // Credentials are a relay anybody holding them can send anything
-  // through for four hours, and it is billed by the gigabyte. So they
+  // through until they run out (turnTtlS), and it is billed by the
+  // gigabyte. So they
   // are a subscribed device's, as live play is, and nobody else's.
   const asked = await signedFor(request, env, 'turn');
   if (asked instanceof Response) return asked;
   const store = storeOf(env);
   if (!store) return json(request, 503, notConfigured('OH_STORE'));
   if (!(await heldAccount(store, asked.key, asked.body, env, { signer: asked.signer, openHouse: openHouse(env, request) }))) {
-    return json(request, 402, { error: 'no subscription' });
+    return json(request, 402, { error: REFUSED.noSubscription });
   }
-  // Local mode's own TURN server (the browser rig's, e2e/drive.mjs), so
-  // the rig's channels take the path production's do.
+  // Local mode's own TURN server, where OH_TURN_LOCAL names one, kept
+  // for voice and video chat: the browser rig sets none now.
   if (openHouse(env, request) && env.OH_TURN_LOCAL) {
-    return json(request, 200, { iceServers: [{ urls: [env.OH_TURN_LOCAL], username: LOCAL_TURN, credential: LOCAL_TURN }], ttl: S().turnTtlS });
+    return json(request, 200, { iceServers: [{ urls: [env.OH_TURN_LOCAL], username: LOCAL_TURN, credential: LOCAL_TURN }], ttl: serviceSettings().turnTtlS });
   }
   const { status, body: out } = await mint(env);
   return json(request, status, out);
@@ -585,8 +627,8 @@ async function storeRoute(request, env, ctx) {
   const { key, body, signer } = asked;
   const store = storeOf(env);
   if (!store) return json(request, 503, notConfigured('OH_STORE'));
-  if (body.store !== 'apple' && body.store !== 'google') return json(request, 400, { error: 'not a store' });
-  if (typeof body.proof !== 'string' || !body.proof) return json(request, 400, { error: 'no proof' });
+  if (body.store !== 'apple' && body.store !== 'google') return json(request, 400, { error: REFUSED.notAStore });
+  if (typeof body.proof !== 'string' || !body.proof) return json(request, 400, { error: REFUSED.noProof });
   const now = Date.now();
   const mine = await storeAccountOf(key);
   let bought;
@@ -621,7 +663,7 @@ async function appleRoute(request, env) {
   // ordinary request is allowed, well inside a webhook's.
   const raw = await textOf(request, MOST_EVENT);
   if (raw === null) return json(request, 413, { error: 'too big' });
-  if (!env.OH_APPLE_BUNDLE_ID || !env.OH_APPLE_PRODUCT) return json(request, 503, { error: 'the store is not set up yet' });
+  if (!env.OH_APPLE_BUNDLE_ID || !env.OH_APPLE_PRODUCT) return json(request, 503, { error: REFUSED.storeNotSetUp });
   const store = storeOf(env);
   if (!store) return json(request, 503, notConfigured('OH_STORE'));
   let signedPayload;
@@ -667,7 +709,7 @@ async function playRoute(request, env) {
   let note;
   try {
     const pushed = JSON.parse((await textOf(request, MOST_BODY)) ?? '');
-    note = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(pushed.message.data), (c) => c.charCodeAt(0))));
+    note = JSON.parse(new TextDecoder().decode(bytesOf64(pushed.message.data)));
   } catch {
     return json(request, 400, { error: 'not a notification' });
   }
@@ -734,6 +776,14 @@ const ROUTES = {
   order: (request, env) => orderRoute(request, env),
 };
 
+/// Whether this deployment answers /api/ at [url]. A preview answers on
+/// whatever address it is reached by; production, on the app's host and
+/// on this machine's, and nowhere else. The zone's rate limit is on the
+/// app's host (infra/cloudflare.mjs), and a production deployment is
+/// reachable at open-hearts.pages.dev too, and at an address of its own
+/// for as long as it is kept, where that limit does not reach.
+const answersApi = (env, url) => env.OH_DEPLOYMENT === 'preview' || url.hostname === APP_HOST || isLocal(url.href);
+
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
@@ -744,10 +794,19 @@ export default {
     if (appHostFor(url.hostname)) {
       return Response.json({ error: `the service has moved to ${appHostFor(url.hostname)}` }, { status: 404, headers: { 'cache-control': 'no-store' } });
     }
+    if (!answersApi(env, url)) return json(request, 404, { error: 'no such handler' });
     const route = Object.hasOwn(ROUTES, name) ? ROUTES[name] : null;
     const started = Date.now();
-    if (route) await settle(env);
-    const response = route ? await route(request, env, ctx) : json(request, 404, { error: 'no such handler' });
+    if (route) await loadServiceSettings(env);
+    let response;
+    try {
+      response = route ? await route(request, env, ctx) : json(request, 404, { error: 'no such handler' });
+    } catch (e) {
+      // A handler that throws is counted as the 500 the runtime answers
+      // for it, and thrown on, so the runtime answers and logs it as before.
+      measure(env, name, 500, Date.now() - started);
+      throw e;
+    }
     measure(env, route ? name : 'unknown', response.status, Date.now() - started);
     return response;
   },

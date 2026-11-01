@@ -4,10 +4,9 @@
 /// answers, this device online to everyone (net/online.dart,
 /// docs/explanation/live-play.md).
 ///
-/// The front door shows it and asks it: who this device is, the game it
-/// asks for, a name when it has none, the words to say things in, and
-/// the page a table opens on are the door's. What is said here is said
-/// in the door's words, as it is said.
+/// The home page supplies the lobby's identity, game options, name
+/// prompt, strings and table-opening callback. `words` is read for each
+/// message, so messages follow the home page's current locale.
 library;
 
 import 'dart:async';
@@ -164,14 +163,10 @@ class Lobby extends ChangeNotifier {
   /// (pace_store.dart). Nothing until it has played enough to know.
   Pace pace = Pace.fresh;
 
-  /// What this device does with the others' pictures: the list of
-  /// people whose pictures it does not show, and the check it runs on
-  /// the rest (pictures.dart). Read once, carried to the table.
+  /// What this device does with the others' pictures: the people whose
+  /// pictures it does not show, and the players it blocked
+  /// (pictures.dart). Read once, carried to the table.
   Pictures? pictures;
-
-  /// Whether the table now open has already had its cards folded into
-  /// the pace: a table says it is done more than once.
-  bool _paced = false;
 
   String? _error;
 
@@ -191,6 +186,11 @@ class Lobby extends ChangeNotifier {
   Opening? _opening;
   Opening? get opening => _opening;
   bool get busy => _opening != null;
+
+  /// Whether a way in is being opened, from before the name, age and
+  /// terms are asked for until a relay answers. [busy] starts only once
+  /// they have been.
+  bool _entering = false;
 
   /// A relay is taking its time and the device is still waiting. Not an
   /// error — there is nothing to do about it but wait — so it is said
@@ -263,16 +263,28 @@ class Lobby extends ChangeNotifier {
   void _timeTheWait() {
     _waitAfterLeaving?.cancel();
     _waitAfterLeaving = null;
+    _clampToNow();
     if (leftEarlyWait == null) {
       if (_leftEarlyAt != null) unawaited(LeftEarly.clear());
       _leftEarlyAt = null;
     } else {
       _waitAfterLeaving = Timer.periodic(const Duration(seconds: 1), (_) {
+        _clampToNow();
         if (leftEarlyWait == null) _timeTheWait();
         _changed();
       });
     }
     _changed();
+  }
+
+  /// A game left early at a time still ahead of the clock means the
+  /// clock was set back since: the wait runs from now, rather than
+  /// staying full until the clock catches up.
+  void _clampToNow() {
+    final at = _leftEarlyAt, now = LeftEarly.nowMs();
+    if (at == null || at <= now) return;
+    _leftEarlyAt = now;
+    unawaited(LeftEarly.reset(now));
   }
 
   /// This device online to everyone (net/online.dart). The same, after
@@ -369,7 +381,6 @@ class Lobby extends ChangeNotifier {
     _closeLobby(address: false);
     _onlineClock?.cancel();
     _waitAfterLeaving?.cancel();
-    _refusalSub?.cancel();
     super.dispose();
   }
 
@@ -380,8 +391,8 @@ class Lobby extends ChangeNotifier {
   }
 
   /// Everything a waiting room or a room needs while it is open, shut:
-  /// the pool, the room, and the transport they share — a matched or
-  /// started table opens its own.
+  /// the pool, the room, the transport they share, and what its relays
+  /// said of this device — a matched or started table opens its own.
   void _closeLobby({bool address = true}) {
     _queueSub?.cancel();
     _queueSub = null;
@@ -389,6 +400,9 @@ class Lobby extends ChangeNotifier {
     _queue = null;
     _waitClock?.cancel();
     _dropRoom(address: address);
+    _refusalSub?.cancel();
+    _refusalSub = null;
+    _relayNote = null;
     _transport?.close();
     _transport = null;
   }
@@ -411,8 +425,21 @@ class Lobby extends ChangeNotifier {
   }
 
   /// Connects to the relays on [tag], or explains why not. Nothing
-  /// goes near a relay without a name on it.
+  /// goes near a relay without a name on it. Null, and nothing done,
+  /// while a way in is being opened or one is open: a second press, or
+  /// a room's link opening while Play live is asked for, would open a
+  /// second wait beside the first.
   Future<RelayTransport?> _connect(String tag, Opening opening) async {
+    if (_entering || _transport != null) return null;
+    _entering = true;
+    try {
+      return await _open(tag, opening);
+    } finally {
+      _entering = false;
+    }
+  }
+
+  Future<RelayTransport?> _open(String tag, Opening opening) async {
     // A device that says it has no network will not find a relay by
     // waiting forty seconds for one (net/network.dart): it is told now,
     // before a name is asked for or anything is opened.
@@ -443,8 +470,7 @@ class Lobby extends ChangeNotifier {
         _changed();
         return null;
       }
-      transport = RelayTransport(relays: relays, signer: signer, table: tag, log: _relayLog, pinned: pinnedRelays(relays));
-      unawaited(_refusalSub?.cancel());
+      transport = RelayTransport(relays: relays, signer: signer, table: tag, log: _relayLog);
       _refusalSub = transport.refusals.listen((r) {
         if (_disposed) return;
         _relayNote = r == null ? null : words().noRelayTakesEvents(r);
@@ -592,7 +618,7 @@ class Lobby extends ChangeNotifier {
     if (queue == null || signer == null || queue.present.length > 1) return;
     queue.waitForPerson();
     _changed();
-    unawaited(askHandler('waiting', signer, {'pool': queue.pool, 'target': queue.target}, null, what: '${queue.pool} ${queue.target}'));
+    unawaited(askHandler('waiting', signer, {'pool': queue.pool, 'target': queue.target}, what: '${queue.pool} ${queue.target}'));
   }
 
   /// The seated table is its own tag on the relay, whose object is the
@@ -604,15 +630,24 @@ class Lobby extends ChangeNotifier {
   /// [again] begins another game the way this one began, for the end
   /// of game's Play again. [strangers] is a table Play live seated,
   /// whose game left early is waited out (left_early.dart).
-  void _toTable(TableSpec spec, Map<int, String> seatNames, Map<int, Avatar> seatAvatars,
+  void _toTable(TableSpec spec, Map<int, String> names, Map<int, Avatar> seatAvatars,
       {TableJournal? journal, VoidCallback? again, bool strangers = false}) {
+    // Cleaned again here, whatever path the names came by (a room, a
+    // seating, a restored table), since a modified build can send any
+    // length or any characters (cleanName, packages/table names.dart).
+    // A name that cleans to nothing is left out, so the seat is shown
+    // by its number, as a seat with no name is.
+    final seatNames = {
+      for (final MapEntry(:key, :value) in names.entries)
+        if (cleanName(value) case final name when name.isNotEmpty) key: name,
+    };
     final signer = _signer!;
     final relays = _relays;
     final line = RelayLine(relays: relays, signer: signer, table: spec.id, log: _debugging ? (l) => debugPrint('line: $l') : null);
     // The watch lane and the reactions beside it, and nothing of the
     // table's own, which is the line's (packages/table, watch.dart,
     // reactions.dart).
-    final lanes = RelayTransport(relays: relays, signer: signer, table: spec.id, log: _relayLog, pinned: pinnedRelays(relays), watchOnly: true);
+    final lanes = RelayTransport(relays: relays, signer: signer, table: spec.id, log: _relayLog, watchOnly: true);
     final ledger = _standing?.ledger ?? Ledger();
     final controller = LiveController(
       spec: spec,
@@ -689,24 +724,31 @@ class Lobby extends ChangeNotifier {
     );
     controller.addListener(watch.changed);
     // What this device measured of its own play goes on the device and
-    // nowhere else (pace_store.dart). Folded when the table is done
-    // with, since a game left early is still cards this player took
-    // their own time over.
-    controller.addListener(() {
-      if (!controller.client.done || _paced) return;
-      _paced = true;
+    // nowhere else (pace_store.dart). Folded once: when the game is
+    // over, so that Play again asks with it, or else when the player
+    // is off the table, since a game left early is still cards this
+    // player took their own time over.
+    var paced = false;
+    void foldPace() {
+      if (paced) return;
+      paced = true;
       unawaited(PaceStore.fold(controller.myCardMs).then((folded) {
         if (_disposed) return;
         pace = folded;
         _changed();
       }));
+    }
+
+    controller.addListener(() {
+      if (controller.client.done) foldPace();
     });
-    _paced = false;
     // The game, kept for anyone to look at afterwards by its address
     // (net/game_records.dart): every player's device sends it, and the
-    // first is kept. Once the house's word on how it came out is in the
-    // log, which a kept game is checked against (packages/table,
-    // record.dart); a game that failed has none, and is kept as it ends.
+    // service keeps the copy with the house's word in it, with each
+    // device's own name beside its seat. Once the house's word on how it
+    // came out is in the log, which a kept game is checked against
+    // (packages/table, record.dart); a game that failed has none, and is
+    // kept as it ends.
     var kept = false;
     controller.addListener(() {
       final c = controller.client;
@@ -730,6 +772,7 @@ class Lobby extends ChangeNotifier {
     void offTheTable() {
       if (off) return;
       off = true;
+      foldPace();
       if (!InUse.current.shut) InUse.current.seatedAt(null);
       watch.close();
       lanes.close();
@@ -773,14 +816,11 @@ class Lobby extends ChangeNotifier {
       // The room is its link, and the link is in the address bar while
       // this device is in it (net/address.dart).
       addressChanged();
-    } on TimeoutException {
-      if (_disposed) return;
-      _opening = null;
-      _error = words().noRelayAnswered;
-      _changed();
     } catch (e) {
+      // The room could not be made from what the relays hold under its
+      // code: nothing of it stays open.
+      _closeLobby();
       if (_disposed) return;
-      _opening = null;
       _error = words().couldNotConnect('$e');
       _changed();
     }
@@ -791,7 +831,7 @@ class Lobby extends ChangeNotifier {
     if (room == null || _disposed) return;
     final spec = room.spec;
     if (room.refusal != null) {
-      _dropRoom();
+      _closeLobby();
       _error = Room.said(room.refusal!, words());
       _changed();
       return;
@@ -800,7 +840,7 @@ class Lobby extends ChangeNotifier {
       if (!room.seated) {
         // A table under this code started without a seat for this
         // device: back to the front door, where the line can be read.
-        _dropRoom();
+        _closeLobby();
         _error = words().tableFilledWithoutYou;
         _changed();
         return;

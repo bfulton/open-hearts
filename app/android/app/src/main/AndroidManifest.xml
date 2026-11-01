@@ -1,9 +1,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- Everything live is on the network: the relays, the signalling,
-         WebRTC between the seats, TURN, the licence. The debug and
-         profile manifests have INTERNET for the Flutter tool, but a
-         release build reads only this one. WebRTC's network monitor
-         reads the network's state as well. -->
+    <!-- Everything live is on the network: the relay and the
+         licence. The debug and profile manifests have INTERNET for the
+         Flutter tool, but a release build reads only this one. The
+         network's state was read by WebRTC's network monitor, which the
+         app no longer carries; the permission stays until the merged
+         release manifest shows nothing else reads it. -->
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
     <!-- Live play is bought as a Google Play subscription
@@ -11,11 +12,19 @@
          manifest declares this too; said here so the release manifest
          says it whatever the library does. -->
     <uses-permission android:name="com.android.vending.BILLING"/>
+    <!-- Backups stay on (android:allowBackup is left at its default,
+         on), minus the device's secret key (lib/secret_store.dart),
+         which is left out, by the name of its file, of both a backup
+         and a transfer to a new phone: by dataExtractionRules on
+         Android 12 and later, and by fullBackupContent on 11 and
+         earlier. -->
     <application
         android:label="Open Hearts"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
-        android:localeConfig="@xml/locales_config">
+        android:localeConfig="@xml/locales_config"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules">
         <activity
             android:name=".MainActivity"
             android:exported="true"

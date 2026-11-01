@@ -138,7 +138,7 @@ class TableLayout extends StatelessWidget {
   /// the felt left at that scale gives. Either the width decides it, or
   /// the height does, and the smaller of the two is the one that holds.
   static double scaleFor(double width, double height, {required bool landscape, required bool roomy}) {
-    const k = 0.17 / TableScale.phoneCard;
+    const k = TableScale.feltShare / TableScale.phoneCard;
     final base = height - TableHeader.height - handRow(landscape: landscape, roomy: roomy);
     final byWidth = k * width;
     final byHeight = k * base / (1 + k * actionRow);

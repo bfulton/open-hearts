@@ -7,6 +7,7 @@ import { test } from 'node:test';
 import worker from './worker.mjs';
 import { claimWith, devicesOn, ticketFor } from './accounts.mjs';
 import { Household, forgetHouseholds, inHousehold, sequencer } from './household.mjs';
+import { textOf } from './http.mjs';
 import { memoryStore } from './rows.mjs';
 import { SERVICE_DEFAULTS } from './settings.mjs';
 import { record } from './stripe.mjs';
@@ -118,7 +119,7 @@ test("an operator's order, through the service to the account's own object: its 
   assert.equal((await inHousehold(env, account, { op: 'seen', key: KEY, account, epoch: 1, tag: 'online' })).status, 200);
   // The tool, asking this worker.
   const fetchImpl = (url, init) => worker.fetch(new Request(url, init), env);
-  const done = await carry(store, account, 'suspend', {}, { origin: 'https://dev.open-hearts.pages.dev', fetchImpl, wait: 0 });
+  const done = await carry(store, account, 'suspend', {}, { origin: 'https://play.openhearts.game', fetchImpl, wait: 0 });
   assert.deepEqual(done, { status: 200, body: { act: 'suspend', suspended: true, flagged: 2, cutOff: true } });
   assert.deepEqual(told, [{ tag: 'online', path: '/revoke', account, epoch: 2, why: SUSPENDED_WHY }]);
   // Its devices take nothing up, told why, and an activation from
@@ -126,7 +127,7 @@ test("an operator's order, through the service to the account's own object: its 
   assert.deepEqual(await inHousehold(env, account, { op: 'activate', key: KEY, account, want: 'take' }), { status: 403, body: { error: SUSPENDED_WHY, suspended: true } });
   assert.deepEqual(await inHousehold(env, account, { op: 'seen', key: KEY, account, epoch: 1, tag: 'pool' }), { status: 409, body: { error: SUSPENDED_WHY } });
   // Let back: a device takes the account up again.
-  assert.equal((await carry(store, account, 'lift', {}, { origin: 'https://dev.open-hearts.pages.dev', fetchImpl, wait: 0 })).status, 200);
+  assert.equal((await carry(store, account, 'lift', {}, { origin: 'https://play.openhearts.game', fetchImpl, wait: 0 })).status, 200);
   assert.equal((await inHousehold(env, account, { op: 'activate', key: KEY, account, want: 'open' })).status, 200);
 });
 
@@ -150,12 +151,62 @@ test('an order the store has not got wakes no account', async () => {
   const store = await household(1);
   let woken = 0;
   const env = { OH_STORE: kvOf(store), HOUSEHOLD: { idFromName: (n) => n, get: () => (woken++, { fetch: async () => Response.json({}) }) } };
-  const ask = (body) => worker.fetch(new Request('https://dev.open-hearts.pages.dev/api/order', { method: 'POST', body }), env);
+  const ask = (body) => worker.fetch(new Request('https://play.openhearts.game/api/order', { method: 'POST', body }), env);
   assert.equal((await ask(JSON.stringify({ order: 'e'.repeat(32) }))).status, 404);
   assert.equal((await ask(JSON.stringify({ order: 'not one' }))).status, 400);
   assert.equal((await ask('not json')).status, 400);
-  assert.equal((await worker.fetch(new Request('https://dev.open-hearts.pages.dev/api/order'), env)).status, 405);
+  assert.equal((await worker.fetch(new Request('https://play.openhearts.game/api/order'), env)).status, 405);
   assert.equal(woken, 0);
+});
+
+test("an account's turn acts only for its own devices, not for one the store has in another account", async () => {
+  forgetHouseholds();
+  const store = await household(2);
+  const account = await accountOf(store);
+  // Another subscriber, with an account of its own, asking in this
+  // account's turn: as a device does that still shows a licence for the
+  // account it has since left.
+  const OTHER = 'cc'.repeat(32);
+  await record({ type: 'checkout.session.completed', data: { object: { payment_status: 'paid', subscription: 'sub_8', metadata: { key: OTHER } } } }, store, { now });
+  const theirs = (await store.get(`KEY#${OTHER}`, 'ENTITLEMENT')).account;
+  assert.notEqual(theirs, account);
+  const env = { OH_STORE: kvOf(store) };
+  const rows = [...store.rows.keys()].sort();
+  const login = `LOGIN#google#${'a'.repeat(64)}`;
+  for (const op of [
+    { op: 'ticket' },
+    { op: 'list' },
+    { op: 'drop', device: OTHER },
+    { op: 'backups' },
+    { op: 'profile' },
+    { op: 'attest', who: { provider: 'google', sub: 's' }, login },
+  ]) {
+    assert.deepEqual(await inHousehold(env, account, { ...op, key: OTHER, account }), { status: 402, body: { error: 'no subscription' } }, op.op);
+  }
+  assert.deepEqual(await inHousehold(env, account, { op: 'delete', key: OTHER, account }), { status: 404, body: { error: 'no account' } });
+  assert.deepEqual([...store.rows.keys()].sort(), rows, 'nothing of either account touched');
+  // Its own account's turn acts for it, and this account's for its own.
+  assert.equal((await inHousehold(env, theirs, { op: 'list', key: OTHER, account: theirs })).status, 200);
+  assert.equal((await inHousehold(env, account, { op: 'list', key: KEY, account })).status, 200);
+});
+
+test("the relay asking after a superseded device's activation spends nothing the device in use renews from", async () => {
+  forgetHouseholds();
+  const store = await household(2);
+  const account = await accountOf(store);
+  const env = { OH_STORE: kvOf(store) };
+  env.HOUSEHOLD = householdNamespace({ OH_STORE: env.OH_STORE });
+  const before = '1'.repeat(64);
+  assert.equal((await inHousehold(env, account, { op: 'activate', key: before, account, want: 'open' })).body.epoch, 1);
+  assert.equal((await inHousehold(env, account, { op: 'activate', key: KEY, account, want: 'take' })).body.epoch, 2);
+  // The device before opens socket after socket with its old activation.
+  const said = new Set();
+  for (let i = 0; i < SERVICE_DEFAULTS.activationsPerHour + 5; i++) {
+    said.add((await inHousehold(env, account, { op: 'seen', key: before, account, epoch: 1, tag: `t${i}` })).status);
+  }
+  assert.deepEqual([...said], [409], 'each refused, none over the allowance');
+  assert.equal((await inHousehold(env, account, { op: 'activate', key: KEY, account, want: 'renew' })).status, 200);
+  assert.equal((await inHousehold(env, account, { op: 'seen', key: KEY, account, epoch: 2, tag: 'online' })).status, 200);
 });
 
 test('asking for a code again is a read: the one outstanding, while it has time', async () => {
@@ -192,11 +243,34 @@ test('a household is held to so many changes an hour', async () => {
 
 test('a body too big to be one of ours is not read', async () => {
   const big = JSON.stringify({ key: KEY, pad: 'x'.repeat(20000) });
-  const res = await worker.fetch(new Request('https://dev.open-hearts.pages.dev/api/licence', { method: 'POST', body: big }), {});
+  const res = await worker.fetch(new Request('https://play.openhearts.game/api/licence', { method: 'POST', body: big }), {});
   assert.equal(res.status, 400);
   const event = await worker.fetch(
-    new Request('https://dev.open-hearts.pages.dev/api/stripe', { method: 'POST', body: 'x'.repeat(600 * 1024) }),
+    new Request('https://play.openhearts.game/api/stripe', { method: 'POST', body: 'x'.repeat(600 * 1024) }),
     { OH_STRIPE_WEBHOOK_SECRET: 'whsec' },
   );
   assert.equal(event.status, 413);
+});
+
+test('a body sent with no length is read no further than what one of ours could be', async () => {
+  // Chunked, as HTTP/1.1 sends a body of no stated length: 8 MiB, 64 KiB
+  // at a time.
+  let pulled = 0;
+  const big = new ReadableStream({
+    pull(c) {
+      pulled += 65536;
+      c.enqueue(new Uint8Array(65536).fill(0x20));
+      if (pulled >= 8 * 1024 * 1024) c.close();
+    },
+  });
+  const at = 'https://play.openhearts.game/api/stripe';
+  const sent = new Request(at, { method: 'POST', body: big, duplex: 'half' });
+  assert.equal(sent.headers.get('content-length'), null);
+  const res = await worker.fetch(sent, { OH_STRIPE_WEBHOOK_SECRET: 'whsec' });
+  assert.equal(res.status, 413);
+  assert.ok(pulled <= 512 * 1024 + 2 * 65536, `read ${pulled} bytes`);
+  // What fits is read whole, as text, without a byte-order mark.
+  assert.equal(await textOf(new Request(at, { method: 'POST', body: new Uint8Array([0xef, 0xbb, 0xbf, 0x7b, 0x7d]) }), 16), '{}');
+  assert.equal(await textOf(new Request(at), 16), '', 'no body is an empty one');
+  assert.equal(await textOf(new Request(at, { method: 'POST', body: 'é'.repeat(9) }), 16), null, 'counted in bytes');
 });

@@ -22,6 +22,7 @@
 import { tagLabel } from './relay.mjs';
 import { isPoolTag } from './pool.mjs';
 import { CONFIG_ROW, configOf } from '../functions/config.mjs';
+import { digestOf } from '../functions/rows.mjs';
 
 /// The wake for [tag], as this object and the house's own port both
 /// take it: `/wake?pool=…` for a pool's tag, `/wake?table=…` for a
@@ -46,12 +47,6 @@ const READY_WAIT_MS = 200;
 /// digest of its environment, which holds a secret, and of the deploy
 /// that started it.
 const STARTED_WITH = 'startedWith';
-
-/// The SHA-256 of [env] as JSON, in hex.
-async function digestOf(env) {
-  const bytes = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify(env))));
-  return [...bytes].map((b) => b.toString(16).padStart(2, '0')).join('');
-}
 
 export class Bench {
   /// [log] takes a line for the operator's logs: what this object did
@@ -80,7 +75,6 @@ export class Bench {
       if (!tag || tag.length > 128) return new Response('a table or a pool to wake for\n', { status: 400 });
       return (await this.wake(tag)) ? new Response('awake\n') : new Response('not up yet\n', { status: 503 });
     }
-    if (request.method === 'GET' && url.pathname === '/status') return Response.json(await this.status());
     return new Response('not found\n', { status: 404 });
   }
 
@@ -124,7 +118,7 @@ export class Bench {
     // environment, or under another deploy (CF_VERSION_METADATA,
     // wrangler.toml), is stopped and started again; the tables it was
     // serving wake it again, and it follows each from its log.
-    const started = await digestOf({ env, version: this.env.CF_VERSION_METADATA?.id ?? null });
+    const started = await digestOf(JSON.stringify({ env, version: this.env.CF_VERSION_METADATA?.id ?? null }));
     if (c.running && (await this.state.storage.get(STARTED_WITH)) !== started) {
       this.log({ bench: 'restart', table: at, why: 'started under another deploy or environment' });
       await c.destroy();

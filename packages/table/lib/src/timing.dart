@@ -4,9 +4,10 @@
 ///
 /// Every side applies them to the referee's times (rules.dart), so every
 /// side has to have the same ones. A table's timing is chosen once, by
-/// whoever starts it, from that device's remote config
-/// (docs/explanation/service.md), and rides in the spec the log starts
-/// with (`TableSpec.timing`).
+/// whoever seats it: the house, with the operator's clocks, at a pool's
+/// table (matching.dart, PoolHost), and the starting device, from its
+/// remote config (docs/explanation/service.md), at a friends' table. It
+/// rides in the spec the log starts with (`TableSpec.timing`).
 library;
 
 import 'time_bank.dart';
@@ -124,15 +125,6 @@ class TableTiming {
     }
     return parse(json);
   }
-
-  /// This timing with a person's clock of [bank]'s.
-  TableTiming withBank(TimeBank bank) => TableTiming(
-        bank: bank,
-        botActsMs: botActsMs,
-        botDealsMs: botDealsMs,
-        houseGraceMs: houseGraceMs,
-        silenceMs: silenceMs,
-      );
 
   @override
   bool operator ==(Object other) {

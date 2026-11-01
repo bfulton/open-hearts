@@ -6,7 +6,7 @@ import { afterEach, test } from 'node:test';
 import { claimWith, ticketFor } from './accounts.mjs';
 import { sequencer } from './household.mjs';
 import { memoryStore } from './rows.mjs';
-import { S, SERVICE_BOUNDS, SERVICE_DEFAULTS, STRIPE_PRICE, forgetSettings, serviceSettingsOf, settle, useSettings } from './settings.mjs';
+import { SERVICE_BOUNDS, SERVICE_DEFAULTS, STRIPE_PRICE, forgetSettings, loadServiceSettings, serviceSettings, serviceSettingsOf, useSettings } from './settings.mjs';
 import { checkout, forgetPriceIds, record } from './stripe.mjs';
 import { STATED, stripePrice, withPrice } from './stripe.fixtures.mjs';
 import { mint } from './turn.mjs';
@@ -74,13 +74,13 @@ test('a Stripe price is named by a price id or a lookup key, and nothing else', 
 test('the row is read once a minute, and a store that is down is the defaults', async () => {
   const counts = { get: 0 };
   const env = { OH_STORE: kvWith({ mostDevices: 3 }, counts) };
-  assert.equal((await settle(env, { now })).mostDevices, 3);
-  assert.equal((await settle(env, { now: now + 59000 })).mostDevices, 3);
+  assert.equal((await loadServiceSettings(env, { now })).mostDevices, 3);
+  assert.equal((await loadServiceSettings(env, { now: now + 59000 })).mostDevices, 3);
   assert.equal(counts.get, 1, 'kept for a minute');
-  await settle({ OH_STORE: kvWith({ mostDevices: 4 }, counts) }, { now: now + 61000 });
-  assert.equal(S().mostDevices, 4);
+  await loadServiceSettings({ OH_STORE: kvWith({ mostDevices: 4 }, counts) }, { now: now + 61000 });
+  assert.equal(serviceSettings().mostDevices, 4);
   const down = { get: async () => { throw new Error('down'); } };
-  assert.deepEqual(await settle({ OH_STORE: down }, { now: now + 200000 }), { ...SERVICE_DEFAULTS });
+  assert.deepEqual(await loadServiceSettings({ OH_STORE: down }, { now: now + 200000 }), { ...SERVICE_DEFAULTS });
 });
 
 async function subscriber() {

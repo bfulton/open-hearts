@@ -6,14 +6,21 @@
 //
 // Prints the test files, one a line, relative to app/; or `all` when the
 // change is to something every test stands on (the pubspec, the
-// analysis options, the words, flutter_test_config.dart) or to a file it
-// cannot follow. ../../check.sh uses it for `quick`.
+// analysis options, the words, flutter_test_config.dart). A file no test
+// imports, such as worker/review_worker.dart, reaches none, and prints
+// nothing. ../../check.sh uses it for `quick`.
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, join, normalize, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = resolve(fileURLToPath(new URL('../..', import.meta.url)));
-const packages = { open_hearts: 'app/lib', engine: 'packages/engine/lib', table: 'packages/table/lib', deal: 'packages/deal/lib' };
+const packages = {
+  open_hearts: 'app/lib',
+  engine: 'packages/engine/lib',
+  table: 'packages/table/lib',
+  table_sim: 'packages/table_sim/lib',
+  deal: 'packages/deal/lib',
+};
 
 /// What every test stands on, so a change there is a change to all.
 const everything = [/^app\/pubspec\.yaml$/, /^app\/analysis_options\.yaml$/, /^app\/l10n\.yaml$/, /^app\/lib\/l10n\//, /^app\/test\/flutter_test_config\.dart$/, /^packages\/\w+\/pubspec\.yaml$/];

@@ -20,7 +20,7 @@
 // for as long as the subscription's record is kept.
 
 import { SITE } from './settings.mjs';
-import { stripeAuth } from './stripe.mjs';
+import { askStripe } from './stripe.mjs';
 import { ORDER_KEPT_S } from './suspension.mjs';
 
 /// How long a device shows a change at the front door, in days.
@@ -71,6 +71,11 @@ export function applyingRenewal(end, anchor, now) {
 
 /// Whether [entry] is a change subscribers are told of.
 const told = (entry) => entry?.change === 'material' || entry?.change === 'price';
+
+/// Every change in [ledger] subscribers are told of, as [document,
+/// version]: each one a subscription can have a note of ([noticeRow]),
+/// which goes with its account (deletion.mjs, forgetAccount).
+export const toldVersions = (ledger) => DOCUMENTS.flatMap((document) => (ledger?.[document] ?? []).filter(told).map((entry) => [document, versionOf(entry)]));
 
 /// What a device is shown at the front door on [now], from [ledger]:
 /// each document's newest change subscribers are told of, for the
@@ -211,12 +216,7 @@ async function viaRelay(env, mail) {
 
 /// The subscription [id] as Stripe has it, with its customer: null for
 /// none. Throws when Stripe does not say.
-async function subscriptionOf(id, secret, fetchImpl) {
-  const res = await fetchImpl(`https://api.stripe.com/v1/subscriptions/${encodeURIComponent(id)}?expand[]=customer`, { headers: stripeAuth(secret) });
-  if (res.status === 404) return null;
-  if (!res.ok) throw new Error(`stripe said ${res.status}`);
-  return res.json();
-}
+const subscriptionOf = (id, secret, fetchImpl) => askStripe(secret, `/subscriptions/${encodeURIComponent(id)}?expand[]=customer`, { missingIsNull: true, fetchImpl });
 
 /// The changes a notice order names, each a document's newest change
 /// with the earlier ones its summary says too ({document, version,

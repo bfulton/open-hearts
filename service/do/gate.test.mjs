@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 
-import { activationOf, authKind, createRelay, objectRelay, schnorrVerifier, serviceGate } from './relay.mjs';
+import { activationOf, authKind, createRelay, householdSeen, objectRelay, schnorrVerifier, serviceGate } from './relay.mjs';
 import { wasmPath } from './host.mjs';
 import { keys, signing } from './sign.mjs';
 import { DELETED_WHY } from '../functions/deletion.mjs';
@@ -106,15 +106,49 @@ test('a socket is asked who it is, and carried nothing until it has answered', a
   assert.equal(a.of('EOSE').length, 1);
 });
 
-test('what the relay took is told to its host with who said it: the account the gate let in', async () => {
-  const heard = [];
-  const relay = createRelay({ verify, now, gate: serviceGate({ service: SERVICE.public, verify, now }), heard: (event, who) => heard.push([event.id, who]) });
+test('before its answer, a socket\'s messages are held up to a count and a size, and past either it is told to answer first', async () => {
+  const relay = gated();
   const a = socket();
   relay.open(a);
+  // Two messages near a table's longest are held, and a third is not.
+  const big = (i) => JSON.stringify(['REQ', `big${i}`, { kinds: [24246], pad: 'x'.repeat(100_000) }]);
+  for (let i = 0; i < 3; i++) await relay.message(a, big(i));
+  assert.deepEqual(a.of('NOTICE'), [['NOTICE', 'auth-required: answer the challenge first']]);
+  // Small ones are held up to the count.
+  for (let i = 0; i < 31; i++) await relay.message(a, JSON.stringify(['REQ', `small${i}`, { kinds: [24246] }]));
+  assert.equal(a.of('NOTICE').length, 2);
   await relay.message(a, JSON.stringify(['AUTH', await showing(ADA, a, await activation(ADA))]));
-  const said = await beat(ADA);
-  await relay.message(a, JSON.stringify(['EVENT', said]));
-  assert.deepEqual(heard, [[said.id, { account: ACCOUNT, key: ADA.public, epoch: 1, until: T + 3600 }]]);
+  assert.equal(a.of('EOSE').length, 32, 'what was held, and only that, is answered');
+});
+
+test('a challenge is answered once, and only an answer that names it has its signatures checked', async () => {
+  let checks = 0;
+  const counted = (...args) => (checks++, verify(...args));
+  const relay = createRelay({ verify: counted, now, gate: serviceGate({ service: SERVICE.public, verify: counted, now }) });
+  const a = socket();
+  relay.open(a);
+  // Ada's activation shown by Bao: his answer's signature and her
+  // activation's are checked, and he is refused.
+  const wrong = await showing(BAO, a, await activation(ADA));
+  await relay.message(a, JSON.stringify(['AUTH', wrong]));
+  assert.equal(checks, 2);
+  for (let i = 0; i < 10; i++) await relay.message(a, JSON.stringify(['AUTH', wrong]));
+  assert.equal(checks, 2, 'nothing checked again');
+  // Not even a good answer: a device that is refused tries again on a
+  // new socket, which has a challenge of its own.
+  await relay.message(a, JSON.stringify(['AUTH', await showing(ADA, a, await activation(ADA))]));
+  assert.deepEqual(a.of('OK').at(-1).slice(2), [false, 'auth-required: not an answer to this relay\'s challenge']);
+  assert.equal(checks, 2);
+  // An answer to another challenge, such as one the object asked before
+  // it was evicted, is refused unchecked, and leaves this one to answer.
+  const b = socket();
+  relay.open(b);
+  const elsewhere = await sign.event(ADA, { kind: authKind, content: '', tags: [['challenge', 'ff'.repeat(16)], ['activation', JSON.stringify(await activation(ADA))]], created_at: T });
+  await relay.message(b, JSON.stringify(['AUTH', elsewhere]));
+  assert.equal(b.of('OK')[0][2], false);
+  assert.equal(checks, 2);
+  await relay.message(b, JSON.stringify(['AUTH', await showing(ADA, b, await activation(ADA))]));
+  assert.equal(b.of('OK')[1][2], true);
 });
 
 test('no activation, another key\'s, one run out or another challenge\'s answer: nothing carried, and told why', async () => {
@@ -194,6 +228,41 @@ test('the account\'s turn says it first: the relay closes the superseded device\
   await relay.message(late, JSON.stringify(['AUTH', await showing(ADA, late, first)]));
   assert.match(late.of('OK')[0][3], /^superseded:/);
   assert.deepEqual(asked, [1, 1], 'asked at every answer');
+});
+
+test('the account\'s turn is asked of its own object, and a device let in without its word is logged', async () => {
+  // The accounts' objects, each answering as [answer] says, or failing.
+  const households = (answer) => ({
+    asked: [],
+    idFromName: (name) => name,
+    get(id) {
+      return {
+        fetch: async (url, init) => {
+          this.asked.push([id, JSON.parse(init.body)]);
+          if (answer instanceof Error) throw answer;
+          return Response.json(answer);
+        },
+      };
+    },
+  });
+  const who = { account: ACCOUNT, key: ADA.public, epoch: 1, until: T + 3600 };
+  const asked = async (answer) => {
+    const lines = [];
+    const h = households(answer);
+    const why = await householdSeen(h, 'online', (line) => lines.push(line))(who);
+    return { why, lines, asked: h.asked };
+  };
+  const yes = await asked({ status: 200, body: { ok: true } });
+  assert.deepEqual(yes, { why: null, lines: [], asked: [[ACCOUNT, { op: 'seen', account: ACCOUNT, key: ADA.public, epoch: 1, tag: 'online' }]] });
+  assert.equal((await asked({ status: 409, body: { error: 'suspended: this account is suspended from live play' } })).why, 'suspended: this account is suspended from live play');
+  assert.match((await asked({ status: 409 })).why, /^superseded: /);
+  // Neither yes nor no: let in on the service's signature, and said so.
+  for (const answer of [{ status: 503, body: { error: 'no store' } }, { status: 429, body: { error: 'slow down' } }, new Error('unreachable')]) {
+    const { why, lines } = await asked(answer);
+    assert.equal(why, null);
+    assert.equal(lines.length, 1);
+    assert.match(lines[0], /^gate: a device let in unchecked: /);
+  }
 });
 
 test('the account\'s turn says the account is suspended: its sockets close saying so, and a device from before is turned away in the same words, for good', async () => {

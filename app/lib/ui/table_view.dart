@@ -42,10 +42,7 @@ const _breathing = 0.06;
 /// Play runs 0-1-2-3, which reads clockwise once the seats are laid
 /// out around the felt: the player at the near edge, then west, north
 /// and east. Every seat wears a badge, the player's own included.
-/// Which way each seat's played card sits from the middle of the trick,
-/// in units of the trick card's own size: a diamond where height is
-/// spare, flatter and wider where it is not (a landscape phone), so the
-/// four cards keep their size in the height the felt has.
+///
 /// Which way each seat lies from the middle of the screen: the player
 /// below, then west, north and east. The table places a seat's card
 /// along it, a played card arrives along it, a swept trick leaves along
@@ -87,24 +84,41 @@ Offset? passesFrom(TableModel controller) {
 /// clear of north's left edge (0.30 ≤ 0.72 − 0.36), and the far side
 /// of the corner it would cover on south (0.72 ≥ 0.30 + 0.36); north
 /// and south 0.6 out are clear of the middle row's tops and of each
-/// other (0.6 ≥ 0.45, ≥ 0.5). The offsets are in steps of 1.15 card
-/// widths and 1.02 heights (_Trick).
+/// other (0.6 ≥ 0.45, ≥ 0.5). The offsets are in steps of
+/// [_stepAcross] card widths and [_stepDown] heights (_Trick).
 const _trickOffset = <int, Offset>{
-  0: Offset(0.30 / 1.15, 0.6 / 1.02),
-  1: Offset(-0.72 / 1.15, 0),
-  2: Offset(-0.30 / 1.15, -0.6 / 1.02),
-  3: Offset(0.72 / 1.15, 0),
+  0: Offset(0.30 / _stepAcross, 0.6 / _stepDown),
+  1: Offset(-0.72 / _stepAcross, 0),
+  2: Offset(-0.30 / _stepAcross, -0.6 / _stepDown),
+  3: Offset(0.72 / _stepAcross, 0),
 };
+
+/// The step a trick's offsets are counted in: a slot one unit across
+/// sits this many card widths from the middle, and one unit down this
+/// many card heights.
+const _stepAcross = 1.15, _stepDown = 1.02;
 
 /// How tall the upright trick's block is, in card heights: its cards'
 /// reach, 0.6 out each way and a card, and the margin the cross kept.
 const _trickTall = 2 * 0.6 + 1 + 0.11;
+
+/// The trick on a wide felt (a landscape phone), where height is what
+/// is short: flatter and wider than upright, so the four cards keep
+/// their size in the height the felt has.
 const _wideTrickOffset = <int, Offset>{
   0: Offset(0, 0.62),
   1: Offset(-1.12, 0),
   2: Offset(0, -0.62),
   3: Offset(1.12, 0),
 };
+
+/// The room the trick's block takes, in card widths across and card
+/// heights down: on a wide felt, and upright.
+const _wideBlock = Size(3.6, 2.3);
+const _uprightBlock = Size(2.9, _trickTall);
+
+/// The narrowest a card on the felt is drawn, and still read.
+const _leastCard = 34.0;
 
 /// Whether the "your turn" pill breathes. A test that waits for the
 /// table to come to rest turns it off, since a breath is a frame every
@@ -361,6 +375,7 @@ class _FeltLayout {
     final room = FeltRoom.maybeOf(context) ?? box;
     wide = room.width > room.height * 1.3;
     offsets = wide ? _wideTrickOffset : _trickOffset;
+    final block = wide ? _wideBlock : _uprightBlock;
     // The line in the corner sits beside the seat across the felt
     // where there is room for it: clear of the widest that seat's
     // badge can be (the trick's own width), and above where the side
@@ -378,13 +393,13 @@ class _FeltLayout {
     // holds a card's width: as wide as leaves the side badges their
     // least, which is the hand's size from a 360-point phone up. On
     // a wide felt the trick lies flat and a share of the width does.
-    final reach = offsets[3]!.dx * 1.15 + 0.5; // the east card's far edge, in card widths from the middle
+    final reach = offsets[3]!.dx * _stepAcross + 0.5; // the east card's far edge, in card widths from the middle
     double sideRoomFor(double cw) => box.width / 2 - cw * reach - edge - badgeGap;
     final leastRoom = SeatBadge.leastWidth * scale;
     final across = wide ? box.width * 0.16 : (box.width / 2 - edge - badgeGap - leastRoom) / reach;
-    final widest = (wide ? 3.6 : 2.9) * math.min(across, TableScale.phoneCard * scale);
+    final widest = block.width * math.min(across, TableScale.phoneCard * scale);
     final tight = SeatBadge.tightLine * scale;
-    final sidesFrom = tight + (wide ? math.max(0.0, (cardHeightFor(34) * 2.3 - tight) / 2) : 0.0);
+    final sidesFrom = tight + (wide ? math.max(0.0, (cardHeightFor(_leastCard) * _wideBlock.height - tight) / 2) : 0.0);
     final beside = edge + noteSize.width + badgeGap <= (box.width - widest) / 2 && edge + noteSize.height + badgeGap <= sidesFrom;
     final noteRow = note == null || beside ? 0.0 : edge + noteSize.height + badgeGap;
     // The badges hold to their cards, so it is the trick that gives
@@ -399,8 +414,8 @@ class _FeltLayout {
     // as a face wants unless that would leave the cards under what
     // a card can be read at, where it takes the smaller size back.
     double cardsUnder(double line) =>
-        (box.height - noteRow - 2 * (line + badgeGap) - (wide ? 0.0 : pillRoom)) / ((wide ? 2.3 : _trickTall) / cardAspect);
-    line = (cardsUnder(SeatBadge.line * scale) >= 34.0 ? SeatBadge.line : SeatBadge.tightLine) * scale;
+        (box.height - noteRow - 2 * (line + badgeGap) - (wide ? 0.0 : pillRoom)) / (block.height / cardAspect);
+    line = (cardsUnder(SeatBadge.line * scale) >= _leastCard ? SeatBadge.line : SeatBadge.tightLine) * scale;
     // The biggest a card is allowed to be, from the felt's own
     // size. A phone is held at arm's length and its felt is small,
     // so seventy-six points is the whole of what fits; a tablet's
@@ -413,14 +428,14 @@ class _FeltLayout {
       across,
       cardsUnder(line),
       most,
-    ].reduce((a, b) => a < b ? a : b).clamp(34.0, most);
+    ].reduce((a, b) => a < b ? a : b).clamp(_leastCard, most);
     if (sideRoomFor(cardWidth) < leastRoom) {
-      cardWidth = ((box.width / 2 - edge - badgeGap - leastRoom) / reach).clamp(34.0, cardWidth);
+      cardWidth = ((box.width / 2 - edge - badgeGap - leastRoom) / reach).clamp(_leastCard, cardWidth);
     }
     this.cardWidth = cardWidth;
     sideRoom = sideRoomFor(cardWidth).clamp(leastRoom, box.width);
     cardHeight = cardHeightFor(cardWidth);
-    trickBox = wide ? Size(cardWidth * 3.6, cardHeight * 2.3) : Size(cardWidth * 2.9, cardHeight * _trickTall);
+    trickBox = Size(cardWidth * block.width, cardHeight * block.height);
 
     // A badge hugs what it says, up to the room it has: the width
     // of the trick's own column for the seat across the felt and
@@ -442,7 +457,7 @@ class _FeltLayout {
     // already floats the action line (table_layout.dart); on a wide
     // felt, where the action line sits on a row of its own, it is
     // split evenly and the table rides in the middle.
-    final inset = trickBox.height / 2 - (offsets[2]!.dy.abs() * cardHeight * 1.02 + cardHeight / 2);
+    final inset = trickBox.height / 2 - (offsets[2]!.dy.abs() * cardHeight * _stepDown + cardHeight / 2);
     gap = (badgeGap - inset).clamp(0.0, badgeGap);
     // Where a side badge's inner edge falls: a gap out from the far
     // edge of the card beside it, measured from the middle of the
@@ -655,7 +670,7 @@ class _PointsGlowState extends State<_PointsGlow> with TickerProviderStateMixin 
     // The trick that was on the table as this seat's has gone from it:
     // taken, and on its way to the seat.
     if (old.trick != null && _up.value > 0 && !_down.isAnimating) {
-      final still = MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+      final still = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
       _waits = still ? Duration.zero : Pacing.trickSweeps;
       _down
         ..duration = _waits + _lasts
@@ -790,7 +805,7 @@ class _MoonQuakeState extends State<_MoonQuake> with SingleTickerProviderStateMi
     // it was opened.
     final shooter = widget.shooter;
     if (shooter == null || old.shooter != null) return;
-    if (MediaQuery.maybeOf(context)?.disableAnimations ?? false) return;
+    if (MediaQuery.maybeDisableAnimationsOf(context) ?? false) return;
     _shooter = shooter;
     _away = -seatDirection[shooter]!;
     _quake.forward(from: 0);
@@ -907,7 +922,7 @@ class _Shows extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final still = MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+    final still = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
     return AnimatedSwitcher(
       duration: still ? Duration.zero : const Duration(milliseconds: 180),
       child: child ?? const SizedBox.shrink(),
@@ -1119,7 +1134,7 @@ class _TrickState extends State<_Trick> with SingleTickerProviderStateMixin {
     // All four going at once is the trick being swept; anything less is
     // the table catching up with itself.
     if (swept.length < seatCount) return;
-    if (MediaQuery.maybeOf(context)?.disableAnimations ?? false) return;
+    if (MediaQuery.maybeDisableAnimationsOf(context) ?? false) return;
     // No setState: this is a widget update, and the build is next.
     // The taker's own card first, so the other three are drawn over it
     // as they are gathered onto it.
@@ -1136,8 +1151,8 @@ class _TrickState extends State<_Trick> with SingleTickerProviderStateMixin {
 
   /// Where a slot sits, out from the middle of the trick.
   Offset _at(int position) => Offset(
-        widget.offsets[position]!.dx * widget.cardWidth * 1.15,
-        widget.offsets[position]!.dy * widget.cardHeight * 1.02,
+        widget.offsets[position]!.dx * widget.cardWidth * _stepAcross,
+        widget.offsets[position]!.dy * widget.cardHeight * _stepDown,
       );
 
   @override
@@ -1274,9 +1289,9 @@ class _TrickSlot extends StatelessWidget {
   }
 }
 
-/// An opponent: who they are, where they stand in the game, what they
-/// have taken this hand. Not how many cards they hold — everyone holds
-/// as many as you do.
+/// A seat's badge, yours included: who they are, where they stand in
+/// the game, what they have taken this hand. Not how many cards they
+/// hold — everyone holds as many as you do.
 class SeatBadge extends StatelessWidget {
   const SeatBadge({
     super.key,
@@ -1746,7 +1761,7 @@ class _YourTurnState extends State<_YourTurn> with SingleTickerProviderStateMixi
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    if (!turnPillBreathes || (MediaQuery.maybeOf(context)?.disableAnimations ?? false)) {
+    if (!turnPillBreathes || (MediaQuery.maybeDisableAnimationsOf(context) ?? false)) {
       _breath
         ..stop()
         ..value = 0.6;
@@ -1844,9 +1859,6 @@ class _Pill extends StatelessWidget {
 /// A clock's seconds, rounded up: "0 s" only once it has run out.
 int clockSeconds(int ms) => (ms / 1000).ceil();
 
-/// A seat's remaining clock, on a badge or the score line: the seconds
-/// and a small dial, red, since a running clock is the one thing on
-/// the felt that asks for haste.
 /// A badge laid out for its size alone: it takes up its room and is not
 /// drawn, heard or touched. The two of a pair are each laid out over a
 /// ghost of the other, so they come out one size.
@@ -1867,6 +1879,9 @@ class BadgeGhost extends StatelessWidget {
       );
 }
 
+/// A seat's remaining clock, on a badge or the score line: the seconds
+/// and a small dial, red, since a running clock is the one thing on
+/// the felt that asks for haste.
 class ClockText extends StatelessWidget {
   const ClockText({super.key, required this.ms});
 

@@ -544,7 +544,91 @@ void sealedTests() {
     return [for (var s = 0; s < seatCount; s++) g.handOf(s)];
   }
 
+  test('the cards played this hand are the game\'s to keep: every card played since the deal, the copy\'s too', () {
+    final game = HeartsGame(seed: 9);
+    final bot = Bot(persona: Persona.roster.first);
+    final played = <Card>{};
+    var plays = 0;
+    while (game.phase != Phase.gameOver) {
+      switch (game.phase) {
+        case Phase.passing:
+          for (var s = 0; s < seatCount; s++) {
+            game.setPass(s, bot.choosePass(game.handOf(s)));
+          }
+        case Phase.playing:
+          if (game.pendingTrick != null) {
+            game.collectTrick();
+            break;
+          }
+          expect(game.playedThisHand, played);
+          expect(game.lookahead().playedThisHand, played);
+          final seat = game.currentSeat!;
+          final card = bot.chooseCard(BotView.of(game, seat), game.legalPlaysFor(seat));
+          game.play(seat, card);
+          played.add(card);
+          plays++;
+        case Phase.handOver:
+          game.nextHand();
+          played.clear();
+          expect(game.playedThisHand, isEmpty);
+        case Phase.gameOver || Phase.dealing:
+          fail('not reached');
+      }
+    }
+    expect(plays, greaterThan(52));
+  });
+
   group('sealed', () {
+    test('a hidden hand cannot play a card already played this hand', () {
+      final game = HeartsGame(sealed: true)..deal([null, null, null, null]);
+      game.declareLeader(0);
+      for (var s = 0; s < seatCount; s++) {
+        game.setPass(s, null);
+      }
+      game.play(0, twoOfClubs);
+      final nine = Card.parse('9D');
+      game.play(1, nine);
+      expect(() => game.play(2, nine), throwsArgumentError);
+      expect(() => game.play(2, twoOfClubs), throwsArgumentError);
+      expect(game.allows(2, nine), isFalse, reason: 'allows says no to what play refuses');
+      expect(game.allows(2, twoOfClubs), isFalse);
+      expect(game.playedThisHand, {twoOfClubs, nine});
+    });
+
+    test('allows says of every card what play does, a hidden hand\'s too, through a whole hand', () {
+      // Seats 0 and 2 seen, 1 and 3 hidden, every pass known. Each
+      // passes its three highest, so the 2♣ stays where it was dealt.
+      final hands = handsFrom(3);
+      final game = HeartsGame(sealed: true)..deal([hands[0], null, hands[2], null]);
+      game.declareLeader(hands.indexWhere((h) => h.contains(twoOfClubs)));
+      for (var s = 0; s < seatCount; s++) {
+        game.setPass(s, (List.of(hands[s])..sort()).reversed.take(3).toList());
+      }
+      bool takes(int seat, Card card) {
+        try {
+          game.lookahead().play(seat, card);
+          return true;
+        } on ArgumentError {
+          return false;
+        }
+      }
+
+      var turns = 0;
+      while (game.phase == Phase.playing) {
+        if (game.pendingTrick != null) {
+          game.collectTrick();
+          continue;
+        }
+        final seat = game.currentSeat!;
+        for (final card in Card.deck) {
+          expect(game.allows(seat, card), takes(seat, card), reason: 'seat $seat, $card, turn $turns');
+        }
+        game.play(seat, Card.deck.firstWhere((c) => game.allows(seat, c)));
+        turns++;
+      }
+      expect(turns, 52);
+    });
+
     test('rests in dealing until dealt, then plays out like any game when every hand is seen', () {
       final game = HeartsGame(sealed: true);
       expect(game.phase, Phase.dealing);

@@ -63,7 +63,7 @@ String houseKey = const String.fromEnvironment('OH_HOUSE_KEY');
 ///
 /// Settable, the way the signature verifier is (table's signing.dart):
 /// one seam for the tests to stand their own service in, rather than
-/// one per call.
+/// one per call. (The TURN client, turn.dart, has its own.)
 Uri? Function(String handler) handlerAt = (handler) => handlerFor(handler, appBase());
 
 Uri? handlerFor(String handler, Uri at) {
@@ -117,8 +117,8 @@ const LicenceAnswer _unanswered = (answered: false, licence: null, suspended: fa
 /// Never throws: a front door that fell over because a handler was slow
 /// would be worse than one that waits for the date on the licence it
 /// already has.
-Future<LicenceAnswer> askLicence(Signer signer, {Uri? endpoint, String service = serviceKey}) async {
-  final url = endpoint ?? handlerAt('licence');
+Future<LicenceAnswer> askLicence(Signer signer, {String service = serviceKey}) async {
+  final url = handlerAt('licence');
   if (url == null) return (answered: true, licence: null, suspended: false);
   final ({int status, String body}) answer;
   try {

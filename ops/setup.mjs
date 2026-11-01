@@ -1,6 +1,6 @@
-// `oh infra`, `oh config …`, `oh key mint`, `oh secret set` and `oh
-// phone …`: what the deployment is made of, set as its definitions and
-// its operator say (docs/how-to/apply-infrastructure.md,
+// `oh infra`, `oh config …`, `oh secret set` and `oh phone …`: what the
+// deployment is made of, set as its definitions and its operator say
+// (docs/how-to/apply-infrastructure.md,
 // docs/how-to/change-remote-config.md,
 // docs/how-to/rotate-the-service-key.md,
 // docs/how-to/cut-a-phone-release.md).
@@ -9,7 +9,7 @@ import { readFile } from 'node:fs/promises';
 import { isDeepStrictEqual } from 'node:util';
 import { join, resolve } from 'node:path';
 
-import { Failed, Usage, root, wranglerVersion } from './env.mjs';
+import { Failed, Usage, WRANGLER, cloudflareOnly, root } from './env.mjs';
 import { pages, relay } from '../infra/cloudflare.mjs';
 import { configOf } from '../service/functions/config.mjs';
 import { serviceSettingsOf } from '../service/functions/settings.mjs';
@@ -106,20 +106,13 @@ export async function configClear(ctx, { args, flags }) {
   ctx.log(`deleted ${row.key.join('|')}`);
 }
 
-/// A new service key pair, printed once and kept nowhere
-/// (service/bin/service_key.dart).
-export async function keyMint(ctx) {
-  const code = await ctx.run('dart', ['run', 'bin/service_key.dart'], { cwd: join(root, 'service') });
-  if (code !== 0) throw new Failed(`service_key.dart exited ${code}`);
-}
-
 /// Where each secret lives, as infra/cloudflare.mjs names them: on the
 /// Pages project (in each of its environments that has it) or on the
 /// relay worker.
 function placesOf(name) {
   const places = [];
   for (const [env, def] of Object.entries(pages.environments)) {
-    if (def.secrets?.includes(name)) places.push({ where: `Pages (${env})`, args: ['pages', 'secret', 'put', name, '--project-name', pages.project ?? 'open-hearts', ...(env === 'production' ? [] : ['--env', env])], cwd: root });
+    if (def.secrets?.includes(name)) places.push({ where: `Pages (${env})`, args: ['pages', 'secret', 'put', name, '--project-name', pages.project, ...(env === 'production' ? [] : ['--env', env])], cwd: root });
   }
   // Its optional secrets too, such as a checker's credentials, which are
   // set once they are issued.
@@ -158,7 +151,7 @@ async function secretFromInput(stdin = process.stdin, stderr = process.stderr) {
 }
 
 export async function secretSet(ctx, { args, flags }) {
-  const made = relay.madeBy?.[args.name];
+  const made = [relay, ...Object.values(pages.environments)].map((def) => def.madeBy?.[args.name]).find(Boolean);
   if (made) throw new Usage(`${args.name} is not typed in: ${made} makes it, with the key that goes into config/openhearts.json beside it`);
   const places = placesOf(args.name);
   if (!places.length) throw new Usage(`${args.name} is not a secret infra/cloudflare.mjs defines`);
@@ -169,9 +162,8 @@ export async function secretSet(ctx, { args, flags }) {
   }
   const value = await (ctx.readSecret ?? secretFromInput)();
   if (!value) throw new Failed('no value: nothing set');
-  const version = await wranglerVersion();
   for (const place of places) {
-    const code = await ctx.run('npx', ['--yes', `wrangler@${version}`, ...place.args], { cwd: place.cwd, input: value });
+    const code = await ctx.run(WRANGLER, place.args, { cwd: place.cwd, env: cloudflareOnly(ctx.env), input: value });
     if (code !== 0) throw new Failed(`wrangler said ${code} setting ${args.name} on ${place.where}`);
     ctx.log(`set ${args.name} on ${place.where}`);
   }

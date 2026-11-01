@@ -1,4 +1,5 @@
-/// The relays a device talks to: a constant of the build, not a setting.
+/// The relays a device talks to: the build's, or the ones of ours the
+/// remote config names.
 ///
 /// A deployed build talks to our relay and nothing else
 /// (docs/explanation/relay.md): one Cloudflare object per tag
@@ -22,16 +23,12 @@ import 'address.dart' show isLocalHost;
 import 'remote_config.dart';
 
 /// Our relay: a Cloudflare object per tag, which is why the tag is in
-/// the URL. The mark is `tagMark` (`packages/table`, presence_relay.dart);
+/// the URL. The mark is `tagMark` (`packages/table`, relays.dart);
 /// whoever opens a socket for a tag puts the tag there.
 const ourRelay = 'wss://relay.openhearts.game/{tag}';
 
 /// The relays a deployed build starts on: ours.
 const deployedRelays = [ourRelay];
-
-/// How many relays at the front of [relays] are ours, kept first in
-/// every table's rotation. All of a deployed list; none of a local one.
-int pinnedRelays(List<Uri> relays) => relays.takeWhile(RemoteConfig.ours).length;
 
 /// The local relay, where a build served from this machine looks: ours
 /// on a node socket (service/do/host.mjs), on its own port, an object

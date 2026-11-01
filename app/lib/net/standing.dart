@@ -10,7 +10,6 @@ import 'dart:async';
 import 'package:table/table.dart';
 
 import 'licence.dart' show houseKey;
-import 'relays.dart';
 import 'remote_config.dart' show waits;
 
 /// The house whose results this build counts (licence.dart): none
@@ -32,7 +31,7 @@ class Standing {
   /// results written to it, so the fold waits for all of them, within
   /// reason.
   static Future<Standing> load(List<Uri> relays, Signer signer, {required String account}) async {
-    final t = RelayTransport(relays: relays, signer: signer, table: GameResult.tag, pinned: pinnedRelays(relays));
+    final t = RelayTransport(relays: relays, signer: signer, table: GameResult.tag);
     try {
       await t.ready.timeout(waits.standing);
       await t.allReady.timeout(waits.standingAll).catchError((_) {});

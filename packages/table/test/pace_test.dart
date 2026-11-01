@@ -51,14 +51,6 @@ void main() {
       expect(Pace.parse({'spc': 4.0, 'cards': 99999}).cards, Pace.remembers);
     });
 
-    test('a word for it, for a screen', () {
-      expect(Pace.fresh.word, 'not yet known');
-      expect(const Pace(secondsPerCard: 2, cards: 40).word, 'brisk');
-      expect(const Pace(secondsPerCard: 7, cards: 40).word, 'steady');
-      expect(const Pace(secondsPerCard: 15, cards: 40).word, 'unhurried');
-      expect(const Pace(secondsPerCard: 40, cards: 40).word, 'slow');
-    });
-
     test('a player who has not measured one is no distance from anybody', () {
       expect(paceApart(0, 30), 0);
       expect(paceApart(30, 0), 0);

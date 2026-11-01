@@ -9,7 +9,7 @@ import { test } from 'node:test';
 import { wasmPath } from './host.mjs';
 import { NAME_REFUSED_WHY, PICTURE_IN_AVATAR_WHY, lobbyKind, namesIn, objectRelay, pictureInAvatar, refusalFor, resultsTag, schnorrVerifier, storedKeep } from './relay.mjs';
 import { keys, signing } from './sign.mjs';
-import { KEPT_MS, SWEEP_EVERY_MS, keyOf, tagStore } from './tag_store.mjs';
+import { AHEAD_MOST_MS, KEPT_MS, SWEEP_EVERY_MS, keyOf, tagStore } from './tag_store.mjs';
 import { pictureScreen } from './withheld.mjs';
 import { pictureDigest, withholding } from '../functions/pictures.mjs';
 
@@ -33,18 +33,26 @@ function storage() {
     async put(key, value) {
       rows.set(key, structuredClone(value));
     },
+    /// One key, or up to 128 of them, as an object's storage takes.
     async delete(key) {
+      if (Array.isArray(key) && key.length > 128) throw new RangeError(`delete takes 128 keys at most, not ${key.length}`);
       for (const k of Array.isArray(key) ? key : [key]) rows.delete(k);
     },
-    async list({ prefix = '', end = null, limit = Infinity } = {}) {
+    /// Keys in order, or the other way with [reverse], from [start] and
+    /// before [end]; [limit] counts from the first of them either way, as
+    /// an object's storage does.
+    async list({ prefix = '', start = null, end = null, limit = Infinity, reverse = false } = {}) {
       const out = new Map();
-      for (const k of sorted()) {
+      for (const k of reverse ? sorted().reverse() : sorted()) {
         if (out.size >= limit) break;
-        if (!k.startsWith(prefix) || (end !== null && k >= end)) continue;
+        if (!k.startsWith(prefix) || (start !== null && k < start) || (end !== null && k >= end)) continue;
         out.set(k, rows.get(k));
       }
+      this.read += out.size;
       return out;
     },
+    /// How many rows every list so far has read.
+    read: 0,
     async getAlarm() {
       return alarm;
     },
@@ -97,7 +105,8 @@ test('nothing that shows the others a name the filter refuses is carried, wherev
   const room = refusalFor('ABCD');
   const table = refusalFor('a'.repeat(32));
   const said = (kind, content) => ({ kind, tags: [['t', 'ABCD']], content: JSON.stringify(content) });
-  const watched = (names) => ({ kind: 24247, tags: [['t', 'a'.repeat(32)]], content: JSON.stringify({ phase: 'play', names }) });
+  // A view as a seated player says it (packages/table, watch.dart).
+  const watched = (names) => ({ kind: 24247, tags: [['t', 'a'.repeat(32)]], content: JSON.stringify({ view: { table: 'a'.repeat(32), phase: 'playing', names } }) });
   // Waiting in a room or a pool, a table started or seated, a table watched.
   assert.equal(room(said(24245, { kind: 'here', name: 'Ada' })), null);
   assert.equal(room(said(24245, { kind: 'here', name: 'Sh1t Head' })), NAME_REFUSED_WHY);
@@ -106,12 +115,20 @@ test('nothing that shows the others a name the filter refuses is carried, wherev
   assert.equal(room(said(lobbyKind, { kind: 'start', seats: [{ key: 'k', name: 'Ada' }, { key: 'j', name: 'Fuckface' }] })), NAME_REFUSED_WHY);
   assert.equal(table(watched(['Ada', 'Bao', 'Sam', 'Cy'])), null);
   assert.equal(table(watched(['Ada', 'Bao', 'nazi', 'Cy'])), NAME_REFUSED_WHY);
+  assert.equal(table(watched(['Ada', 'Bao', 'Аdmin', 'Cy'])), NAME_REFUSED_WHY, 'with a Cyrillic А');
+  // A name no app sends: one the app would show joined up as `Admin`,
+  // or cut to end in it.
+  assert.equal(room(said(24245, { kind: 'wait', name: 'Ad\u0001min', rating: 1500 })), NAME_REFUSED_WHY);
+  assert.equal(room(said(24245, { kind: 'here', name: 'Ad\u2028min' })), NAME_REFUSED_WHY);
+  assert.equal(room(said(24245, { kind: 'here', name: `${'x'.repeat(54)} adminz` })), NAME_REFUSED_WHY);
+  assert.equal(room(said(24245, { kind: 'here', name: 'x'.repeat(60) })), null);
   // A kind that names nobody is not read for names: a table's own events.
   assert.equal(room(said(24242, { name: 'fuck' })), null);
   // Content that is not JSON, or names nobody, is carried as before.
   assert.equal(room({ kind: 24245, tags: [['t', 'ABCD']], content: 'not json' }), null);
   assert.deepEqual(namesIn(said(lobbyKind, { kind: 'picture', jpeg: 'AAAA' })), []);
   assert.deepEqual(namesIn(said(lobbyKind, { name: 7, seats: [null, { name: 'Ada' }], names: ['Bao', 3] })), ['Ada', 'Bao']);
+  assert.deepEqual(namesIn(said(24247, { view: { names: 'Cy' } })), []);
 });
 
 test('a picture travels only as its own event: one inside an avatar, its own or a seat\'s, is not carried', () => {
@@ -214,6 +231,20 @@ test('a day on, the sweep deletes what is a day old and leaves the rest', async 
   assert.equal(st.alarm, null);
 });
 
+test('the sweep deletes any number of events, 128 keys at a time as storage takes them', async () => {
+  const st = storage();
+  const kept = tagStore(st, 'ABCD');
+  const now = 10 * KEPT_MS;
+  const day = Math.floor((now - KEPT_MS) / 1000);
+  // 300 a day old, and 200 dated far ahead.
+  for (let i = 0; i < 300; i++) await kept.keep(await lobby(keys[i % keys.length], 'ABCD', day - 1 - i), null, { now: 0 });
+  for (let i = 0; i < 200; i++) await kept.keep(await lobby(keys[i % keys.length], 'ABCD', Math.floor(now / 1000) + 2 * 60 * 60 + i), null, { now: 0 });
+  const fresh = await lobby(keys[0], 'ABCD', day + 1);
+  await kept.keep(fresh, null, { now: 0 });
+  assert.equal(await kept.sweep({ now }), true);
+  assert.deepEqual([...st.rows.keys()], [keyOf(fresh)]);
+});
+
 test('the tag kept for good is the one the table package publishes results on', () => {
   // Ratings are folded from every result (packages/table, results.dart),
   // so a result swept with the day's rooms is a rating that changes.
@@ -237,6 +268,36 @@ test('results are kept for good: no sweep, and storage keeps what memory lets go
   // What is loaded is the newest the memory holds.
   assert.equal(storedKeep(resultsTag), 20000);
   assert.equal((await kept.load()).size, 2);
+});
+
+test('an object woken holds the newest of what it stored, oldest first, and reads no more of it', async () => {
+  const st = storage();
+  const most = storedKeep('ABCD');
+  // More rows than memory holds, as the results' storage has: it keeps
+  // every one.
+  const events = Array.from({ length: most + 5 }, (_, i) => ({ id: i.toString(16).padStart(64, '0'), created_at: 1000 + i, kind: lobbyKind }));
+  for (const e of events) st.rows.set(keyOf(e), e);
+  st.read = 0;
+  const store = await tagStore(st, 'ABCD').load();
+  assert.deepEqual(store.ids(), events.slice(5).map((e) => e.id));
+  assert.equal(st.read, most);
+});
+
+test('the sweep deletes at once a stored event dated more than an hour ahead, which a day from its date would keep past its day', async () => {
+  const st = storage();
+  const kept = tagStore(st, 'ABCD');
+  const now = 10 * KEPT_MS;
+  const ahead = (now + AHEAD_MOST_MS) / 1000;
+  const near = await lobby(keys[0], 'ABCD', ahead);
+  const far = await lobby(keys[1], 'ABCD', ahead + 1);
+  const years = await lobby(keys[2], 'ABCD', ahead + 10 * 365 * 24 * 60 * 60);
+  for (const e of [near, far, years]) await kept.keep(e, null, { now: 0 });
+  assert.equal(await kept.sweep({ now }), true);
+  assert.deepEqual([...st.rows.keys()], [keyOf(near)]);
+  assert.equal(st.alarm, now + SWEEP_EVERY_MS);
+  // The one an hour ahead goes a day after its date, as any does.
+  assert.equal(await kept.sweep({ now: now + AHEAD_MOST_MS + KEPT_MS + 1000 }), true);
+  assert.equal(st.rows.size, 0);
 });
 
 test('a room\'s object lets the oldest go from storage as it lets it go from memory', async () => {

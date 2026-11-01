@@ -50,20 +50,24 @@ class SimTable {
               licence: licenceOf?.call(signers[botsFirst ? s - (seatCount - humans) : s].publicKey))
           : BotSeat(Persona.roster[(s + seed) % Persona.roster.length]));
     }
-    spec = TableSpec(
-      seed: seed,
-      seats: seats,
-      sealed: sealed,
-      target: target,
-      timing: timing,
-      rated: rated,
-      house: sealed ? houseSigner.publicKey : null,
-      salt: salt,
-    );
+    final houseSecret = Uint8List.fromList(utf8.encode('house secret $seed').take(32).toList());
+    TableSpec specWith(String? salt) => TableSpec(
+          seed: seed,
+          seats: seats,
+          sealed: sealed,
+          target: target,
+          timing: timing,
+          rated: rated,
+          house: sealed ? houseSigner.publicKey : null,
+          salt: salt,
+        );
+    // A rated table is one a pool seats, with the house's own salt,
+    // unless the test gives it another.
+    spec = specWith(salt ?? (rated ? seatingSalt(houseSecret, specWith(null)) : null));
     DealWorker? workerFor() => workers && crypto != null ? SimDealWorker(crypto!, clock) : null;
     _newHouse = () => House(
           signer: houseSigner,
-          secret: Uint8List.fromList(utf8.encode('house secret $seed').take(32).toList()),
+          secret: houseSecret,
           lineFor: (_) => referee.line(houseSigner.publicKey, latencyMs: houseLatencyMs ?? latencyMs),
           clock: clock,
           crypto: crypto,

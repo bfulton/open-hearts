@@ -3,6 +3,9 @@
 /// takes for a table since the referee.
 library;
 
+import 'dart:math';
+
+import 'package:deal/deal.dart';
 import 'package:table/table.dart';
 import 'package:table_sim/table_sim.dart';
 import 'package:test/test.dart';
@@ -81,6 +84,54 @@ void main() {
       final l = Ledger.from([r.signedBy(house()), other.signedBy(house())], house: house().publicKey);
       expect(l.standing, hasLength(1));
       expect(l.standing.single.seats.first.id, r.seats.first.id);
+    });
+  });
+
+  group('the house says one', () {
+    late DealCrypto crypto;
+    setUpAll(() async => crypto = await rememberedCrypto());
+
+    // [t] with only its first person there: the rest never come.
+    TableRules alone(SimTable t) {
+      t.people.first.start();
+      final c = t.clients.first;
+      expect(t.clock.runUntil(() => c.done && c.rules.result != null && t.house!.serving.isEmpty, limitMs: 60 * 60 * 1000), isTrue);
+      return c.rules;
+    }
+
+    test('for a rated table only when it seated it: one a device started as rated is not served, and nobody is rated on it', () {
+      // Any one of a table's people can write its start: rated, naming
+      // whoever they like, with a salt of their own.
+      final t = SimTable(humans: 2, seed: 112, target: 1, crypto: crypto, rated: true, salt: newSalt(Random(1)))..start();
+      expect(t.run(), isTrue, reason: 'over at the house\'s word, which the house let the table go after');
+      expect(t.following.map((c) => c.state), everyElement(TableState.failed));
+      expect(t.house!.serving, isEmpty, reason: 'the house let the table go');
+      expect(t.results, isEmpty);
+      expect([for (final e in t.referee.log) if (e.event?.author == t.houseSigner.publicKey) e.event!.body], [t.clients.first.rules.refusal],
+          reason: 'the house said one thing at it: that it will not serve it (refusal_test.dart)');
+      t.close();
+    });
+
+    test('for a pool\'s table, about everyone it seated, whether they came or not', () {
+      final t = SimTable(humans: 2, seed: 113, target: 1, crypto: crypto, rated: true);
+      final over = alone(t);
+      expect(over.removals[1]?.exit, Exit.booted);
+      final said = GameResult.parse(t.results.single)!;
+      expect(said.rated, isTrue);
+      expect(said.seats.singleWhere((s) => s.key == t.signers[1].publicKey).left, isTrue, reason: 'seated, and gone');
+      t.close();
+    });
+
+    test('for a table a device started, none when one of its people never said a word there', () {
+      // Whoever starts a table chooses who sits at it: somebody named
+      // there who never said anything never sat down to it.
+      final t = SimTable(humans: 2, seed: 113, target: 1, crypto: crypto);
+      final over = alone(t);
+      expect(over.state, TableState.finished, reason: 'the game went on with a bot in the empty seat');
+      expect(over.removals[1]?.exit, Exit.booted);
+      expect(over.result?.body['n'], over.endN, reason: 'the house served it and said how it came out, as for any table, and did not refuse it');
+      expect(t.results, isEmpty, reason: 'and published nothing');
+      t.close();
     });
   });
 }

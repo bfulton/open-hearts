@@ -112,6 +112,15 @@ test('offline, the kept copy answers — and every page in the scope is the one 
   assert.equal(await (await w.ask(get('./subscription', 'navigate'))).text(), '<html>');
 });
 
+test('a file opened as a page is left to the network, and the app stays the page kept', async () => {
+  const w = start({ '/play/': '<html>', '/play/robots.txt': 'User-Agent: *', '/play/nothing.here': '<html>the site</html>' });
+  await w.ask(get('./', 'navigate'));
+  assert.equal(await w.ask(get('./robots.txt', 'navigate')), null, 'the browser fetches it itself');
+  assert.equal(await w.ask(get('./nothing.here', 'navigate')), null, 'and a missing file, which the site answers with its front page');
+  w.net.online = false;
+  assert.equal(await (await w.ask(get('./', 'navigate'))).text(), '<html>', 'offline, still the app');
+});
+
 test('offline, what was never kept fails as the network did', async () => {
   const w = start({});
   w.net.online = false;

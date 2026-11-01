@@ -125,9 +125,9 @@ class _RankMark extends StatelessWidget {
       style: TextStyle(
         fontSize: heavy ? 12.5 : 11.5,
         height: 1.2,
-        // Gone is said by fading it, not by striking it through: a rail
-        // read out of the corner of the eye wants the ones still out
-        // there to be the ones that carry.
+        // A rank played is faded, struck through and no longer bold,
+        // so on a rail read out of the corner of the eye the ranks
+        // still out are the ones that stand out.
         color: gone ? colour.withValues(alpha: 0.22) : colour,
         fontWeight: heavy && !gone ? FontWeight.w800 : FontWeight.w500,
         decoration: gone ? TextDecoration.lineThrough : null,

@@ -208,6 +208,16 @@ export function reportOf(body) {
   return { about, what, table, name, picture, note: note.trim() };
 }
 
+/// A reporter's [note] as the mail quotes it: each of its lines behind
+/// `  > `, whatever breaks them, and without control characters, so that
+/// nothing they write can pass for one of the mail's own lines, such as
+/// a command to run.
+const quoted = (note) =>
+  note
+    .split(/\r\n?|[\n\x85\u2028\u2029]/)
+    .map((line) => `  > ${line.replace(/\p{Cc}/gu, '')}`)
+    .join('\n');
+
 /// [account]'s report, from its device [key], of [about] (reportOf),
 /// told to the operator at once: the same report from the same account
 /// once a day, and no more than [REPORTS_A_DAY] of them. Resolves
@@ -229,7 +239,7 @@ export async function alertReport(env, store, { key, account, about, what, table
   const text = [
     `Account ${account} (device ${short(key)}…) reported account ${about} for its ${what === 'other' ? 'conduct' : what}, at ${new Date(now).toISOString()}${table ? `, at table ${table}` : ''}.`,
     '',
-    note ? `What they wrote: ${note}` : 'They wrote nothing more.',
+    note ? `What they wrote:\n${quoted(note)}` : 'They wrote nothing more.',
     '',
     ...(picture ? [`The picture they saw: ${pictureUrl(about, picture)} — ${picture === itsPicture ? 'its profile picture now' : 'not its profile picture now'}`] : []),
     ...(name !== null ? [`The name they saw: ${name} — ${name === itsName ? 'its name now' : `its name now is ${itsName ? itsName : 'none'}`}`] : []),

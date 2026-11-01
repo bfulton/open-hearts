@@ -375,8 +375,9 @@ fn seal_challenge(
 
 /// A secret two seats share and nobody else can compute: the hash of
 /// the point [pk] times this seat's key. Both sides get the same 32
-/// bytes; what a seat keeps for another — a share of its deal secret,
-/// held against its leaving — is encrypted with it (packages/deal).
+/// bytes. The escrow in packages/deal does not use it: its pieces are
+/// wrapped in the secret the two seats' table keys share
+/// (Signer.sharedSecretWith).
 pub fn shared_secret(secret: &[u8], pk: &[u8], out: &mut [u8]) -> Option<usize> {
     use blake2::{Blake2s256 as Blake2s, Digest};
     let (_, sk) = keys(secret)?;
@@ -562,6 +563,55 @@ mod tests {
         assert_eq!(shared_secret(&secrets[0], &pks[2 * POINT..3 * POINT], &mut ac), Some(32));
         assert_eq!(ab, ba);
         assert_ne!(ab, ac);
+    }
+
+    /// A shuffle argument comes from another seat, and each vector in
+    /// it is as long as its written length says. One cut short or
+    /// emptied is an argument that does not hold. It is never a panic,
+    /// which under panic = "abort" would end the process checking it:
+    /// the house, or a verifier.
+    #[test]
+    fn a_shuffle_argument_with_a_vector_cut_short_is_refused() {
+        let mut joint = vec![0u8; POINT];
+        keygen(&seed(1), &mut joint).unwrap();
+        let mut deck = vec![0u8; DECK_BYTES];
+        initial_deck(&joint, &mut deck).unwrap();
+        let mut next = vec![0u8; DECK_BYTES];
+        let mut out = vec![0u8; 16384];
+        let n = shuffle(&joint, &deck, &seed(2), &mut next, &mut out).unwrap();
+        let proof = &out[..n];
+        assert!(verify_shuffle(&joint, &deck, &next, proof));
+
+        // Every vector in an M × N argument: where its length is
+        // written (eight bytes, little-endian, then the elements), how
+        // many elements an honest one has, and the size of one.
+        let vectors = [
+            (0, M, POINT),          // the shuffle's commitments
+            (136, M, POINT),
+            (304, M, POINT),        // the Hadamard argument's
+            (504, 2 * M + 1, POINT), // its zero argument's
+            (800, N, SCALAR),
+            (1224, N, SCALAR),
+            (1840, N, SCALAR),      // the single-value argument's
+            (2264, N, SCALAR),
+            (2784, 2 * M, POINT),   // the multi-exponentiation argument's
+            (3048, 2 * M, MASKED),
+            (3696, N, SCALAR),
+        ];
+        for (at, count, size) in vectors {
+            assert_eq!(u64::from_le_bytes(proof[at..at + 8].try_into().unwrap()), count as u64, "{count} elements at {at}");
+            let body = at + 8;
+            for keep in [0, count - 1] {
+                // Fewer elements and the rest of the argument as it was,
+                // padded back to an honest argument's length.
+                let mut bent = proof[..at].to_vec();
+                bent.extend((keep as u64).to_le_bytes());
+                bent.extend(&proof[body..body + keep * size]);
+                bent.extend(&proof[body + count * size..]);
+                bent.resize(proof.len(), 0);
+                assert!(!verify_shuffle(&joint, &deck, &next, &bent), "{keep} of the {count} elements at {at}");
+            }
+        }
     }
 
     /// The reference crate hashes a projective point's Jacobian

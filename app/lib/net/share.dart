@@ -26,6 +26,7 @@ Uri pageLink(String path, [Uri? base]) {
 /// caller falls back to the clipboard.
 Future<bool> shareLink(Uri url) => platform.shareLink(url.toString());
 
-/// Opens [url] beside the app — a new tab on the web. False where
-/// nothing can be opened, so the caller copies it instead.
-bool openBeside(Uri url) => platform.openBeside(url.toString());
+/// Opens [url] beside the app: a new tab on the web, the app it is for
+/// on a phone. False where nothing opened, so the caller copies it
+/// instead.
+Future<bool> openBeside(Uri url) => platform.openBeside(url.toString());

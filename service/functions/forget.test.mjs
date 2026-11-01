@@ -5,12 +5,16 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
+import { readFile } from 'node:fs/promises';
 import { gunzipSync } from 'node:zlib';
 
 import { accountFor } from './accounts.mjs';
 import { accountsNamed, accountsPaidBy, forgetAccount } from './deletion.mjs';
+import { signerOn } from './licence.mjs';
 import { memoryStore } from './rows.mjs';
-import { anonymizeGames, withoutNames } from './records.mjs';
+import { anonymizeGames, forgottenKey, keepRecord, withoutNames } from './records.mjs';
+import { keys } from '../do/sign.mjs';
+import { forget } from '../tool/forget.mjs';
 import { restBucket } from '../tool/r2.mjs';
 
 const ADA = 'a'.repeat(32);
@@ -180,6 +184,92 @@ test('the operator\'s tool rewrites only a record it would write back as it was 
   }]);
 });
 
+test('a game that is the whole of one stays the game when the operator\'s tool takes a name off it, though its API carries no custom metadata: no copy replaces it, and it is marked again', async (t) => {
+  // R2 as the worker reaches it (head, get, put with a condition on the
+  // etag) and as the tool does through Cloudflare's API, over the same
+  // objects. The API's write is the one Wrangler sends: the bytes, a type
+  // and an encoding, and no custom metadata (service/tool/r2.mjs).
+  const objects = new Map();
+  let etags = 0;
+  const binding = {
+    async head(key) {
+      const o = objects.get(key);
+      return o ? { key, etag: o.etag, customMetadata: o.custom } : null;
+    },
+    async get(key) {
+      const o = objects.get(key);
+      return o ? { body: new Blob([o.body]).stream(), etag: o.etag, customMetadata: o.custom } : null;
+    },
+    async put(key, body, options = {}) {
+      const { etagMatches, etagDoesNotMatch } = options.onlyIf ?? {};
+      if (etagMatches !== undefined && objects.get(key)?.etag !== etagMatches) return null;
+      if (etagDoesNotMatch !== undefined && objects.has(key)) return null;
+      objects.set(key, { body: Buffer.from(typeof body === 'string' ? body : new Uint8Array(body)), custom: options.customMetadata, etag: `etag-${++etags}` });
+      return { key };
+    },
+  };
+  const written = [];
+  t.mock.method(globalThis, 'fetch', async (url, init = {}) => {
+    const u = new URL(url);
+    if (!u.pathname.includes('/objects/')) {
+      const keys = [...objects.keys()].filter((k) => k.startsWith(u.searchParams.get('prefix')));
+      return Response.json({ success: true, result: keys.map((key) => ({ key })), result_info: { is_truncated: false } });
+    }
+    const key = decodeURIComponent(u.pathname.split('/objects/')[1]);
+    if (init.method === 'PUT') {
+      written.push(init.headers);
+      objects.set(key, { body: Buffer.from(init.body), custom: undefined, etag: `etag-${++etags}` });
+      return new Response(null, { status: 200 });
+    }
+    return objects.has(key) ? new Response(gunzipSync(objects.get(key).body)) : new Response(null, { status: 404 });
+  });
+
+  const text = gunzipSync(await readFile(new URL('../../packages/table/test/fixtures/refereed_four.json.gz', import.meta.url))).toString().trim();
+  const real = JSON.parse(text);
+  const verify = (await signerOn(await readFile(new URL('../../app/web/schnorr.wasm', import.meta.url)))).verify;
+  const send = (seat, copy = text) => keepRecord(binding, real.spec.seats[seat].key, real.spec.id, copy, { verify, service: keys[1].public, house: real.spec.house });
+  const at = `tables/${real.spec.id}.json`;
+  const names = () => JSON.parse(gunzipSync(objects.get(at).body).toString()).names;
+  const logLength = () => JSON.parse(gunzipSync(objects.get(at).body).toString()).log.length;
+  const accounts = real.spec.seats.map((seat) => seat.licence.account);
+
+  // The game is kept and marked, each player's device putting its own name
+  // beside it.
+  for (const seat of [0, 1, 2]) await send(seat);
+  assert.equal(objects.get(at).custom.vouched, '1');
+  assert.deepEqual(names(), { 0: 'Ada', 1: 'Bao', 2: 'Cy' });
+
+  // Bao's account is forgotten, through the tool: the mark first, then the
+  // name off the game, written through the API.
+  const store = memoryStore();
+  const said = [];
+  await forget({ ...store, list: keysOf(store) }, restBucket({ token: 't', account: 'a', bucket: 'b' }), accounts[1], { apply: true, now: Date.parse('2026-11-01T12:00:00Z'), log: (line) => said.push(line) });
+  assert.ok(said.some((line) => line.startsWith('took the name off') && line.includes(at)), said.join('\n'));
+  assert.deepEqual(names(), { 0: 'Ada', 2: 'Cy' });
+  assert.equal(logLength(), real.log.length);
+  assert.ok(objects.has(forgottenKey(accounts[1])));
+  assert.ok(written.every((h) => Object.keys(h).sort().join() === 'authorization,content-encoding,content-type'), 'the tool\'s writes carry a type and an encoding');
+  assert.equal(objects.get(at).custom, undefined, 'and so the mark is gone from the game');
+
+  // A later copy of the game cut short does not replace it...
+  const resultAt = real.log.findIndex((entry) => entry.e?.kind === 'result');
+  const stub = JSON.stringify({ ...real, log: real.log.slice(0, resultAt - 40) });
+  assert.deepEqual(await send(2, stub), { status: 200, body: { kept: true, already: true } });
+  assert.equal(logLength(), real.log.length);
+  // ...and the game is marked again, with the accounts at its seats.
+  assert.deepEqual(objects.get(at).custom, { accounts: accounts.join(','), vouched: '1' });
+  // Nor does a late copy of the whole game, which would take the names
+  // the others put beside it: it adds its own sender's, and Bao's, whose
+  // account is forgotten, is put back by no one.
+  objects.get(at).custom = undefined;
+  assert.deepEqual(await send(3), { status: 200, body: { kept: true, already: true } });
+  assert.deepEqual(names(), { 0: 'Ada', 2: 'Cy', 3: 'Dee' });
+  assert.deepEqual(await send(1), { status: 200, body: { kept: true, already: true } });
+  assert.deepEqual(names(), { 0: 'Ada', 2: 'Cy', 3: 'Dee' });
+  assert.equal(logLength(), real.log.length);
+  assert.equal(objects.get(at).custom.vouched, '1');
+});
+
 test('the operator\'s tool lists every page of kept games, cursor by cursor', async (t) => {
   const asked = [];
   t.mock.method(globalThis, 'fetch', async (url) => {
@@ -206,15 +296,89 @@ test('every subscription an account has had goes with it, and nobody else\'s', a
     await store.put(`SUB#${sub}`, 'META', { source: 'stripe', renews_at: '2026-01-01', cancelled_at: null });
     await store.put(`SUB#${sub}`, 'CUSTOMER', { customer: `cus_${sub}` });
   }
+  // Each was told of a change to the terms.
+  for (const sub of ['sub_old', 'sub_bao']) await store.put(`NOTICE#terms@2026-10-23`, `SUB#${sub}`, { at: '2026-10-24T00:00:00Z', lang: 'en' });
   const would = await forgetAccount(store, ADA, { dry: true, keys: keysOf(store) });
-  for (const row of ['SUB#sub_old|ACCOUNT', 'SUB#sub_old|META', 'SUB#sub_old|CUSTOMER', 'SUB#sub_new|ACCOUNT']) assert.ok(would.includes(row), row);
+  for (const row of ['SUB#sub_old|ACCOUNT', 'SUB#sub_old|META', 'SUB#sub_old|CUSTOMER', 'SUB#sub_new|ACCOUNT', 'NOTICE#terms@2026-10-23|SUB#sub_old']) assert.ok(would.includes(row), row);
+  assert.equal(would.includes('NOTICE#terms@2026-10-23|SUB#sub_bao'), false);
   assert.equal(new Set(would).size, would.length, 'each row once');
   assert.equal(store.rows.has('SUB#sub_old|ACCOUNT'), true, 'a dry run deletes nothing');
   await forgetAccount(store, ADA, { keys: keysOf(store) });
   assert.deepEqual([...store.rows.keys()].filter((k) => k.startsWith('SUB#')).sort(), ['SUB#sub_bao|ACCOUNT', 'SUB#sub_bao|CUSTOMER', 'SUB#sub_bao|META']);
+  assert.deepEqual([...store.rows.keys()].filter((k) => k.startsWith('NOTICE#')), ['NOTICE#terms@2026-10-23|SUB#sub_bao']);
   // The address the old subscription was paid with finds nobody now.
   const stripe = async (path) => (path.startsWith('/customers/search') ? { data: [{ id: 'cus_1', email: 'ada@example.com' }] } : { data: [{ id: 'sub_old' }] });
   assert.deepEqual(await accountsPaidBy(store, stripe, 'ada@example.com'), []);
+});
+
+test('the operator\'s tool ends a web subscription still running before it deletes, and keeps only a store subscription\'s notes', async () => {
+  const now = Date.parse('2026-11-01T12:00:00Z');
+  const puts = [];
+  const bucket = { list: async () => [], get: async () => null, put: async (...args) => puts.push(args) };
+  /// Ada's account with sub_1, whose META is [meta], told of a change to the terms.
+  const subscribed = async (meta) => {
+    const store = memoryStore();
+    await store.put(`ACCOUNT#${ADA}`, 'META', { subscription: 'sub_1' });
+    await store.put('SUB#sub_1', 'ACCOUNT', { account: ADA });
+    await store.put('SUB#sub_1', 'META', { source: 'stripe', ...meta });
+    await store.put('NOTICE#terms@2026-10-23', 'SUB#sub_1', { at: '2026-10-24T00:00:00Z', lang: 'en' });
+    return { ...store, list: keysOf(store) };
+  };
+  const ended = [];
+  const endWeb = async (id) => ended.push(id);
+  const run = (store, options = {}) => forget(store, bucket, ADA, { apply: true, now, ...options });
+
+  // Running to 2027-03-01, not cancelled: a dry run says it would end it and ends nothing; the real
+  // run ends it, then deletes everything, its note with the rest.
+  const paid = await subscribed({ renews_at: '2027-03-01', cancelled_at: null });
+  const said = [];
+  await run(paid, { apply: false, endWeb, log: (line) => said.push(line) });
+  assert.deepEqual(ended, []);
+  assert.ok(said.includes('would end sub_1 in Stripe now: no renewal, and nothing refunded'));
+  assert.ok(paid.rows.has(`ACCOUNT#${ADA}|META`), 'a dry run deletes nothing');
+  await run(paid, { endWeb });
+  assert.deepEqual(ended, ['sub_1']);
+  assert.deepEqual([...paid.rows.keys()], []);
+
+  // Cancelled, and running to 2027-03-01: Stripe still lists it, so it is ended too, and its note goes.
+  const running = await subscribed({ renews_at: '2027-03-01', cancelled_at: '2026-10-30' });
+  await run(running, { endWeb });
+  assert.deepEqual(ended, ['sub_1', 'sub_1']);
+  assert.deepEqual([...running.rows.keys()], []);
+
+  // Already ended in Stripe: nothing to end, and its note goes with the rest.
+  const over = await subscribed({ renews_at: '2026-11-01', cancelled_at: '2026-11-01', final: true });
+  await run(over, { endWeb });
+  assert.equal(ended.length, 2);
+  assert.deepEqual([...over.rows.keys()], []);
+
+  // Stripe not answering: nothing deleted, nothing marked, and the run is run again.
+  const stuck = await subscribed({ renews_at: '2027-03-01', cancelled_at: null });
+  const marked = puts.length;
+  await assert.rejects(run(stuck, { endWeb: async () => { throw new Error('Stripe said 500'); } }), /Stripe said 500/);
+  assert.ok(stuck.rows.has(`ACCOUNT#${ADA}|META`));
+  assert.equal(puts.length, marked, 'not marked');
+
+  // Without a way to end it, or for a subscription bought in a store, one not cancelled is refused.
+  await assert.rejects(run(await subscribed({ renews_at: '2027-03-01', cancelled_at: null })), /sub_1 is still paid up to 2027-03-01; cancel it first/);
+  const store = await subscribed({ source: 'apple', renews_at: '2027-03-01', cancelled_at: null });
+  await assert.rejects(run(store, { endWeb }), /sub_1 is still paid up to 2027-03-01; cancel it first/);
+  assert.equal(ended.length, 2, 'a store\'s is not Stripe\'s to end');
+  assert.ok(store.rows.has(`ACCOUNT#${ADA}|META`));
+  // One that is cancelled and runs on keeps its notes: it is still a subscriber's, and is not written to again about a change it was told of.
+  const kept = await subscribed({ source: 'apple', renews_at: '2027-03-01', cancelled_at: '2026-10-30' });
+  await run(kept, { endWeb });
+  assert.deepEqual([...kept.rows.keys()], ['NOTICE#terms@2026-10-23|SUB#sub_1']);
+
+  // Under a legal hold nothing is ended, marked, changed or deleted.
+  const held = await subscribed({ renews_at: '2027-03-01', cancelled_at: null });
+  await held.put(`ACCOUNT#${ADA}`, 'HOLD', { since: '2026-10-16', until: '2027-10-16', ref: null, deleteAsked: null });
+  const before = [...held.rows.keys()].sort();
+  const markedBefore = puts.length;
+  await assert.rejects(run(held, { endWeb }), /held since 2026-10-16, until at least 2027-10-16/);
+  assert.equal(ended.length, 2);
+  assert.equal(puts.length, markedBefore, 'not marked');
+  assert.deepEqual([...held.rows.keys()].sort(), before);
 });
 
 test('a lapsed subscriber who pays again keeps a note of the subscription before, and both go with the account, found without a listing', async () => {

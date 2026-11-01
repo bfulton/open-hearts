@@ -1,20 +1,11 @@
-/// Web implementation of the deployed-build check.
-///
-/// A bare `fetch` rather than a package: the whole job is one no-store
-/// GET of a small JSON file next to index.html, and a dependency for
-/// that would be the larger cost.
+/// Web implementation of the deployed-build check: one no-store GET of
+/// the small JSON file next to index.html.
 library;
 
 import 'dart:convert';
 import 'dart:js_interop';
 
-@JS('fetch')
-external JSPromise<_Response> _fetch(JSString url, JSObject init);
-
-extension type _Response._(JSObject _) implements JSObject {
-  external bool get ok;
-  external JSPromise<JSString> text();
-}
+import 'net/http_web.dart' as http;
 
 /// `?updatecheck` turns the pill on for a build that was not deployed —
 /// the escape hatch that lets the pill itself be exercised by hand.
@@ -25,11 +16,9 @@ Future<String?> publishedBuild() async {
   try {
     // Cache-busted twice over: the query defeats any intermediary that
     // ignores no-store, and no-store defeats the browser's own cache.
-    final url = 'build-info.json?t=${DateTime.now().millisecondsSinceEpoch}';
-    final init = {'cache': 'no-store'}.jsify() as JSObject;
-    final response = await _fetch(url.toJS, init).toDart;
-    if (!response.ok) return null;
-    final body = (await response.text().toDart).toDart;
+    final url = Uri.parse('build-info.json?t=${DateTime.now().millisecondsSinceEpoch}');
+    final body = await http.getText(url, noStore: true);
+    if (body == null) return null;
     final json = jsonDecode(body);
     return json is Map && json['build'] is String
         ? json['build'] as String

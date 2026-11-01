@@ -1,5 +1,8 @@
 // OH_STORE as every module reads it (storeOf), and what its rows hold:
-// days, account numbers, digests and base64url.
+// days, account numbers, digests and base64. With no imports, so that
+// any module can share these, the relay's included: the licence's
+// signed statement is here too, since a kept game's seats are checked
+// by it (records.mjs) as well as signed by it (licence.mjs).
 
 export const hex = (bytes) => [...bytes].map((b) => b.toString(16).padStart(2, '0')).join('');
 
@@ -74,11 +77,25 @@ export function memoryStore(seed = {}) {
   };
 }
 
+/// What a licence is the service's signature over: its tag, then the
+/// device's key, its account, its last day and its plan, a line each
+/// (licence.mjs, licenceFor; records.mjs; packages/table, licence.dart).
+export const licenceStatement = (key, account, until, plan) => `oh-licence/2\n${key}\n${account}\n${until}\n${plan}`;
+
 export async function digestOf(text) {
   return hex(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text))));
 }
 
+/// Base64 [s] as its bytes. Throws for anything that is not base64.
+export const bytesOf64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
+
+/// [bytes] as base64. Each byte is an argument to String.fromCharCode,
+/// so it is for what is small: a picture (PROFILE_PICTURE_MOST, 12,000
+/// bytes) or less.
+export const base64Of = (bytes) => btoa(String.fromCharCode(...bytes));
+
+/// Base64url [s], padded or not, as its bytes.
 export const un64 = (s) => {
   const padded = s.replace(/-/g, '+').replace(/_/g, '/');
-  return Uint8Array.from(atob(padded + '='.repeat((4 - (padded.length % 4)) % 4)), (c) => c.charCodeAt(0));
+  return bytesOf64(padded + '='.repeat((4 - (padded.length % 4)) % 4));
 };

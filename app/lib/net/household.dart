@@ -44,16 +44,14 @@ class Device {
 
 /// The devices on this subscription, and how many it carries.
 class Household {
-  const Household({required this.devices, required this.most, this.signIn, this.toldSignIn = false});
+  const Household({required this.devices, required this.most, this.signIn});
 
   final List<Device> devices;
   final int most;
 
   /// The sign-in the account is linked to (`apple`, `google`), or null
-  /// for none — as the service has it, which [toldSignIn] says it did: a
-  /// service from before it said so leaves the device's own note.
+  /// for none, as the service has it.
   final String? signIn;
-  final bool toldSignIn;
 
   bool get full => devices.length >= most;
 
@@ -65,28 +63,26 @@ class Household {
     return Household(
       devices: [
         for (final d in list)
-          if (d is Map && d['key'] is String) Device(key: d['key'] as String, boundAt: d['bound_at'] as String?, inUse: d['active'] == true),
+          if (d is Map && d['key'] is String)
+            Device(key: d['key'] as String, boundAt: d['bound_at'] is String ? d['bound_at'] as String : null, inUse: d['active'] == true),
       ],
       most: most,
       signIn: json['signIn'] is String ? json['signIn'] as String : null,
-      toldSignIn: json.containsKey('signIn'),
     );
   }
 }
 
-/// A code another device can arrive with, and how long it is worth
-/// anything for.
+/// A code another device can arrive with.
 class Ticket {
-  const Ticket({required this.code, required this.expires});
+  const Ticket({required this.code});
 
   final String code;
-  final DateTime? expires;
 
   static Ticket? parse(Object? json) {
     if (json is! Map) return null;
     final code = json['ticket'];
     if (code is! String || code.isEmpty) return null;
-    return Ticket(code: code, expires: DateTime.tryParse(json['expires_at'] as String? ?? ''));
+    return Ticket(code: code);
   }
 }
 
@@ -191,10 +187,9 @@ class CodeFormatter extends TextInputFormatter {
 
 /// A subscription's backup codes, as a device on it is shown them.
 class BackupCodes {
-  const BackupCodes({required this.codes, this.madeAt, this.emailed = false, this.unsent});
+  const BackupCodes({required this.codes, this.emailed = false, this.unsent});
 
   final List<({String code, bool used})> codes;
-  final DateTime? madeAt;
 
   /// Whether asking to send them sent them to the payer's email.
   final bool emailed;
@@ -212,9 +207,8 @@ class BackupCodes {
         for (final c in json['codes'] as List)
           if (c is Map && c['code'] is String) (code: c['code'] as String, used: c['used'] == true),
       ],
-      madeAt: DateTime.tryParse(json['made_at'] as String? ?? ''),
       emailed: json['emailed'] == true,
-      unsent: json['unsent'] as String?,
+      unsent: json['unsent'] is String ? json['unsent'] as String : null,
     );
   }
 }
@@ -223,11 +217,11 @@ class BackupCodes {
 /// place of them; with [send], the ones still good emailed to the
 /// payer, and [BackupCodes.emailed] or [BackupCodes.unsent] says how
 /// that went.
-Future<Said<BackupCodes>> backupCodes(Signer signer, {bool replace = false, bool send = false, Uri? endpoint}) async {
-  final answer = await askHandler('backups', signer, {if (replace) 'rotate': true, if (send && !replace) 'send': true}, endpoint,
+Future<Said<BackupCodes>> backupCodes(Signer signer, {bool replace = false, bool send = false}) async {
+  final answer = await askHandler('backups', signer, {if (replace) 'rotate': true, if (send && !replace) 'send': true},
       what: replace ? 'rotate' : (send ? 'send' : ''));
   if (answer?.status != 200) return (answer: null, refusal: refusalOf(answer));
-  final codes = BackupCodes.parse(jsonDecode(answer!.body));
+  final codes = BackupCodes.parse(jsonOf(answer!.body));
   return codes == null ? (answer: null, refusal: _unreachable) : (answer: codes, refusal: null);
 }
 
@@ -316,9 +310,9 @@ Future<({int status, String body})> Function(Uri url, String body) askService = 
 /// brought in by its account's object somewhere else is known there
 /// before the service's store where it asks has heard of it
 /// (service/functions/licence.mjs, accountAsking and heldAccount).
-Future<({int status, String body})?> askHandler(String handler, Signer signer, Map<String, Object?> more, Uri? endpoint,
+Future<({int status, String body})?> askHandler(String handler, Signer signer, Map<String, Object?> more,
     {String what = '', Duration? timeout}) async {
-  final url = endpoint ?? handlerAt(handler);
+  final url = handlerAt(handler);
   if (url == null) return null;
   try {
     return await askService(url, jsonEncode({...signedAsk(signer, handler, what: what), ...Entitlement.current.licenceShown, ...more}))
@@ -328,17 +322,24 @@ Future<({int status, String body})?> askHandler(String handler, Signer signer, M
   }
 }
 
+/// An answer's body as JSON, or null when it is not JSON: a page from
+/// something in between, a captive portal's or a proxy's, is not the
+/// service talking.
+Object? jsonOf(String body) {
+  try {
+    return jsonDecode(body);
+  } on FormatException {
+    return null;
+  }
+}
+
 /// What a refusal said, in its own words where it gave any.
 Refused refusalOf(({int status, String body})? answer) {
   if (answer == null) return _unreachable;
-  try {
-    final json = jsonDecode(answer.body);
-    if (json is Map && json['error'] is String) {
-      final said = json['error'] as String;
-      return said.isEmpty ? _unreachable : Refused.from(said);
-    }
-  } on FormatException {
-    // A body that is not JSON says nothing in its own words.
+  final json = jsonOf(answer.body);
+  if (json is Map && json['error'] is String) {
+    final said = json['error'] as String;
+    return said.isEmpty ? _unreachable : Refused.from(said);
   }
   return _unreachable;
 }
@@ -346,18 +347,20 @@ Refused refusalOf(({int status, String body})? answer) {
 const _unreachable = Refused('unreachable');
 
 /// A code for another device to arrive with.
-Future<Said<Ticket>> askForCode(Signer signer, {Uri? endpoint}) async {
-  final answer = await askHandler('ticket', signer, const {}, endpoint);
+Future<Said<Ticket>> askForCode(Signer signer) async {
+  final answer = await askHandler('ticket', signer, const {});
   if (answer?.status != 200) return (answer: null, refusal: refusalOf(answer));
-  final ticket = Ticket.parse(jsonDecode(answer!.body));
+  final ticket = Ticket.parse(jsonOf(answer!.body));
   return ticket == null ? (answer: null, refusal: _unreachable) : (answer: ticket, refusal: null);
 }
 
 /// Arriving with a code: the licence it was claimed for, or why not.
-Future<Said<Licence>> claimCode(Signer signer, String code, {Uri? endpoint, String service = serviceKey}) async {
-  final answer = await askHandler('claim', signer, {'ticket': code}, endpoint, what: code);
+Future<Said<Licence>> claimCode(Signer signer, String code, {String service = serviceKey}) async {
+  final answer = await askHandler('claim', signer, {'ticket': code}, what: code);
   if (answer?.status != 200) return (answer: null, refusal: refusalOf(answer));
-  final licence = Licence.parse(jsonDecode(answer!.body)['licence']);
+  final json = jsonOf(answer!.body);
+  if (json is! Map) return (answer: null, refusal: _unreachable);
+  final licence = Licence.parse(json['licence']);
   if (licence == null || !licence.holdsFor(signer.publicKey, service: service)) {
     return (answer: null, refusal: const Refused('notForThisDevice'));
   }
@@ -368,8 +371,8 @@ Future<Said<Licence>> claimCode(Signer signer, String code, {Uri? endpoint, Stri
 /// (service/functions/worker.mjs, deleteRoute): true once it is, and
 /// once there is none — a deletion whose answer was lost, asked again,
 /// which the service carries on from where it stopped — or why not.
-Future<Said<bool>> deleteAccount(Signer signer, {Uri? endpoint}) async {
-  final answer = await askHandler('delete', signer, const {}, endpoint);
+Future<Said<bool>> deleteAccount(Signer signer) async {
+  final answer = await askHandler('delete', signer, const {});
   if (answer?.status == 200) return (answer: true, refusal: null);
   final refused = refusalOf(answer);
   if (answer?.status == 404 && refused.said == 'no account') return (answer: true, refusal: null);
@@ -377,9 +380,9 @@ Future<Said<bool>> deleteAccount(Signer signer, {Uri? endpoint}) async {
 }
 
 /// The devices on this subscription; with [drop], one fewer.
-Future<Said<Household>> devicesOn(Signer signer, {PublicKey? drop, Uri? endpoint}) async {
-  final answer = await askHandler('devices', signer, {'drop': ?drop}, endpoint, what: drop ?? '');
+Future<Said<Household>> devicesOn(Signer signer, {PublicKey? drop}) async {
+  final answer = await askHandler('devices', signer, {'drop': ?drop}, what: drop ?? '');
   if (answer?.status != 200) return (answer: null, refusal: refusalOf(answer));
-  final household = Household.parse(jsonDecode(answer!.body));
+  final household = Household.parse(jsonOf(answer!.body));
   return household == null ? (answer: null, refusal: _unreachable) : (answer: household, refusal: null);
 }

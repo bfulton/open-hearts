@@ -12,7 +12,8 @@ by side (`.github/workflows/ci.yml`). One more needs a Mac, so
 `./check.sh` does not run it: the `ios` workflow
 (`.github/workflows/ios.yml`) builds the deal's frameworks and the app,
 and checks on a simulator that the libraries load as the app loads them
-and make the same bytes as the build the other suites test
+and make the same bytes as the build the other suites test, and that the
+iPhone's native side for the device's secret key answers
 (`app/integration_test/native_libs_test.dart`).
 
 `quick` checks what a change touches. It reads the paths that differ from
@@ -121,9 +122,7 @@ To write a test that stays fast, see
 
 - `packages/deal`: every primitive round trips. Four sessions in one
   process deal, pass, play, lose a seat and rebuild it, and audit, and a
-  verifier that saw only the messages checks the result. The share-token
-  path opens a departed seat's hand and a pass sealed to it while
-  `knowsSecret` stays false.
+  verifier that saw only the messages checks the result.
 - `packages/table/test/refereed_test.dart`: whole sealed games at one,
   three and four people over the simulator's referee, with the house at
   the table, that verify to the end. They cover people going mid-hand,
@@ -166,6 +165,14 @@ The harnesses:
   doing nothing, the phone off the network, at every moment of a hand:
   on or off turn, mid-trick, the last trick, the pass, the deal, a hand
   boundary. Sealed and not.
+- A table the house will not serve (`packages/table/test/refusal_test.dart`,
+  and the twelve-day wake count in `service/do/referee.test.mjs`): the
+  house says so once, in the table's log; every side ends the table
+  failed at that word and nobody is rated or published on it; and the
+  table's object, which asks for the house until it has said a result,
+  wakes it once, where a house that said nothing was woken every twenty
+  seconds until the log's notes ran out. A table the house serves, has
+  not reached yet, or meets again after a restart gets no such word.
 - The chaos walk (`packages/table_sim/lib/src/chaos_walk.dart`, run by
   `chaos_test.dart`, `chaos_sealed_test.dart` and
   `packages/table/tool/chaos.dart`) throws random faults at tables of one
@@ -209,10 +216,10 @@ the same carry-over and the same handlers as production.
 
 ### The service
 
-- **Every relay.** The `service/` suite runs against the local Dart
-  relay, against the relay the Cloudflare object runs, and against that
-  relay under the object's own rules (`OH_RELAY`), so the app's side of
-  the wire is checked against each.
+- **The relay.** The `service/` suite runs against the relay the
+  Cloudflare object runs, under the object's own rules
+  (`service/do/host.mjs --object`), so the app's side of the wire is
+  checked against what production runs.
 - **Local mode.** The browser suites run the Pages worker in-process
   over a `Map`, with `OH_OPEN_HOUSE` set. In that mode any key that asks
   is written a subscription and an account of its own and licensed, and
@@ -222,11 +229,15 @@ the same carry-over and the same handlers as production.
   `e2e/build.sh` compiles the app against BIP-340's published test key
   pair, so the suites exercise the real handlers, signatures and
   licence check.
-- **One device at a time.** The suites' relay is the local Dart one,
-  which asks nobody who they are, so there one device at a time is seen
-  by presence. The relay's own refusal is proved in `service/do`'s
-  tests.
+- **One device at a time.** The browser suites' relay is the one the
+  Cloudflare object runs, with its gate on (`service/do/host.mjs
+  --object --gate` with the rig's service key, `startRelay` in
+  `e2e/drive.mjs`). Every socket answers the challenge with the
+  activation local mode gave it, as in production, so a later device of
+  an account cuts the earlier one off at the relay. The flow "one device
+  at a time" in `e2e/flows.mjs` drives this through the app;
+  `service/test/one_device_over_relay_test.dart` and `service/do`'s
+  tests prove the relay's refusal itself.
 - **TURN.** With `OH_TURN_LOCAL` set as well, `turn` hands out a local
-  TURN server with fixed credentials. The rig points it at a coturn it
-  starts on `127.0.0.1`, so channels in the suites go through TURN as
-  they do in production.
+  TURN server with fixed credentials. The rig sets none now: no part of
+  the game uses TURN, which stays for voice and video chat.

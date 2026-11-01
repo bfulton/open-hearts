@@ -48,7 +48,7 @@ class _Service {
   final List<({Duration after, LicenceAnswer said})?> answers;
   final at = <Duration>[];
 
-  Future<LicenceAnswer> ask(Signer signer, {Uri? endpoint, String service = serviceKey}) {
+  Future<LicenceAnswer> ask(Signer signer, {String service = serviceKey}) {
     final answer = answers[at.length < answers.length ? at.length : answers.length - 1];
     at.add(clock.elapsed);
     if (answer == null) return Completer<LicenceAnswer>().future;
@@ -241,10 +241,21 @@ void main() {
       return (url: Uri.parse('http://127.0.0.1:${server.port}/api/licence'), stop: () => server.close(force: true));
     }
 
+    /// The licence asked for of [url].
+    Future<LicenceAnswer> askAt(Uri url) async {
+      final was = handlerAt;
+      handlerAt = (_) => url;
+      try {
+        return await askLicence(device, service: _service);
+      } finally {
+        handlerAt = was;
+      }
+    }
+
     Future<LicenceAnswer> asked(int status, String body) async {
       final h = await handler(status, body);
       try {
-        return await askLicence(device, endpoint: h.url, service: _service);
+        return await askAt(h.url);
       } finally {
         await h.stop();
       }
@@ -265,7 +276,7 @@ void main() {
       expect(await asked(503, '{"error":"service not configured: OH_STORE"}'), _down);
       expect(await asked(429, ''), _down);
       expect(await asked(200, '<html>a captive portal</html>'), _down, reason: 'not the service talking');
-      expect(await askLicence(device, endpoint: Uri.parse('http://127.0.0.1:1/api/licence'), service: _service), _down);
+      expect(await askAt(Uri.parse('http://127.0.0.1:1/api/licence')), _down);
       // Somebody else's licence, from the service, is still its answer.
       final theirs = await asked(200, jsonEncode({'licence': jsonDecode(_licenceFor('cd' * 32).encoded)}));
       expect(theirs, _none);

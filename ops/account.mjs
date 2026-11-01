@@ -161,7 +161,7 @@ export const restore = (ctx, said) => profileAct(ctx, 'restore', said);
 
 export function remove(ctx, said) {
   const parts = String(said.args.what ?? '').split(',');
-  if (!parts.length || parts.some((p) => p !== 'name' && p !== 'picture')) throw new Usage('remove takes name, picture, or name,picture');
+  if (parts.some((p) => p !== 'name' && p !== 'picture')) throw new Usage('remove takes name, picture, or name,picture');
   return profileAct(ctx, 'remove', said, { name: parts.includes('name'), picture: parts.includes('picture') });
 }
 
@@ -170,8 +170,14 @@ export async function del(ctx, { args, flags }) {
   const store = await ctx.store();
   const account = await accountOf(store, args.account);
   if (!account) throw new Usage('name the account (32 hex) or one of its devices (64 hex); oh account find finds one by name, email or picture');
+  // A web subscription still running is ended in Stripe, as the app's own
+  // deletion ends it, with nothing refunded (forget.mjs says when).
+  const endWeb = async (id) => {
+    const stripe = ctx.stripe();
+    if (await endNow(stripe, id, await inStripe(stripe, id), 'account deleted')) ctx.log(`ended ${id}`);
+  };
   try {
-    await forget(store, ctx.bucket(), account, { apply: !!flags.apply, log: ctx.log, now: ctx.now() });
+    await forget(store, ctx.bucket(), account, { apply: !!flags.apply, log: ctx.log, now: ctx.now(), endWeb });
   } catch (e) {
     throw new Failed(e.message);
   }

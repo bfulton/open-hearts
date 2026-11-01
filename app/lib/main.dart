@@ -105,34 +105,34 @@ class OpenHeartsApp extends StatefulWidget {
 }
 
 class _OpenHeartsAppState extends State<OpenHeartsApp> {
-  late final AppLifecycleListener _lifecycle = AppLifecycleListener(
-    onStateChange: (state) {
-      switch (state) {
-        case AppLifecycleState.resumed:
-          Online.back();
-          // Back from the background, perhaps after a long sleep: still
-          // the device in use, or not; and its licence asked for now, if
-          // the service has not answered yet.
-          unawaited(InUse.current.renew());
-          Entitlement.current.askAgain();
-          unawaited(AccountProfile.current.retry());
-        // Hidden is a tab switched away from or a phone's home button:
-        // timers throttle, sockets may go, and this device is not
-        // about to play until it is back. Detached is the page
-        // unloading, which is the case worth having most.
-        case AppLifecycleState.inactive:
-        case AppLifecycleState.hidden:
-        case AppLifecycleState.paused:
-        case AppLifecycleState.detached:
-          Online.leaving();
-      }
-    },
-  );
+  late final AppLifecycleListener _lifecycle;
 
   @override
   void initState() {
     super.initState();
-    _lifecycle;
+    _lifecycle = AppLifecycleListener(
+      onStateChange: (state) {
+        switch (state) {
+          case AppLifecycleState.resumed:
+            Online.back();
+            // Back from the background, perhaps after a long sleep: still
+            // the device in use, or not; and its licence asked for now, if
+            // the service has not answered yet.
+            unawaited(InUse.current.renew());
+            Entitlement.current.askAgain();
+            unawaited(AccountProfile.current.retry());
+          // Hidden is a tab switched away from or a phone's home button:
+          // timers throttle, sockets may go, and this device is not
+          // about to play until it is back. Detached is the page
+          // unloading, which is the case worth having most.
+          case AppLifecycleState.inactive:
+          case AppLifecycleState.hidden:
+          case AppLifecycleState.paused:
+          case AppLifecycleState.detached:
+            Online.leaving();
+        }
+      },
+    );
   }
 
   @override

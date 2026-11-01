@@ -481,11 +481,13 @@ class _ReviewPageState extends State<ReviewPage> {
               padding: const EdgeInsets.symmetric(vertical: 3),
               child: Row(
                 children: [
-                  PlayerIcon(name: nameAt(s), seed: nameAt(s), size: 26),
+                  PlayerIcon(name: nameAt(s), seed: v.accounts?[s] ?? v.names[s], size: 26),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
                       nameAt(s),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
@@ -517,31 +519,7 @@ class _ReviewPageState extends State<ReviewPage> {
             Text(what, style: const TextStyle(fontSize: 13.5, color: Palette.gold)),
           ],
           const SizedBox(height: 10),
-          for (final (i, trick) in tricks.indexed)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 3),
-              child: Row(
-                children: [
-                  SizedBox(
-                    width: 74,
-                    child: Text(l10n.trickNumber(i + 1), style: const TextStyle(fontSize: 12.5, color: Palette.chromeDim)),
-                  ),
-                  for (final p in trick)
-                    Padding(
-                      padding: const EdgeInsets.only(right: 6),
-                      child: _Pip(card: p.card, by: nameAt(p.seat), taken: trick.length == seatCount && p.seat == _takerOf(trick)),
-                    ),
-                  if (trick.length == seatCount)
-                    Expanded(
-                      child: Text(
-                        nameAt(_takerOf(trick)),
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 12.5, color: Palette.chromeDim),
-                      ),
-                    ),
-                ],
-              ),
-            ),
+          for (final (i, trick) in tricks.indexed) _trickRow(l10n, i, trick, nameAt),
           const SizedBox(height: 16),
           Text(l10n.watchingNote, style: const TextStyle(fontSize: 12.5, color: Palette.chromeDim)),
           // The players' reactions show here as at the table; a watcher
@@ -551,12 +529,6 @@ class _ReviewPageState extends State<ReviewPage> {
         ],
       ),
     );
-  }
-
-  /// Who took a trick: the highest of the suit led.
-  static int _takerOf(List<({int seat, Card card})> trick) {
-    final led = trick.first.card.suit;
-    return trick.where((p) => p.card.suit == led).reduce((a, b) => a.card.rank.value >= b.card.rank.value ? a : b).seat;
   }
 }
 
@@ -568,6 +540,36 @@ String _seatName(AppLocalizations l10n, KeptGame game, int seat, bool Function(S
   HumanSeat(:final account) when blocked(account) => l10n.blockedPlayer,
   HumanSeat() => game.names[seat] ?? l10n.seatPlayer(seat + 1),
 };
+
+/// Trick [i] of a hand as a row: its number, each card and who played
+/// it, and once the trick is whole, who took it.
+Widget _trickRow(AppLocalizations l10n, int i, List<({int seat, Card card})> trick, String Function(int seat) nameOf) {
+  final taker = trick.length == seatCount ? trickWinner([for (final p in trick) Play(p.seat, p.card)]) : null;
+  return Padding(
+    padding: const EdgeInsets.symmetric(vertical: 3),
+    child: Row(
+      children: [
+        SizedBox(
+          width: 74,
+          child: Text(l10n.trickNumber(i + 1), style: const TextStyle(fontSize: 12.5, color: Palette.chromeDim)),
+        ),
+        for (final p in trick)
+          Padding(
+            padding: const EdgeInsets.only(right: 6),
+            child: _Pip(card: p.card, by: nameOf(p.seat), taken: p.seat == taker),
+          ),
+        if (taker != null)
+          Expanded(
+            child: Text(
+              nameOf(taker),
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 12.5, color: Palette.chromeDim),
+            ),
+          ),
+      ],
+    ),
+  );
+}
 
 /// A checked hand: each seat's thirteen as dealt, what it passed, and
 /// the tricks in order.
@@ -673,34 +675,7 @@ class _HandRowsState extends State<_HandRows> {
           ),
       (cards: 0, row: const SizedBox(height: 10)),
       // The tricks, in order: who led, what each played, who took it.
-      for (final (i, trick) in hand.tricks.indexed)
-        (
-          cards: trick.length,
-          row: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 3),
-            child: Row(
-              children: [
-                SizedBox(
-                  width: 74,
-                  child: Text(l10n.trickNumber(i + 1), style: const TextStyle(fontSize: 12.5, color: Palette.chromeDim)),
-                ),
-                for (final p in trick)
-                  Padding(
-                    padding: const EdgeInsets.only(right: 6),
-                    child: _Pip(card: p.card, by: nameOf(p.seat), taken: trick.length == seatCount && p.seat == _ReviewPageState._takerOf(trick)),
-                  ),
-                if (trick.length == seatCount)
-                  Expanded(
-                    child: Text(
-                      nameOf(_ReviewPageState._takerOf(trick)),
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 12.5, color: Palette.chromeDim),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        ),
+      for (final (i, trick) in hand.tricks.indexed) (cards: trick.length, row: _trickRow(l10n, i, trick, nameOf)),
     ];
   }
 
@@ -881,7 +856,7 @@ class _Busy extends StatelessWidget {
   Widget build(BuildContext context) => RepaintBoundary(
     child: CircularProgressIndicator(
       strokeWidth: strokeWidth,
-      value: MediaQuery.maybeOf(context)?.disableAnimations ?? false ? 0.3 : null,
+      value: MediaQuery.maybeDisableAnimationsOf(context) ?? false ? 0.3 : null,
     ),
   );
 }

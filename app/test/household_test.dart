@@ -22,6 +22,7 @@ import 'package:open_hearts/net/buying.dart';
 import 'package:open_hearts/net/household.dart';
 import 'package:open_hearts/net/licence.dart';
 import 'package:open_hearts/net/remote_config.dart';
+import 'package:open_hearts/net/sign_in.dart' show Provider, attestWith;
 import 'package:open_hearts/start_afresh.dart';
 import 'package:open_hearts/subscribe_page.dart';
 import 'package:open_hearts/ui/qr_view.dart';
@@ -122,10 +123,10 @@ void main() {
     final signer = await Identity.signer();
     await Entitlement.current.load(signer.publicKey);
     Map<String, Object?> sent() => jsonDecode(stand.seen.last.substring(stand.seen.last.indexOf(' ') + 1)) as Map<String, Object?>;
-    await askHandler('devices', signer, const {}, null);
+    await askHandler('devices', signer, const {});
     expect(sent().containsKey('licence'), isFalse);
     await licenceThisDevice();
-    await askHandler('devices', signer, {'drop': 'cd' * 32}, null, what: 'cd' * 32);
+    await askHandler('devices', signer, {'drop': 'cd' * 32}, what: 'cd' * 32);
     expect(sent()['licence'], Entitlement.current.licence!.toJson());
     expect(sent()['drop'], 'cd' * 32, reason: 'beside what it asks');
   });
@@ -165,6 +166,24 @@ void main() {
     final theirs = await claimCode(me, 'ab12', service: _service);
     expect(theirs.answer, isNull);
     expect(theirs.refusal?.say(), 'That code is not for this device.');
+  });
+
+  test('a page that is not the service\'s answer, a captive portal\'s or a proxy\'s, is the service out of reach, and throws nothing', () async {
+    standUp();
+    final me = SchnorrSigner.generate();
+    for (final body in ['<html>a captive portal</html>', '[]', '"ok"']) {
+      askService = (url, sent) async => (status: 200, body: body);
+      for (final said in <Said<Object>>[
+        await devicesOn(me),
+        await askForCode(me),
+        await claimCode(me, 'ab12', service: _service),
+        await backupCodes(me),
+        await attestWith(me, Provider.apple, 'local:ada', service: _service),
+      ]) {
+        expect(said.answer, isNull, reason: body);
+        expect(said.refusal?.reason, 'unreachable', reason: body);
+      }
+    }
   });
 
   test('a claim that was refused says why: used, run out, or never a code', () async {

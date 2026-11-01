@@ -15,7 +15,10 @@
 /// every bot seat, holds half of each person's escrow and says it when
 /// that person goes, and once the game is over says how it came out —
 /// in the log, which every side and every kept game checks it against,
-/// and on the results tag, where the ratings are folded from. A table
+/// and on the results tag, where the ratings are folded from. A table it
+/// will not serve (a seat without its licence, a rated table it did not
+/// seat) it says so of, once, in the table's log alone, and the table
+/// ends there, failed: nothing goes on the results tag for it. A table
 /// the house was serving before it stopped wakes it again, and it goes
 /// on from the log; its bot seats' deal secrets are made from its own
 /// secret, so nothing is lost with the process.
@@ -37,11 +40,13 @@
 ///
 /// One secret is the whole of it, OH_HOUSE_SECRET, the relay worker's
 /// own: the house's signing key, and the root of every deal secret it
-/// makes. The relay carries it on its key alone (service/do/relay.mjs,
-/// serviceGate) and referees sealed tables only for that key
-/// (OH_HOUSE_KEY, config/openhearts.json); a house whose secret is not
-/// that key's does not start. With OH_SERVICE_KEY it holds every seat to
-/// its licence (packages/table, licence.dart), as every device does.
+/// makes and of the salt of every table it seats, which is how it knows
+/// a rated table for one of its own. The relay carries it on its key
+/// alone (service/do/relay.mjs, serviceGate) and referees sealed tables
+/// only for that key (OH_HOUSE_KEY, config/openhearts.json); a house
+/// whose secret is not that key's does not start. With OH_SERVICE_KEY it
+/// holds every seat to its licence (packages/table, licence.dart), as
+/// every device does.
 library;
 
 // A server's output is its log.
@@ -104,9 +109,10 @@ Future<void> main(List<String> args) async {
   }
   final results = ResultPublisher(relays: relays, signer: signer, log: print);
   final ratings = Ratings(relays: relays, signer: signer, log: print);
+  final own = houseSecretOf(secret);
   final house = House(
     signer: signer,
-    secret: houseDealSecret(secret),
+    secret: own,
     lineFor: (table) => RelayLine(relays: relays, signer: signer, table: table, log: (line) => print('${table.substring(0, 8)} $line')),
     clock: WallClock(),
     crypto: crypto,
@@ -149,6 +155,7 @@ Future<void> main(List<String> args) async {
     pools[tag] = PoolHost(
       relay: line,
       pool: pool,
+      secret: own,
       target: target,
       timing: timing,
       bots: (rating, count, random) => botsNear(ratings.ledger)(rating, count, random),
@@ -178,10 +185,11 @@ Future<void> main(List<String> args) async {
   });
 }
 
-/// The deal secret every bot seat's is made from (packages/table,
-/// house.dart): the house's own secret, taken apart from its signing
-/// key, so that neither says anything of the other.
-Uint8List houseDealSecret(String secret) => Uint8List.fromList(sha256.convert(utf8.encode('open-hearts/house/deal\n$secret')).bytes);
+/// The house's own secret (packages/table, house.dart, House.secret),
+/// which every bot seat's deal secret and every pool table's salt are
+/// made from: taken apart from its signing key, so that neither says
+/// anything of the other.
+Uint8List houseSecretOf(String secret) => Uint8List.fromList(sha256.convert(utf8.encode('open-hearts/house/deal\n$secret')).bytes);
 
 /// The house's own port, for whatever runs it.
 Future<void> _answer(int port,

@@ -58,7 +58,7 @@ export function configOf(raw) {
     const id = typeof raw.banner.id === 'string' && /^[\w.-]{1,64}$/.test(raw.banner.id) ? raw.banner.id : null;
     if (text && id) c.banner = { id, level: raw.banner.level === 'warn' ? 'warn' : 'info', text };
   }
-  // Please update: a build published before this day is asked to.
+  // Please update: a build made before this day is asked to.
   if (raw.update && typeof raw.update === 'object' && typeof raw.update.before === 'string' && DAY.test(raw.update.before)) {
     c.update = { before: raw.update.before, text: sayingOf(raw.update.text) };
   }
@@ -123,6 +123,28 @@ export const WAITS_BOUNDS = Object.freeze({
   recordSoonMs: [2000, 60000],
 });
 
+/// The waits a device goes by where the row sets none: the app's own
+/// (app/lib/net/remote_config.dart, the AppWaits constructor). A field
+/// the row leaves out is compared at these. Milliseconds, minutes for
+/// configEveryMin.
+export const WAITS_DEFAULTS = Object.freeze({
+  licenceMs: 6000,
+  householdMs: 10000,
+  buyMs: 12000,
+  turnMs: 5000,
+  configMs: 8000,
+  configEveryMin: 15,
+  relaySlowMs: 8000,
+  relayGiveUpMs: 40000,
+  standingMs: 8000,
+  standingAllMs: 4000,
+  roomStartMs: 10000,
+  recordMs: 30000,
+  recordAgainMs: 3000,
+  recordForMs: 60000,
+  recordSoonMs: 9000,
+});
+
 /// The waits the row sets, each field taken on its own when it is a
 /// whole number within its bounds; null when none is. The relay's pair
 /// goes together or not at all: saying it is slow comes before giving up.
@@ -136,16 +158,16 @@ export function waitsOf(raw) {
     if (Number.isInteger(v) && v >= least && v <= most) out[name] = v;
   }
   if ('relaySlowMs' in out || 'relayGiveUpMs' in out) {
-    const slow = out.relaySlowMs ?? 8000;
-    const giveUp = out.relayGiveUpMs ?? 40000;
+    const slow = out.relaySlowMs ?? WAITS_DEFAULTS.relaySlowMs;
+    const giveUp = out.relayGiveUpMs ?? WAITS_DEFAULTS.relayGiveUpMs;
     if (slow >= giveUp) {
       delete out.relaySlowMs;
       delete out.relayGiveUpMs;
     }
   }
   if ('recordAgainMs' in out || 'recordForMs' in out || 'recordSoonMs' in out) {
-    const again = out.recordAgainMs ?? 3000;
-    if (again > (out.recordForMs ?? 60000) || again > (out.recordSoonMs ?? 9000)) {
+    const again = out.recordAgainMs ?? WAITS_DEFAULTS.recordAgainMs;
+    if (again > (out.recordForMs ?? WAITS_DEFAULTS.recordForMs) || again > (out.recordSoonMs ?? WAITS_DEFAULTS.recordSoonMs)) {
       delete out.recordAgainMs;
       delete out.recordForMs;
       delete out.recordSoonMs;

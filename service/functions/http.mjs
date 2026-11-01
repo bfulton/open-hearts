@@ -4,8 +4,9 @@
 
 import { APP_HOST } from './app_host.mjs';
 import { signerFor } from './licence.mjs';
+import { REFUSED } from './refusals.mjs';
 import { digestOf } from './rows.mjs';
-import { S, isLocal } from './settings.mjs';
+import { isLocal, serviceSettings } from './settings.mjs';
 
 /// The origin a browser may call the handlers from, echoed back, or
 /// null: the site's own hosts, the app's (which calls its own origin's
@@ -19,7 +20,7 @@ export function allowedOrigin(origin, requestUrl = null) {
   } catch {
     return null;
   }
-  if (host === 'localhost' || host === '127.0.0.1' || host.endsWith('.localhost')) return requestUrl && isLocal(requestUrl) ? origin : null;
+  if (isLocal(origin)) return requestUrl && isLocal(requestUrl) ? origin : null;
   if (host === 'openhearts.game' || host === 'www.openhearts.game' || host === APP_HOST) return origin;
   if (host === 'open-hearts.pages.dev' || host.endsWith('.open-hearts.pages.dev')) return origin;
   return null;
@@ -80,8 +81,8 @@ export async function askedBy(body, handler, what, signer, { now = Date.now() } 
   if (!signer.verify(key, await digestOf(requestStatement(handler, key, at, what)), sig)) {
     return { status: 401, body: { error: 'not signed by that key' } };
   }
-  if (Math.abs(now / 1000 - at) > S().requestToleranceS) {
-    return { status: 401, body: { error: "this device's clock is out by more than five minutes" } };
+  if (Math.abs(now / 1000 - at) > serviceSettings().requestToleranceS) {
+    return { status: 401, body: { error: REFUSED.clockOff } };
   }
   return { key };
 }
@@ -101,18 +102,33 @@ export const MOST_BODY = 16 * 1024;
 /// with its line items.
 export const MOST_EVENT = 512 * 1024;
 
-/// The body as text, or null when it is longer than [most] — said by its
-/// length where the request says one, and counted where it does not.
+/// The body as text, or null when it is longer than [most] bytes — said
+/// by its length where the request says one, and counted as it is read
+/// where it does not, so that a body sent with no length is never read
+/// much past [most].
 export async function textOf(request, most) {
   const said = Number(request.headers.get('content-length'));
   if (Number.isFinite(said) && said > most) return null;
-  let text;
+  const chunks = [];
+  let size = 0;
   try {
-    text = await request.text();
+    // No body at all is an empty one.
+    const reader = request.body?.getReader();
+    while (reader) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      size += value.byteLength;
+      if (size > most) {
+        await reader.cancel();
+        return null;
+      }
+      chunks.push(value);
+    }
   } catch {
+    // A body already read, or cut off.
     return null;
   }
-  return text.length > most ? null : text;
+  return new Blob(chunks).text();
 }
 
 /// The body as JSON, or null when it is longer than [most] or not JSON.

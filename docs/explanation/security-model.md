@@ -47,12 +47,19 @@ and later end it to strand the device.
 A provider's ID token must carry a nonce equal to the hash of the
 device's key. The nonce is chosen by whoever asks the provider, though,
 so it shows which key the token was made for, not that the key consented.
-The request is therefore also signed by the key. Otherwise a stranger
-could bind his own account to a subscriber's key with `attest`, then
-`supersede` it onto his own key and carry her subscription with it.
+The request is therefore also signed by the key, over the provider and
+the token (`<provider> <token>`, the request's `what` line). Otherwise a
+stranger could bind his own account to a subscriber's key with `attest`,
+then `supersede` it onto his own key and carry her subscription with it;
+and one who captured her request could send it again, within the minutes
+a request is good for, with a token of his own in its place, which names
+her key because its nonce is his to choose. A request signed over
+nothing, as these were before, is refused, and so is a provider or a
+token that is not a string.
 Tokens are verified against the provider's fixed JWKS URL with
-allow-listed algorithms (RS256, ES256), checking issuer, audience
-(one of a configured list), expiry, subject and nonce. A malformed token is a 401, never a 500. Only
+allow-listed algorithms (RS256, ES256), checking issuer (Google's in
+either of the two forms it signs with), audience (one of a configured
+list), expiry, subject and nonce. A malformed token is a 401, never a 500. Only
 an HMAC of the subject (`OH_ID_HMAC`) is stored.
 
 Sign in with Apple's notifications (`apple-id`) are checked against the
@@ -133,7 +140,12 @@ product.
   size of the reads'. That covers a device just brought in, and one
   dropped from the household that still holds its licence, so a dropped
   device spends none of the household's
-  ([one account at a time](service.md#accounts)).
+  ([one account at a time](service.md#accounts)). A device coming in,
+  with a code, a backup code or a sign-in, has an allowance of its own
+  too, the size of the changes', and a code the store already shows as
+  spent or run out is turned away before the account's turn is asked:
+  whoever once saw a code can keep asking with it, and spends nothing
+  the household's own devices need.
 
 ## TURN
 
@@ -149,17 +161,52 @@ The relay is open to anybody who can open a socket, and each tag's
 object runs on one thread shared by everyone on that tag.
 
 - Every event's id is recomputed and its BIP-340 signature checked
-  before anything else sees it. Key and signature shapes are checked
-  before they are written into the wasm's memory. Nobody can sign as
-  another key, and nobody can silence a table by saying its events
-  first, since a duplicate id can only be the same signed event.
+  before anything else sees it, and so is the id of a table event
+  inside one (`service/do/referee.mjs`). Key and signature shapes are
+  checked before they are written into the wasm's memory. Nobody can
+  sign as another key, and nobody can silence a table by saying its
+  events first, since a duplicate id can only be the same signed event.
+- A table's log takes at most `authorMost` characters of each person's
+  events, as much as a whole kept game may be, so one seat's events
+  cannot grow its table's object until it fails, or make every
+  reconnecting side read without end. The house is the operator's and
+  is not held to it. A tick (`TICK`) is taken only from the table's
+  people and its house, at most one every `tickGapMs`, none after the
+  house's word on the game, and none past `ticksInARowMost` since the
+  last event. So nobody else can lengthen the log with ticks, nobody
+  can once the game is over, and at a table whose house never says that
+  word (one with no house, or whose house has not come) its people
+  cannot tick for ever. Once the log holds `notesMost` ticks and
+  connections noted, it takes no more ticks and notes no more
+  connections closing. It still notes a person back whom it last noted
+  gone, or they would stay gone on every side's rules and lose their
+  seat at their next turn; nobody is noted gone after that point, so
+  this happens at most once for each, and otherwise only events grow
+  the log. These bound each table. The referee asks for the house until
+  the house has said a result, and a table the house will not serve (a
+  seat without the licence the service signed for its key, an account
+  seated twice, a rated table the house did not seat) is given the
+  house's word that it will not, once, in the table's own log and
+  nowhere else: it fails there for every side, rates nobody, and costs
+  one wake of the house. Without that word the house would be woken for
+  it every twenty seconds until the log's notes ran out. A subscriber
+  can still start as many tables as it likes, which is left to the
+  account's spend alerts.
 - Each socket is bounded: message size, REQ size (so a socket's
   subscriptions always fit in the attachment a hibernating socket
   carries), a few subscriptions (`maxSubscriptions`), and a
-  burst-then-rate limit on publishing that
-  refuses floods before checking signatures. An event is serialised
-  once for all listeners. Presence uses the tighter `objectLimits`,
+  burst-then-rate limit on publishing, subscribing and asking for a
+  table's log, that refuses floods before checking signatures. A
+  stored event weighs at most `storedMost` as the object holds it, so a
+  lobby's object holds its newest `storedKeep` in a bounded amount of
+  memory; and the house's seatings carry only the icon and colour of a
+  waiter's avatar, so no waiter can make one too long to store. An
+  event is serialised once for all listeners. Presence uses the tighter `objectLimits`,
   tables use `tableLimits`.
+- A socket that has not answered the challenge has what it says held
+  up to `heldMost` messages and `heldMostChars` characters, and may
+  answer the challenge once, so it costs the object at most two
+  signature checks and a bounded amount of memory.
 - Remembered ids are capped. Tag names are a single strict path
   segment.
 - An object stores only the lobby kind tagged for its own tag, so nobody
@@ -203,7 +250,13 @@ frame (`service/do/ws.test.mjs`).
   that is seated at the table and has signed events of its own in the
   record, within an hourly allowance (`recordsPerHour`), and are
   size-capped (`service/functions/records.mjs`). They are verified by
-  whoever views them, not by the worker.
+  whoever views them, not by the worker. What the worker decides is which
+  copy is kept: a player can send a copy cut short, before the game is
+  over, which nobody can open, so the copy that carries the house's
+  checked result (its `result`, signed by the house, names the log by its
+  hash) replaces one that does not, and is never replaced. A name beside a
+  record is unsigned, so it is kept from nobody but the device of the
+  seat it names.
 
 ## The site
 
@@ -213,23 +266,70 @@ policy (`site/public/_headers`), so no other page can frame the app and
 steer its one-tap buttons. One page is excepted: `openhearts.game/carry`,
 which hands a device's storage to `play.openhearts.game`. Only that
 origin may frame it, it has no buttons, and it answers only that origin
-([the device, carried over](service.md#the-device-carried-over)). The app loads one
-third-party script, on play.openhearts.game only: New Relic's browser
-agent, which its loader (`app/web/observability.js`) fetches from
-`js-agent.newrelic.com`. Cloudflare's
-Web Analytics and email obfuscation are off, since both inject scripts.
-Open: a fuller CSP (`script-src`) has not been set. The Flutter build
-needs `wasm-unsafe-eval`, and the policy has to be tested against it.
+([the device, carried over](service.md#the-device-carried-over)).
+
+The app's own files, everything under `/play/` in the Pages project (the
+root of play.openhearts.game), carry a policy of their own in the same
+header, which says what may run in the app:
+
+```
+frame-ancestors 'none'; script-src 'self' 'wasm-unsafe-eval' https://js-agent.newrelic.com https://appleid.cdn-apple.com; worker-src 'self' blob:
+```
+
+Scripts are the app's own files, WebAssembly (CanvasKit, the deal and
+the signature) and the third parties below; workers are the app's own
+files and one made from a blob, which is how the deal's worker is
+started (`packages/deal/lib/src/worker_web.dart`: its script is fetched
+once and started from memory). There is no inline script, no `eval` and
+no other origin, so a script that got into the page cannot load more of
+itself, and a blob cannot be a script. A worker has no `localStorage`.
+`site/headers.test.mjs` holds the policy to the code and to
+`config/openhearts.json`, and `e2e/csp.mjs` loads the real build under
+it in a browser, with a sign-in button on the screen, and sees nothing
+refused. The browser rig serves the same file's headers, as Pages does.
+
+The app loads these third-party scripts:
+
+- New Relic's browser agent, on every page of play.openhearts.game
+  only, which its loader (`app/web/observability.js`) fetches from
+  `js-agent.newrelic.com`, its chunks pinned by integrity hashes.
+- A sign-in provider's script, on the Subscription page once that
+  provider's sign-in button is on the screen
+  (`app/lib/net/provider_tokens_web.dart`): Apple's `appleid.auth.js`
+  from `appleid.cdn-apple.com` in a build with `apple.servicesId`, and
+  Google's client from `accounts.google.com` in a build with
+  `google.webClientId`. These are not pinned. Apple's origin is in the
+  policy and Google's is not, because no build offers Google on the web:
+  setting `google.webClientId` (which an Android build needs as well)
+  makes the web build offer it, and its button would be refused until
+  the policy names the origin. `site/headers.test.mjs` fails first.
+
+Each runs in the app's own document, so it can read the app's storage,
+the device's secret key included; the policy does not change that, only
+what else can join them. Cloudflare's Web Analytics and email
+obfuscation are off, since both inject scripts.
+
+Open: Apple's script is still in the policy and still runs in the app's
+document. Opening Apple's sign-in page in a popup of our own, and taking
+its answer from a `postMessage` of `https://appleid.apple.com` alone,
+would leave Apple's origin out of the policy and no sign-in provider's
+code in the document. It needs the popup's address and the shape of its
+answer, which only Apple's script knows and the repository does not, so
+it has to be seen once on a real sign-in before it is written.
 
 ## Secrets
 
 The service key, Stripe keys, the TURN token, the HMAC key and the
-house's secret are Cloudflare secrets, set by hand and checked
-only by name (`infra/apply.mjs`). The service key is minted with a
-CSPRNG by `service/bin/service_key.dart`, which prints it once and
-writes it nowhere. `deploy.sh` reads only environment
-variables and pins `wrangler`. The Android release key's properties
-file is never checked in. Every key in the repository is a published
+house's secret are Cloudflare secrets, checked only by name
+(`infra/apply.mjs`). The service key is minted with a CSPRNG by
+`service/bin/service_key.dart`, and `oh key mint` sets its secret on
+the Pages project without showing it, as `oh house key` does the
+house's: neither secret is written anywhere else. The rest are typed
+into `oh secret set`, which does not show them either. `deploy.sh`
+reads only environment variables. Every deploy runs Wrangler with its
+whole dependency tree locked (`ops/wrangler`), and `oh` gives it, and
+`deploy.sh`, only Cloudflare's credentials. The Android release key's
+properties file is never checked in. Every key in the repository is a published
 test vector: BIP-340's test pair (used by the e2e rig and the relay's
 self-check) and NIP-44's vectors.
 
@@ -237,11 +337,26 @@ self-check) and NIP-44's vectors.
 branch was deployed to it, reviewed or not, so the secrets it signs
 with are its own ([previews](service.md#previews)): a service key pair
 of its own, whose public half every preview build and the preview relay
-name, and a house key pair of its own, whose secret only the preview
-relay holds. `oh preview
+name, an HMAC key of its own for the sign-ins it stores, and a house
+key pair of its own, whose secret only the preview relay holds. It has
+no TURN token, since no part of the game uses TURN. `oh preview
 secrets` makes them and sets them without showing them, and `oh secret
 set` puts production's on production alone. Nothing a preview signs is
 good in production, and a preview takes nothing production signed: its
 relay admits only activations its own key signed. Who plays on a
 preview is the operator's say: there is nothing to buy, and an account
 there is an invitation (`oh preview invite`).
+
+**Deploying a preview runs the branch's own code with the operator's
+Cloudflare token.** What a preview serves holds none of production's
+keys, but what deploys it is the branch's: its `oh`, `deploy.sh` and
+`site/build.mjs`, the Flutter, Cargo and Dart builds they start, and
+the `[env.preview]` of its `service/do/wrangler.toml`, all run on the
+operator's machine with `CLOUDFLARE_API_TOKEN`. That token is the
+account's, so it can also deploy production and write production's
+store. `oh` gives what it runs no credential but Cloudflare's, and only
+an honest branch's `oh` does that. So a preview is deployed only from a
+branch the operator has read, as before running any of its code,
+`./check.sh` included. Open: previews in a Cloudflare account of their
+own, deployed with that account's token, would let a preview be
+deployed from a branch nobody has read.

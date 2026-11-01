@@ -48,6 +48,14 @@ where
         let n = statement.shuffled_ciphers[0].len();
         let num_of_diagonals = 2 * m - 1;
 
+        // Open Hearts: the proof's vectors are checked for length before
+        // they are indexed, as in the Hadamard argument.
+        if self.commit_b_k.len() != 2 * m || self.vector_e_k.len() != 2 * m {
+            return Err(CryptoError::ProofVerificationError(String::from(
+                "Multi Exponentiation",
+            )));
+        }
+
         fs_rng.absorb(
             &to_bytes![
                 b"multi-exponentiation",

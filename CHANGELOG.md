@@ -269,6 +269,27 @@ squashed from a pull request, the pull request's number.
 
 ### Changed
 
+- The code is simpler throughout, after an engineering audit of every
+  part of the repository: copies of the same logic made one, each
+  service call and Stripe call made one way, error strings the app
+  matches kept in one table, misleading names renamed, and comments
+  rewritten in plain words where they were wrong or hard to follow.
+  Nothing a player sees changes. (2026-11-01, #47)
+- A production deploy of the site deletes old deployments before it
+  publishes, as `./oh deploy prune --apply` does, so nobody has to
+  remember to. It keeps the newest five previews, the newest three
+  production deployments, as many again of each that succeeded (so
+  failed uploads never leave nothing to roll back to), and every live
+  deployment: production's on its domains, and the newest of each
+  preview branch on its branch's address. The old sweep counted those
+  last among the previews to delete, which Cloudflare refuses unless
+  forced. Running before publishing keeps the deployment being
+  replaced, since it is still live then. A listing it cannot read
+  deletes nothing. If the cleanup fails, the deploy says so and goes
+  on; a preview's deploy deletes nothing. The cleanup is `oh`'s now:
+  `deploy.sh` no longer takes `--prune`, and needs no Python. `oh`
+  refuses an empty flag value (`--label ''`), which is most likely an
+  unset variable. (2026-11-01, #47)
 - Bots never take longer over a card than the quickest person at the
   table. A person's pace is the middle of the times they took over their
   last three cards; at a live table the house keeps each bot's thinking
@@ -427,6 +448,12 @@ squashed from a pull request, the pull request's number.
 
 ### Removed
 
+- Code nothing used: `flutter_webrtc`, which nothing had imported
+  since #42; the on-device picture check, which no build had; the
+  relay client's one-relay write path, since every write goes to every
+  relay; the deal's share-token escrow; and dead members, flags and
+  routes across the repository. (2026-11-01, #47)
+
 - Juries, the backup jurors and the duty of every open app to serve
   other tables, the mesh of connections between the devices at a table,
   and the votes and signatures a table settled its seats by: the
@@ -442,6 +469,33 @@ squashed from a pull request, the pull request's number.
   count showed none in production. (2026-10-11, 0520e34)
 
 ### Fixed
+
+- Phone builds carry their commit and the day they were built, so the
+  About page shows them and the operator's update notice can reach a
+  phone build that is out of date. Before, every store build said
+  `dev`. (2026-11-01, #47)
+- Live play: a room that refuses this device, or fills without it, now
+  closes its connection; a relay's refusal from one room no longer
+  shows in the next; Play live and Play friends can no longer be
+  entered twice while the name and age checks run; and the cards of a
+  game left early count towards the player's pace. A deal that fails on
+  this device's own step now says the device can't deal, rather than
+  booting the player. (2026-11-01, #47)
+- The game options are kept however their sheet is closed; the wait
+  after leaving a game early counts down after the clock is set back;
+  stepping back for another device also closes what was open over the
+  table; Restore purchases on an iPhone waits for what the store found
+  before saying there was nothing; a page no longer spins for ever when
+  something between the app and the service answers with a page of its
+  own; feedback on a phone opens the report instead of only copying it;
+  a language chosen in the app is not undone by reloading the site's
+  link; and a watched table colours each icon as the table does.
+  (2026-11-01, #47)
+- `oh verify` fails when infrastructure has problems to fix by hand,
+  where it said ok. (2026-11-01, #47)
+- The relay's line of counts counts the pictures it withheld, which it
+  dropped. The count comes last, after the seconds, so every number
+  before it keeps its column. (2026-11-01, #47)
 
 - Previews play live again. Since the referee, every live table has the
   house at it, and the preview relay had no house of its own: now it
@@ -620,6 +674,159 @@ squashed from a pull request, the pull request's number.
   parse. (2026-10-11, ddcb3b8)
 
 ### Security
+
+- A seated player can no longer silence another seat. The referee took
+  a table event under whatever id it claimed, so a player could sign an
+  event of their own under the id another seat's next move would carry,
+  get it logged first, and have the real move refused as a duplicate;
+  the seat then timed out to a bot. Every table event's id is now
+  checked to be the hash of what it says, as the start's already was.
+  (2026-11-01, #47)
+- A seated player can no longer grow a table's log until the table
+  fails for everyone. Each person's events may fill only a set share of
+  the log (the house's are not held to it), ticks are taken only from
+  the table's own people and its house and none once the result is in,
+  and an event nested deeper than any table event goes is refused.
+  (2026-11-01, #47)
+- Only the house can make a rated table. Nothing tied a table's
+  `rated` to a pool seating, so a subscriber could start a rated table
+  naming anyone, and the house would play out the absent seats and
+  rate them as having left. A pool table's salt is now a value only the
+  house can make, and the house serves no rated table without it; at a
+  table it did not seat, it publishes no result while a person there
+  never said anything. Rated games already in play when this house
+  first deploys stall without a result, since they were seated
+  without that salt. (2026-11-01, #47)
+- A malformed deal message can no longer crash the house. Inputs of the
+  wrong size were read past their end by the deal library, and a
+  shuffle proof with a list of the wrong length made it abort the whole
+  process; both are now refused. A device's proofs are bound to the
+  cards they are about, and the keys message no longer carries key
+  shares wrapped under the same pad as the escrow piece, which leaked
+  part of each deal secret. (2026-11-01, #47)
+- One paid checkout makes one account. Two deliveries of the same
+  Stripe event at once could each make an account for one
+  subscription; the account is now found or made in the subscription's
+  own turn, and Stripe is asked to send again when that fails for a
+  while. An account's turn acts only for that account's devices, and
+  backup codes tried from outside an account no longer use up its
+  hourly allowance. (2026-11-01, #47)
+- Names other players' devices send are cleaned before they are shown:
+  the characters that reverse the direction of text (which could make
+  "Bob wins" read as something else, or spell a refused word
+  backwards), control characters and line breaks are dropped, and every
+  name is cut to the length the profile allows. Names in look-alike
+  Cyrillic or Greek letters are held to the reserved-name filter too.
+  (2026-11-01, #47)
+- The relay carries a view of a watched table only from one of its
+  people, so a stranger can no longer show watchers a game of their
+  own. A socket that has not answered the relay's challenge can hold
+  only a bounded amount, subscribing and LOG requests count against a
+  socket's rate, and only an answer to the socket's own challenge is
+  checked. An event a room or a pool keeps is at most 24 KiB, which a
+  picture fits in, so one subscriber can no longer fill a lobby past
+  what its object can hold, and have it fail each time it wakes; the
+  house's seatings carry only the icon and colour of each waiter's
+  avatar, so nobody's can make one too long to keep. The
+  service reads no request body past its bound, and quotes a report's
+  note in the operator's email so that it cannot pass for instructions.
+  (2026-11-01, #47)
+- A sealed pass no longer shows the cards passed to anyone reading the
+  game's log. The proof that goes with each passed token travelled in
+  the clear beside the seals, and with the other seats' public tokens it
+  was enough to work out the card (all three cards of a pass, in a test).
+  It now travels inside what is sealed to the receiver, hidden under a
+  pad only the passer and the receiver can make, or the whole table once
+  one of them has left and its secret is rebuilt. A pass made by an
+  earlier build is refused at a live table; games already kept still
+  verify as they did. A passer can still hand the receiver a proof that
+  does not verify, which leaves those cards shut to the receiver: that
+  was so before, and nobody can check it without opening the seal.
+  (2026-11-01, #47)
+- A game's record is kept from the copy that carries the house's word
+  on how it came out, not from whichever copy arrived first. A copy cut
+  short, which any player at the table could send before the game was
+  over and which nobody could open, no longer keeps the game from being
+  opened: the whole game replaces it, and is never replaced. A name beside
+  a kept game is put there only by its own seat's device, so one player
+  can no longer name everybody else's seats; until a seat's device has
+  sent, the game shows that seat as "Player N", as a seat with no name
+  already was. A game whose log holds events the table does not read,
+  which a person at the table can put there, is kept the same as any
+  other. A game the operator's deletion tool rewrites, which cannot
+  carry the note that marks it, is checked again when the next copy of
+  it is sent and marked again, so that a late copy of the same game does
+  not replace it and take the other players' names with it.
+  (2026-11-01, #47)
+- Signing in with Apple or Google signs the provider and its token
+  with the request, so a sign-in request taken off the wire can no
+  longer be sent again with somebody else's sign-in in its place. A
+  build from before this change cannot sign in until it is updated.
+  (2026-11-01, #47)
+- The web app carries a Content-Security-Policy that lets only its own
+  scripts, WebAssembly, New Relic's browser agent and Apple's sign-in
+  script run, and workers only from its own files or the blob the deal's
+  worker starts from. No inline script, no eval and no other origin can
+  run in the page where the device's key is kept. The browser tests
+  serve the app with the same headers as production, and a new suite
+  loads the real build under the policy with nothing refused and checks
+  that what the policy exists for is refused. Opening Apple's sign-in in
+  a popup of our own, which would take Apple's script and origin out of
+  the page and the policy, is not done: it needs one real Apple sign-in on
+  the web observed first. (2026-11-01, #47)
+- A table the house will not serve (a seat without a licence the
+  service signed for its key, or a rated table the house did not seat)
+  now ends at once. The house says so once, in the table's own log;
+  nobody is rated on it, nothing is published on the results tag, and
+  the table's object stops asking for the house. Before, such a table
+  woke the house every twenty seconds, an up and a down in its log each
+  time, until the log's notes ran out: about 50,000 wakes over eleven and
+  a half days for one table, which a subscriber starting many such
+  tables multiplied. At a table the house refuses, the existing
+  "Connection failure" screen shows at once instead of a minute later,
+  and an earlier build, which does not read the house's word, waits on
+  such a table as it did. (2026-11-01, #47)
+- A phone's backups no longer carry the device's secret key. On
+  Android it lives in a preferences file of its own that Google's backup
+  and a transfer to a new phone leave out, and on an iPhone in a file
+  marked as not to be backed up; both go with the app when it is
+  deleted, as before. A phone restored from a backup or moved to a new
+  phone now comes back as a new player, and gets its account back with a
+  backup code, a sign-in or Restore purchases; everything else, the
+  settings among it, is still backed up. A phone updating from an
+  earlier build moves its key at its first start, and keeps it where it
+  was, unchanged, if the move fails. A phone restored from a backup made
+  before this keeps that key in the backup. (2026-11-01, #47)
+- `oh account delete` ends a web subscription that is still running in
+  Stripe before it deletes anything, as the app's own deletion does, with
+  nothing refunded, and so no longer keeps that subscription's notes of
+  the changes it was told of; it had refused an account whose
+  subscription was still paid up, and kept the notes of one cancelled
+  but still running, so that `oh terms notify` would not write to the
+  person again. Stripe not answering stops it with nothing deleted. The
+  command now also checks for a legal hold before it marks the account
+  forgotten or changes any kept game, where it used to do both first and
+  refuse only when it came to the rows. A store subscription still paid
+  up and not cancelled is still refused. (2026-11-01, #47)
+- Production's service no longer answers on its `open-hearts.pages.dev`
+  addresses. `/api/` was answered there too, at the project's own
+  address and at one for each production deployment kept, where the
+  zone's per-address rate limit on the app's host does not reach.
+  Production now answers `/api/` on the app's host and on a developer's
+  machine only, and anywhere else says there is no such handler; a
+  preview still answers wherever it is reached. Stripe, the stores and
+  the monitors already call the app's host. (2026-11-01, #47)
+- Releases are held to reviewed code throughout. A production web
+  build takes nothing from the shell: its keys and sign-in IDs come
+  from config/openhearts.json, and its relay is the app's own, as a
+  phone build's is; the release gate
+  refuses untracked files, and ignored files the site would publish,
+  and refuses when origin/main cannot be fetched; store builds are
+  gated too; and `OH_RELAY_DRY_RUN`, which skipped the relay's gate, is
+  gone. `oh key mint` sets the service secret without ever showing it.
+  Previews get their own sign-in key and no TURN token. Wrangler runs
+  from a lockfile, and deploys are given only the Cloudflare
+  credentials. (2026-11-01, #47)
 
 - Previews hold none of production's secrets. A preview runs whatever
   branch was deployed to it, and it held production's service secret,

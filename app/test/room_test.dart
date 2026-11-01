@@ -152,6 +152,26 @@ void main() {
     });
   });
 
+  test('a name another device sends is kept without what turns text round, and no longer than a profile keeps one', () {
+    fakeAsync((async) {
+      final bus = Bus();
+      int now() => async.elapsed.inMilliseconds;
+      // A build that cleans nothing: an override that draws "kcuf" as
+      // the word the filter refuses, and a name no profile would keep.
+      final sent = '\u202ekcuf\u202c${'x' * 500}';
+      final clean = 'kcuf${'x' * (longestName - 4)}';
+      final a = Room(house: _house, canDeal: true, channel: bus.attach(FakeSigner('a')), code: 'ROOM', myName: 'Ada', nowMs: now);
+      final b = Room(house: _house, canDeal: true, channel: bus.attach(FakeSigner('b')), code: 'ROOM', myName: sent, nowMs: now);
+      async.elapse(const Duration(seconds: 3));
+      expect(a.members.map((m) => m.name), ['Ada', clean]);
+      async.elapse(const Duration(seconds: 10));
+      expect(a.spec, isNotNull);
+      expect(a.seatNames.values.toSet(), {'Ada', clean}, reason: 'and the same at the table, whoever led');
+      a.dispose();
+      b.dispose();
+    });
+  });
+
   test('four in: it starts at once; a fifth is told the table filled without them', () {
     fakeAsync((async) {
       final bus = Bus();
@@ -552,6 +572,46 @@ void main() {
     });
   });
 
+  test('each seat is who its own beats say, whoever sends the start; the start\'s word only for someone never heard', () {
+    fakeAsync((async) {
+      final bus = Bus();
+      int now() => async.elapsed.inMilliseconds;
+      final ada = Room(
+          house: _house, canDeal: true, channel: bus.attach(FakeSigner('a')), code: 'ROOM', myName: 'Ada',
+          myAvatar: const Avatar(icon: 'rocket', color: 3), nowMs: now, startAfterMs: 60000);
+      final bao = Room(
+          house: _house, canDeal: true, channel: bus.attach(FakeSigner('b')), code: 'ROOM', myName: 'Bao',
+          myAvatar: const Avatar(icon: 'cake', color: 1), nowMs: now, startAfterMs: 60000);
+      // A changed app in the room, present by its beats, which starts
+      // the table itself and names everyone else as it likes.
+      final mallory = bus.attach(FakeSigner('mallory'));
+      mallory.announce({'kind': 'here', 'name': 'Mallory', 'seed': 1, 'since': now(), 'policy': botPolicyVersion}, ephemeral: true);
+      // Long enough for Ada and Bao to have heard each other's beats.
+      async.elapse(const Duration(seconds: 3));
+      expect(ada.members.map((m) => m.name), containsAll(['Ada', 'Bao', 'Mallory']));
+      final never = FakeSigner('never').publicKey;
+      mallory.announce(named({
+        ..._inFull, 'kind': 'start', 'seed': 7, 'policy': botPolicyVersion, 'sealed': true, 'at': now(),
+        'seats': [
+          {'key': ada.me, 'name': 'Bao', 'avatar': {'icon': 'cake', 'color': 1}},
+          {'key': bao.me, 'name': 'Ada', 'avatar': {'icon': 'rocket', 'color': 3}},
+          {'key': never, 'name': 'Cara', 'avatar': {'icon': 'cake', 'color': 2}},
+          {'bot': 'Romeo'},
+        ],
+      }));
+      async.elapse(const Duration(seconds: 1));
+      for (final room in [ada, bao]) {
+        expect(room.seated, isTrue);
+        expect(room.seatNames, {0: 'Ada', 1: 'Bao', 2: 'Cara'});
+        expect(room.seatAvatars[0], const Avatar(icon: 'rocket', color: 3));
+        expect(room.seatAvatars[1], const Avatar(icon: 'cake', color: 1));
+        expect(room.seatAvatars[2], const Avatar(icon: 'cake', color: 2), reason: 'never heard: the start says who');
+      }
+      ada.dispose();
+      bao.dispose();
+    });
+  });
+
   test('how you look travels with you: the icon and colour in every beat, the picture once, and all of it into the seats', () {
     fakeAsync((async) {
       final bus = Bus();
@@ -706,6 +766,37 @@ void main() {
       })), tags: const [['t', 'ROOM']]), ephemeral: false);
       async.elapse(const Duration(seconds: 2));
       expect(a.spec, isNull, reason: 'nobody here started it');
+      a.dispose();
+    });
+  });
+
+  test('a field of the wrong type in a stored start, a beat or a start is taken as left out, and the room still opens', () {
+    fakeAsync((async) {
+      final bus = Bus();
+      int now() => async.elapsed.inMilliseconds;
+      final ghost = FakeSigner('ghost');
+      void said(Map<String, Object?> content, {bool stored = false}) =>
+          bus.publish(NostrEvent.sign(ghost, kind: stored ? 4244 : 24245, content: jsonEncode(content), tags: const [['t', 'ROOM']]),
+              ephemeral: !stored);
+      // Kept by the relay, read inside the room's constructor.
+      bus.stored.add(NostrEvent.sign(ghost, kind: 4244, content: jsonEncode({'kind': 'start', 'at': 'soon', 'seats': 'all'}),
+          tags: const [['t', 'ROOM']]));
+      final a = Room(house: _house, canDeal: true, channel: bus.attach(FakeSigner('a')), code: 'ROOM', myName: 'Ada', nowMs: now);
+      expect(a.members.map((m) => m.name), ['Ada']);
+
+      said({'kind': 'here', 'name': 5, 'since': 'then', 'policy': 'p', 'seed': 'x'});
+      async.elapse(const Duration(seconds: 1));
+      expect(a.members.map((m) => m.name), unorderedEquals(['Ada', 'Someone']), reason: 'in the room, under no name');
+
+      said({
+        ..._inFull, 'kind': 'start', 'seed': 'x', 'policy': botPolicyVersion, 'sealed': true, 'at': now(), 'target': 'all',
+        'seats': [
+          {'key': a.me, 'name': 'Ada'}, {'key': ghost.publicKey, 'name': 'Ghost'}, {'bot': 'Romeo'}, {'bot': 'Juliet'},
+        ],
+      });
+      async.elapse(const Duration(seconds: 1));
+      expect(a.spec, isNull, reason: 'no seed is no table');
+      expect(a.refusal, isNull);
       a.dispose();
     });
   });

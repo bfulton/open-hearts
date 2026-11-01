@@ -12,6 +12,12 @@ test('every language has every string, with English markup', () => {
   for (const l of languages) assert.deepEqual(problems(l.code), [], l.code);
 });
 
+test('an English page sends a browser to each other language the site is built in, and to no other', () => {
+  const script = readFileSync(new URL('./public/lang.js', import.meta.url), 'utf8');
+  const others = JSON.parse(/const others = (\[[^\]]*\]);/.exec(script)[1].replaceAll("'", '"'));
+  assert.deepEqual(others.sort(), languages.map((l) => l.code).filter((c) => c !== 'en').sort(), 'others in site/public/lang.js');
+});
+
 test('every page is built in every language, with nothing left unfilled', () => {
   const out = mkdtempSync(join(tmpdir(), 'site-'));
   build(out);

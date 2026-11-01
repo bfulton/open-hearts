@@ -1,6 +1,6 @@
-# The per-tag relay (worker.mjs, docs/explanation/service.md).
-#
-#   cd service/do && npx wrangler@4.130.0 deploy
+# The per-tag relay (worker.mjs, docs/explanation/service.md), deployed
+# by ./oh deploy relay (ops/release.mjs), which runs Wrangler as
+# ops/wrangler locks it, with the PhotoDNA module in place.
 #
 # The signature wasm is the app's own copy, imported from where it
 # already lives rather than duplicated here, so there is one file to
@@ -98,11 +98,12 @@ tag = "v3"
 new_sqlite_classes = ["Bench"]
 
 # Where each new picture is checked against known images of child
-# sexual abuse, by Arachnid Shield, PhotoDNA or both, before it is
+# sexual abuse, by whichever of Arachnid Shield or PhotoDNA the run-time
+# row config|known names (Shield unless it says PhotoDNA), before it is
 # carried, and a match acted on: withheld, its accounts held and
 # terminated, and reported to NCMEC (known.mjs, checkers.mjs). One
 # object, made in the "us" jurisdiction, under the US law that has a
-# match reported. Shield is on once the secrets OH_ARACHNID_USERNAME
+# match reported. Shield checks once the secrets OH_ARACHNID_USERNAME
 # and OH_ARACHNID_PASSWORD are set, and PhotoDNA once OH_PHOTODNA_KEY
 # is and the relay is deployed with its module; reports are filed once
 # OH_NCMEC_USERNAME and OH_NCMEC_PASSWORD are set too.

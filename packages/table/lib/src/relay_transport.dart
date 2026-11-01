@@ -10,7 +10,6 @@ import 'dart:typed_data';
 
 import 'nip44.dart';
 import 'nostr.dart';
-import 'presence_relay.dart' show relaysForTag;
 import 'reactions.dart';
 import 'relays.dart';
 import 'signing.dart';
@@ -21,13 +20,12 @@ class RelayTransport implements ReactionLane {
       required this.signer,
       required this.table,
       this.log,
-      int pinned = 0,
       int refusalMs = RelayGroup.defaultRefusalMs,
       bool watchOnly = false})
-      : relays = Relays.turnedBy(relaysForTag(relays, table), table, pinned: pinned) {
+      : relays = relaysForTag(relays, table) {
     // The watch lane, and the players' reactions beside it: both are for
     // anyone looking at the table, watching it or seated at it.
-    final watch = const Filter(kinds: [TableKinds.watch, TableKinds.react]).toJson()..['#t'] = [table];
+    final watch = Filter(kinds: const [TableKinds.watch, TableKinds.react], tags: {'t': [table]}).toJson();
     _group = RelayGroup(
       urls: this.relays,
       refusalMs: refusalMs,
@@ -38,11 +36,8 @@ class RelayTransport implements ReactionLane {
       subscriptions: watchOnly ? {'watch': [watch]} : {
         'table': [
           watch,
-          Filter(kinds: const [TableKinds.signal], tags: {
-            'p': [signer.publicKey]
-          }).toJson()
-            ..['#t'] = [table],
-          Filter(kinds: const [TableKinds.lobby, TableKinds.waiting], since: _lobbySince(table)).toJson()..['#t'] = [table],
+          Filter(kinds: const [TableKinds.signal], tags: {'p': [signer.publicKey], 't': [table]}).toJson(),
+          Filter(kinds: const [TableKinds.lobby, TableKinds.waiting], since: _lobbySince(table), tags: {'t': [table]}).toJson(),
         ],
       },
       onEvent: _onEvent,
@@ -54,10 +49,9 @@ class RelayTransport implements ReactionLane {
   static const poolPrefix = 'queue:';
 
   /// How far back a pool's seatings are worth reading. A seating is for
-  /// its own round of a few seconds and ignored after it, and the
-  /// rounds are cut by each device's own clock, so the pool already
-  /// takes the clocks to agree within one; a minute is that with room
-  /// to spare.
+  /// its own round of a few seconds, the house's, and a device takes one
+  /// only within two rounds of its own clock (matching.dart); a minute
+  /// is that with room to spare.
   static const poolHistorySeconds = 60;
 
   /// Where the stored lobby events start for [tag]: a pool's from a
@@ -70,7 +64,7 @@ class RelayTransport implements ReactionLane {
   static int? _lobbySince(String tag) =>
       tag.startsWith(poolPrefix) ? DateTime.now().millisecondsSinceEpoch ~/ 1000 - poolHistorySeconds : null;
 
-  /// The relays, in the order this table writes to them.
+  /// The relays, with the table's tag in each that asks for one.
   final List<Uri> relays;
   final Signer signer;
   final String table;
@@ -118,7 +112,7 @@ class RelayTransport implements ReactionLane {
   void sayWatch(Map<String, Object?> content) {
     _group.publish(NostrEvent.sign(signer, kind: TableKinds.watch, content: jsonEncode(content), tags: [
       ['t', table],
-    ]), everywhere: true);
+    ]));
   }
 
   /// Says a reaction (reactions.dart) on every relay, as the watch lane
@@ -130,7 +124,7 @@ class RelayTransport implements ReactionLane {
   void sayReaction(String content) {
     _group.publish(NostrEvent.sign(signer, kind: TableKinds.react, content: content, tags: [
       ['t', table],
-    ]), everywhere: true, aside: true);
+    ]), aside: true);
   }
 
   /// Everyone else's reactions, as they arrive, not yet believed: the
@@ -143,11 +137,8 @@ class RelayTransport implements ReactionLane {
 
   /// Publishes a lobby event, tagged with the table id: stored by the
   /// relay, or [ephemeral] — a waiting heartbeat nobody needs later.
-  /// To every relay, not one: a room forms from who hears whom, and a
-  /// peer that has lost one relay must still hear this device on the
-  /// others, or two tables start under one code.
   void announce(Map<String, Object?> content, {bool ephemeral = false}) {
-    _group.publish(_lobbyEvent(content, ephemeral: ephemeral), everywhere: true);
+    _group.publish(_lobbyEvent(content, ephemeral: ephemeral));
   }
 
   /// [announce]d and stored, and whether a relay took it: true once one
@@ -157,7 +148,7 @@ class RelayTransport implements ReactionLane {
   Future<bool> announceTaken(Map<String, Object?> content, {Duration within = const Duration(seconds: 10)}) {
     final e = _lobbyEvent(content);
     final taken = _group.taken(e.id, within: within);
-    _group.publish(e, everywhere: true);
+    _group.publish(e);
     return taken;
   }
 
@@ -168,9 +159,7 @@ class RelayTransport implements ReactionLane {
 
   /// Sends one signalling message to [to], sealed to its key: an
   /// offer or a candidate carries an address, and a relay carries the
-  /// event — every relay, since a peer that cannot read
-  /// one of them still has to be reached, and there are a dozen of
-  /// these a table.
+  /// event.
   void signal(PublicKey to, Signal s) {
     final String content;
     try {
@@ -182,7 +171,7 @@ class RelayTransport implements ReactionLane {
     _group.publish(NostrEvent.sign(signer, kind: TableKinds.signal, content: content, tags: [
       ['p', to],
       ['t', table],
-    ]), everywhere: true);
+    ]));
   }
 
   final Map<PublicKey, Uint8List> _conversationKeys = {};
@@ -196,8 +185,10 @@ class RelayTransport implements ReactionLane {
   /// real event under it still gets in.
   bool _onEvent(Map<String, Object?> raw) {
     // A reaction nobody here shows — the house's client, say — is not
-    // worth its signature.
+    // worth its signature, nor a signal nobody here reads the key
+    // exchange that opens it.
     if (raw['kind'] == TableKinds.react && !_reactions.hasListener) return true;
+    if (raw['kind'] == TableKinds.signal && !_signals.hasListener) return true;
     final e = NostrEvent.parse(raw);
     if (e == null || e.tag('t') != table) return false;
     if (e.kind == TableKinds.lobby || e.kind == TableKinds.waiting) {

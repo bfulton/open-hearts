@@ -156,6 +156,65 @@ void main() {
     expect(jsonDecode((await house.ask('GET', '/status')).$2)['online'], isTrue);
   }, timeout: const Timeout(Duration(minutes: 5)));
 
+  test('woken for a table it will not serve, the house says so in the table\'s log, the table ends, and it is not woken for it again; nothing is rated', () async {
+    final crypto = await rememberedCrypto(kept: false);
+    late HouseProcess house;
+    final wanted = <String>[];
+    final relay = Relay(
+      house: _house,
+      // What the table's object does: the house woken on its port.
+      onWanted: (table) {
+        wanted.add(table);
+        unawaited(house.ask('POST', '/wake', {'table': table}).then((_) {}, onError: (_) {}));
+      },
+    );
+    await relay.serve();
+    addTearDown(relay.close);
+    house = await HouseProcess.start(relay, env: {'OH_HOUSE_KEY': _house});
+    addTearDown(house.stop);
+    await until('the house did not come up: ${house.said}', house.up, within: const Duration(seconds: 60));
+
+    // Any one of a table's people writes its start: this one says it is
+    // rated, with a salt that is not the house's.
+    final people = [SchnorrSigner.generate(), SchnorrSigner.generate()];
+    final spec = TableSpec(salt: newSalt(), seed: 22, target: 1, rated: true, sealed: true, house: _house, seats: [
+      HumanSeat(people[0].publicKey),
+      const BotSeat(Persona.romeo),
+      const BotSeat(Persona.juliet),
+      HumanSeat(people[1].publicKey),
+    ]);
+    final clock = WallClock();
+    final clients = [
+      for (final p in people)
+        TableClient(
+            tableId: spec.id, spec: spec, signer: p, line: RelayLine(relays: [relay.url], signer: p, table: spec.id), clock: clock, crypto: crypto),
+    ];
+    for (final c in clients) {
+      c.start();
+    }
+    addTearDown(() {
+      for (final c in clients) {
+        c.close();
+      }
+    });
+    // Over at the house's word, not at a turn of its running out, which
+    // takes a minute.
+    await until('the table did not end at the house\'s word', () => clients.every((c) => c.done), within: const Duration(seconds: 30));
+    for (final c in clients) {
+      expect(c.state, TableState.failed);
+      expect(c.rules.result!.author, _house);
+      expect(c.rules.result!.body, c.rules.refusal);
+    }
+    expect(house.said.join('\n'), contains('a rated table the house did not seat; not served'));
+    await until('the house still serves the table', () async => jsonDecode((await house.ask('GET', '/status')).$2)['serving'] == 0, within: const Duration(seconds: 10));
+
+    // The table's object asks for the house at most once in twenty
+    // seconds until it has said a result: it has.
+    await Future<void>.delayed(const Duration(seconds: 25));
+    expect(wanted, [spec.id], reason: 'woken as the table started, and not again');
+    expect(await storedResult(relay, spec.id), isNull, reason: 'nothing for the ratings');
+  }, timeout: const Timeout(Duration(minutes: 3)));
+
   test('woken for a pool, the house seats it, by the clocks the wake says', () async {
     late HouseProcess house;
     final wanted = <String>[];

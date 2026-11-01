@@ -32,7 +32,7 @@ import 'dart:isolate';
 import 'package:table/table.dart';
 
 class Relay {
-  Relay({this.keep = 10000, this.log, String? Function(NostrEvent event)? refuse, this.gate, this.house, this.onWanted}) {
+  Relay({this.log, String? Function(NostrEvent event)? refuse, this.gate, this.house, this.onWanted}) {
     _refuse = refuse;
   }
 
@@ -58,9 +58,6 @@ class Relay {
   void revoke(String account, int epoch, {String? why}) => _tell({
         'revoke': {'account': account, 'epoch': epoch, 'why': ?why},
       });
-
-  /// How many stored events the host holds before the oldest go.
-  final int keep;
 
   /// Receives the host's own log lines, connections and subscriptions
   /// and refusals, or null to start it quiet.
@@ -110,7 +107,6 @@ class Relay {
     final host = await Process.start('node', [
       script,
       '--port', '$port',
-      '--keep', '$keep',
       '--stats', _counts!.path,
       '--control',
       '--object',

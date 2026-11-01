@@ -155,45 +155,6 @@ class CardView extends StatelessWidget {
   }
 }
 
-/// A face-down card. Opponent hands are counts, not cards, so this is
-/// only ever drawn as a stack.
-class CardBack extends StatelessWidget {
-  const CardBack({super.key, required this.width});
-
-  final double width;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: width,
-      height: cardHeightFor(width),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(width * 0.11),
-        border: Border.all(color: Palette.gold.withValues(alpha: 0.35), width: 0.9),
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFF7A1F2B), Color(0xFF4A1119)],
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.4),
-            blurRadius: width * 0.09,
-            offset: Offset(0, width * 0.03),
-          ),
-        ],
-      ),
-      child: Center(
-        child: Icon(
-          Icons.favorite,
-          size: width * 0.42,
-          color: Palette.gold.withValues(alpha: 0.30),
-        ),
-      ),
-    );
-  }
-}
-
 /// The place a card will land: the room it takes, and nothing drawn.
 /// The room is what keeps the trick from jumping as cards arrive, and a
 /// trick reads as a trick without outlines on the felt.

@@ -147,7 +147,7 @@ For a name, or a picture the relay can't act on:
 1. Delete the account's copy at `pictures.openhearts.game`, now that the hold has kept one:
 
    ```bash
-   npx wrangler r2 object delete "open-hearts-pictures/account/$account/<sha256>.jpg" --remote
+   ops/wrangler/wrangler r2 object delete "open-hearts-pictures/account/$account/<sha256>.jpg" --remote
    ```
 
 ## Report it
@@ -155,7 +155,7 @@ For a name, or a picture the relay can't act on:
 1. Make the report to the CyberTipline, unless the relay's email gives a report number already. Give what you know: the picture or name, when you learned of it and how, the account's number, its devices' keys (`./oh account show` lists how many; the report can ask for them), and, for a web subscription, the email address in Stripe. The picture is the copy the hold kept, or, for a profile picture taken off, the base64 JPEG under `picture` in the account's `HELD` row. Download it only to attach it to the report, and delete the download as soon as it is attached:
 
    ```bash
-   npx wrangler r2 object get "open-hearts-records/held/$account/<sha256>.jpg" --remote --file picture.jpg
+   ops/wrangler/wrangler r2 object get "open-hearts-records/held/$account/<sha256>.jpg" --remote --file picture.jpg
    ```
 
 1. Record the report's number on the hold:

@@ -97,8 +97,9 @@ class SimReferee {
   }
 
   /// An event as [author] signed it, that does not read: logged as the
-  /// relay's referee logs any event whose signature on its id checks,
-  /// from a key it takes from.
+  /// relay's referee logs any event from a key it takes from, whose id
+  /// is the hash of its bytes and whose signature on it checks. [raw]'s
+  /// id is taken as given.
   void receiveUnread(Map<String, Object?> raw, PublicKey author) {
     if (log.isEmpty || !_writers.contains(author) || raw['id'] is! String || !_ids.add(raw['id'] as String)) return;
     _append(unread: raw);

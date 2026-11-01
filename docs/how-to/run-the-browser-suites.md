@@ -47,6 +47,7 @@ Use this guide to run the suites in `e2e/` that drive the built web app in a hea
    | `node e2e/offline.mjs` | The network taken away a piece at a time. |
    | `node e2e/move.mjs` | The site's and the app's hosts: old addresses, the device carried over, previews. |
    | `node e2e/site.mjs` | The marketing site in each language. It needs no app build. |
+   | `node e2e/csp.mjs` | The app under the Content-Security-Policy production serves it with. It makes its own build, with Apple's Services ID, in `app/build/e2e-signin`. |
    | `node e2e/shots.mjs` | Screenshots of the table at each screen shape, into `app/build/shots/`. |
    | `node e2e/site_shots.mjs` | The site's pictures of the game, into `site/public/img/`. Run it after a change to the menu. |
    | `node e2e/store_shots.mjs` | The App Store's and Google Play's pictures of the app, into `app/build/store/`. See [Update the App Store and Google Play listings](update-the-store-listings.md#make-the-pictures). |

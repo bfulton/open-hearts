@@ -156,7 +156,6 @@
   "yourPicture": "Votre image",
   "useIt": "Utiliser",
   "cropHelp": "Faites glisser pour la déplacer, pincez pour l'agrandir.\nCe qui est dans le cercle est votre image.",
-  "pictureFlagged": "Cet appareil a pensé que vous ne voudriez pas de cette image à la table. C'est une supposition, faite ici, et elle peut être fausse.",
   "showPicture": "Afficher l'image de {name}",
   "hidePicture": "Masquer l'image de {name}",
   "pictureChoiceNote": "Sur cet appareil seulement, et seulement l'image : le nom et le score restent.",

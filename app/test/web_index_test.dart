@@ -112,4 +112,20 @@ void main() {
     final manifest = jsonDecode(File('web/manifest.json').readAsStringSync()) as Map<String, Object?>;
     expect(manifest['orientation'], anyOf(isNull, 'any'));
   });
+
+  test('New Relic\'s agent records no session, console line, click or key, and masks a room\'s code', () {
+    // What the privacy policy lists is all it sends: set over New
+    // Relic's own init, so nothing there turns it back on
+    // (observability/apply.mjs, pinnedInit).
+    final agent = File('web/observability.js').readAsStringSync();
+    final pinned = RegExp(r'Object\.assign\(NREUM\.init,\{(.*)\}\);').firstMatch(agent);
+    expect(pinned, isNotNull);
+    expect(pinned!.start, greaterThan(agent.indexOf('NREUM.init={')), reason: 'after New Relic\'s own');
+    expect(pinned.start, lessThan(agent.indexOf('NREUM.loader_config=')), reason: 'before the agent starts');
+    for (final off in ['session_replay', 'session_trace', 'logging', 'user_actions']) {
+      expect(pinned.group(1), contains('$off:{enabled:false}'));
+    }
+    expect(pinned.group(1), contains(r'{regex:/\/room\/[A-Z0-9]{8}/g,replacement:"/room/*"}'));
+    expect(pinned.group(1), contains(r'{regex:/\/table\/[0-9a-f]{32}/g,replacement:"/table/*"}'));
+  });
 }

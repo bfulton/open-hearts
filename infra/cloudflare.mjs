@@ -22,11 +22,6 @@ const config = JSON.parse(readFileSync(new URL('../config/openhearts.json', impo
 /// once the config names Play's package and product, as here.
 export const playSecrets = config.google?.package && config.google?.product ? ['OH_PLAY_SERVICE_ACCOUNT'] : [];
 
-export const app = {
-  key: 'open-hearts',
-  name: 'Open Hearts',
-};
-
 // ---- the site, the app and /api: one Pages project ---------------------
 
 /// Published by deploy.sh (wrangler pages deploy); what is set here is
@@ -54,6 +49,9 @@ export const pages = {
       /// set one (it has no value to set), so a missing one is set by
       /// hand: `./oh secret set NAME --apply`.
       secrets: ['OH_ID_HMAC', 'OH_SERVICE_SECRET', 'OH_STRIPE_SECRET', 'OH_STRIPE_WEBHOOK_SECRET', 'OH_TURN_API_TOKEN', ...playSecrets],
+      /// What makes a secret that is not typed in: the service's is made
+      /// with its key, which goes into config/openhearts.json beside it.
+      madeBy: { OH_SERVICE_SECRET: './oh key mint --apply' },
       kv: { OH_STORE: 'open-hearts-store' },
       r2: { OH_RECORDS: 'open-hearts-records' },
       /// The household object lives in the relay worker (wrangler.toml).
@@ -70,13 +68,16 @@ export const pages = {
       /// Which deployment this is: a preview signs with the service key
       /// previews have, never production's (service/functions/deployment.mjs).
       vars: { OH_DEPLOYMENT: 'preview' },
-      // No Stripe on preview: the shop says it is not open yet, and the
-      // people who play are the operator's invitations (ops/preview.mjs).
-      secrets: ['OH_ID_HMAC', 'OH_TURN_API_TOKEN'],
+      // None of production's. No Stripe on preview: the shop says it is
+      // not open yet, and the people who play are the operator's
+      // invitations (ops/preview.mjs). No TURN: no part of the game uses
+      // it (app/lib/net/turn.dart), and its token is billed by the
+      // gigabyte.
+      secrets: [],
       /// A preview's own: made for previews, never production's, since a
       /// preview runs whatever branch was deployed to it. Set by `./oh
       /// preview secrets --apply`, and not by `./oh secret set`.
-      ownSecrets: ['OH_SERVICE_SECRET'],
+      ownSecrets: ['OH_SERVICE_SECRET', 'OH_ID_HMAC'],
       // Its own store, so a preview never writes production's rows, and
       // the preview relay's households, which read and write that store
       // (service/do/wrangler.toml, [env.preview]). Its own bucket too: a
@@ -150,8 +151,8 @@ export const turnKeys = [{ name: 'open-hearts-turn', uid: config.turnKeyId }];
 /// nothing of that is repeated here. apply.mjs reads wrangler.toml and
 /// checks the live worker against it, and against the little the
 /// account adds: its secrets by name, and that it is reached only by
-/// its custom domain. A difference is fixed by deploying with wrangler,
-/// not by this script.
+/// its custom domain. A difference is fixed by deploying the relay
+/// (`./oh deploy relay`), not by this script.
 export const relay = {
   wrangler: 'service/do/wrangler.toml',
   /// The house's secret (service/bin/house.dart).

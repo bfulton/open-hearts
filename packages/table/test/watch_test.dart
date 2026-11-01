@@ -62,6 +62,8 @@ void main() {
       toPlay: 1,
     ).toJson();
     expect(WatchedTable.parse(good, table: 'x'), isNotNull);
+    expect(WatchedTable.parse({...good, 'names': ['\u{1F600}' * longestName, 'b', 'c', 'd']}, table: 'x'), isNotNull,
+        reason: 'the longest name is a name, though each of its characters is two UTF-16 units');
     expect(WatchedTable.parse({...good, 'accounts': ['ab' * 16, null, 'cd' * 32, null]}, table: 'x')?.accounts, ['ab' * 16, null, 'cd' * 32, null]);
     for (final (what, change) in <(String, void Function(Map<String, Object?>))>[
       ('three names', (m) => m['names'] = ['a', 'b', 'c']),
@@ -70,7 +72,8 @@ void main() {
       ('a turn off the table', (m) => m['toPlay'] = 7),
       ('a phase nobody plays', (m) => m['phase'] = 'cheating'),
       ('a score that is not a number', (m) => m['totals'] = [0, 0, 'x', 0]),
-      ('a name too long to be one', (m) => m['names'] = ['a' * 61, 'b', 'c', 'd']),
+      ('a name too long to be one', (m) => m['names'] = ['a' * (longestName + 1), 'b', 'c', 'd']),
+      ('a name of emoji too long to be one', (m) => m['names'] = ['\u{1F600}' * (longestName + 1), 'b', 'c', 'd']),
       ('three accounts', (m) => m['accounts'] = ['ab' * 16, null, null]),
       ('an account that is not one', (m) => m['accounts'] = ['AB' * 16, null, null, null]),
     ]) {

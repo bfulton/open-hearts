@@ -49,7 +49,6 @@ Future<void> _check(Map<Object?, Object?> asked) async {
     // to be (net/record_check.dart, KeptGame); and checked for the house
     // the page plays with.
     final read = readRecord(asked['record'] as String);
-    if (read.failed case final failed? when failed.reason == null) return _say({'error': 'not a record'});
     final house = asked['house'];
     final v = checkRead(read,
         crypto: crypto,

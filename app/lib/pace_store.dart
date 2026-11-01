@@ -1,11 +1,9 @@
 /// This device's own pace, kept on it (packages/table, pace.dart).
 ///
-/// Not on a relay and not in a result. A pace is the one number about a
-/// game that no two peers can agree on — the record carries no clock —
-/// so it is measured by the device that played the cards, kept by it,
-/// and stated by it in the pool the way a rating is stated there. It
-/// decides who you sit with and nothing else, and nobody is ever told
-/// how long you took.
+/// Not on a relay and not in a result. It is measured by the device
+/// that played the cards, kept by it, and stated by it in the pool the
+/// way a rating is stated there. It decides who you sit with and nothing
+/// else, and nobody is ever told how long you took.
 library;
 
 import 'dart:convert';
@@ -31,8 +29,9 @@ class PaceStore {
       (await SharedPreferences.getInstance()).setString(_key, jsonEncode(pace.toJson()));
 
   /// A game's worth of this device's own cards folded in, and the
-  /// pace that leaves. [cardMs] is what the table measured for this
-  /// seat's own plays (`TableClient.myCardMs`).
+  /// pace that leaves. [cardMs] is how long this player took over each
+  /// of their own cards, as this device timed them
+  /// (`LiveController.myCardMs`).
   static Future<Pace> fold(Iterable<int> cardMs) async {
     // A turn this device was away for is not a think: a phone in a
     // pocket during a hand would otherwise read as somebody very slow

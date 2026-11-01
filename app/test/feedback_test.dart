@@ -1,6 +1,7 @@
 /// Tell us what's broken (feedback_page.dart): what goes, shown before
-/// it goes; where it goes, as the operator says; and on a build that
-/// cannot open a page, the report on the clipboard with where to take it.
+/// it goes; where it goes, as the operator says, opened in the app that
+/// takes it; and where nothing opens it, the report on the clipboard
+/// with where to take it.
 library;
 
 import 'package:flutter/material.dart';
@@ -34,6 +35,16 @@ void main() {
     expect(carriesReport(form), isFalse);
   });
 
+  test('the title is the first line, cut at eighty characters and never through one', () {
+    expect(titleOf(''), 'Something is broken');
+    expect(titleOf('Stuck\nafter the pass'), 'Stuck');
+    expect(titleOf('a' * 100), '${'a' * 79}…');
+    // Two emoji across the eightieth code unit: kept whole, as two of
+    // the eighty characters, where a cut by code units sent half of one.
+    expect(titleOf('${'a' * 78}😀😀'), '${'a' * 78}😀😀');
+    expect(titleOf('😀' * 90), '${'😀' * 79}…');
+  });
+
   test('the operator may send it elsewhere: a page or mail, nothing that runs', () {
     expect(RemoteConfig.parse({'feedback': 'mailto:help@x.example'}).feedback, Uri.parse('mailto:help@x.example'));
     expect(RemoteConfig.parse({'feedback': 'https://forms.example/h'}).feedback, Uri.parse('https://forms.example/h'));
@@ -62,8 +73,11 @@ void main() {
     await tester.pump();
     expect(find.textContaining('Record: oh1:4:a,b,c::'), findsOneWidget);
 
-    // No page to open off the web: the report and where to take it, on
-    // the clipboard, and said.
+    // No app on the device takes the address: the report and where to
+    // take it, on the clipboard, and said.
+    const launcher = MethodChannel('plugins.flutter.io/url_launcher');
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(launcher, (call) async => false);
+    addTearDown(() => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(launcher, null));
     await tester.tap(send);
     await tester.pump();
     expect(copied, hasLength(1));
@@ -71,6 +85,33 @@ void main() {
     expect(copied.single, contains('Record: oh1:4:a,b,c::'));
     expect(copied.single, endsWith('\n\n$projectIssues'));
     expect(find.text('Copied. Paste it at $projectIssues'), findsOneWidget);
+  });
+
+  testWidgets('on a phone, Send opens the report in the app that takes it, and copies nothing', (tester) async {
+    final copied = <String>[];
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(SystemChannels.platform, (call) async {
+      if (call.method == 'Clipboard.setData') copied.add((call.arguments as Map)['text'] as String);
+      return null;
+    });
+    final launched = <String>[];
+    const launcher = MethodChannel('plugins.flutter.io/url_launcher');
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(launcher, (call) async {
+      if (call.method == 'launch') launched.add((call.arguments as Map)['url'] as String);
+      return true;
+    });
+    addTearDown(() {
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(SystemChannels.platform, null);
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(launcher, null);
+    });
+    await tester.pumpWidget(MaterialApp(theme: buildTheme(), home: const FeedbackPage()));
+    await tester.enterText(find.byType(TextField), 'Stuck');
+    await tester.pump();
+    await tester.tap(find.widgetWithText(FilledButton, 'Send'));
+    await tester.pump();
+    expect(launched, hasLength(1));
+    expect(Uri.parse(launched.single).queryParameters['title'], 'Stuck');
+    expect(copied, isEmpty);
+    expect(find.byType(SnackBar), findsNothing);
   });
 
   testWidgets('mail is not public, and the page does not say it is', (tester) async {

@@ -114,8 +114,7 @@ fn rng_from(seed: &[u8]) -> Option<ChaCha20Rng> {
 
 /// A seat's keys from its 32-byte secret: the reference crate's own
 /// key generation, driven by a generator seeded with the secret, so
-/// the same secret always gives the same pair and nothing here needs
-/// the parameters' private generator.
+/// the same secret always gives the same pair.
 fn keys(secret: &[u8]) -> Option<(Affine, Scalar)> {
     if secret.len() < 32 {
         return None;
@@ -123,17 +122,10 @@ fn keys(secret: &[u8]) -> Option<(Affine, Scalar)> {
     Protocol::player_keygen(&mut rng_from(secret)?, &fixed().pp).ok()
 }
 
-/// The ElGamal generator the parameters were set up with. The
-/// protocol's own parameters keep it private and offer no way to ask
-/// for it, but a public key is sk·G, so one throwaway pair gives it
-/// back exactly: G = sk⁻¹·pk. Drawn once, and checked in the tests
-/// against a second pair.
+/// The ElGamal generator the parameters were set up with: every
+/// public key is sk·G, and the arguments here are made over it.
 fn generator() -> Affine {
-    static G: OnceLock<Affine> = OnceLock::new();
-    *G.get_or_init(|| {
-        let (pk, sk) = keys(b"open-hearts generator probe v1  ").expect("probe keys");
-        (pk * sk.inverse().expect("a key's secret is not zero")).into_affine()
-    })
+    fixed().pp.enc_generator()
 }
 
 fn write<T: CanonicalSerialize>(v: &T, out: &mut [u8]) -> Option<usize> {
@@ -194,11 +186,10 @@ fn seed(i: u8) -> [u8; 32] {
 mod tests {
     use super::*;
 
-    /// The parameters' generator is private, so it is taken back from
-    /// a throwaway pair (see [generator]). Any other pair proves it was
-    /// the right one: every public key is that same G times its secret.
+    /// The generator the arguments use is the one keys are made with:
+    /// every public key is G times its secret.
     #[test]
-    fn the_generator_taken_back_is_the_one_every_key_was_made_with() {
+    fn the_generator_is_the_one_every_key_was_made_with() {
         let g = generator();
         for i in 1..5u8 {
             let mut secret = [0u8; 32];

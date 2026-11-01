@@ -14,26 +14,55 @@
 // What it checks is what it takes: the first start that names this
 // table and is said by one of its people, naming this relay's house if
 // it names one, and after that events from the start's people and its
-// house alone, each once. An event's signature is checked on its id and
-// no further — the id is the hash of the event's canonical bytes, which
-// are Dart's to make (packages/table, events.dart) — so an event whose
-// id is not its bytes' is logged as it came and changes nothing, at
-// every side alike (log.dart, LogEntry.unread).
+// house alone, each once. Every event's id must be the hash of its
+// canonical bytes (packages/table, events.dart, as
+// functions/records.mjs, eventIdOf, makes them) and carry its author's
+// signature. So an id stands for one event only, and nobody can keep
+// another's event out of the log by saying its id first. An event the
+// rules do not read, of a kind or shape this build does not know, is
+// logged as it came and changes nothing, at every side alike (log.dart,
+// LogEntry.unread).
+//
+// Each person's events may fill only so much of the log ([authorMost]),
+// so one seat's events cannot grow the table's object until it fails
+// for everybody, nor make every side that reads the log read without
+// end. The entries that are not events are bounded too. A tick is taken
+// only from the table's people and its house, at most one every
+// [tickGapMs], none after the house's word on the game, and none past
+// [ticksInARowMost] since the last event. So nobody else can lengthen
+// the log with ticks, nobody can once the game is over, and at a table
+// whose house never says that word (one with no house, or whose house
+// has not come) its people cannot tick for ever. Once the log holds
+// [notesMost] ticks and connections noted, it takes no more ticks and
+// notes no more connections closing. It still notes a person back whom
+// it last noted gone, or they would stay gone on every side's rules and
+// lose their seat at their next turn. Nobody is noted gone after that
+// point, so this happens at most once for each, and otherwise only
+// events grow the log.
+//
+// The house is asked for until it has said a result, whatever the
+// result says (note, `said`): its word on how a game came out, or its
+// word that it will not serve the table (packages/table, rules.dart,
+// TableRules.refusal), which a table it refuses is given at once. A
+// house that merely let such a table go would be woken for it every
+// [wakeEveryMs] until the log's notes ran out ([notesMost] of them, an
+// up and a down a visit: some eleven and a half days), and a subscriber
+// who starts many such tables would multiply that.
 //
 // But for the start, which every side has to read as the same table
 // for anything after it to mean anything: a log that began with one
 // they could not would be no table at all, for any of them. So the
 // start is taken only as Dart wrote it (startRefusal): its text as it
-// comes out written again, its id the hash of what it says, and its
-// spec the one the table's id names (packages/table, spec.dart,
-// TableSpec.id). The table is the one everybody was seated at, and one
-// person cannot start it as another.
-
-import { eventIdOf } from '../functions/records.mjs';
+// comes out written again, and its spec the one the table's id names
+// (packages/table, spec.dart, TableSpec.id). The table is the one
+// everybody was seated at, and one person cannot start it as another.
 //
 // The simulator's referee (packages/table_sim, sim_referee.dart) is
 // this, on the simulator's clock: a table played there is a table played
 // here.
+
+import { eventIdOf, recordMost } from '../functions/records.mjs';
+import { digestOf } from '../functions/rows.mjs';
 
 /// The kind a table event rides in: its JSON as the content, signed by
 /// its author (packages/table, nostr.dart, TableKinds.log).
@@ -44,9 +73,33 @@ export const logKind = 4250;
 /// waiting on it asks at once.
 export const tickGapMs = 250;
 
+/// The most ticks the log takes with no table event between them: ten
+/// minutes of ticks at one every [tickGapMs]. A side asks for one only
+/// once a deadline is due, and a tick past it moves the table on, so at
+/// a table in play a few come between one event and the next, or the
+/// table's end.
+export const ticksInARowMost = 2400;
+
+/// How many entries that are not table events (ticks and connections
+/// noted, together) the log holds before it takes no more ticks and
+/// notes no more connections closing. A person it last noted gone is
+/// still noted back past this, at most once each, since nobody is noted
+/// gone after it. A table in play adds one only when a deadline is due
+/// or a person's device comes or goes, and never comes near this.
+export const notesMost = 100000;
+
 /// A table's tag (packages/table, spec.dart, newTableId): the only tags
 /// that keep a log.
 export const tableTag = /^[0-9a-f]{32}$/;
+
+/// The most of a table's log one person's events may fill, in
+/// characters as the log keeps them: as much as a whole kept game may be
+/// ([recordMost]). A person's share of a game to a hundred is some
+/// 400 KiB: the game in packages/table/test/fixtures/refereed_four.json.gz
+/// holds about 72 KiB of each person's over three hands, and no game to
+/// a hundred lasts more than sixteen. The house deals and plays every bot
+/// seat, and its key is the operator's, so it is not held to this.
+export const authorMost = recordMost;
 
 const hex64 = /^[0-9a-f]{64}$/;
 
@@ -105,28 +158,21 @@ export function writersOf(spec, table, house) {
   return { people, house: named, writers: new Set(named ? [...people, named] : people) };
 }
 
-/// SHA-256 of [text], in hex.
-async function sha256Hex(text) {
-  const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text)));
-  return [...digest].map((b) => b.toString(16).padStart(2, '0')).join('');
-}
-
 /// The id of the table [spec] names: the first 32 hex digits of the
 /// SHA-256 of all it says but its id, as it is written (packages/table,
 /// spec.dart, TableSpec.idOf).
 export async function specIdOf(spec) {
   const { id, ...written } = spec;
-  return (await sha256Hex(JSON.stringify(written))).slice(0, 32);
+  return (await digestOf(JSON.stringify(written))).slice(0, 32);
 }
 
 /// Why [content], a [logKind] event's text, is no start for the log of
 /// [table] to begin with; null for one that is, or for content that is
 /// no start at all. A start is taken as Dart wrote it and every side
 /// reads it: its text as it comes out written again, so that the bytes
-/// hashed here are the bytes hashed there; its id the hash of what it
-/// says (events.dart, as functions/records.mjs, eventIdOf, works it
-/// out); saying a spec and nothing else, its id first; and that spec
-/// the one [table] names.
+/// hashed here are the bytes hashed there; saying a spec and nothing
+/// else, its id first; and that spec the one [table] names. Its id is
+/// checked as every event's is ([tableReferee], take).
 export async function startRefusal(content, table) {
   let said;
   try {
@@ -141,13 +187,34 @@ export async function startRefusal(content, table) {
   if (Object.keys(body ?? {}).length !== 1 || !spec || typeof spec !== 'object' || Array.isArray(spec) || Object.keys(spec)[0] !== 'id') {
     return 'invalid: a start says its spec and nothing else';
   }
-  if ((await eventIdOf(said.table, said)) !== said.id) return 'invalid: a start\'s id is the hash of what it says';
   if (spec.id !== table || (await specIdOf(spec)) !== table) return 'blocked: not the table this id names';
   return null;
 }
 
+/// How deep a table event may nest, counting itself (packages/table,
+/// events.dart, TableEvent.deepest). No build writes one deeper than six:
+/// a start's licences. Every side reads an event, and writes it out
+/// again, by walking it to the bottom, so a deep enough one would
+/// overflow the stack of every side that met it, and the log would go no
+/// further for anyone.
+const deepest = 32;
+
+/// Whether [value] nests no deeper than [deepest], counted without
+/// recursion, so that no depth can overflow the count itself.
+function shallow(value) {
+  const stack = [[value, 1]];
+  while (stack.length) {
+    const [v, depth] = stack.pop();
+    if (!v || typeof v !== 'object') continue;
+    if (depth > deepest) return false;
+    for (const child of Object.values(v)) stack.push([child, depth + 1]);
+  }
+  return true;
+}
+
 /// The table event a [logKind] event carries, the fields a table event
-/// has and nothing else; null for content that is not one.
+/// has and nothing else; null for content that is not one, or that
+/// nests deeper than any table event does.
 function eventIn(content) {
   let said;
   try {
@@ -155,7 +222,7 @@ function eventIn(content) {
   } catch {
     return null;
   }
-  if (!said || typeof said !== 'object' || Array.isArray(said)) return null;
+  if (!said || typeof said !== 'object' || Array.isArray(said) || !shallow(said)) return null;
   const { id, table, author, kind, body, sig } = said;
   if (typeof id !== 'string' || !hex64.test(id) || typeof author !== 'string' || !hex64.test(author) || typeof sig !== 'string') return null;
   return { id, table, author, kind, body, sig };
@@ -167,9 +234,10 @@ function eventIn(content) {
 /// [keep] is told of each entry as it is added, to write it down;
 /// [wanted] is told whenever the house is wanted and is not on the log
 /// — a start that names it, and every entry after while it is away,
-/// until its word on how the game came out is in; [send] sends text to
-/// a socket, [admitted] says whether a socket may be carried now.
-export function tableReferee({ table, verify, house = null, now = Date.now, entries: kept = [], keep = null, wanted = null, send = () => {}, admitted = () => true }) {
+/// until its word on the table is in, whether how the game came out or
+/// that it will not serve the table; [send] sends text to a socket,
+/// [admitted] says whether a socket may be carried now.
+export function tableReferee({ table, verify, house = null, now = Date.now, entries: written = [], keep = null, wanted = null, send = () => {}, admitted = () => true }) {
   const entries = [];
   /// The start's writers ([writersOf]), once there is a start.
   let spec = null;
@@ -183,8 +251,16 @@ export function tableReferee({ table, verify, house = null, now = Date.now, entr
   /// The writers whose last connection's close is the last thing the
   /// log says of them.
   const downLogged = new Set();
-  /// Whether the house's word on the game is in.
+  /// Whether the house's word on the table is in: a result of its,
+  /// whatever it says. The referee decides nothing about it, and every
+  /// side reads it alike (rules.dart).
   let said = false;
+  /// author -> how many characters of the log its events fill.
+  const filled = new Map();
+  /// How many entries are not events: ticks, and connections noted.
+  let notes = 0;
+  /// How many ticks have come since the last event.
+  let ticksInARow = 0;
 
   const lastAt = () => (entries.length ? entries[entries.length - 1].t : -Infinity);
 
@@ -194,15 +270,20 @@ export function tableReferee({ table, verify, house = null, now = Date.now, entr
     const e = entry.e;
     if (e) {
       ids.add(e.id);
+      filled.set(e.author, (filled.get(e.author) ?? 0) + JSON.stringify(e).length);
       if (entry.n === 0) spec = writersOf(e.body?.spec, table, house);
       if (e.kind === 'result' && spec?.house && e.author === spec.house) said = true;
+      ticksInARow = 0;
+    } else {
+      notes++;
+      if (!entry.up && !entry.down) ticksInARow++;
     }
     if (entry.up) downLogged.delete(entry.up);
     if (entry.down) downLogged.add(entry.down);
   }
 
   // The log as kept, as far as it runs on without a gap.
-  for (const entry of kept) {
+  for (const entry of written) {
     if (!entry || entry.n !== entries.length) break;
     note(entry);
   }
@@ -210,7 +291,8 @@ export function tableReferee({ table, verify, house = null, now = Date.now, entr
   const houseHere = () => !!spec?.house && (open.get(spec.house) ?? 0) > 0;
 
   /// Whether the table wants its house and the house is not on the log:
-  /// a sealed table whose house has not said its word.
+  /// a sealed table whose house has not said its word, how the game
+  /// came out or that it will not serve the table.
   const wantsHouse = () => !!spec?.house && !said && !houseHere();
 
   /// One more entry: numbered, stamped, written down, and sent to
@@ -228,7 +310,13 @@ export function tableReferee({ table, verify, house = null, now = Date.now, entr
     return entry;
   }
 
-  /// [socket], answered as [key], following the log one more time.
+  /// One more tick or connection closing noted, if the log takes more of
+  /// them ([notesMost]).
+  const appendNote = (fields) => (notes < notesMost ? append(fields) : null);
+
+  /// [socket], answered as [key], following the log one more time. A
+  /// key the log last noted gone is noted back even past [notesMost]:
+  /// only that note ends its absence on every side's rules.
   function opened(key) {
     if (!key) return;
     const count = (open.get(key) ?? 0) + 1;
@@ -242,24 +330,28 @@ export function tableReferee({ table, verify, house = null, now = Date.now, entr
       return entries;
     },
 
-    get started() {
-      return entries.length > 0;
-    },
-
     /// Whether the table wants its house and the house is not there.
     get wantsHouse() {
       return wantsHouse();
     },
 
+    /// Whether [key] holds a seat in person, by the table's start: null
+    /// while the log has not begun.
+    seated(key) {
+      return spec ? spec.people.has(key) : null;
+    },
+
     /// A [logKind] event, its own id and signature already checked:
-    /// {ok, why}, as the relay answers it. Waits only on a start, while
-    /// the log has not begun: every other event is in the log, or not,
-    /// before this returns, in the order they were handed in.
+    /// {ok, why}, as the relay answers it. Waits on the hash of the
+    /// table event it carries, and on a start's checks while the log has
+    /// not begun; what it decides after each wait is decided on the log
+    /// as it stands then.
     async take(event) {
       const e = eventIn(event.content);
       if (!e) return { ok: false, why: 'invalid: not a table event' };
       if (e.table !== table) return { ok: false, why: `blocked: this log is table ${table}'s` };
       if (event.pubkey !== e.author) return { ok: false, why: 'blocked: a table event is said by its author' };
+      if ((await eventIdOf(table, e)) !== e.id) return { ok: false, why: 'invalid: an event\'s id is the hash of what it says' };
       if (ids.has(e.id)) return { ok: true, why: 'duplicate: already in the log' };
       if (!verify(e.author, e.id, e.sig)) return { ok: false, why: 'invalid: not signed by its author' };
       if (!entries.length) {
@@ -277,6 +369,9 @@ export function tableReferee({ table, verify, house = null, now = Date.now, entr
       }
       if (e.kind === 'start') return { ok: true, why: 'duplicate: the table has started' };
       if (!spec?.writers.has(e.author)) return { ok: false, why: 'blocked: not one of the table\'s people or its house' };
+      if (e.author !== spec.house && (filled.get(e.author) ?? 0) + JSON.stringify(e).length > authorMost) {
+        return { ok: false, why: 'blocked: this author has filled its share of the log' };
+      }
       append({ e });
       return { ok: true, why: '' };
     },
@@ -307,7 +402,7 @@ export function tableReferee({ table, verify, house = null, now = Date.now, entr
     settle() {
       if (!spec) return;
       for (const key of spec.writers) {
-        if ((open.get(key) ?? 0) === 0 && !downLogged.has(key)) append({ down: key });
+        if ((open.get(key) ?? 0) === 0 && !downLogged.has(key)) appendNote({ down: key });
       }
       if (wantsHouse()) wanted?.();
     },
@@ -323,7 +418,7 @@ export function tableReferee({ table, verify, house = null, now = Date.now, entr
       const left = (open.get(l.key) ?? 1) - 1;
       if (left > 0) return open.set(l.key, left);
       open.delete(l.key);
-      if (spec?.writers.has(l.key) && !downLogged.has(l.key)) append({ down: l.key });
+      if (spec?.writers.has(l.key) && !downLogged.has(l.key)) appendNote({ down: l.key });
     },
 
     /// The subscription [socket] follows the log under, for it to carry
@@ -332,10 +427,18 @@ export function tableReferee({ table, verify, house = null, now = Date.now, entr
       return listeners.get(socket)?.sub ?? null;
     },
 
-    /// A tick, if the log has begun and its last entry is [tickGapMs] old.
-    tick() {
-      if (!entries.length || now() - lastAt() < tickGapMs) return null;
-      return append({});
+    /// A tick asked for by a socket that answered the relay's challenge
+    /// as [key] (null where nobody answers one), if the log has begun,
+    /// [key] is one of the table's people or its house, the house's word
+    /// on the game is not in, the last entry is [tickGapMs] old, fewer
+    /// than [ticksInARowMost] ticks have come since the last event, and
+    /// the log takes more entries that are not events ([notesMost]).
+    /// Only the sides at the table wait on its deadlines, and none once
+    /// the game is over.
+    tick(key = null) {
+      if (!entries.length || (key !== null && !spec?.writers.has(key)) || said) return null;
+      if (ticksInARow >= ticksInARowMost || now() - lastAt() < tickGapMs) return null;
+      return appendNote({});
     },
   };
 }

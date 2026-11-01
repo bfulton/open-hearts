@@ -27,18 +27,10 @@ void main() {
     expect(appRelays(base: Uri(), web: false), [Uri.parse(ourRelay)]);
   });
 
-  test('ours are pinned first, a local relay is not', () {
-    expect(pinnedRelays(appRelays(base: Uri.parse('https://play.openhearts.game/'), web: true)), 1);
-    expect(pinnedRelays(appRelays(base: Uri.parse('http://localhost:8080/'), web: true)), 0);
-    // The browser rig's stand-in for play.openhearts.game is this machine.
-    expect(appRelays(base: Uri.parse('http://play.openhearts.localhost:8080/'), web: true), [Uri.parse(localRelay)]);
-    expect(pinnedRelays(const []), 0);
-  });
-
   test('a table, a pool, the results and presence each reach the object for their own tag', () {
     final deployed = appRelays(base: Uri.parse('https://play.openhearts.game/'), web: true);
     for (final tag in ['mf66d4537', 'queue:anyone', 'results', 'KP4T9MXR']) {
-      final t = RelayTransport(relays: deployed, signer: FakeSigner('t'), table: tag, pinned: pinnedRelays(deployed));
+      final t = RelayTransport(relays: deployed, signer: FakeSigner('t'), table: tag);
       addTearDown(t.close);
       expect(t.relays.single.host, 'relay.openhearts.game');
       expect(t.relays.single.pathSegments.single, tag, reason: 'the tag written in, not the mark');
@@ -51,7 +43,7 @@ void main() {
     // presence, which takes nothing but presence.
     final local = appRelays(base: Uri.parse('http://localhost:8080/?relay=40123'), web: true);
     for (final tag in ['mf66d4537', 'queue:anyone', 'results', 'KP4T9MXR']) {
-      final t = RelayTransport(relays: local, signer: FakeSigner('t'), table: tag, pinned: pinnedRelays(local));
+      final t = RelayTransport(relays: local, signer: FakeSigner('t'), table: tag);
       addTearDown(t.close);
       expect((t.relays.single.host, t.relays.single.port), ('127.0.0.1', 40123));
       expect(t.relays.single.pathSegments.single, tag, reason: 'the tag written in, not the mark');
@@ -61,6 +53,8 @@ void main() {
   test('served from localhost, the local relay', () {
     expect(appRelays(base: Uri.parse('http://localhost:8080/'), web: true), [Uri.parse(localRelay)]);
     expect(appRelays(base: Uri.parse('http://127.0.0.1:41234/?e2e=1'), web: true), [Uri.parse(localRelay)]);
+    // The browser rig's stand-in for play.openhearts.game is this machine.
+    expect(appRelays(base: Uri.parse('http://play.openhearts.localhost:8080/'), web: true), [Uri.parse(localRelay)]);
   });
 
   test('served from localhost, the local relay at the port the address names', () {

@@ -46,20 +46,22 @@ export const SERVICE_DEFAULTS = Object.freeze({
   ticketReuseMinutes: 2,
   turnTtlS: 4 * 60 * 60,
   // How far a request's second may be from ours: clocks drift, and a
-  // phone out by more than this is told so — in words that say five
-  // minutes, which the app knows the refusal by (app/lib/net/
-  // household.dart): a change here is a change there.
+  // phone out by more than this is told so, in words that say five
+  // minutes whatever this is, since the app knows the refusal by them
+  // (refusals.mjs, clockOff).
   requestToleranceS: 300,
   // How old a webhook's own timestamp may be: a replay is not a payment.
   webhookToleranceS: 300,
-  // What one account may do in an hour: changes (a code, a claim, a
-  // drop) and readings of its list. Adding a phone takes a handful.
+  // What one account may do in an hour: changes (a code, a drop) and
+  // readings of its list. Devices coming in (a claim) have as many
+  // again of their own. Adding a phone takes a handful.
   householdChangesPerHour: 20,
   householdReadsPerHour: 60,
   // What one account's devices may ask of the account's turn in an hour
   // to be the one in use, or the relay on their behalf: an opening, a
   // renewal every twenty minutes, a word at each table sat at, and the
-  // relay asking at every socket a device opens.
+  // relay asking at every socket a device opens (not counted when the
+  // activation it asks about is no longer the one in use).
   activationsPerHour: 600,
   // How often one account's profile may be written in an hour: the app
   // writes it once each time the profile page is left changed, so this
@@ -117,11 +119,11 @@ let settings = SERVICE_DEFAULTS;
 let settledAt = -Infinity;
 
 /// What the service runs by now.
-export const S = () => settings;
+export const serviceSettings = () => settings;
 
 /// Reads the row if this isolate has not lately; a store that is down,
 /// or no store, is the defaults. Called at the top of every request.
-export async function settle(env, { now = Date.now() } = {}) {
+export async function loadServiceSettings(env, { now = Date.now() } = {}) {
   if (now - settledAt < SETTINGS_KEPT_MS) return settings;
   settledAt = now;
   let raw = null;
@@ -134,7 +136,7 @@ export async function settle(env, { now = Date.now() } = {}) {
   return settings;
 }
 
-/// For a test: these settings, until the next [settle] that reads.
+/// For a test: these settings, until the next [loadServiceSettings] that reads.
 export function useSettings(next = {}) {
   settings = Object.freeze({ ...SERVICE_DEFAULTS, ...next });
   settledAt = Infinity;

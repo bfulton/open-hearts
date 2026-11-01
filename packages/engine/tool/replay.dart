@@ -24,7 +24,7 @@ void main(List<String> args) {
     print('not a record');
     return;
   }
-  final names = [for (var s = 0; s < seatCount; s++) s == record.humanSeat ? 'You' : record.personas[s]];
+  final names = [for (var s = 0; s < seatCount; s++) s == humanSeat ? 'You' : record.personas[s]];
   print('seed ${record.dealSeed ?? record.seed}: ${names.join(', ')}${record.target == gameOverScore ? '' : ', to ${record.target}'}');
   final replay = record.replay();
   for (final h in replay.hands) {

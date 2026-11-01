@@ -928,10 +928,6 @@
   "@cropHelp": {
     "description": "How to crop the photo."
   },
-  "pictureFlagged": "This device thought this picture was one you would not want at the table. It is a guess, made here, and it can be wrong.",
-  "@pictureFlagged": {
-    "description": "When another player's picture has been hidden automatically."
-  },
   "showPicture": "Show {name}'s picture",
   "@showPicture": {
     "description": "Button: show another player's picture.",

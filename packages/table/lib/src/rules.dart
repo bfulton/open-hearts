@@ -85,8 +85,9 @@ enum TableState {
   ended,
 
   /// A turn of the house's ran out: the operator's service stopped
-  /// answering, and nobody else can play a bot seat's cards. Nobody is
-  /// rated.
+  /// answering, and nobody else can play a bot seat's cards. Or the
+  /// house said it will not serve the table ([TableRules.refusal]).
+  /// Nobody is rated.
   failed,
 }
 
@@ -123,6 +124,7 @@ class TableRules {
     this.worker,
     this.random,
     this.trace,
+    this.readsOldPasses = false,
   });
 
   /// The table the log is for: the start must name it.
@@ -131,9 +133,9 @@ class TableRules {
   /// The deal's primitives, for a sealed table.
   final DealCrypto? crypto;
 
-  /// The key this side acts with — a person's, or the house's — or null
-  /// for a side that only follows: the house watching a table, a
-  /// verifier.
+  /// The key this side acts with — a person's, or the house's, which
+  /// also holds a piece of every person's escrow — or null for a
+  /// verifier, which only reads.
   final PublicKey? myKey;
 
   /// The seat this side holds the deal secret of, where it holds one:
@@ -164,6 +166,12 @@ class TableRules {
 
   final void Function(String line)? trace;
 
+  /// Whether the deal also reads a pass as passes were made before a
+  /// token's proof was hidden (`DealSession.readsOldPasses`). For the
+  /// verifier of a record, which has to check games kept then; a table
+  /// plays none.
+  final bool readsOldPasses;
+
   // ---- what the log has said ---------------------------------------------
 
   /// The spec, from the log's start.
@@ -182,9 +190,28 @@ class TableRules {
   bool get over => _state == TableState.finished || _state == TableState.ended || _state == TableState.failed;
 
   /// The house's word on how the game came out, once it is in the log
-  /// and names the log as it stood when the game ended.
+  /// and names the log as it stood when the game ended; or its word that
+  /// it will not serve the table ([refusal]).
   TableEvent? get result => _result;
   TableEvent? _result;
+
+  /// The house's word that it will not serve a table: a result that says
+  /// failed and names the log as it stood after its start alone. The
+  /// house says it as it reads the start, and cannot know where in the
+  /// log the word will land, so it names what it has read; whatever came
+  /// in between changes nothing about the word. A table the house refuses
+  /// ends there, failed and unrated, at every side alike, and the
+  /// referee, which asks for the house until it has said a result, stops
+  /// asking (service/do/referee.mjs). Taken only from the house and only
+  /// while the table is being played: a table that has ended on its own
+  /// keeps its end. Its totals are zero and unread. Null before the
+  /// log's start.
+  Map<String, Object?>? get refusal => _startHash == null
+      ? null
+      : {'n': 1, 'hash': _startHash, 'state': TableState.failed.name, 'totals': List.filled(seatCount, 0)};
+
+  /// The log's hash as it stood after its start.
+  String? _startHash;
 
   /// How many entries the log had, and its hash, when the game ended:
   /// what the house's result has to name.
@@ -298,6 +325,16 @@ class TableRules {
   String? get cannotDeal => _cannotDeal;
   String? _cannotDeal;
 
+  /// This side's deal worker failed for good, [why], at one of its jobs:
+  /// one of these rules' own, or one for this side's own step of the deal
+  /// (client.dart). Every job fails from then on (work.dart), so this
+  /// side can deal no more.
+  void workerFailed(Object why) {
+    _cannotDeal = '$why';
+    trace?.call('cannot deal: $why');
+    onChange?.call();
+  }
+
   late final PreparedDeal? _prepared = worker == null || crypto == null ? null : PreparedDeal(crypto!);
 
   /// Takes the entries in order, as they come: an entry out of order is
@@ -362,11 +399,7 @@ class TableRules {
         _deal?.resume();
         _settledSince = true;
         _pump();
-      }, failed: (why) {
-        _cannotDeal = '$why';
-        trace?.call('cannot deal: $why');
-        onChange?.call();
-      });
+      }, failed: workerFailed);
     }
     return all;
   }
@@ -411,8 +444,8 @@ class TableRules {
     if (e.down != null) _down[e.down!] = e.t;
     final ev = e.event;
     if (ev != null) _takeEvent(ev);
-    // Logged by the referee, which checks a signature on an id and no
-    // more, and read by no side: it changes nothing, and says so.
+    // Logged by the referee and read by no side: it changes nothing,
+    // and says so.
     final unread = e.unread;
     if (unread != null) trace?.call('entry #${e.n} does not read as an event (${unread['kind']} by ${'${unread['author']}'.padRight(6).substring(0, 6)}), and changes nothing');
     _settledSince = true;
@@ -427,6 +460,7 @@ class TableRules {
       return;
     }
     _spec = spec;
+    _startHash = hash.value;
     _now = e.t;
     _holders = List.of(spec.seats);
     _game = HeartsGame(seed: spec.seed, sealed: spec.sealed, target: spec.target);
@@ -444,6 +478,16 @@ class TableRules {
     _result = ev;
   }
 
+  /// The house's word that it will not serve the table ([refusal]): the
+  /// table fails here. A word that says anything else at a table being
+  /// played is not read.
+  void _takeRefusal(TableEvent ev) {
+    final body = refusal!;
+    if (ev.author != _spec!.house || ev.body['n'] != body['n'] || ev.body['hash'] != body['hash'] || ev.body['state'] != body['state']) return;
+    _result = ev;
+    _fail();
+  }
+
   void _takeEvent(TableEvent ev) {
     final spec = _spec!;
     if (ev.table != spec.id) return;
@@ -457,7 +501,9 @@ class TableRules {
         _takeRelease(ev);
       case EventKind.deal || EventKind.pass || EventKind.play:
         _takeMove(ev);
-      case EventKind.start || EventKind.result:
+      case EventKind.result:
+        _takeRefusal(ev);
+      case EventKind.start:
         break;
     }
   }
@@ -703,6 +749,7 @@ class TableRules {
       // bot seat the house holds escrows to nobody, since nobody else
       // may see its cards.
       custodians: me != null && _dealtTo[me] is HumanSeat ? [house] : const [],
+      readsOldPasses: readsOldPasses,
       mySecret: secret,
       random: random,
     )..log = (l) => trace?.call('deal: $l');
@@ -924,16 +971,6 @@ class TableRules {
     return null;
   }
 
-  /// Where the lead card is for [hand], as the table has it: the seat
-  /// that leads the first trick, passes counted.
-  int? leaderOf(int hand) {
-    final d = _deals[hand];
-    if (d == null) return null;
-    if (hand != game.handNumber) return d.leader;
-    final lead = _leadPosition(d);
-    return lead == null ? null : d.holderOf(lead);
-  }
-
   /// Whether [seat] owes the hand its audit: a keyed seat somebody still
   /// takes the turns of, whose secret the log has not had yet.
   bool _owesAudit(int seat) => _keyed(seat) && actorOf(seat) != null && !_progress.audited.contains(seat);
@@ -1072,7 +1109,6 @@ class TableRules {
         1 => d.acceptShuffle(b, verified: true),
         2 => d.acceptTokens(b, verified: true),
         3 => d.acceptDeclaration(b, verified: true),
-        4 => d.acceptAudit(b, verified: true),
         _ => false,
       };
 
@@ -1148,9 +1184,9 @@ class TableRules {
     if (_try((d) => d.acceptRelease(b))) taken.add(ev);
   }
 
-  /// The card a bot plays at [seat] where [g] stands, with [played] the
-  /// cards played this hand before it.
-  static Card botCard(HeartsGame g, int seat, Set<Card> played, {Persona? persona, List<SeatHolder>? holders}) {
+  /// The card [persona], a bot at [seat], plays where [g] stands, with
+  /// [played] the cards played this hand before it.
+  static Card botCard(HeartsGame g, int seat, Set<Card> played, Persona persona) {
     final view = BotView(
       seat: seat,
       hand: g.handOf(seat),
@@ -1160,10 +1196,10 @@ class TableRules {
       isFirstTrick: g.isFirstTrick,
       taken: g.taken,
     );
-    return Bot(persona: persona ?? (holders![seat] as BotSeat).persona).chooseCard(view, g.legalPlaysFor(seat));
+    return Bot(persona: persona).chooseCard(view, g.legalPlaysFor(seat));
   }
 
-  Card _botCardHere(HeartsGame g, int seat, Set<Card> played) => botCard(g, seat, played, holders: _holders);
+  Card _botCardHere(HeartsGame g, int seat, Set<Card> played) => botCard(g, seat, played, (_holders[seat] as BotSeat).persona);
 
   /// What every side sees of the table now, alike: whose turns are open
   /// and since when, who holds the seats and who has gone, the hand and

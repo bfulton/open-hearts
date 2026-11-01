@@ -23,7 +23,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show LengthLimitingTextInputFormatter;
 import 'package:image/image.dart' as img;
 import 'package:image_picker/image_picker.dart';
-import 'package:table/table.dart' show Pace, Tally;
+import 'package:table/table.dart' show Pace, Tally, cleanName, longestName;
 
 import 'avatar.dart';
 import 'entitlement.dart';
@@ -151,7 +151,7 @@ class _ProfilePageState extends State<ProfilePage> {
   @override
   void initState() {
     super.initState();
-    _opened = (name: Identity.nameOf(_name.text), avatar: _avatar);
+    _opened = (name: cleanName(_name.text), avatar: _avatar);
     _watch();
     if (widget.current == null) unawaited(_readDevice());
     AccountProfile.current.addListener(_reprofiled);
@@ -160,7 +160,7 @@ class _ProfilePageState extends State<ProfilePage> {
   /// Another device of the account changed the profile while this page
   /// was open: shown here too, unless something has been changed here.
   void _reprofiled() {
-    if ((name: Identity.nameOf(_name.text), avatar: _avatar) == _opened) unawaited(_readDevice());
+    if ((name: cleanName(_name.text), avatar: _avatar) == _opened) unawaited(_readDevice());
   }
 
   /// Who this device is, when nobody said: opened by its address.
@@ -172,7 +172,7 @@ class _ProfilePageState extends State<ProfilePage> {
     setState(() {
       _name.text = name ?? '';
       _avatar = avatar;
-      _opened = (name: Identity.nameOf(_name.text), avatar: avatar);
+      _opened = (name: cleanName(_name.text), avatar: avatar);
       // The account's colour, the one every table shows it in.
       _seed = widget.seed ?? Entitlement.current.licence?.account ?? signer.publicKey;
     });
@@ -256,10 +256,8 @@ class _ProfilePageState extends State<ProfilePage> {
       },
       child: Scaffold(
         backgroundColor: Felt.dark,
-        appBar: AppBar(
-          backgroundColor: Colors.transparent,
-          foregroundColor: Palette.chromeDim,
-          title: Text(context.l10n.yourProfile, style: const TextStyle(fontSize: 16, color: Palette.chromeDim)),
+        appBar: pageBar(
+          context.l10n.yourProfile,
           actions: [
             TextButton(
               onPressed: _done,
@@ -304,7 +302,7 @@ class _ProfilePageState extends State<ProfilePage> {
                   // is still a picture of something.
                   onChanged: (_) => setState(() {}),
                   // No longer than a table carries, or the account keeps.
-                  inputFormatters: [LengthLimitingTextInputFormatter(Identity.longestName)],
+                  inputFormatters: [LengthLimitingTextInputFormatter(longestName)],
                   style: const TextStyle(color: Palette.chrome, fontSize: 16),
                 ),
                 const SizedBox(height: 20),
@@ -396,7 +394,7 @@ class _ProfilePageState extends State<ProfilePage> {
   Future<void> _done() async {
     // A name the others may not see is not kept: the one the page
     // opened with stays, if they may see that.
-    final typed = Identity.nameOf(_name.text);
+    final typed = cleanName(_name.text);
     final chosen = (name: nameRefused(typed) ? Identity.playable(_opened.name) : typed, avatar: _avatar);
     if (chosen != _opened) {
       await AccountProfile.current.keep(chosen.name, chosen.avatar);
@@ -406,7 +404,7 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   /// Whether the name typed is one the filter refuses (names.dart).
-  bool get _refused => nameRefused(Identity.nameOf(_name.text));
+  bool get _refused => nameRefused(cleanName(_name.text));
 
   /// What the badge in the sheet wears while there is nothing to go on.
   String get _shownName => _name.text.trim().isEmpty ? '?' : _name.text.trim();
@@ -428,7 +426,6 @@ class _ProfilePageState extends State<ProfilePage> {
   );
 }
 
-/// A quiet label over a section.
 /// How long you take over a card, and what it does.
 ///
 /// Measured by this device from its own turns and kept on it: it is the
@@ -483,13 +480,8 @@ class _Record extends StatelessWidget {
       children: [
         SectionHeading(l10n.rating),
         const SizedBox(height: 10),
-        Container(
+        Panel(
           padding: const EdgeInsets.symmetric(vertical: 16),
-          decoration: BoxDecoration(
-            color: Colors.black.withValues(alpha: 0.13),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-          ),
           child: Column(
             children: [
               Text(
@@ -582,13 +574,9 @@ class _Tile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Expanded(
-        child: Container(
+        child: Panel(
           padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 6),
-          decoration: BoxDecoration(
-            color: Colors.black.withValues(alpha: 0.13),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-          ),
+          radius: 12,
           child: Column(
             children: [
               Text('$value',

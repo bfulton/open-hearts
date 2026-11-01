@@ -38,32 +38,27 @@ import '../pictures.dart';
 import '../reaction_mute.dart';
 import '../table_model.dart';
 
-class LiveController extends ChangeNotifier implements TableModel {
+class LiveController extends ChangeNotifier with TableModel {
   LiveController({
     required TableSpec spec,
     required this.seatNames,
     this.seatAvatars = const {},
     required Signer signer,
     required RefereeLine line,
-    String Function()? lineHealth,
     Clock? clock,
     DealCrypto? crypto,
     DealWorker? dealWorker,
     this.ratingOf,
     this.onResult,
     this.pictures,
-    this.paced = true,
     this.canPlayAgain = false,
     this.strangers = false,
     TableJournal? journal,
     Random? random,
     ReactionLane? reactions,
-    ValueListenable<bool>? reactionMute,
     int Function()? screenClock,
     void Function(String line)? trace,
   })  : _lane = reactions,
-        _lineHealth = lineHealth ?? (() => line is RelayLine ? line.health : ''),
-        _mute = reactionMute ?? ReactionMute.current,
         _screenClock = screenClock ?? _wallMs,
         _trace = trace,
         _reactionRules = ReactionRules(now: screenClock),
@@ -80,7 +75,11 @@ class LiveController extends ChangeNotifier implements TableModel {
             trace: trace) {
     _shown = HeartsGame(seed: spec.seed, sealed: spec.sealed, target: spec.target);
     _shownHolders = List.of(spec.seats);
-    client.rules.onFrame = (frame) => _frames.add((frame: frame, paced: client.caughtUp));
+    // Once the seat is gone nothing more is shown ([_next]), so nothing
+    // more is kept to show.
+    client.rules.onFrame = (frame) {
+      if (client.amSeated) _frames.add((frame: frame, paced: client.caughtUp));
+    };
     _sub = client.changes.listen((_) => _onChange());
     pictures?.addListener(_pictured);
     _heardReactions = reactions?.reactions.listen(_heardReaction);
@@ -126,12 +125,9 @@ class LiveController extends ChangeNotifier implements TableModel {
   /// every picture alone.
   final Pictures? pictures;
 
-  /// Whether the view is paced. Tests turn it off.
-  final bool paced;
-
-  /// Whether the front door knows how this game began, and so can begin
-  /// another the same way: the pool it was drawn from, or the room it
-  /// was started in. A table come back to after a reload does not.
+  /// Whether the lobby can start another game the same way (same pool
+  /// or room). False for a table reopened after a reload, which has no
+  /// `again` callback (lobby.dart).
   final bool canPlayAgain;
 
   /// Whether Play live seated this table, with strangers, rather than a
@@ -199,11 +195,11 @@ class LiveController extends ChangeNotifier implements TableModel {
 
   final void Function(String line)? _trace;
 
-  /// This player's turn as this device met it, for the trace: which,
-  /// when the referee opened it, and by the wall clock when the table
-  /// here first owed it and when the screen first offered it. The
-  /// referee's time and this device's are one machine's in the browser
-  /// suites; elsewhere their difference is the clocks' too.
+  /// Timing of this player's current turn, for the debug trace: `since`
+  /// is when the referee opened it (the referee's clock); `here` and
+  /// `shown` are this device's wall-clock ms when the table first owed
+  /// it and when the screen first offered it. Outside the browser
+  /// suites the deltas include any skew between the two clocks.
   ({TurnId turn, int since, int here, int? shown})? _met;
   bool _metSaid = false;
 
@@ -308,7 +304,7 @@ class LiveController extends ChangeNotifier implements TableModel {
       while (!_disposed) {
         final step = _next();
         if (step == null) break;
-        if (paced && step.delay > Duration.zero) {
+        if (step.delay > Duration.zero) {
           await _wait(step.delay);
           if (_disposed) return;
         }
@@ -408,11 +404,15 @@ class LiveController extends ChangeNotifier implements TableModel {
   // ---- this device's line ------------------------------------------------
 
   /// The line in a few words, for a report of it ([RelayLine.health]).
-  final String Function() _lineHealth;
+  String get _lineHealth {
+    final line = client.line;
+    return line is RelayLine ? line.health : '';
+  }
 
-  /// Since when this device's line to the referee has been down, while
-  /// it is — from the table's opening, until it is first up — and
-  /// whether it has been up since the table opened.
+  /// When this device's line to the referee went down, or null while it
+  /// is up. Set at construction, so the time before the first connect
+  /// counts as down. [_wasUp] is whether the line has been up since the
+  /// table opened.
   int? _downSince;
   bool _wasUp = false;
   Cancel? _downTimer;
@@ -444,12 +444,12 @@ class LiveController extends ChangeNotifier implements TableModel {
   void _watchLine() {
     if (client.state == TableState.failed && !_toldLost) {
       _toldLost = true;
-      reportLine('game lost: the house let a turn run out', table: spec.id, account: _seen, line: _lineHealth());
+      reportLine('game lost: the house let a turn run out', table: spec.id, seen: _seen, line: _lineHealth);
     }
     final cannotDeal = client.cannotDeal;
     if (cannotDeal != null && !_toldCannotDeal) {
       _toldCannotDeal = true;
-      reportLine('cannot deal: $cannotDeal', table: spec.id, account: _seen, line: _lineHealth());
+      reportLine('cannot deal: $cannotDeal', table: spec.id, seen: _seen, line: _lineHealth);
     }
     if (!client.lineDown) {
       _wasUp = true;
@@ -491,7 +491,7 @@ class LiveController extends ChangeNotifier implements TableModel {
       if (_disposed || since == null) return;
       if (!_toldDown && client.clock.nowMs - since >= downTooLongMs && client.lineDown) {
         _toldDown = true;
-        reportLine('line down ${(client.clock.nowMs - since) ~/ 1000} s', table: spec.id, account: _seen, line: _lineHealth());
+        reportLine('line down ${(client.clock.nowMs - since) ~/ 1000} s', table: spec.id, seen: _seen, line: _lineHealth);
       }
       notifyListeners();
       _armDown();
@@ -549,17 +549,15 @@ class LiveController extends ChangeNotifier implements TableModel {
   /// and in no signed record (packages/table, pace.dart).
   final List<int> myCardMs = [];
 
-  /// A seat's name with its rating: "Roxane 1520". The rating is the
+  /// A seat's name with its [rating]: "Roxane 1520". The rating is the
   /// seat's as dealt — a bot that took over a leaver's seat shows the
   /// leaver's, since that is whose result it still is.
-  String nameWithRating(int seat) {
-    final r = ratingOf;
-    if (r == null) return _plainName(seat);
+  String _nameWithRating(int seat, Rating Function(String id) rating) {
     final id = switch (spec.seats[seat]) {
       HumanSeat(:final account) => account,
       BotSeat(:final persona) => persona.id,
     };
-    return '${_plainName(seat)} ${r(id).shown}';
+    return '${_plainName(seat)} ${rating(id).shown}';
   }
 
   void dismissHandSheet() {
@@ -578,15 +576,12 @@ class LiveController extends ChangeNotifier implements TableModel {
   @override
   int get mySeat => client.mySeat ?? 0;
 
-  @override
-  int positionOf(int seat) => (seat - mySeat + seatCount) % seatCount;
-
-  @override
-  int seatAt(int position) => (position + mySeat) % seatCount;
-
   /// Names, and on a rated table each name with its rating.
   @override
-  List<String> get names => [for (var s = 0; s < seatCount; s++) ratingOf == null ? _plainName(s) : nameWithRating(s)];
+  List<String> get names {
+    final rating = ratingOf;
+    return [for (var s = 0; s < seatCount; s++) rating == null ? _plainName(s) : _nameWithRating(s, rating)];
+  }
 
   /// The words the table speaks in: the page sets them from the app's
   /// language (l10n/l10n.dart), and they are English until it does.
@@ -737,15 +732,14 @@ class LiveController extends ChangeNotifier implements TableModel {
     final picture = avatar.picture;
     final pictures = this.pictures;
     if (picture == null || pictures == null) return avatar;
-    return pictures.allows(key, picture) ? avatar : avatar.copyWith(clearPicture: true);
+    return pictures.allows(key) ? avatar : avatar.copyWith(clearPicture: true);
   }
 
   /// Who holds [seat], for the sheet holding their badge opens: their
   /// account, their name and the picture they chose, as they chose
-  /// them, whether this device blocked them, and whether it hides their
-  /// picture — by the viewer's choice, or the check's. Null for a bot
-  /// and for your own seat.
-  ({String key, String name, Uint8List? picture, bool blocked, bool hidden, bool flagged})? playerAt(int seat) {
+  /// them, whether this device blocked them, and whether the viewer hid
+  /// their picture. Null for a bot and for your own seat.
+  ({String key, String name, Uint8List? picture, bool blocked, bool hidden})? playerAt(int seat) {
     final holder = _shownHolders[seat];
     if (holder is! HumanSeat || seat == mySeat) return null;
     final picture = (seatAvatars[seat] ?? Avatar.none).picture;
@@ -756,7 +750,6 @@ class LiveController extends ChangeNotifier implements TableModel {
       picture: picture,
       blocked: _blocked(holder.account),
       hidden: picture != null && pictures != null && pictures.isHidden(holder.account),
-      flagged: picture != null && pictures != null && pictures.wasFlagged(holder.account, picture),
     );
   }
 
@@ -767,7 +760,9 @@ class LiveController extends ChangeNotifier implements TableModel {
   static const leaveBeat = Duration(milliseconds: 600);
   bool _left = false;
 
-  /// Whether this device left the table, by its own word.
+  /// Whether the player left the table by their own word. Unlike
+  /// [TableClient.left], not set when the client leaves by itself
+  /// because this device cannot deal.
   bool get left => _left;
 
   /// Seated in a game still going: leaving now gives the seat to a bot
@@ -858,7 +853,7 @@ class LiveController extends ChangeNotifier implements TableModel {
   StreamSubscription<HeardReaction>? _heardReactions;
 
   /// Whether this device hides the others' reactions (reaction_mute.dart).
-  final ValueListenable<bool> _mute;
+  final ValueListenable<bool> _mute = ReactionMute.current;
 
   /// What is showing at each seat, and when it goes.
   final Map<int, ({SeatReaction shown, Timer gone})> _reacting = {};

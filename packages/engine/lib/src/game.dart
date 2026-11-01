@@ -17,6 +17,7 @@
 /// without seeing them. The rest is the audit's, at the end of the hand.
 library;
 
+import 'dart:collection';
 import 'dart:math';
 
 import 'card.dart';
@@ -88,6 +89,7 @@ class HeartsGame {
     _hands = [for (final h in g._hands) h == null ? null : List.of(h)];
     _sizes = List.of(g._sizes);
     _trick.addAll(g._trick);
+    _played.addAll(g._played);
     final pending = g._pendingTrick;
     _pendingTrick = pending == null ? null : (plays: List.of(pending.plays), winner: pending.winner);
     _lastTrick = g._lastTrick;
@@ -169,6 +171,11 @@ class HeartsGame {
   List<Play> get trick => List.unmodifiable(_trick);
   final List<Play> _trick = [];
 
+  /// Every card played this hand, the trick on the table included: what
+  /// a bot reads to know whether the queen is still out (BotView.of).
+  Set<Card> get playedThisHand => UnmodifiableSetView(_played);
+  final Set<Card> _played = {};
+
   /// The finished trick still sitting on the table, waiting for
   /// [collectTrick]. Null whenever the table is live.
   ({List<Play> plays, int winner})? get pendingTrick => _pendingTrick;
@@ -228,6 +235,7 @@ class HeartsGame {
     _passed = List.filled(seatCount, false);
     _received = [for (var s = 0; s < seatCount; s++) <Card>[]];
     _trick.clear();
+    _played.clear();
     _pendingTrick = null;
     _lastTrick = const [];
     _tricksPlayed = 0;
@@ -458,37 +466,44 @@ class HeartsGame {
   }
 
   /// Whether [card] can be [play]ed by [seat] now, as far as this side
-  /// can tell: the full rules over a hand it sees, [legalFromHidden]
-  /// over one it does not.
+  /// can tell: the full rules over a hand it sees; over one it does not,
+  /// a card the hand can still be holding ([_notInHidden]) that
+  /// [legalFromHidden] lets it play. True exactly when [play] takes it.
   bool allows(int seat, Card card) {
     if (currentSeat != seat) return false;
     final hand = _hands[seat];
-    if (hand == null) return legalFromHidden(card: card, trick: _trick, isFirstTrick: isFirstTrick);
+    if (hand == null) return _notInHidden(seat, card) == null && legalFromHidden(card: card, trick: _trick, isFirstTrick: isFirstTrick);
     return legalPlays(hand: hand, trick: _trick, heartsBroken: _heartsBroken, isFirstTrick: isFirstTrick).contains(card);
   }
 
+  /// Why [card] cannot be in [seat]'s hand, one this side does not see,
+  /// or null when it can be: the seat has no cards left, the card has
+  /// been played this hand, or it is in a hand this side sees.
+  String? _notInHidden(int seat, Card card) {
+    if (_sizes[seat] == 0) return 'seat $seat has no cards';
+    if (_played.contains(card)) return '$card has been played this hand';
+    for (var s = 0; s < seatCount; s++) {
+      if (_hands[s]?.contains(card) == true) return '$card is in seat $s\'s hand, not seat $seat\'s';
+    }
+    return null;
+  }
+
   /// Plays [card] from [seat]. Throws [StateError] out of turn and
-  /// [ArgumentError] on an illegal card — an illegal play is a bug in the
-  /// caller, never a rule the engine quietly bends. From a hidden hand
-  /// the card is checked as far as the rules allow without the hand.
+  /// [ArgumentError] on a card [allows] refuses — an illegal play is a
+  /// bug in the caller, never a rule the engine quietly bends. From a
+  /// hidden hand the card is checked as far as can be without the hand.
   void play(int seat, Card card) {
     if (currentSeat != seat) {
       throw StateError('not seat $seat\'s turn (current: $currentSeat)');
     }
-    if (!allows(seat, card)) {
-      throw ArgumentError('$card is not a legal play for seat $seat');
-    }
     final hand = _hands[seat];
-    if (hand == null) {
-      if (_sizes[seat] == 0) throw StateError('seat $seat has no cards');
-      for (var s = 0; s < seatCount; s++) {
-        if (_hands[s]?.contains(card) == true) throw ArgumentError('$card is in seat $s\'s hand, not seat $seat\'s');
-      }
-    } else {
-      hand.remove(card);
+    if (!allows(seat, card)) {
+      throw ArgumentError(hand == null ? (_notInHidden(seat, card) ?? '$card is not a legal play for seat $seat') : '$card is not a legal play for seat $seat');
     }
+    hand?.remove(card);
     _sizes[seat]--;
     _trick.add(Play(seat, card));
+    _played.add(card);
     if (card.suit == Suit.hearts) _heartsBroken = true;
     if (_trick.length == seatCount) {
       _pendingTrick = (plays: List.of(_trick), winner: trickWinner(_trick));

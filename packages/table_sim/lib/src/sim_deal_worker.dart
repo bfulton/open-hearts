@@ -24,16 +24,6 @@ class SimDealWorker implements DealWorker {
   @override
   bool dead = false;
 
-  /// A worker that has stopped: every job sent from here on is taken
-  /// and never answered — until the stall is noticed and the worker
-  /// replaced, and the replacement stalls in turn and is given up on:
-  /// two stalls ([DealWorker.stallTick] × [DealWorker.stallTicks]) on,
-  /// what is waiting fails, and the worker is dead.
-  bool hung = false;
-
-  final List<void Function(Object)> _hanging = [];
-  bool _stallCounted = false;
-
   /// Jobs made, for tests.
   int made = 0;
 
@@ -55,22 +45,6 @@ class SimDealWorker implements DealWorker {
   @override
   void run(DealJob job, {required void Function(Object answer) done, required void Function(Object error) failed}) {
     if (_closed || dead) return failed(_closed ? 'closed' : 'the simulated worker is dead');
-    if (hung) {
-      _hanging.add(failed);
-      if (!_stallCounted) {
-        _stallCounted = true;
-        final stall = DealWorker.stallTick.inMilliseconds * DealWorker.stallTicks;
-        clock.schedule(2 * stall, () {
-          dead = true;
-          final hanging = List.of(_hanging);
-          _hanging.clear();
-          for (final f in hanging) {
-            f('the simulated worker stalled, and so did its replacement');
-          }
-        });
-      }
-      return;
-    }
     final start = clock.nowMs > _freeAt ? clock.nowMs : _freeAt;
     _freeAt = start + costMs(job);
     final answer = job.run(crypto);

@@ -1,0 +1,8 @@
+{
+  "name": "open-hearts-wrangler",
+  "private": true,
+  "description": "Wrangler, as every deploy and every secret is run with: this version, its whole dependency tree locked in package-lock.json (ops/wrangler/wrangler).",
+  "dependencies": {
+    "wrangler": "4.130.0"
+  }
+}

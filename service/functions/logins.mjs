@@ -3,6 +3,7 @@
 // turn.
 
 import { accountOfKey } from './accounts.mjs';
+import { REFUSED } from './refusals.mjs';
 import { dayOf, hex, isAccount } from './rows.mjs';
 import { notConfigured } from './settings.mjs';
 
@@ -33,11 +34,11 @@ export async function attest(who, key, store, login, { now = Date.now() } = {}) 
   if (!login) return { status: 503, body: notConfigured('OH_ID_HMAC') };
   const today = dayOf(now);
   const account = await accountOfKey(store, key);
-  if (!account || !(await store.get(`ACCOUNT#${account}`, `DEVICE#${key}`))) return { status: 402, body: { error: 'no subscription' } };
+  if (!account || !(await store.get(`ACCOUNT#${account}`, `DEVICE#${key}`))) return { status: 402, body: { error: REFUSED.noSubscription } };
   const linked = await linkedAccount(store, login);
-  if (linked && linked !== account) return { status: 409, body: { error: 'that sign-in is linked to another account' } };
+  if (linked && linked !== account) return { status: 409, body: { error: REFUSED.accountElsewhere } };
   const mine = await store.get(`ACCOUNT#${account}`, 'LOGIN');
-  if (mine && mine.login !== login) return { status: 409, body: { error: 'this account is linked to another sign-in' } };
+  if (mine && mine.login !== login) return { status: 409, body: { error: REFUSED.otherSignIn } };
   const held = await store.get(login, 'IDENTITY');
   if (!isAccount(held?.account)) await store.put(login, 'IDENTITY', { account, created_at: held?.created_at ?? today });
   // What the account carries is which provider, and the row's own

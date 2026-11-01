@@ -72,8 +72,12 @@ class PlayerIcon extends StatelessWidget {
     final Widget face;
     if (picture != null) {
       face = ClipOval(
-        child: Image.memory(
-          picture,
+        // Decoded no bigger than a picture the app makes (Avatar.side
+        // square), whatever size another device's JPEG says it is: a
+        // few kilobytes can declare a picture that takes gigabytes
+        // decoded in full. One the app made is left as it is.
+        child: Image(
+          image: ResizeImage(MemoryImage(picture), width: Avatar.side, height: Avatar.side, policy: ResizeImagePolicy.fit),
           width: size,
           height: size,
           fit: BoxFit.cover,
