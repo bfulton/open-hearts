@@ -127,11 +127,7 @@ class _FeedbackPageState extends State<FeedbackPage> {
     final about = _about(context);
     return Scaffold(
       backgroundColor: Felt.dark,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        foregroundColor: Palette.chromeDim,
-        title: Text(l10n.tellUsWhatsBroken, style: const TextStyle(fontSize: 16, color: Palette.chromeDim)),
-      ),
+      appBar: pageBar(l10n.tellUsWhatsBroken),
       body: SingleChildScrollView(
         child: Center(
           child: ConstrainedBox(
@@ -170,8 +166,7 @@ class _FeedbackPageState extends State<FeedbackPage> {
                       title: Text(l10n.feedbackWithRecord, style: const TextStyle(fontSize: 13.5, color: Palette.chrome)),
                     ),
                   const SizedBox(height: 10),
-                  Text(l10n.feedbackSentWithIt,
-                      style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: Palette.chromeDim, letterSpacing: 0.6)),
+                  SectionHeading(l10n.feedbackSentWithIt),
                   const SizedBox(height: 6),
                   // Exactly what goes, in the words it goes in.
                   Container(

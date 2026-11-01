@@ -98,11 +98,7 @@ class _ActivatePageState extends State<ActivatePage> {
     final l10n = context.l10n;
     return Scaffold(
       backgroundColor: Felt.dark,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        foregroundColor: Palette.chromeDim,
-        title: Text(l10n.activateSubscription, style: const TextStyle(fontSize: 16, color: Palette.chromeDim)),
-      ),
+      appBar: pageBar(l10n.activateSubscription),
       body: Center(
         child: SingleChildScrollView(
           child: ConstrainedBox(
@@ -148,12 +144,7 @@ class _ActivatePageState extends State<ActivatePage> {
                   const SizedBox(height: 18),
                   FilledButton(
                     onPressed: _working ? null : _activate,
-                    style: FilledButton.styleFrom(
-                      backgroundColor: Palette.gold,
-                      foregroundColor: Felt.dark,
-                      padding: const EdgeInsets.symmetric(vertical: 13, horizontal: 18),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
+                    style: goldButton,
                     child: _working
                         ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2.2, color: Felt.dark))
                         : Text(l10n.activate, style: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.w700)),
@@ -228,11 +219,7 @@ class _ScanPageState extends State<_ScanPage> {
     final camera = _camera;
     return Scaffold(
       backgroundColor: Colors.black,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        foregroundColor: Palette.chromeDim,
-        title: Text(l10n.scanCode, style: const TextStyle(fontSize: 16, color: Palette.chromeDim)),
-      ),
+      appBar: pageBar(l10n.scanCode),
       body: Column(
         children: [
           Expanded(

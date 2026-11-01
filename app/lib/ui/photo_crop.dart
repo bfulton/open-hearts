@@ -127,10 +127,8 @@ class _PhotoCropState extends State<PhotoCrop> {
     final at = _window;
     return Scaffold(
       backgroundColor: Felt.dark,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        foregroundColor: Palette.chromeDim,
-        title: Text(context.l10n.yourPicture, style: const TextStyle(fontSize: 16, color: Palette.chromeDim)),
+      appBar: pageBar(
+        context.l10n.yourPicture,
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(_window.looking),

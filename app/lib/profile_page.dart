@@ -256,10 +256,8 @@ class _ProfilePageState extends State<ProfilePage> {
       },
       child: Scaffold(
         backgroundColor: Felt.dark,
-        appBar: AppBar(
-          backgroundColor: Colors.transparent,
-          foregroundColor: Palette.chromeDim,
-          title: Text(context.l10n.yourProfile, style: const TextStyle(fontSize: 16, color: Palette.chromeDim)),
+        appBar: pageBar(
+          context.l10n.yourProfile,
           actions: [
             TextButton(
               onPressed: _done,
@@ -483,13 +481,8 @@ class _Record extends StatelessWidget {
       children: [
         SectionHeading(l10n.rating),
         const SizedBox(height: 10),
-        Container(
+        Panel(
           padding: const EdgeInsets.symmetric(vertical: 16),
-          decoration: BoxDecoration(
-            color: Colors.black.withValues(alpha: 0.13),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-          ),
           child: Column(
             children: [
               Text(
@@ -582,13 +575,9 @@ class _Tile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Expanded(
-        child: Container(
+        child: Panel(
           padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 6),
-          decoration: BoxDecoration(
-            color: Colors.black.withValues(alpha: 0.13),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-          ),
+          radius: 12,
           child: Column(
             children: [
               Text('$value',

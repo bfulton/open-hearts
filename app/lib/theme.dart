@@ -72,6 +72,44 @@ class SectionHeading extends StatelessWidget {
       );
 }
 
+/// A page's bar, the same on every page: clear over the felt, its title
+/// and back arrow dim.
+AppBar pageBar(String title, {List<Widget>? actions}) => AppBar(
+      backgroundColor: Colors.transparent,
+      foregroundColor: Palette.chromeDim,
+      title: Text(title, style: const TextStyle(fontSize: 16, color: Palette.chromeDim)),
+      actions: actions,
+    );
+
+/// A box that holds one part of a page: a shade darker than the felt,
+/// with a faint edge.
+class Panel extends StatelessWidget {
+  const Panel({super.key, required this.padding, this.radius = 16, required this.child});
+
+  final EdgeInsetsGeometry padding;
+  final double radius;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: padding,
+        decoration: BoxDecoration(
+          color: Colors.black.withValues(alpha: 0.13),
+          borderRadius: BorderRadius.circular(radius),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+        ),
+        child: child,
+      );
+}
+
+/// The filled gold button: the one thing a screen asks you to do next.
+final goldButton = FilledButton.styleFrom(
+  backgroundColor: Palette.gold,
+  foregroundColor: Felt.dark,
+  padding: const EdgeInsets.symmetric(vertical: 13, horizontal: 18),
+  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+);
+
 ThemeData buildTheme() {
   final base = ThemeData.dark(useMaterial3: true);
   return base.copyWith(
