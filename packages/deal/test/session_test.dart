@@ -408,6 +408,57 @@ void main() {
     expect(p.knowsSecret(3), isTrue, reason: 'two good pieces open it, whatever lies beside them');
   });
 
+  // A v2 game's jury could grow during a hand. Its record's verifier
+  // appends the new jurors to the seat's custodians
+  // (packages/table, legacy/v2_record.dart, growCustodians) and reads
+  // the pieces released in the open, each weighed by its holder's
+  // place in that list.
+  test('a custodian appended after the keys went out counts at the next place: with one original it opens the seat', () {
+    final jury = ['juror0', 'juror1', 'juror2', 'juror3'];
+    const newcomer = 'juror4';
+    final seats = [
+      const HumanDealSeat('a'),
+      const HumanDealSeat('b'),
+      const HumanDealSeat('c'),
+      BotDealSeat(key: jury.first),
+    ];
+    final keys = make(seats, 3, key: jury.first, custodians: jury).myKeys()!;
+    final jurors = [for (final k in jury) make(seats, null, key: k, custodians: jury)];
+    for (final j in jurors) {
+      expect(j.acceptKeys(keys), isTrue);
+      j.seatLeft(3);
+    }
+    Map<String, Object?> released(int place) => jurors[place - 1].releaseShare(3, inTheOpen: true)!;
+
+    // The newcomer's piece at place five, made from the pieces at
+    // places one and three, as a juror brought on mid-hand was given it.
+    const from = [1, 3];
+    final piece = d.bytesSum([
+      for (final i in from) d.bytesScale(base64Decode(released(i)['share'] as String), d.bytesLagrange(from, i, at: 5)),
+    ]);
+    final newcomers = {'about': 3, 'holder': newcomer, 'share': base64Encode(piece)};
+
+    DealSession verifier({List<String> added = const []}) {
+      final v = make(seats, null, verifier: true, custodians: jury);
+      expect(v.acceptKeys(keys), isTrue);
+      v.seatLeft(3);
+      v.extendCustodians(3, added);
+      return v;
+    }
+
+    final v = verifier(added: [newcomer]);
+    expect(v.acceptRelease(newcomers), isTrue);
+    expect(v.knowsSecret(3), isFalse, reason: 'one piece opens nothing');
+    expect(v.acceptRelease(released(2)), isTrue);
+    expect(v.knowsSecret(3), isTrue, reason: 'the newcomer at place five and juror1 at place two open it');
+
+    expect(verifier().acceptRelease(newcomers), isFalse, reason: 'not appended, the newcomer is no custodian of the seat');
+    final elsewhere = verifier(added: ['juror5', newcomer]);
+    expect(elsewhere.acceptRelease(newcomers), isTrue);
+    expect(elsewhere.acceptRelease(released(2)), isTrue);
+    expect(elsewhere.knowsSecret(3), isFalse, reason: 'a piece made for place five does not count at place six');
+  });
+
   test('a bot seat a juror holds is awaited when its keys have not been read, never guessed', () {
     // The case a juror summoned mid-hand is in: it has been told the
     // seat is given up before it has been carried the keys that say
