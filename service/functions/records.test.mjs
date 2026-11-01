@@ -268,6 +268,28 @@ test('a game is kept without a name the filter refuses, the rest as it was sent'
   assert.equal(gunzipSync(b3.kept.get(`tables/${TABLE}.json`).body).toString(), fine);
 });
 
+test("a record's names are one at most beside each person's seat, as a profile holds one; more is not a record, and a name that could not be one there is taken off", async () => {
+  const named = (names) => (r) => ({ ...r, names });
+  const five = Object.fromEntries(Array.from({ length: 5 }, (_, i) => [i, 'Ada']));
+  for (const names of [five, ['Ada'], null, 'Ada']) {
+    assert.deepEqual(await keep(bucket(), ADA, TABLE, record(named(names))), { status: 400, body: { error: 'not a record' } }, JSON.stringify(names));
+  }
+  // A name longer than a profile's, beside a bot's seat, beside no seat,
+  // with a control character in it, or not a name at all: taken off,
+  // before the filter is run over it.
+  for (const names of [
+    { 0: 'Ada', 1: 'a '.repeat(500000) },
+    { 0: 'Ada', 2: 'Romeo' },
+    { 0: 'Ada', x: 'Bao' },
+    { 0: 'Ada', 1: 'Bao\u0007' },
+    { 0: 'Ada', 1: 7 },
+  ]) {
+    const b = bucket();
+    assert.deepEqual(await keep(b, ADA, TABLE, record(named(names))), { status: 200, body: { kept: true } });
+    assert.deepEqual(JSON.parse(gunzipSync(b.kept.get(`tables/${TABLE}.json`).body).toString()).names, { 0: 'Ada' });
+  }
+});
+
 test('a kept game notes the accounts at its seats, and the worker reads only the games that name the one being deleted', async () => {
   const A = 'a'.repeat(32);
   const B = 'b'.repeat(32);

@@ -21,6 +21,7 @@
 // name beside the record to an account, for forgetting one.
 
 import { nameRefused } from './names.mjs';
+import { PROFILE_NAME_MOST } from './profile.mjs';
 import { dayOf } from './rows.mjs';
 
 /// A table's id (packages/table, spec.dart, newTableId).
@@ -148,6 +149,11 @@ export async function keepRecord(bucket, key, table, text, { verify, service = n
   if (spec?.id !== table || !Array.isArray(spec?.seats) || !Array.isArray(record?.log)) {
     return { status: 400, body: { error: 'not this table\'s record' } };
   }
+  // A name beside each seat at most, which the app only ever puts there.
+  const { names } = record;
+  if (names !== undefined && (names === null || typeof names !== 'object' || Array.isArray(names) || Object.keys(names).length > spec.seats.length)) {
+    return { status: 400, body: { error: 'not a record' } };
+  }
   if (!spec.seats.some((s) => s?.key === key)) return { status: 403, body: { error: 'only a player at the table sends its record' } };
   if (!(await signedInto(record, key, table, verify))) {
     return { status: 403, body: { error: 'a record with none of your own moves in it' } };
@@ -231,7 +237,8 @@ export function keptGames(binding) {
 /// game played while the account's last licence ran, or ended while
 /// forget.mjs went through the kept games — nor any name the filter
 /// refuses (names.mjs), which a device the relay would not have carried
-/// it from could still put beside its game. Rewritten only if
+/// it from could still put beside its game, nor any that could not be a
+/// person's name beside its seat ([nameFits]). Rewritten only if
 /// JSON.stringify gives back [text] as it was sent, since an event's id
 /// is a digest of its body as its reader parses it; null when it would
 /// not.
@@ -246,7 +253,7 @@ async function asKept(bucket, record, text) {
     without = w.record;
     named += w.named.length;
   }
-  const refused = Object.entries(without.names ?? {}).filter(([, name]) => nameRefused(name));
+  const refused = Object.entries(without.names ?? {}).filter(([seat, name]) => !nameFits(record.spec.seats, seat, name) || nameRefused(name));
   if (refused.length) {
     const { names: was, ...rest } = without;
     const names = { ...was };
@@ -256,6 +263,16 @@ async function asKept(bucket, record, text) {
   }
   if (!named) return text;
   return JSON.stringify(record) === text ? JSON.stringify(without) : null;
+}
+
+/// Whether [name], beside [seat], could be a person's name there: a
+/// person's seat, and a name as a profile holds one (profile.mjs). The
+/// app copies its peers' names as they said them, so a modified peer's
+/// name of any length can be in an honest player's record; it is taken
+/// off, as a refused name is, before the filter is run over it.
+function nameFits(seats, seat, name) {
+  const at = /^\d+$/.test(seat) ? seats[Number(seat)] : undefined;
+  return !!at && typeof at.bot !== 'string' && typeof name === 'string' && [...name].length <= PROFILE_NAME_MOST && !/\p{Cc}/u.test(name);
 }
 
 /// [record] with the names of the seats [account] sat in taken out:

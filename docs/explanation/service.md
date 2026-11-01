@@ -505,7 +505,9 @@ answers by one file of cases (`service/functions/names.vectors.json`):
 - **In the service** (`service/functions/names.mjs`), a profile with a
   refused name is not kept: the write is refused with
   `not an allowed name`, which the app does not send again. A kept
-  game is kept without a refused name beside it.
+  game is kept without a refused name beside it, or one that could not
+  be a profile's name, and a record with more names than seats is not
+  kept at all.
 - **At the relay**, an event naming somebody with a refused name is not
   carried ([refused names](relay.md#refused-names)).
 
