@@ -525,6 +525,13 @@ async function st(method, path, body) {
 }
 
 async function applyStripe() {
+  // The service takes stripePrice as a price id or a lookup key, but this
+  // finds and keeps the price by its lookup key: given an id, it would
+  // make a second price under it, which checkout never sells.
+  if (stripe.price.lookupKey.startsWith('price_')) {
+    console.error(`apply: stripePrice in config/openhearts.json is a price id (${stripe.price.lookupKey}); infra keeps the price under its lookup key, so name the price by that key; nothing compared`);
+    process.exit(2);
+  }
   const key = keyMode(process.env.STRIPE_API_KEY);
   if (!key) {
     console.error('apply: Stripe needs STRIPE_API_KEY (sk_… or rk_…)');

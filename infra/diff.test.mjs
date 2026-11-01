@@ -736,8 +736,8 @@ test('price: the one kept is the one the service sells, found by the lookup key 
   const config = JSON.parse(readFileSync(new URL('../config/openhearts.json', import.meta.url), 'utf8'));
   assert.equal(stripe.price.lookupKey, config.stripePrice);
   // stripePrice may also be a price's id (service/functions/stripe.mjs,
-  // priceLookup), which no price holds as its lookup key: infra would
-  // make a second price under it.
+  // priceLookup), which no price holds as its lookup key: infra refuses
+  // one (apply.test.mjs), since it would make a second price under it.
   assert.ok(!config.stripePrice.startsWith('price_'), 'config/openhearts.json: stripePrice is the lookup key infra keeps the price under, not a price id');
 });
 
