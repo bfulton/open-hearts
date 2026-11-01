@@ -36,13 +36,13 @@ const sealProofBytes = 160;
 /// A token's proof: what follows its point in [tokenBytes].
 const tokenProofBytes = tokenBytes - pointBytes;
 
-/// A seal as a pass carries it: the sealed token ([sealedBytes]), the
-/// argument that it is the right one ([sealProofBytes]), and after
-/// them the token's own proof ([tokenProofBytes]) hidden from all but
-/// the seat it is passed to. The proof is what makes the token whole
-/// when that seat plays the card, and in the clear it would name the
-/// card to anyone reading the log (docs/explanation/fair-deal.md).
-const passSealBytes = sealedBytes + sealProofBytes + tokenProofBytes;
+/// A seal as a pass carries it: the sealed token ([sealedBytes]) and
+/// the argument that it is the right one ([sealProofBytes]), and
+/// nothing after them. Every byte is checked by every side, so a
+/// passer has none to bend. The seat the pass is for plays the card
+/// with its own opening of the seal, not with a proof of the passer's
+/// (docs/explanation/fair-deal.md).
+const passSealBytes = sealedBytes + sealProofBytes;
 
 /// How many custodians have to answer to open a bot seat escrowed to
 /// several, as a v2 game's jury held one: any two of them.
