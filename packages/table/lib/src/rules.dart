@@ -411,8 +411,8 @@ class TableRules {
     if (e.down != null) _down[e.down!] = e.t;
     final ev = e.event;
     if (ev != null) _takeEvent(ev);
-    // Logged by the referee, which checks a signature on an id and no
-    // more, and read by no side: it changes nothing, and says so.
+    // Logged by the referee and read by no side: it changes nothing,
+    // and says so.
     final unread = e.unread;
     if (unread != null) trace?.call('entry #${e.n} does not read as an event (${unread['kind']} by ${'${unread['author']}'.padRight(6).substring(0, 6)}), and changes nothing');
     _settledSince = true;

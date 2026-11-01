@@ -14,26 +14,32 @@
 // What it checks is what it takes: the first start that names this
 // table and is said by one of its people, naming this relay's house if
 // it names one, and after that events from the start's people and its
-// house alone, each once. An event's signature is checked on its id and
-// no further — the id is the hash of the event's canonical bytes, which
-// are Dart's to make (packages/table, events.dart) — so an event whose
-// id is not its bytes' is logged as it came and changes nothing, at
-// every side alike (log.dart, LogEntry.unread).
+// house alone, each once. Every event's id must be the hash of its
+// canonical bytes (packages/table, events.dart, as
+// functions/records.mjs, eventIdOf, makes them) and carry its author's
+// signature. So an id stands for one event only, and nobody can keep
+// another's event out of the log by saying its id first. An event the
+// rules do not read, of a kind or shape this build does not know, is
+// logged as it came and changes nothing, at every side alike (log.dart,
+// LogEntry.unread).
+//
+// Each person's events may fill only so much of the log ([authorMost]),
+// so one seat cannot grow the table's object until it fails for
+// everybody, nor make every side that reads the log read without end.
 //
 // But for the start, which every side has to read as the same table
 // for anything after it to mean anything: a log that began with one
 // they could not would be no table at all, for any of them. So the
 // start is taken only as Dart wrote it (startRefusal): its text as it
-// comes out written again, its id the hash of what it says, and its
-// spec the one the table's id names (packages/table, spec.dart,
-// TableSpec.id). The table is the one everybody was seated at, and one
-// person cannot start it as another.
-
-import { eventIdOf } from '../functions/records.mjs';
+// comes out written again, and its spec the one the table's id names
+// (packages/table, spec.dart, TableSpec.id). The table is the one
+// everybody was seated at, and one person cannot start it as another.
 //
 // The simulator's referee (packages/table_sim, sim_referee.dart) is
 // this, on the simulator's clock: a table played there is a table played
 // here.
+
+import { eventIdOf, recordMost } from '../functions/records.mjs';
 
 /// The kind a table event rides in: its JSON as the content, signed by
 /// its author (packages/table, nostr.dart, TableKinds.log).
@@ -47,6 +53,15 @@ export const tickGapMs = 250;
 /// A table's tag (packages/table, spec.dart, newTableId): the only tags
 /// that keep a log.
 export const tableTag = /^[0-9a-f]{32}$/;
+
+/// The most of a table's log one person's events may fill, in
+/// characters as the log keeps them: as much as a whole kept game may be
+/// ([recordMost]). A person's share of a game to a hundred is some
+/// 400 KiB: the game in packages/table/test/fixtures/refereed_four.json.gz
+/// holds about 72 KiB of each person's over three hands, and no game to
+/// a hundred lasts more than sixteen. The house deals and plays every bot
+/// seat, and its key is the operator's, so it is not held to this.
+export const authorMost = recordMost;
 
 const hex64 = /^[0-9a-f]{64}$/;
 
@@ -123,10 +138,9 @@ export async function specIdOf(spec) {
 /// [table] to begin with; null for one that is, or for content that is
 /// no start at all. A start is taken as Dart wrote it and every side
 /// reads it: its text as it comes out written again, so that the bytes
-/// hashed here are the bytes hashed there; its id the hash of what it
-/// says (events.dart, as functions/records.mjs, eventIdOf, works it
-/// out); saying a spec and nothing else, its id first; and that spec
-/// the one [table] names.
+/// hashed here are the bytes hashed there; saying a spec and nothing
+/// else, its id first; and that spec the one [table] names. Its id is
+/// checked as every event's is ([tableReferee], take).
 export async function startRefusal(content, table) {
   let said;
   try {
@@ -141,7 +155,6 @@ export async function startRefusal(content, table) {
   if (Object.keys(body ?? {}).length !== 1 || !spec || typeof spec !== 'object' || Array.isArray(spec) || Object.keys(spec)[0] !== 'id') {
     return 'invalid: a start says its spec and nothing else';
   }
-  if ((await eventIdOf(said.table, said)) !== said.id) return 'invalid: a start\'s id is the hash of what it says';
   if (spec.id !== table || (await specIdOf(spec)) !== table) return 'blocked: not the table this id names';
   return null;
 }
@@ -185,6 +198,8 @@ export function tableReferee({ table, verify, house = null, now = Date.now, entr
   const downLogged = new Set();
   /// Whether the house's word on the game is in.
   let said = false;
+  /// author -> how many characters of the log its events fill.
+  const filled = new Map();
 
   const lastAt = () => (entries.length ? entries[entries.length - 1].t : -Infinity);
 
@@ -194,6 +209,7 @@ export function tableReferee({ table, verify, house = null, now = Date.now, entr
     const e = entry.e;
     if (e) {
       ids.add(e.id);
+      filled.set(e.author, (filled.get(e.author) ?? 0) + JSON.stringify(e).length);
       if (entry.n === 0) spec = writersOf(e.body?.spec, table, house);
       if (e.kind === 'result' && spec?.house && e.author === spec.house) said = true;
     }
@@ -242,10 +258,6 @@ export function tableReferee({ table, verify, house = null, now = Date.now, entr
       return entries;
     },
 
-    get started() {
-      return entries.length > 0;
-    },
-
     /// Whether the table wants its house and the house is not there.
     get wantsHouse() {
       return wantsHouse();
@@ -258,14 +270,16 @@ export function tableReferee({ table, verify, house = null, now = Date.now, entr
     },
 
     /// A [logKind] event, its own id and signature already checked:
-    /// {ok, why}, as the relay answers it. Waits only on a start, while
-    /// the log has not begun: every other event is in the log, or not,
-    /// before this returns, in the order they were handed in.
+    /// {ok, why}, as the relay answers it. Waits on the hash of the
+    /// table event it carries, and on a start's checks while the log has
+    /// not begun; what it decides after each wait is decided on the log
+    /// as it stands then.
     async take(event) {
       const e = eventIn(event.content);
       if (!e) return { ok: false, why: 'invalid: not a table event' };
       if (e.table !== table) return { ok: false, why: `blocked: this log is table ${table}'s` };
       if (event.pubkey !== e.author) return { ok: false, why: 'blocked: a table event is said by its author' };
+      if ((await eventIdOf(table, e)) !== e.id) return { ok: false, why: 'invalid: an event\'s id is the hash of what it says' };
       if (ids.has(e.id)) return { ok: true, why: 'duplicate: already in the log' };
       if (!verify(e.author, e.id, e.sig)) return { ok: false, why: 'invalid: not signed by its author' };
       if (!entries.length) {
@@ -283,6 +297,9 @@ export function tableReferee({ table, verify, house = null, now = Date.now, entr
       }
       if (e.kind === 'start') return { ok: true, why: 'duplicate: the table has started' };
       if (!spec?.writers.has(e.author)) return { ok: false, why: 'blocked: not one of the table\'s people or its house' };
+      if (e.author !== spec.house && (filled.get(e.author) ?? 0) + JSON.stringify(e).length > authorMost) {
+        return { ok: false, why: 'blocked: this author has filled its share of the log' };
+      }
       append({ e });
       return { ok: true, why: '' };
     },

@@ -281,17 +281,26 @@ later comes to the same table too.
 The log begins with the table's start. Each seated person's device
 sends one, and the first the referee has is taken: from one of the
 table's people, naming this relay's house, and only as Dart wrote it.
-Its text must come out the same written again, its id must be the hash
-of what it says, and its spec must be the one the table's id names
-(`startRefusal`). A log that began with a start the sides could read
-two ways would be no table at all, for any of them.
+Its text must come out the same written again, and its spec must be the
+one the table's id names (`startRefusal`). A log that began with a
+start the sides could read two ways would be no table at all, for any
+of them.
 
 After the start, the referee takes events from the start's people and
-its house alone, each once, each signed by its author. It checks a
-signature on the event's id and no further: the id is the hash of the
-event's canonical bytes, which are Dart's to make (`events.dart`). An
-event whose id is not its bytes' is logged as it came and changes
-nothing, at every side alike (`LogEntry.unread`).
+its house alone, each once, each signed by its author. Every event's
+id, the start's too, must be the hash of the event's canonical bytes
+(`events.dart`, made the same way by `eventIdOf` in
+`service/functions/records.mjs`), so an id stands for one event and
+nobody can keep a seat's move out of the log by saying its id first. An
+event the rules do not read, of a kind or shape the build does not
+know, is logged as it came and changes nothing, at every side alike
+(`LogEntry.unread`).
+
+Each person's events may fill at most `authorMost` characters of the
+log, as much as a whole kept game may be (`recordMost`) and some five
+times a person's share of a game to a hundred. Past it the referee
+refuses that person's events, so their turns run out as a device's
+that has gone. The house's events are not held to it.
 
 A socket is carried at all only once it answers the relay's challenge:
 a device in use, by the activation its account's service gave it, or
