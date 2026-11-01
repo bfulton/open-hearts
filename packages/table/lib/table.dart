@@ -30,7 +30,6 @@ export 'src/reactions.dart';
 export 'src/record.dart';
 export 'src/referee_line.dart';
 export 'src/relay_line.dart';
-export 'src/relay_policy.dart';
 export 'src/relay_transport.dart';
 export 'src/relays.dart';
 export 'src/replay.dart';

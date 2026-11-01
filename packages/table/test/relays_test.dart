@@ -41,6 +41,18 @@ void main() {
       expect(Relays.turnedBy(const [], 'x'), isEmpty);
     });
 
+    test('a pinned front stays first while the rest turn', () {
+      final relays = [for (var i = 0; i < 4; i++) Uri.parse('wss://r$i')];
+      for (final key in ['t1', 't2', 'across', 'zzz', 'mumtaz']) {
+        final turned = Relays.turnedBy(relays, key, pinned: 1);
+        expect(turned.first, relays.first, reason: 'the pinned relay is always first');
+        final tail = turned.sublist(1);
+        final k = relays.indexOf(tail.first) - 1;
+        expect(tail, [...relays.sublist(1).sublist(k), ...relays.sublist(1).sublist(0, k)]);
+      }
+      expect(Relays.turnedBy([relays[0], relays[1]], 'k', pinned: 1), [relays[0], relays[1]], reason: 'too few to turn');
+    });
+
     test('a known key lands where it did: the hash is not the platform\'s', () {
       final relays = [for (var i = 0; i < 7; i++) Uri.parse('wss://r$i')];
       // FNV-1a of 'HRTS' mod 7, pinned.

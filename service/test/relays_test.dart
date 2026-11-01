@@ -1,6 +1,6 @@
-/// Several relays under one client: listening on all, writing to one,
-/// moving on when a relay refuses — over real sockets to two local
-/// relays, one of which can be told to refuse.
+/// Several relays under one client: listening on all and writing to all,
+/// a relay that refuses kept out for a while — over real sockets to two
+/// local relays, either of which can be told to refuse.
 library;
 
 import 'dart:async';
@@ -33,7 +33,7 @@ void main() {
     final a = SchnorrSigner.generate();
     final b = SchnorrSigner.generate();
     // Opposite orders: whichever way the table id turns them, the two
-    // write to different relays first.
+    // list different relays first.
     final ta = RelayTransport(relays: [r1.url, r2.url], signer: a, table: 'both');
     final tb = RelayTransport(relays: [r2.url, r1.url], signer: b, table: 'both');
     await Future.wait([ta.allReady, tb.allReady]).timeout(const Duration(seconds: 5));
@@ -54,12 +54,11 @@ void main() {
   test('a lobby announcement and a signal reach a peer that reads only one of the relays', () async {
     final a = SchnorrSigner.generate();
     final b = SchnorrSigner.generate();
-    // a writes its table events to the first relay it gets; b can read
-    // only the other. What forms a room, and what sets up a channel,
-    // goes to every relay, so b hears it anyway.
+    // b can read only one of the relays a writes to: a writes
+    // everything to both, so b hears it anyway.
     final ta = RelayTransport(relays: [r1.url, r2.url], signer: a, table: 'half-deaf');
     await ta.allReady.timeout(const Duration(seconds: 5));
-    // b reads only the relay a does not write its table events to.
+    // b reads only the relay a lists second.
     final other = ta.relays.first == r1.url ? r2.url : r1.url;
     final tb = RelayTransport(relays: [other], signer: b, table: 'half-deaf');
     await tb.allReady.timeout(const Duration(seconds: 5));
@@ -75,7 +74,7 @@ void main() {
     tb.close();
   });
 
-  test('a relay that refuses is moved past, and the event still arrives', () async {
+  test('a relay that refuses is left out for a while, and the event still arrives', () async {
     r1.refuse = (_) => 'pow: 28 bits needed';
     final a = SchnorrSigner.generate();
     final b = SchnorrSigner.generate();
@@ -84,9 +83,8 @@ void main() {
     final tb = RelayTransport(relays: relays, signer: b, table: 'one-refusing');
     await Future.wait([ta.allReady, tb.allReady]).timeout(const Duration(seconds: 5));
 
-    // Whichever relay comes first for this table, r1 refuses and r2
-    // takes; the message gets through either way, and with one relay
-    // taking it, nothing is reported.
+    // r1 refuses and r2 takes: the message gets through, and with one
+    // relay taking it, nothing is reported.
     final heard = next(tb);
     ta.sayWatch({'n': 1});
     expect(await heard, {'n': 1});

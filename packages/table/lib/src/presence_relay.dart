@@ -61,7 +61,7 @@ class RelayPresence {
     _beat = Timer.periodic(Duration(milliseconds: everyMs), (_) => _announce());
   }
 
-  /// The relays, in the order this client writes to them.
+  /// The relays, with presence's tag in each that asks for one.
   final List<Uri> relays;
   final Signer signer;
 
