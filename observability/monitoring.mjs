@@ -38,10 +38,12 @@ export const synthetics = {
 
 /// From inside: New Relic Browser in the app's page, for what people's
 /// own browsers meet — errors, load times, the service's calls failing.
-/// No cookies, no session replay, no session traces: what a page did,
-/// not what a person did. apply.mjs writes the loader New Relic gives it
-/// to app/web/observability.js, which runs only on the production host,
-/// so a fork or a local build reports nothing to us.
+/// No cookies, no session replay or traces, no console lines, clicks or
+/// keys, and a room's code and a table's id masked (apply.mjs,
+/// pinnedInit): what a page did, not what a person did. apply.mjs writes
+/// the loader New Relic gives it to app/web/observability.js, which runs
+/// only on the production host, so a fork or a local build reports
+/// nothing to us.
 export const browser = {
   // The web build's; a phone build is an app of its own.
   name: 'web',

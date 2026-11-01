@@ -745,7 +745,9 @@ From outside, New Relic (`observability/monitoring.mjs`) pings the
 site, the app, `/api/health` and the relay, and tells the operator when
 one is down. Its browser agent reports errors, load times and the
 service's calls from people's own browsers, on `play.openhearts.game`
-only, with no cookies, session replay or session traces. The New Relic
+only, with no cookies, session replay, session traces, console lines,
+clicks or keys, and with a room's code and a table's id masked in the
+addresses it sends (`pinnedInit` in `observability/apply.mjs`). The New Relic
 account may hold other apps, so everything of ours is named
 `Open Hearts: …`, tagged `app: open-hearts` and gathered in a workload
 of its own, and the script reads and writes only what carries that tag
