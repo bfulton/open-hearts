@@ -1130,10 +1130,13 @@ export const tableLimits = Object.freeze({
   perSecond: 20,
 });
 
-/// What one object has seen since it last said so, in the order the
-/// operator's query reads the numbers (docs/explanation/service.md):
-/// counts, never who.
-export const tallied = ['opened', 'closed', 'events', 'delivered', 'subscriptions', 'rateLimited', 'invalid', 'refused', 'duplicate', 'tooBig', 'malformed', 'superseded'];
+/// The numbers in each line an object writes, in the order the
+/// operator's query reads them (docs/explanation/service.md): what it
+/// has seen since its last line, and the seconds that covers. Counts,
+/// never who. A count added later goes at the end, so that no column
+/// moves: `withheld` comes after the seconds.
+export const tallied = ['opened', 'closed', 'events', 'delivered', 'subscriptions', 'rateLimited', 'invalid', 'refused', 'duplicate', 'tooBig', 'malformed', 'superseded', 'seconds', 'withheld'];
+const counted = tallied.filter((k) => k !== 'seconds');
 
 /// [fn] in [ms], as a cancel: a timer node does not wait for, so a
 /// test's tally does not hold its process open.
@@ -1153,21 +1156,21 @@ function later(fn, ms) {
 /// minute: an object whose sockets are open hibernates once nothing is
 /// pending, and what it holds in memory goes with it.
 export function tally(sink, { every = 60000, now = Date.now, after = later } = {}) {
-  let counts = Object.fromEntries(tallied.map((k) => [k, 0]));
+  let counts = Object.fromEntries(counted.map((k) => [k, 0]));
   let since = now();
   let pending = null;
   const flush = () => {
     pending?.();
     pending = null;
     const t = now();
-    if (sink && tallied.some((k) => counts[k] > 0)) {
+    if (sink && counted.some((k) => counts[k] > 0)) {
       try {
-        sink.writeDataPoint({ indexes: ['relay'], blobs: ['relay'], doubles: [...tallied.map((k) => counts[k]), (t - since) / 1000] });
+        sink.writeDataPoint({ indexes: ['relay'], blobs: ['relay'], doubles: tallied.map((k) => (k === 'seconds' ? (t - since) / 1000 : counts[k])) });
       } catch {
         // What is watched never stops what is watched.
       }
     }
-    counts = Object.fromEntries(tallied.map((k) => [k, 0]));
+    counts = Object.fromEntries(counted.map((k) => [k, 0]));
     since = t;
   };
   const count = (what, n = 1) => {

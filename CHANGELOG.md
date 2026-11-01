@@ -493,6 +493,9 @@ squashed from a pull request, the pull request's number.
   (2026-11-01, #47)
 - `oh verify` fails when infrastructure has problems to fix by hand,
   where it said ok. (2026-11-01, #47)
+- The relay's line of counts counts the pictures it withheld, which it
+  dropped. The count comes last, after the seconds, so every number
+  before it keeps its column. (2026-11-01, #47)
 
 - Previews play live again. Since the referee, every live table has the
   house at it, and the preview relay had no house of its own: now it
