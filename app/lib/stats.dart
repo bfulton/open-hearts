@@ -156,7 +156,7 @@ const runAtTheMoon = 10;
     // A record that stops short is a game that was left, not one that
     // was played: there is no score to claim for it.
     if (!replay.complete) continue;
-    final me = record.humanSeat;
+    final me = humanSeat;
     final totals = replay.game.totals;
     final mine = totals[me];
     games++;

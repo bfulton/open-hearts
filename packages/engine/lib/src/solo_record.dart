@@ -23,11 +23,9 @@ import 'rules.dart';
 class SoloRecord {
   /// A record of a game dealt from [dealSeed], or by `Random` from
   /// [seed]: one of the two, never both.
-  SoloRecord({this.seed, this.dealSeed, required this.personas, this.humanSeat = humanSeatDefault, this.target = gameOverScore}) {
+  SoloRecord({this.seed, this.dealSeed, required this.personas, this.target = gameOverScore}) {
     if ((seed == null) == (dealSeed == null)) throw ArgumentError('a record names one seed: an int or a deal seed');
   }
-
-  static const humanSeatDefault = 0;
 
   /// The version of a record whose seed is an int: a game dealt by
   /// `Random`.
@@ -48,10 +46,9 @@ class SoloRecord {
   /// table asked for another target, so a game to fifty has no field.
   final int target;
 
-  /// Persona name per seat; the human's seat holds an empty string.
+  /// Persona name per seat; the human's seat ([humanSeat]) holds an
+  /// empty string.
   final List<String> personas;
-
-  final int humanSeat;
 
   /// The human's three passed cards per hand, or null on a hold hand.
   final List<List<Card>?> passes = [];
@@ -84,7 +81,7 @@ class SoloRecord {
       final personas = <String>[];
       var b = 0;
       for (var s = 0; s < seatCount; s++) {
-        personas.add(s == humanSeatDefault ? '' : bots[b++]);
+        personas.add(s == humanSeat ? '' : bots[b++]);
       }
       for (final name in personas) {
         if (name.isNotEmpty) Persona.named(name); // throws when unknown

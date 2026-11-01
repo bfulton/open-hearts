@@ -63,16 +63,12 @@ class BotView {
   /// True once the queen has been seen, so spades are no longer scary.
   bool get queenGone => played.contains(queenOfSpades);
 
-  /// An opponent who holds every point played so far, far enough along
-  /// that letting the rest through would hand them the moon.
+  /// An opponent who holds every point played so far, once at least
+  /// [trigger] points are out ([Persona.moonDefenseTrigger]): far enough
+  /// along that letting the rest through would hand them the moon.
   ///
   /// The moon is the one situation where the whole game inverts: taking
   /// points becomes the cheap move and ducking becomes the ruinous one.
-  /// Four points is the usual trigger — early enough to break a run
-  /// before it is out of reach, late enough not to fire on a single
-  /// stray heart. [Persona.moonDefenseTrigger] moves it.
-  int? get moonThreat => moonThreatAt(4);
-
   int? moonThreatAt(int trigger, {bool queenAloneIsSafe = true}) {
     final total = taken.fold(0, (a, b) => a + b);
     if (total < trigger) return null;
@@ -86,10 +82,6 @@ class BotView {
     if (queenAloneIsSafe && total == 13 && queenGone) return null;
     return holder;
   }
-
-  List<Card> suit(Suit s) => hand.where((c) => c.suit == s).toList();
-
-  int count(Suit s) => hand.where((c) => c.suit == s).length;
 }
 
 /// A heuristic Hearts player. Stateless, and deterministic: the same
