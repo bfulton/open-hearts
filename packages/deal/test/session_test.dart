@@ -36,7 +36,7 @@ void main() {
   }
 
   DealSession make(List<DealSeat> seats, int? seat,
-          {String? key, List<String> custodians = const [], int seed = 1, bool verifier = false}) =>
+          {String? key, List<String> custodians = const [], int seed = 1, bool verifier = false, Uint8List? secret}) =>
       DealSession(
         d,
         tableId: 'T1',
@@ -48,6 +48,7 @@ void main() {
         myKey: key ?? (seat == null ? null : (seats[seat] as HumanDealSeat).key),
         wrap: verifier ? null : wrapFor(key ?? (seat == null ? 'nobody' : (seats[seat] as HumanDealSeat).key)),
         custodians: custodians,
+        mySecret: secret,
         random: Random(seed * 100 + (seat ?? 99)),
       );
 
@@ -766,5 +767,38 @@ void main() {
       expect(all[(s + 1) % 4].verifyDeclaration(m), isTrue);
       expect(all[(s + 1) % 4].verifyDeclaration({...m, 'token': base64Encode(sized(t, tokenBytes - 1))}), isFalse);
     }
+  });
+
+  test('a secret that answers for two decks of one hand proves over each with a nonce of its own', () {
+    // Seat 0 keeps its secret, as a session built again for the same
+    // hand does, and the other seats shuffle differently. Were a nonce
+    // drawn from the secret and the step alone, the two decks' proofs
+    // would share it, and the pair of them would give the key away.
+    final seats = [for (final k in ['a', 'b', 'c', 'd']) HumanDealSeat(k)];
+    final secret = Uint8List.fromList(List.generate(32, (i) => i + 1));
+    DealSession dealtWith(int seed) {
+      final all = [for (var s = 0; s < 4; s++) make(seats, s, seed: seed, secret: s == 0 ? secret : null)];
+      for (var s = 0; s < 4; s++) {
+        broadcast(all, s, (x) => x.acceptKeys(all[s].myKeys()!));
+      }
+      for (var s = 0; s < 4; s++) {
+        final m = all[s].myShuffle()!;
+        broadcast(all, s, (x) => x.acceptShuffle(m));
+      }
+      return all[0];
+    }
+
+    final one = dealtWith(1);
+    final two = dealtWith(2);
+    expect(one.deck, isNot(two.deck));
+    // A batch is thirty-nine tokens and then its argument, which opens
+    // with the commitment to its nonce; a token that travels alone has
+    // its own proof after it, which does too.
+    Uint8List batchCommitment(DealSession x) =>
+        base64Decode(x.myTokens()!['tokens'] as String).sublist(39 * pointBytes, 40 * pointBytes);
+    Uint8List playCommitment(DealSession x) => base64Decode(x.playToken(0)!['token'] as String).sublist(pointBytes, 2 * pointBytes);
+    expect(batchCommitment(one), isNot(batchCommitment(two)));
+    expect(playCommitment(one), isNot(playCommitment(two)));
+    expect(batchCommitment(one), batchCommitment(dealtWith(1)), reason: 'and the same deck still gives the same proof');
   });
 }

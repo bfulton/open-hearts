@@ -797,9 +797,18 @@ class DealSession {
     return true;
   }
 
-  /// Public randomness for a bot seat's step: from its public secret.
-  Uint8List _seed(String step, int seat) =>
-      Uint8List.fromList(sha256.convert([...utf8.encode('$step|'), ..._secrets[seat]!]).bytes);
+  /// A seed for one of [seat]'s steps, drawn from its secret. A seat
+  /// whose secret is public shuffles with one, which every side must
+  /// make alike, and every proof of a token takes its nonce from one.
+  ///
+  /// A proof's seed also takes [about], the masked cards the proof is
+  /// about, so two proofs about different cards never share a nonce.
+  /// Two proofs with one nonce give the key away to anyone holding
+  /// both. That would happen if one secret answered for two decks of
+  /// the same hand, as it could if a device that reloaded were served
+  /// a different log.
+  Uint8List _seed(String step, int seat, [Uint8List? about]) =>
+      Uint8List.fromList(sha256.convert([...utf8.encode('$step|'), ..._secrets[seat]!, ...?about]).bytes);
 
   // ---- shuffles --------------------------------------------------------
 
@@ -903,13 +912,11 @@ class DealSession {
         return [ShuffleJob(_joint!, _decks.last, _myShuffleSeed ??= _draw())];
       case 2:
         if (deck == null) return const [];
-        final secret = _secrets[me]!;
-        final owed = _owed(me);
         final had = _tokens[me] ?? const <int, Uint8List>{};
         final own = [for (var p = 0; p < deckSize; p++) if (p ~/ _handSize == me && had[p] == null) p];
         return [
-          if (_myTokens == null) RevealTokensJob(secret, _cardsAt(owed), _seed('tokens ${owed.length}', me)),
-          if (own.isNotEmpty) RevealTokensJob(secret, _cardsAt(own), _seed('tokens ${own.length}', me)),
+          if (_myTokens == null) _tokensJob(me, _owed(me)),
+          if (own.isNotEmpty) _tokensJob(me, own),
         ];
     }
     return const [];
@@ -962,9 +969,16 @@ class DealSession {
         if ((everyPosition || p ~/ _handSize != seat) && t[p] == null) p,
     ];
     if (want.isEmpty) return;
-    final job = RevealTokensJob(_secrets[seat]!, _cardsAt(want), _seed('tokens ${want.length}', seat));
+    final job = _tokensJob(seat, want);
     if (!_ready(job)) return;
     _spread(t, want, crypto.revealTokens(job.secret, job.cards, job.seed));
+  }
+
+  /// [seat]'s batch of tokens for [positions]: what [workToMake]
+  /// describes, and [myTokens] and [_tokensBy] make, alike.
+  RevealTokensJob _tokensJob(int seat, List<int> positions) {
+    final cards = _cardsAt(positions);
+    return RevealTokensJob(_secrets[seat]!, cards, _seed('tokens ${positions.length}', seat, cards));
   }
 
   /// The bare tokens out of a batch, position by position.
@@ -994,7 +1008,8 @@ class DealSession {
     final me = mySeat;
     if (me == null || deck == null) return null;
     final owed = _owed(me);
-    final batch = _myTokens ??= crypto.revealTokens(_secrets[me]!, _cardsAt(owed), _seed('tokens ${owed.length}', me));
+    final job = _tokensJob(me, owed);
+    final batch = _myTokens ??= crypto.revealTokens(job.secret, job.cards, job.seed);
     _spread(_tokens.putIfAbsent(me, () => {}), owed, batch);
     // And its own thirteen, which it needs to open its own cards and
     // nobody else ever sees.
@@ -1164,7 +1179,7 @@ class DealSession {
     if (p == null) return {'seat': me, 'position': -1};
     // With its proof, since it travels alone and nothing else here
     // vouches for it; what this side keeps is still the bare token.
-    return {'seat': me, 'position': p, 'token': _b64(crypto.revealToken(_secrets[me]!, _masked(p), _seed('declare $p', me)))};
+    return {'seat': me, 'position': p, 'token': _b64(crypto.revealToken(_secrets[me]!, _masked(p), _seed('declare $p', me, _masked(p))))};
   }
 
   /// Whether a seat's word on the lead card holds: nowhere, or a
@@ -1264,7 +1279,7 @@ class DealSession {
   /// holding somebody else's token at all.
   Uint8List? _proved(int owner, int p) {
     final secret = _secrets[owner];
-    if (secret != null && deck != null) return crypto.revealToken(secret, _masked(p), _seed('play token $p', owner));
+    if (secret != null && deck != null) return crypto.revealToken(secret, _masked(p), _seed('play token $p', owner, _masked(p)));
     return _passed[owner]?[p];
   }
 
@@ -1345,7 +1360,7 @@ class DealSession {
       // token alone: a pass needs the proof beside it, in the clear or
       // as the half that travels with a seal. Deterministic, so it is
       // the same token either way.
-      tokens.add(crypto.revealToken(secret, _masked(p), _seed('pass token $p', me)));
+      tokens.add(crypto.revealToken(secret, _masked(p), _seed('pass token $p', me, _masked(p))));
     }
     if (_public(to)) {
       return {'from': me, 'to': to, 'positions': positions, 'tokens': [for (final t in tokens) _b64(t)]};
