@@ -10,21 +10,28 @@ import 'game_options.dart';
 import 'l10n/l10n.dart';
 import 'theme.dart';
 
-/// Opens the options over [context]; resolves to what was chosen, or
-/// null if the sheet was dismissed without a change.
-Future<GameOptions?> showGameOptions(BuildContext context, {required GameOptions current}) {
-  return showModalBottomSheet<GameOptions>(
+/// Opens the options over [context]; resolves to the options as the
+/// player left them, whether they closed the sheet with Done, by
+/// swiping it away or by tapping outside it, or to null if they changed
+/// nothing.
+Future<GameOptions?> showGameOptions(BuildContext context, {required GameOptions current}) async {
+  var latest = current;
+  await showModalBottomSheet<void>(
     context: context,
     backgroundColor: Felt.mid,
     shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-    builder: (_) => _OptionsSheet(current: current),
+    builder: (_) => _OptionsSheet(current: current, onChanged: (options) => latest = options),
   );
+  return latest == current ? null : latest;
 }
 
 class _OptionsSheet extends StatefulWidget {
-  const _OptionsSheet({required this.current});
+  const _OptionsSheet({required this.current, required this.onChanged});
 
   final GameOptions current;
+
+  /// Told of every pick, as it is made.
+  final ValueChanged<GameOptions> onChanged;
 
   @override
   State<_OptionsSheet> createState() => _OptionsSheetState();
@@ -32,6 +39,11 @@ class _OptionsSheet extends StatefulWidget {
 
 class _OptionsSheetState extends State<_OptionsSheet> {
   late GameOptions _options = widget.current;
+
+  void _pick(GameOptions options) {
+    setState(() => _options = options);
+    widget.onChanged(options);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -49,7 +61,7 @@ class _OptionsSheetState extends State<_OptionsSheet> {
                   child: Text(l10n.gameOptions, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Palette.chrome)),
                 ),
                 TextButton(
-                  onPressed: () => Navigator.of(context).pop(_options),
+                  onPressed: () => Navigator.of(context).pop(),
                   style: TextButton.styleFrom(foregroundColor: Palette.gold),
                   child: Text(l10n.done, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
                 ),
@@ -66,7 +78,7 @@ class _OptionsSheetState extends State<_OptionsSheet> {
                   _Pick(
                     label: l10n.targetPoints(target),
                     selected: _options.target == target,
-                    onTap: () => setState(() => _options = _options.copyWith(target: target)),
+                    onTap: () => _pick(_options.copyWith(target: target)),
                   ),
               ],
             ),
@@ -77,8 +89,8 @@ class _OptionsSheetState extends State<_OptionsSheet> {
               spacing: 10,
               runSpacing: 10,
               children: [
-                _Pick(label: l10n.rated, selected: _options.rated, onTap: () => setState(() => _options = _options.copyWith(rated: true))),
-                _Pick(label: l10n.unrated, selected: !_options.rated, onTap: () => setState(() => _options = _options.copyWith(rated: false))),
+                _Pick(label: l10n.rated, selected: _options.rated, onTap: () => _pick(_options.copyWith(rated: true))),
+                _Pick(label: l10n.unrated, selected: !_options.rated, onTap: () => _pick(_options.copyWith(rated: false))),
               ],
             ),
           ],
