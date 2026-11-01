@@ -62,9 +62,12 @@ Future<Said<SignedIn>> supersedeWith(Signer signer, Provider provider, String to
     _signIn('supersede', signer, provider, token, service);
 
 Future<Said<SignedIn>> _signIn(String handler, Signer signer, Provider provider, String token, String service) async {
-  // The token is not part of what is signed: it names this key itself,
-  // in its nonce, and the provider signed that.
-  final answer = await askHandler(handler, signer, {'provider': provider.name, 'token': token});
+  // The request signs the provider and the token (`<provider> <token>`,
+  // service/functions/worker.mjs, signInRoute). The token names this key
+  // in its nonce, but whoever asked the provider chose the nonce, so a
+  // request taken off the wire could otherwise be sent again with
+  // another sign-in's token in it.
+  final answer = await askHandler(handler, signer, {'provider': provider.name, 'token': token}, what: '${provider.name} $token');
   if (answer?.status != 200) return (answer: null, refusal: refusalOf(answer));
   final json = jsonOf(answer!.body);
   if (json is! Map) return (answer: null, refusal: const Refused('unreachable'));

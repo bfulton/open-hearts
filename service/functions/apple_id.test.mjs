@@ -144,16 +144,20 @@ async function linked() {
     OH_ID_HMAC: 'pepper',
     OH_APPLE_AUDIENCE,
   };
-  const ask = async (pair, handler, more = {}) => {
+  const ask = async (pair, handler, more = {}, what = '') => {
     const at = Math.floor(Date.now() / 1000);
-    const sig = signer.sign(pair.secret, await sha(`oh-request/1\n${handler}\n${pair.public}\n${at}\n`));
+    const sig = signer.sign(pair.secret, await sha(`oh-request/1\n${handler}\n${pair.public}\n${at}\n${what}`));
     const res = await worker.fetch(
       new Request(`https://play.openhearts.game/api/${handler}`, { method: 'POST', body: JSON.stringify({ key: pair.public, at, sig, ...more }) }),
       env,
     );
     return { status: res.status, body: await res.json() };
   };
-  const signIn = async (pair, handler, sub = SUB) => ask(pair, handler, { provider: 'apple', token: await idToken(pair.public, sub) });
+  // Signed over the provider and the token, as the app signs them.
+  const signIn = async (pair, handler, sub = SUB) => {
+    const token = await idToken(pair.public, sub);
+    return ask(pair, handler, { provider: 'apple', token }, `apple ${token}`);
+  };
   const attested = await signIn(ADA, 'attest');
   assert.equal(attested.status, 200, 'linked, as the app links it');
   const login = await loginRow({ provider: 'apple', sub: SUB }, env);

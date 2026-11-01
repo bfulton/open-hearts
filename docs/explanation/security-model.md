@@ -47,9 +47,15 @@ and later end it to strand the device.
 A provider's ID token must carry a nonce equal to the hash of the
 device's key. The nonce is chosen by whoever asks the provider, though,
 so it shows which key the token was made for, not that the key consented.
-The request is therefore also signed by the key. Otherwise a stranger
-could bind his own account to a subscriber's key with `attest`, then
-`supersede` it onto his own key and carry her subscription with it.
+The request is therefore also signed by the key, over the provider and
+the token (`<provider> <token>`, the request's `what` line). Otherwise a
+stranger could bind his own account to a subscriber's key with `attest`,
+then `supersede` it onto his own key and carry her subscription with it;
+and one who captured her request could send it again, within the minutes
+a request is good for, with a token of his own in its place, which names
+her key because its nonce is his to choose. A request signed over
+nothing, as these were before, is refused, and so is a provider or a
+token that is not a string.
 Tokens are verified against the provider's fixed JWKS URL with
 allow-listed algorithms (RS256, ES256), checking issuer (Google's in
 either of the two forms it signs with), audience (one of a configured

@@ -122,8 +122,14 @@ void main() {
     expect(said.answer!.licence!.key, me.publicKey);
     final asked = sentTo(stand, 'attest');
     expect([asked['key'], asked['provider'], asked['token']], [me.publicKey, 'apple', 'local:ada']);
-    expect(schnorrVerifier(me.publicKey, requestDigest('attest', me.publicKey, asked['at'] as int), asked['sig'] as String), isTrue,
-        reason: 'the service binds only a key that asked to be bound');
+    // Signed over the provider and the token, so that a request taken off
+    // the wire is not sent again with another sign-in's token in it.
+    expect(schnorrVerifier(me.publicKey, requestDigest('attest', me.publicKey, asked['at'] as int, 'apple local:ada'), asked['sig'] as String), isTrue,
+        reason: 'the service binds only a key that asked to be bound, to the sign-in it asked for');
+    for (final other in ['', 'apple local:bao', 'google local:ada']) {
+      expect(schnorrVerifier(me.publicKey, requestDigest('attest', me.publicKey, asked['at'] as int, other), asked['sig'] as String), isFalse,
+          reason: 'not signed over "$other"');
+    }
 
     // Somebody else's licence, correctly signed, is not this device's.
     stand.says('attest', {'attested': '2026-10-06', 'licence': signedFor(SchnorrSigner.generate().publicKey)});
@@ -138,8 +144,10 @@ void main() {
     final said = await supersedeWith(me, Provider.google, 'local:ada', service: _service);
     expect(said.answer!.licence!.holdsFor(me.publicKey, service: _service), isTrue);
     final asked = sentTo(stand, 'supersede');
-    expect(schnorrVerifier(me.publicKey, requestDigest('supersede', me.publicKey, asked['at'] as int), asked['sig'] as String), isTrue,
-        reason: 'signed for supersede, so an attest cannot be spent as one');
+    expect(schnorrVerifier(me.publicKey, requestDigest('supersede', me.publicKey, asked['at'] as int, 'google local:ada'), asked['sig'] as String), isTrue,
+        reason: 'signed for supersede, so an attest cannot be spent as one, and over the sign-in it brings the device in by');
+    expect(schnorrVerifier(me.publicKey, requestDigest('supersede', me.publicKey, asked['at'] as int), asked['sig'] as String), isFalse,
+        reason: 'and not signed over nothing');
   });
 
   test('a refused sign-in says why, in words', () async {

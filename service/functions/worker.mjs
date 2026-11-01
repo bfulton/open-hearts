@@ -269,10 +269,17 @@ async function signInRoute(request, env, move) {
   // The token names the key its nonce was made for, and the nonce is
   // whoever asked the provider's to choose: a stranger can have his
   // own account signed over somebody else's key. The key signing the
-  // request is what says it wanted that account.
-  const asked = await signedFor(request, env, move ? 'supersede' : 'attest');
+  // request is what says it wanted that account, so it signs the
+  // provider and the token themselves (`<provider> <token>`): a request
+  // somebody captured cannot be sent again with a token of their own
+  // choosing in its place, nor one signed as these were when they
+  // signed nothing.
+  const asked = await signedFor(request, env, move ? 'supersede' : 'attest', (body) => `${body.provider} ${body.token}`);
   if (asked instanceof Response) return asked;
   const { key, body, signer } = asked;
+  // What is signed is the text of the two, so a token that is not text
+  // (an array of one, which would read as it) is not one.
+  if (typeof body.provider !== 'string' || typeof body.token !== 'string') return json(request, 401, { error: REFUSED.signInRefused });
   const store = storeOf(env);
   if (!store) return json(request, 503, notConfigured('OH_STORE'));
   const who = await whoSignedIn(body.provider, body.token, key, env, fetch, { open: openHouse(env, request) });

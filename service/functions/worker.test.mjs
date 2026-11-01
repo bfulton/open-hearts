@@ -65,6 +65,11 @@ const asking = async (pair, handler, { what = '', at = Math.floor(Date.now() / 1
   ...more,
 });
 
+/// A sign-in as the app asks it (app/lib/net/sign_in.dart): signed over
+/// the provider and the token it names, so that a request taken off the
+/// wire is not sent again with another's token in it.
+const signingIn = (pair, handler, provider, token, more = {}) => asking(pair, handler, { what: `${provider} ${token}`, provider, token, ...more });
+
 /// The hash of BIP-340's first key asking for a code at 1700000000:
 /// the same figure is pinned on the app's side, so the two cannot
 /// drift apart without both suites saying so.
@@ -1631,13 +1636,13 @@ test('local mode: a local: sign-in links one device\'s account and brings the ne
   const send = (what, body) => new Request(`http://127.0.0.1:8788/api/${what}`, { method: 'POST', body: JSON.stringify(body) });
 
   // Ada's device is licensed by the open house, and she signs in on it.
-  const first = await worker.fetch(send('attest', await asking(ADA, 'attest', { provider: 'apple', token: 'local:ada' })), held);
+  const first = await worker.fetch(send('attest', await signingIn(ADA, 'attest', 'apple', 'local:ada')), held);
   assert.equal(first.status, 200);
   const attested = await first.json();
   assert.equal(attested.licence.key, ADA.public);
 
   // A new phone signs in, and is a device of her account.
-  const moved = await worker.fetch(send('supersede', await asking(BAO, 'supersede', { provider: 'apple', token: 'local:ada' })), held);
+  const moved = await worker.fetch(send('supersede', await signingIn(BAO, 'supersede', 'apple', 'local:ada')), held);
   assert.equal(moved.status, 200);
   const said = await moved.json();
   assert.equal(said.account, attested.account);
@@ -1646,11 +1651,11 @@ test('local mode: a local: sign-in links one device\'s account and brings the ne
   assert.equal((await entitlementOf(store, BAO.public)).account, (await entitlementOf(store, ADA.public)).account);
 
   // A sign-in nobody has linked has nowhere to bring a device.
-  const nowhere = await worker.fetch(send('supersede', await asking(CY, 'supersede', { provider: 'google', token: 'local:cy' })), held);
+  const nowhere = await worker.fetch(send('supersede', await signingIn(CY, 'supersede', 'google', 'local:cy')), held);
   assert.deepEqual([nowhere.status, (await nowhere.json()).error], [404, 'that sign-in is not linked to an account']);
 
   // And the same token anywhere but this machine is nobody.
-  const away = new Request('https://play.openhearts.game/api/attest', { method: 'POST', body: JSON.stringify(await asking(CY, 'attest', { provider: 'google', token: 'local:cy' })) });
+  const away = new Request('https://play.openhearts.game/api/attest', { method: 'POST', body: JSON.stringify(await signingIn(CY, 'attest', 'google', 'local:cy')) });
   assert.deepEqual([(await worker.fetch(away, held)).status], [401]);
 });
 
@@ -1665,11 +1670,11 @@ test('the sign-in route: a token that does not check out is 401, and one that do
     const { held: base, send } = serving(store);
     const held = { ...base, ...signedInAs };
 
-    const nonsense = await worker.fetch(send('attest', await asking(ADA, 'attest', { provider: 'google', token: 'not.a.token' })), held);
+    const nonsense = await worker.fetch(send('attest', await signingIn(ADA, 'attest', 'google', 'not.a.token')), held);
     assert.equal(nonsense.status, 401);
 
     const token = await p.token({ sub: 'sub-1', nonce: await nonceFor(ADA.public) });
-    const ok = await worker.fetch(send('attest', await asking(ADA, 'attest', { provider: 'google', token })), held);
+    const ok = await worker.fetch(send('attest', await signingIn(ADA, 'attest', 'google', token)), held);
     assert.equal(ok.status, 200);
     const said = await ok.json();
     assert.equal(said.attested, dayOf(Date.now()));
@@ -1678,8 +1683,8 @@ test('the sign-in route: a token that does not check out is 401, and one that do
     // The same person on a new phone: it has no account to link, and
     // signing in brings it into hers.
     const theirs = await p.token({ sub: 'sub-1', nonce: await nonceFor(BAO.public) });
-    assert.equal((await worker.fetch(send('attest', await asking(BAO, 'attest', { provider: 'google', token: theirs })), held)).status, 402);
-    const moved = await worker.fetch(send('supersede', await asking(BAO, 'supersede', { provider: 'google', token: theirs })), held);
+    assert.equal((await worker.fetch(send('attest', await signingIn(BAO, 'attest', 'google', theirs)), held)).status, 402);
+    const moved = await worker.fetch(send('supersede', await signingIn(BAO, 'supersede', 'google', theirs)), held);
     assert.equal(moved.status, 200);
     const joined = await moved.json();
     assert.equal(joined.licence.key, BAO.public);
@@ -1699,13 +1704,13 @@ test('a device signing in is licensed at once, though the store where it asked h
     const { send } = serving(store);
     const held = { ...env, ...signedInAs, OH_SERVICE_SECRET: SERVICE_SECRET, OH_SERVICE_KEY: SERVICE_KEY, OH_STORE: seenFrom(kvOf(store)), HOUSEHOLD: objectsAt(seenFrom(kvOf(store))) };
     const mine = await p.token({ sub: 'sub-1', nonce: await nonceFor(ADA.public) });
-    assert.equal((await worker.fetch(send('attest', await asking(ADA, 'attest', { provider: 'google', token: mine })), held)).status, 200);
+    assert.equal((await worker.fetch(send('attest', await signingIn(ADA, 'attest', 'google', mine)), held)).status, 200);
 
     // A new phone asks for its licence as it starts, and has none; then
     // its person signs in.
     assert.equal((await worker.fetch(send('licence', await asking(BAO, 'licence')), held)).status, 402);
     const theirs = await p.token({ sub: 'sub-1', nonce: await nonceFor(BAO.public) });
-    const moved = await worker.fetch(send('supersede', await asking(BAO, 'supersede', { provider: 'google', token: theirs })), held);
+    const moved = await worker.fetch(send('supersede', await signingIn(BAO, 'supersede', 'google', theirs)), held);
     assert.equal(moved.status, 200);
     const said = await moved.json();
     assert.equal(said.licence?.key, BAO.public);
@@ -1770,7 +1775,7 @@ test('a device just brought in is asked of its account by each handler at once, 
       ['backups', {}, 200],
       ['devices', {}, 200],
       ['profile', {}, 200],
-      ['attest', { provider: 'google', token }, 200],
+      ['attest', { what: `google ${token}`, provider: 'google', token }, 200],
       ['turn', {}, 200],
       ['waiting', { what: 'rated 50', pool: 'rated', target: 50 }, 200],
       ['review', { what: table, table }, 404],
@@ -1825,7 +1830,7 @@ test("a device dropped from its account, still holding its licence, is refused, 
     for (let spent = 2; spent < SERVICE_DEFAULTS.householdReadsPerHour; spent++) assert.equal((await ask(BAO, 'activate', open)).status, 402);
     const token = await p.token({ sub: 'sub-2', nonce: await nonceFor(BAO.public) });
     const drop = { what: ADA.public, drop: ADA.public };
-    for (const [handler, more] of [['activate', open], ['ticket'], ['backups'], ['devices'], ['devices', drop], ['profile'], ['attest', { provider: 'google', token }]]) {
+    for (const [handler, more] of [['activate', open], ['ticket'], ['backups'], ['devices'], ['devices', drop], ['profile'], ['attest', { what: `google ${token}`, provider: 'google', token }]]) {
       assert.equal((await ask(BAO, handler, more)).status, 429, `${handler}: spent for the hour`);
     }
     // ...and nothing of what the account's own devices have.
@@ -1900,10 +1905,63 @@ test('a sign-in binds only a key that asked to be bound, so nobody\'s account is
     const bound = await worker.fetch(send('attest', { key: ADA.public, provider: 'google', token: overHers }), held);
     assert.equal(bound.status, 401, 'her key did not ask');
     const overMine = await p.token({ sub: 'mallory', nonce: await nonceFor(BAO.public) });
-    const moved = await worker.fetch(send('supersede', await asking(BAO, 'supersede', { provider: 'google', token: overMine })), held);
+    const moved = await worker.fetch(send('supersede', await signingIn(BAO, 'supersede', 'google', overMine)), held);
     assert.equal(moved.status, 404, 'his sign-in is linked to no account, so there is nothing to come into');
     assert.equal(await entitlementOf(store, BAO.public, { now }), null);
     assert.deepEqual((await devicesOn(store, await accountOfSub(store, 'sub_9'))).map((d) => d.key), [ADA.public]);
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+});
+
+test('a sign-in request signs the provider and the token: a captured one is not sent again with another sign-in\'s, and nothing signed as these were is taken', async () => {
+  // Ada asks to link her Google sign-in. Mallory saw the request, and has
+  // a token of his own that names her key (the nonce is the caller's to
+  // choose, as above); in her request's place, with her signature on it,
+  // he sends his.
+  forgetProviderKeys();
+  const store = await household(Date.now(), ADA.public);
+  const p = await provider({ iss: 'https://accounts.google.com', aud: signedInAs.OH_GOOGLE_AUDIENCE });
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = p.fetch;
+  try {
+    const { held: base, send } = serving(store);
+    const held = { ...base, ...signedInAs };
+    const hers = await p.token({ sub: 'ada', nonce: await nonceFor(ADA.public) });
+    const his = await p.token({ sub: 'mallory', nonce: await nonceFor(ADA.public) });
+    const asked = await signingIn(ADA, 'attest', 'google', hers);
+    const refusal = async (body, handler = 'attest') => {
+      const res = await worker.fetch(send(handler, body), held);
+      return [res.status, (await res.json()).error];
+    };
+    const unsigned = [401, 'not signed by that key'];
+    assert.deepEqual(await refusal({ ...asked, token: his }), unsigned, 'her request, his token');
+    assert.deepEqual(await refusal({ ...asked, provider: 'apple' }), unsigned, 'her request, another provider');
+    // Signed as these were, over nothing: not taken, though the token is
+    // a good one for her key.
+    assert.deepEqual(await refusal(await asking(ADA, 'attest', { provider: 'google', token: hers })), unsigned, 'the old, empty statement');
+    // And an attest is not an attest of the other sign-in.
+    assert.deepEqual(await refusal({ ...(await signingIn(ADA, 'supersede', 'google', hers)) }), unsigned, 'signed for another handler');
+    // Not text: what is signed is its reading as text, and it is read as
+    // that nowhere, however it would read.
+    const notText = [401, 'that sign-in does not check out'];
+    assert.deepEqual(await refusal(await asking(ADA, 'attest', { what: `google ${hers}`, provider: 'google', token: [hers] })), notText, 'an array of the token');
+    assert.deepEqual(await refusal(await asking(ADA, 'attest', { what: `google ${hers}`, provider: ['google'], token: hers })), notText, 'an array of the provider');
+    assert.deepEqual(await refusal(await asking(ADA, 'attest', { what: 'google undefined', provider: 'google' })), notText, 'no token');
+    // None of it linked anything: hers, as she asked, links.
+    assert.equal((await worker.fetch(send('attest', asked), held)).status, 200);
+
+    // The same for the other handler: Bao, new on a phone, asks to come
+    // in by her sign-in; his own signature on his request is no use for
+    // another token in it.
+    const theirs = await p.token({ sub: 'ada', nonce: await nonceFor(BAO.public) });
+    const other = await p.token({ sub: 'mallory', nonce: await nonceFor(BAO.public) });
+    const comes = await signingIn(BAO, 'supersede', 'google', theirs);
+    assert.deepEqual(await refusal({ ...comes, token: other }, 'supersede'), unsigned);
+    assert.deepEqual(await refusal(await asking(BAO, 'supersede', { provider: 'google', token: theirs }), 'supersede'), unsigned, 'the old, empty statement');
+    const moved = await worker.fetch(send('supersede', comes), held);
+    assert.equal(moved.status, 200);
+    assert.equal((await moved.json()).account, await accountOfSub(store, 'sub_9'));
   } finally {
     globalThis.fetch = realFetch;
   }
