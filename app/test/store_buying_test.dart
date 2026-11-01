@@ -61,6 +61,14 @@ class FakeStore implements PhoneStore {
   /// What a restore finds.
   List<StorePurchase> restoring = [];
 
+  /// How long after a restore returns it says what it found, as the
+  /// StoreKit 2 plugin does; null to say it before returning, as Play
+  /// does.
+  Duration? restoresAfter;
+
+  /// Whether a restore says nothing at all.
+  bool restoreSaysNothing = false;
+
   /// The store telling the app about purchases.
   void says(List<StorePurchase> purchases) => _purchases.add(purchases);
 
@@ -83,7 +91,13 @@ class FakeStore implements PhoneStore {
   }
 
   @override
-  Future<void> restore() async => _purchases.add(restoring);
+  Future<void> restore() async {
+    if (restoreSaysNothing) return;
+    final found = restoring;
+    final after = restoresAfter;
+    if (after == null) return _purchases.add(found);
+    unawaited(Future<void>.delayed(after, () => _purchases.add(found)));
+  }
 
   @override
   Future<void> finish(StorePurchase purchase) async => finished.add(purchase);
@@ -437,6 +451,56 @@ void main() {
     expect(store.finished, isEmpty);
     expect(find.text('This device'), findsOneWidget);
     expect(find.textContaining('No subscription to restore'), findsNothing);
+  });
+
+  testWidgets('a restore that says what it found after it returns, as StoreKit 2 does, is waited for', (tester) async {
+    final stand = standUp();
+    final me = await Identity.signer();
+    final store = FakeStore()..restoresAfter = const Duration(seconds: 2);
+    await shopWith(store);
+    await _pumpPage(tester);
+
+    // Nothing found, said only once the store has said so.
+    await tester.tap(find.text('Restore purchases'));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+    expect(find.textContaining('No subscription to restore'), findsNothing, reason: 'the store has not said yet');
+    await tester.pump(const Duration(seconds: 2));
+    await tester.pump();
+    expect(find.text('No subscription to restore was found in this store account.'), findsOneWidget);
+
+    // Found: never said to be nothing, on the way to taking it.
+    store.restoring = [paid('restored.jws.sig', status: StoreStatus.restored)];
+    stand.says('store', {'licence': signedFor(me.publicKey)});
+    stand.says('devices', {
+      'devices': [
+        {'key': me.publicKey, 'bound_at': '2026-10-01'},
+      ],
+      'most': 5,
+      'signIn': null,
+    });
+    await tester.tap(find.text('Restore purchases'));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+    expect(find.textContaining('No subscription to restore'), findsNothing);
+    await tester.pump(const Duration(seconds: 2));
+    await tester.pumpAndSettle();
+    expect(lastAt(stand, 'store')['proof'], 'restored.jws.sig');
+    expect(Entitlement.current.live, isTrue);
+    expect(find.textContaining('No subscription to restore'), findsNothing);
+
+    // A store that never says is given up on, and found nothing.
+    await Entitlement.current.forget();
+    store.restoreSaysNothing = true;
+    await tester.pumpWidget(const SizedBox());
+    await _pumpPage(tester);
+    await tester.tap(find.text('Restore purchases'));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 4));
+    expect(find.textContaining('No subscription to restore'), findsNothing);
+    await tester.pump(const Duration(seconds: 2));
+    await tester.pump();
+    expect(find.text('No subscription to restore was found in this store account.'), findsOneWidget);
   });
 
   testWidgets('a suspended account is told so where live play would be sold, and sold nothing', (tester) async {
