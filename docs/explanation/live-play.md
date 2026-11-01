@@ -162,7 +162,9 @@ The leader's start says the same as a seating: the seats with their
 licences, the target score, the table's clocks and the house, with a
 salt, under the id their hash makes. A room's members say their licences
 in their beats, and a start whose seats do not check out, or whose
-table is not its spec's, is not sat at.
+table is not its spec's, is not sat at. Each seat at the table is shown
+under the name and look its own beats gave, whoever sent the start; the
+start's names count only for someone a device never heard.
 
 ## Bots
 

@@ -259,11 +259,12 @@ class Room extends ChangeNotifier {
   /// Set once the start event is seen; the table can be built.
   TableSpec? spec;
 
-  /// Seat number to the human's name, from the start event.
+  /// Seat number to the human's name, as their own beats said it: the
+  /// start's only for someone this device never heard.
   Map<int, String> seatNames = const {};
 
-  /// Seat number to the human's avatar, from the start event and the
-  /// pictures seen.
+  /// Seat number to the human's avatar, as their own beats said it (the
+  /// start's only for someone never heard), with the pictures seen.
   Map<int, Avatar> seatAvatars = const {};
 
   PublicKey get me => channel.me;
@@ -511,8 +512,11 @@ class Room extends ChangeNotifier {
         } else {
           final key = m['key'] as String;
           seats.add(HumanSeat(key, licence: m['licence'] == null ? null : Licence.parse(m['licence']) ?? (throw const FormatException('licence'))));
-          names[s] = m['name'] as String? ?? 'Someone';
-          final chosen = key == me ? myAvatar : Avatar.fromJson(m['avatar'], withPicture: false);
+          // Each person as their own beats said they are: whoever sent
+          // the start could have named them anything.
+          final heard = _others[key]?.member;
+          names[s] = key == me ? myName : heard?.name ?? m['name'] as String? ?? 'Someone';
+          final chosen = key == me ? myAvatar : heard?.avatar ?? Avatar.fromJson(m['avatar'], withPicture: false);
           final picture = key == me ? myAvatar.picture : _pictures[key];
           avatars[s] = picture == null ? chosen : chosen.copyWith(picture: picture);
         }

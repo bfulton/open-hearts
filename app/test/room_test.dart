@@ -552,6 +552,46 @@ void main() {
     });
   });
 
+  test('each seat is who its own beats say, whoever sends the start; the start\'s word only for someone never heard', () {
+    fakeAsync((async) {
+      final bus = Bus();
+      int now() => async.elapsed.inMilliseconds;
+      final ada = Room(
+          house: _house, canDeal: true, channel: bus.attach(FakeSigner('a')), code: 'ROOM', myName: 'Ada',
+          myAvatar: const Avatar(icon: 'rocket', color: 3), nowMs: now, startAfterMs: 60000);
+      final bao = Room(
+          house: _house, canDeal: true, channel: bus.attach(FakeSigner('b')), code: 'ROOM', myName: 'Bao',
+          myAvatar: const Avatar(icon: 'cake', color: 1), nowMs: now, startAfterMs: 60000);
+      // A changed app in the room, present by its beats, which starts
+      // the table itself and names everyone else as it likes.
+      final mallory = bus.attach(FakeSigner('mallory'));
+      mallory.announce({'kind': 'here', 'name': 'Mallory', 'seed': 1, 'since': now(), 'policy': botPolicyVersion}, ephemeral: true);
+      // Long enough for Ada and Bao to have heard each other's beats.
+      async.elapse(const Duration(seconds: 3));
+      expect(ada.members.map((m) => m.name), containsAll(['Ada', 'Bao', 'Mallory']));
+      final never = FakeSigner('never').publicKey;
+      mallory.announce(named({
+        ..._inFull, 'kind': 'start', 'seed': 7, 'policy': botPolicyVersion, 'sealed': true, 'at': now(),
+        'seats': [
+          {'key': ada.me, 'name': 'Bao', 'avatar': {'icon': 'cake', 'color': 1}},
+          {'key': bao.me, 'name': 'Ada', 'avatar': {'icon': 'rocket', 'color': 3}},
+          {'key': never, 'name': 'Cara', 'avatar': {'icon': 'cake', 'color': 2}},
+          {'bot': 'Romeo'},
+        ],
+      }));
+      async.elapse(const Duration(seconds: 1));
+      for (final room in [ada, bao]) {
+        expect(room.seated, isTrue);
+        expect(room.seatNames, {0: 'Ada', 1: 'Bao', 2: 'Cara'});
+        expect(room.seatAvatars[0], const Avatar(icon: 'rocket', color: 3));
+        expect(room.seatAvatars[1], const Avatar(icon: 'cake', color: 1));
+        expect(room.seatAvatars[2], const Avatar(icon: 'cake', color: 2), reason: 'never heard: the start says who');
+      }
+      ada.dispose();
+      bao.dispose();
+    });
+  });
+
   test('how you look travels with you: the icon and colour in every beat, the picture once, and all of it into the seats', () {
     fakeAsync((async) {
       final bus = Bus();
