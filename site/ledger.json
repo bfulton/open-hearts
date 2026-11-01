@@ -148,6 +148,19 @@
         "de": "Unser Server spielt live die Bots: Mit einem Spieler und drei Bots könnte er dessen Hand erschließen; Züge bleiben einen Tag im Relay. Dein Gerät speichert auch, ob du Spielen lernen geöffnet hast, wann du zuletzt ein Live-Spiel früh verließt und wann die App um Bewertung bat.",
         "fr": "Notre serveur joue désormais les bots en direct : avec un joueur et trois bots, il pourrait déduire sa main ; les coups restent un jour sur le relais. Votre appareil garde aussi si vous avez ouvert Apprendre à jouer, votre dernier départ anticipé et la dernière demande de note."
       }
+    },
+    {
+      "date": "2026-11-01",
+      "fingerprint": "b4123ba1ca558a649983b5f8177dfafb9796c6ec1828b37406fbdeb86fd09c54",
+      "change": "material",
+      "storesNotified": null,
+      "summary": {
+        "en": "The policy now says what our relay's own log, kept seven days, notes: which account backup codes were emailed for, which account's pictures were left to be checked, and a code for each picture. It already did; the policy had not said so.",
+        "es": "La política ahora dice qué anota el registro propio de nuestro relé, que se guarda siete días: para qué cuenta se enviaron códigos de respaldo, de qué cuenta quedaron imágenes por revisar y un código de cada imagen. Ya lo hacía; la política no lo decía.",
+        "pt": "A política agora diz o que o registro próprio do nosso relay, guardado por sete dias, anota: para qual conta foram enviados códigos de backup, de qual conta imagens ficaram para verificar e um código de cada imagem. Já era assim; a política não dizia.",
+        "de": "Die Richtlinie sagt jetzt, was das eigene Protokoll unseres Relays, sieben Tage aufbewahrt, festhält: für welches Konto Backup-Codes verschickt wurden, welche Bilder welches Kontos noch zu prüfen waren und ein Code je Bild. Das tat es schon; die Richtlinie sagte es nicht.",
+        "fr": "La politique dit maintenant ce que note le journal propre de notre relais, gardé sept jours : pour quel compte des codes de secours ont été envoyés, les images de quel compte restaient à vérifier, et un code par image. C'était déjà le cas ; la politique ne le disait pas."
+      }
     }
   ]
 }
