@@ -621,7 +621,7 @@ void main() {
       expect(ProfileButton.shown(null), isNull, reason: 'the relays have not said');
       final ledger = Ledger();
       expect(ProfileButton.shown(Standing(ledger, me)), isNull, reason: 'the 1500 everyone starts at is not earned');
-      ledger.apply(GameResult(table: 't1', rated: true, at: 0, seats: [
+      ledger.apply(GameResult(table: 't1', rated: true, at: 0, v: GameResult.version, seats: [
         SeatResult(human: true, key: me, account: me, total: 20, fromStart: true),
         SeatResult(human: false, bot: 'Romeo', total: 50, fromStart: true),
         SeatResult(human: false, bot: 'Juliet', total: 60, fromStart: true),

@@ -167,6 +167,7 @@ void main() {
           table: table,
           rated: true,
           at: 0,
+          v: GameResult.version,
           seats: [
             SeatResult(human: true, key: me, account: me, total: totals[0], fromStart: true),
             SeatResult(human: true, key: you, account: you, total: totals[1], fromStart: true),

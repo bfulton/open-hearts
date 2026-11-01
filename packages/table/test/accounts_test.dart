@@ -148,7 +148,7 @@ void main() {
       const BotSeat(Persona.romeo),
       const BotSeat(Persona.juliet),
     ]);
-    final result = GameResult.of(spec, spec.seats, [10, 50, 60, 80]);
+    final result = GameResult(table: spec.id, rated: true, seats: GameResult.seatsOf(spec, spec.seats, [10, 50, 60, 80]), at: 0, v: 2);
     NostrEvent say(Signer s, Map<String, Object?> content, int at) =>
         NostrEvent.sign(s, kind: TableKinds.lobby, content: jsonEncode(content), tags: [
           ['t', GameResult.tag]

@@ -104,7 +104,7 @@ class SeatResult {
 
 class GameResult {
   const GameResult(
-      {required this.table, required this.rated, required this.seats, required this.at, this.v = 2, this.state, this.endN, this.endHash});
+      {required this.table, required this.rated, required this.seats, required this.at, required this.v, this.state, this.endN, this.endHash});
 
   final String table;
   final bool rated;
@@ -156,7 +156,7 @@ class GameResult {
       final v = m['v'];
       if (m['kind'] != 'result' || v is! int || !versions.contains(v)) return null;
       final seats = [for (final s in m['seats'] as List) SeatResult.parse(s)!];
-      if (v == 2) return GameResult(table: m['table'] as String, rated: m['rated'] == true, seats: seats, at: e.createdAt);
+      if (v == 2) return GameResult(table: m['table'] as String, rated: m['rated'] == true, seats: seats, at: e.createdAt, v: 2);
       final state = m['state'] as String;
       if (state != TableState.finished.name && state != TableState.ended.name) return null;
       final end = m['end'] as Map;
@@ -181,11 +181,10 @@ class GameResult {
   static GameResult? ofTable(TableRules rules) {
     final spec = rules.spec;
     if (spec == null || rules.endN == null || (rules.state != TableState.finished && rules.state != TableState.ended)) return null;
-    final seats = GameResult.of(spec, rules.holders, rules.game.totals).seats;
     return GameResult(
       table: spec.id,
       rated: spec.rated,
-      seats: seats,
+      seats: seatsOf(spec, rules.holders, rules.game.totals),
       at: 0,
       v: version,
       state: rules.state.name,
@@ -199,9 +198,9 @@ class GameResult {
         ['t', tag],
       ]);
 
-  /// Builds a result from a finished game: the spec says who sat down,
-  /// the holders who finished, and the totals settle it.
-  factory GameResult.of(TableSpec spec, List<SeatHolder> finalHolders, List<int> totals) {
+  /// The lines of a finished game: the spec says who sat down, the
+  /// holders who finished, and the totals settle it.
+  static List<SeatResult> seatsOf(TableSpec spec, List<SeatHolder> finalHolders, List<int> totals) {
     final seats = <SeatResult>[];
     for (var s = 0; s < seatCount; s++) {
       final start = spec.seats[s];
@@ -216,7 +215,7 @@ class GameResult {
         seats.add(SeatResult(human: false, bot: (start as BotSeat).persona.id, total: totals[s], fromStart: true));
       }
     }
-    return GameResult(table: spec.id, rated: spec.rated, seats: seats, at: 0);
+    return seats;
   }
 
   /// The accounts who sat down, whose majority makes the result stand.
@@ -358,8 +357,8 @@ class Ledger {
       v.signers.add(account);
     }
     final standing = <GameResult>[...said.values];
-    for (final versions in byTable.values) {
-      if (said.isNotEmpty && versions.values.any((v) => said.containsKey(v.result.table))) continue;
+    for (final MapEntry(key: table, value: versions) in byTable.entries) {
+      if (said.containsKey(table)) continue;
       for (final v in versions.values) {
         if (v.signers.length >= v.result.humans.length ~/ 2 + 1) {
           standing.add(v.result);
