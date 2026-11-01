@@ -18,11 +18,24 @@ import { termsProblems } from './terms.mjs';
 
 const TARGETS = ['site', 'relay', 'phone'];
 
-/// The folders the site's deploy publishes whole: every page in
-/// site/pages, every file in site/public and app/web, and every module
-/// in service/functions (site/build.mjs, deploy.sh). A file git ignores
-/// there is published like any other.
-const PUBLISHED_WHOLE = ['site/pages', 'site/public', 'app/web', 'service/functions'];
+/// The folders the site's deploy takes files from (site/build.mjs,
+/// deploy.sh).
+const PUBLISHED_FROM = ['site/pages', 'site/public', 'app/web', 'service/functions'];
+
+/// Whether the site's deploy publishes [path], whether or not git
+/// ignores it: each page in site/pages, each module in
+/// service/functions but the tests and their fixtures, and every file
+/// in site/public and app/web but those Wrangler leaves out of an
+/// upload (a .DS_Store, and anything in a node_modules or .git folder).
+function published(path) {
+  const parts = path.split('/');
+  const name = parts.at(-1);
+  const folder = parts.slice(0, -1).join('/');
+  if (folder === 'site/pages') return name.endsWith('.html');
+  if (folder === 'service/functions') return name.endsWith('.mjs') && !/\.(test|fixtures)\.mjs$/.test(name);
+  if (name === '.DS_Store' || parts.includes('node_modules') || parts.includes('.git')) return false;
+  return path.startsWith('site/public/') || path.startsWith('app/web/');
+}
 
 const firstLine = (text) => text.trim().split('\n')[0] || 'git said nothing';
 
@@ -44,10 +57,10 @@ async function sourceProblems(ctx) {
   return problems;
 }
 
-/// Files git ignores in the folders the site is published from whole.
+/// Files git ignores that the site's deploy would publish.
 async function ignoredProblems(ctx) {
-  const listed = (await ctx.capture('git', ['status', '--porcelain', '--ignored', '--untracked-files=all', '--', ...PUBLISHED_WHOLE])).out;
-  const ignored = listed.split('\n').filter((l) => l.startsWith('!! ')).map((l) => l.slice(3));
+  const listed = (await ctx.capture('git', ['status', '--porcelain', '--ignored', '--untracked-files=all', '--', ...PUBLISHED_FROM])).out;
+  const ignored = listed.split('\n').filter((l) => l.startsWith('!! ')).map((l) => l.slice(3)).filter(published);
   return ignored.length ? [`files git ignores would be published: ${ignored.join(', ')}`] : [];
 }
 

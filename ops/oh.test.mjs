@@ -167,12 +167,18 @@ test('production is released only from main as it was reviewed', async () => {
   // A file git does not track is published as much as a changed one.
   const untracked = await releaseProblems(fake({ capture: git({ ...clean, 'status --porcelain': '?? site/pages/draft.html\n' }) }), 'relay');
   assert.deepEqual(untracked, ['uncommitted changes: 1 file(s)']);
-  // So is one git ignores, where the site is published from whole; the
+  // So is one git ignores, where the site's deploy would publish it; the
   // relay's build takes only what its code imports.
   const published = 'status --porcelain --ignored --untracked-files=all -- site/pages site/public app/web service/functions';
-  const ignored = { ...clean, [published]: '!! site/public/.DS_Store\n!! app/web/notes.txt\n' };
-  assert.deepEqual(await releaseProblems(fake({ capture: git(ignored), ...settled() }), 'site'), ['files git ignores would be published: site/public/.DS_Store, app/web/notes.txt']);
+  const ignored = { ...clean, [published]: '!! app/web/.index.html.swp\n!! site/public/img/notes.txt\n!! site/pages/draft.html\n!! service/functions/scratch.mjs\n' };
+  assert.deepEqual(await releaseProblems(fake({ capture: git(ignored), ...settled() }), 'site'), ['files git ignores would be published: app/web/.index.html.swp, site/public/img/notes.txt, site/pages/draft.html, service/functions/scratch.mjs']);
   assert.deepEqual(await releaseProblems(fake({ capture: git(ignored) }), 'relay'), []);
+  // An ignored file the deploy leaves out is no reason to refuse it:
+  // Wrangler uploads no .DS_Store and nothing in node_modules or .git,
+  // site/build.mjs reads only the pages' .html, and deploy.sh copies
+  // only the service's modules, not their tests or fixtures.
+  const unpublished = { ...clean, [published]: '!! site/public/.DS_Store\n!! site/public/img/.DS_Store\n!! app/web/node_modules/x/a.js\n!! app/web/.git/HEAD\n!! site/pages/.draft.html.swp\n!! service/functions/notes.txt\n!! service/functions/old/x.mjs\n!! service/functions/x.test.mjs\n!! service/functions/x.fixtures.mjs\n' };
+  assert.deepEqual(await releaseProblems(fake({ capture: git(unpublished), ...settled() }), 'site'), []);
   // Main as it is now: a fetch that failed leaves this clone's main as
   // it last saw it, which may be older.
   const offline = await releaseProblems(fake({ capture: git({ ...clean, 'fetch -q origin main': { code: 128, out: "fatal: unable to access 'https://github.com/x/y/': Could not resolve host: github.com\n" } }) }), 'relay');
