@@ -37,7 +37,8 @@ functions over bytes in `crypto/deal`.
 - **Declaring the lead.** The holder of the 2♣ declares it with the
   token that opens it for everyone.
 - **Pass.** Moving three positions to another seat is public. The tokens
-  that open them are sealed to the receiver (below).
+  that open them, and the proofs they will be played with, are sealed to
+  the receiver (below).
 - **Play.** A play is the token that opens a position for everyone. The
   card it opens must be the card named, so nobody can play a card they
   do not hold. The rules are checked as far as they can be without the
@@ -110,7 +111,38 @@ challenge from a hash of the statement, answer `z1 = a + c·sk` and
 group elements and scalars (`SEAL_PROOF` in `crypto/deal/src/lib.rs`),
 and every side checks it before it takes the pass. A pass that fails
 the check is taken by nobody, and the passer's clock runs out at its
-own turn. The receiver never has to complain.
+own turn. The receiver never has to complain about the token.
+
+**The proof that goes with the token.** What the receiver opens is the
+32-byte token. The Chaum–Pedersen proof that makes it whole (96 bytes,
+as for any token that travels alone) is the passer's to make, and the
+receiver needs it later: when it plays the card, the play carries the
+passer's token with its proof, and every side checks that against the
+passer's key. So the proof has to reach the receiver, and it cannot
+travel in the clear. A proof is also a test for the token it belongs
+to. The other three seats' tokens for the passer's positions are public,
+and the 52 cards are fixed points, so there are 52 candidates for the
+passer's token (the masked card's second half, less those three
+tokens, less the card), and the proof verifies for exactly one of them.
+With the proof in the log, anyone reading it could find every card
+that was passed.
+
+It travels inside what is sealed to the receiver instead: in the same
+field of the pass, after the seal and its argument, 96 bytes XORed with
+a pad. The pad is HMAC-SHA-256 keyed by the secret that the passer's and
+the receiver's deal keys share (`shared_secret`, the same from either
+side), over the table, hand, seats and position, so no two positions
+share one. Only a holder of one of those two secrets can make it: the
+receiver, or everyone once the passer or the receiver has left and its
+secret is rebuilt, when that seat's cards are open to the table anyway.
+There is no tag. The receiver checks the whole token against the
+passer's key when it opens the seal, as any token is checked when it
+arrives.
+
+The argument is about the token, so it cannot say anything about a proof
+that nobody else can see. A passer that hides a proof which does not
+verify is not caught: every side takes the pass, and the receiver cannot
+open those positions.
 
 ### The one fault no proof catches
 
@@ -199,6 +231,12 @@ hand it came from. A seat opened from the escrow is not audited, since
 its released pieces stand in for its audit. A record that does not reach
 the end of the game, or whose end the house did not sign for, is
 rejected ([game records](live-play.md#game-records)).
+
+A game kept before passes hid their proofs has each proof in the clear
+beside its seal. The two verifiers of kept games (`verifyRecord` and the
+frozen `legacy/v2_record.dart`) still read a pass that way, because
+games are kept for good (`DealSession.readsOldPasses`). A table never
+does.
 
 ## Cost, and keeping it off the page
 
