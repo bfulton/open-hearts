@@ -375,13 +375,21 @@ async function orderRoute(request, env) {
   const { status, body } = await inHousehold(env, order.account, { op: 'order', account: order.account, order: id });
   if (status !== 200 || order.act !== 'terminate' || order.endWeb !== true) return json(request, status, body);
   const web = webSubscriptionsOf(await store.get(`ACCOUNT#${order.account}`, 'META'));
+  return (await endWebSubscriptions(request, env, web, 'terminated under the terms')) ?? json(request, 200, { ...body, endedWeb: web });
+}
+
+/// Each of [web], an account's web subscriptions, ended in Stripe with
+/// [comment] as the reason: null once they are, or the answer when they
+/// could not be, 503 without the Stripe key and 502 when Stripe did not
+/// answer, so that the asker asks again.
+async function endWebSubscriptions(request, env, web, comment) {
   if (web.length && !env.OH_STRIPE_SECRET) return json(request, 503, notConfigured('OH_STRIPE_SECRET'));
   try {
-    for (const sub of web) await endAtStripe(sub, env.OH_STRIPE_SECRET, 'terminated under the terms');
+    for (const sub of web) await endAtStripe(sub, env.OH_STRIPE_SECRET, comment);
   } catch {
     return json(request, 502, { error: 'the shop is not answering' });
   }
-  return json(request, 200, { ...body, endedWeb: web });
+  return null;
 }
 
 async function manageRoute(request, env) {
@@ -534,13 +542,8 @@ async function deleteRoute(request, env) {
   const account = await accountOfKey(store, asked.key);
   if (!account || !(await store.get(`ACCOUNT#${account}`, `DEVICE#${asked.key}`))) return json(request, 404, { error: 'no account' });
   if (!(await holdOf(store, account))) {
-    const web = webSubscriptionsOf(await store.get(`ACCOUNT#${account}`, 'META'));
-    if (web.length && !env.OH_STRIPE_SECRET) return json(request, 503, notConfigured('OH_STRIPE_SECRET'));
-    try {
-      for (const sub of web) await endAtStripe(sub, env.OH_STRIPE_SECRET, 'account deleted');
-    } catch {
-      return json(request, 502, { error: 'the shop is not answering' });
-    }
+    const unended = await endWebSubscriptions(request, env, webSubscriptionsOf(await store.get(`ACCOUNT#${account}`, 'META')), 'account deleted');
+    if (unended) return unended;
     if (env.OH_RECORDS) {
       await markForgotten(env.OH_RECORDS, account);
       const unwritten = [];
