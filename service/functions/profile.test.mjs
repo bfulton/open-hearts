@@ -70,7 +70,7 @@ async function twoDevices() {
   const env = { ASSETS: assets, OH_SERVICE_SECRET: SERVICE_SECRET, OH_SERVICE_KEY: SERVICE_KEY, OH_STORE: kvOf(store) };
   const ask = async (pair, handler, more = {}) => {
     const res = await worker.fetch(
-      new Request(`https://dev.open-hearts.pages.dev/api/${handler}`, { method: 'POST', body: JSON.stringify(await asking(pair, handler, more)) }),
+      new Request(`https://play.openhearts.game/api/${handler}`, { method: 'POST', body: JSON.stringify(await asking(pair, handler, more)) }),
       env,
     );
     return { status: res.status, body: await res.json() };

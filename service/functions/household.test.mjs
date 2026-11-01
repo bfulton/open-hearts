@@ -119,7 +119,7 @@ test("an operator's order, through the service to the account's own object: its 
   assert.equal((await inHousehold(env, account, { op: 'seen', key: KEY, account, epoch: 1, tag: 'online' })).status, 200);
   // The tool, asking this worker.
   const fetchImpl = (url, init) => worker.fetch(new Request(url, init), env);
-  const done = await carry(store, account, 'suspend', {}, { origin: 'https://dev.open-hearts.pages.dev', fetchImpl, wait: 0 });
+  const done = await carry(store, account, 'suspend', {}, { origin: 'https://play.openhearts.game', fetchImpl, wait: 0 });
   assert.deepEqual(done, { status: 200, body: { act: 'suspend', suspended: true, flagged: 2, cutOff: true } });
   assert.deepEqual(told, [{ tag: 'online', path: '/revoke', account, epoch: 2, why: SUSPENDED_WHY }]);
   // Its devices take nothing up, told why, and an activation from
@@ -127,7 +127,7 @@ test("an operator's order, through the service to the account's own object: its 
   assert.deepEqual(await inHousehold(env, account, { op: 'activate', key: KEY, account, want: 'take' }), { status: 403, body: { error: SUSPENDED_WHY, suspended: true } });
   assert.deepEqual(await inHousehold(env, account, { op: 'seen', key: KEY, account, epoch: 1, tag: 'pool' }), { status: 409, body: { error: SUSPENDED_WHY } });
   // Let back: a device takes the account up again.
-  assert.equal((await carry(store, account, 'lift', {}, { origin: 'https://dev.open-hearts.pages.dev', fetchImpl, wait: 0 })).status, 200);
+  assert.equal((await carry(store, account, 'lift', {}, { origin: 'https://play.openhearts.game', fetchImpl, wait: 0 })).status, 200);
   assert.equal((await inHousehold(env, account, { op: 'activate', key: KEY, account, want: 'open' })).status, 200);
 });
 
@@ -151,11 +151,11 @@ test('an order the store has not got wakes no account', async () => {
   const store = await household(1);
   let woken = 0;
   const env = { OH_STORE: kvOf(store), HOUSEHOLD: { idFromName: (n) => n, get: () => (woken++, { fetch: async () => Response.json({}) }) } };
-  const ask = (body) => worker.fetch(new Request('https://dev.open-hearts.pages.dev/api/order', { method: 'POST', body }), env);
+  const ask = (body) => worker.fetch(new Request('https://play.openhearts.game/api/order', { method: 'POST', body }), env);
   assert.equal((await ask(JSON.stringify({ order: 'e'.repeat(32) }))).status, 404);
   assert.equal((await ask(JSON.stringify({ order: 'not one' }))).status, 400);
   assert.equal((await ask('not json')).status, 400);
-  assert.equal((await worker.fetch(new Request('https://dev.open-hearts.pages.dev/api/order'), env)).status, 405);
+  assert.equal((await worker.fetch(new Request('https://play.openhearts.game/api/order'), env)).status, 405);
   assert.equal(woken, 0);
 });
 
@@ -243,10 +243,10 @@ test('a household is held to so many changes an hour', async () => {
 
 test('a body too big to be one of ours is not read', async () => {
   const big = JSON.stringify({ key: KEY, pad: 'x'.repeat(20000) });
-  const res = await worker.fetch(new Request('https://dev.open-hearts.pages.dev/api/licence', { method: 'POST', body: big }), {});
+  const res = await worker.fetch(new Request('https://play.openhearts.game/api/licence', { method: 'POST', body: big }), {});
   assert.equal(res.status, 400);
   const event = await worker.fetch(
-    new Request('https://dev.open-hearts.pages.dev/api/stripe', { method: 'POST', body: 'x'.repeat(600 * 1024) }),
+    new Request('https://play.openhearts.game/api/stripe', { method: 'POST', body: 'x'.repeat(600 * 1024) }),
     { OH_STRIPE_WEBHOOK_SECRET: 'whsec' },
   );
   assert.equal(event.status, 413);
@@ -263,7 +263,7 @@ test('a body sent with no length is read no further than what one of ours could 
       if (pulled >= 8 * 1024 * 1024) c.close();
     },
   });
-  const at = 'https://dev.open-hearts.pages.dev/api/stripe';
+  const at = 'https://play.openhearts.game/api/stripe';
   const sent = new Request(at, { method: 'POST', body: big, duplex: 'half' });
   assert.equal(sent.headers.get('content-length'), null);
   const res = await worker.fetch(sent, { OH_STRIPE_WEBHOOK_SECRET: 'whsec' });

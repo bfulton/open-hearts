@@ -731,6 +731,14 @@ squashed from a pull request, the pull request's number.
   service reads no request body past its bound, and quotes a report's
   note in the operator's email so that it cannot pass for instructions.
   (2026-11-01, #47)
+- Production's service no longer answers on its `open-hearts.pages.dev`
+  addresses. `/api/` was answered there too, at the project's own
+  address and at one for each production deployment kept, where the
+  zone's per-address rate limit on the app's host does not reach.
+  Production now answers `/api/` on the app's host and on a developer's
+  machine only, and anywhere else says there is no such handler; a
+  preview still answers wherever it is reached. Stripe, the stores and
+  the monitors already call the app's host. (2026-11-01, #47)
 - Releases are held to reviewed code throughout. A production web
   build takes nothing from the shell: its keys and sign-in IDs come
   from config/openhearts.json, and its relay is the app's own, as a

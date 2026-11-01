@@ -17,7 +17,7 @@
 
 import { accountOfKey, backupCodeOf, backupRow, entitlementOf } from './accounts.mjs';
 import { alertReport, alertSubscribed, alertUnwritten, alertWaiting, reportOf } from './alerts.mjs';
-import { appHostFor, serveStatic } from './app_host.mjs';
+import { APP_HOST, appHostFor, serveStatic } from './app_host.mjs';
 import { CONFIG_ROW, configOf } from './config.mjs';
 import { healthOf } from './health.mjs';
 import { holdOf } from './holds.mjs';
@@ -31,7 +31,7 @@ import { MOST_PROFILE_BODY } from './profile.mjs';
 import { anonymizeGames, keepRecord, keptGames, markForgotten, recordMost, recordResponse, tableIdShape } from './records.mjs';
 import { REFUSED } from './refusals.mjs';
 import { bytesOf64, isAccount, storeOf } from './rows.mjs';
-import { loadServiceSettings, notConfigured, openHouse, serviceSettings } from './settings.mjs';
+import { isLocal, loadServiceSettings, notConfigured, openHouse, serviceSettings } from './settings.mjs';
 import { APPLE_ID_GONE, PROVIDERS, appleIdNotice, supersede, unlinkFromAccount, whoSignedIn } from './signin.mjs';
 import { appleTransaction, playPurchase, playSubscriptionOf, pushedByPlay, storeAccountOf } from './stores.mjs';
 import { checkout, endAtStripe, endRefunded, manage, payerLookup, record, sameSite, webSubscriptionsOf, webhookSigned } from './stripe.mjs';
@@ -766,6 +766,14 @@ const ROUTES = {
   order: (request, env) => orderRoute(request, env),
 };
 
+/// Whether this deployment answers /api/ at [url]. A preview answers on
+/// whatever address it is reached by; production, on the app's host and
+/// on this machine's, and nowhere else. The zone's rate limit is on the
+/// app's host (infra/cloudflare.mjs), and a production deployment is
+/// reachable at open-hearts.pages.dev too, and at an address of its own
+/// for as long as it is kept, where that limit does not reach.
+const answersApi = (env, url) => env.OH_DEPLOYMENT === 'preview' || url.hostname === APP_HOST || isLocal(url.href);
+
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
@@ -776,6 +784,7 @@ export default {
     if (appHostFor(url.hostname)) {
       return Response.json({ error: `the service has moved to ${appHostFor(url.hostname)}` }, { status: 404, headers: { 'cache-control': 'no-store' } });
     }
+    if (!answersApi(env, url)) return json(request, 404, { error: 'no such handler' });
     const route = Object.hasOwn(ROUTES, name) ? ROUTES[name] : null;
     const started = Date.now();
     if (route) await loadServiceSettings(env);

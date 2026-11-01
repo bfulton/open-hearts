@@ -23,7 +23,7 @@ The worker routes by host. The default `fetch` in `service/functions/worker.mjs`
 |---|---|---|
 | `play.openhearts.game` (rig: `play.openhearts.localhost`) | The handlers | The app at the root. A path with no file extension (`appPage`) is the build's `/play/` page; any other path is that file under `/play/`. |
 | `openhearts.game` (rig: `openhearts.localhost`) | 404, with `{"error": "the service has moved to <app host>"}` | The site. `/play` and `/play/…` are 404. `/carry` and `/carry.html` may be framed by the app's host only (`framedBy`). In the rig, links to `https://play.openhearts.game/` point at the rig's app host. |
-| Any other host: a preview (`*.open-hearts.pages.dev`), or `127.0.0.1` in the rig | The handlers | The site at the root, with its links to `https://play.openhearts.game/` pointed at this host's `/play/`. The app at `/play/`, with the page's `<base href="/">` moved to `/play/` (`underPlay`). |
+| Any other host: a preview (`*.open-hearts.pages.dev`), or `127.0.0.1` in the rig | The handlers on a preview, and in the rig; on a production deployment, 404 with `{"error": "no such handler"}` (`answersApi` in `service/functions/worker.mjs`), as at `open-hearts.pages.dev` or a deployment's own address, where the zone's rate limit does not reach | The site at the root, with its links to `https://play.openhearts.game/` pointed at this host's `/play/`. The app at `/play/`, with the page's `<base href="/">` moved to `/play/` (`underPlay`). |
 
 A name that is not a handler answers 404 with `{"error": "no such handler"}`.
 

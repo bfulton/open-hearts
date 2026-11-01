@@ -76,7 +76,7 @@ const assets = {
 };
 const env = { OH_TURN_KEY_ID: 'kid', OH_TURN_API_TOKEN: 'tok', ASSETS: assets };
 const post = (body, origin) =>
-  new Request('https://dev.open-hearts.pages.dev/api/turn', {
+  new Request('https://play.openhearts.game/api/turn', {
     method: 'POST',
     headers: { 'content-type': 'application/json', ...(origin ? { origin } : {}) },
     body: JSON.stringify(body),
@@ -95,7 +95,7 @@ test('origins: the site, its branches and a dev machine; nobody else', () => {
   // site, which a page on somebody's localhost has no business calling.
   assert.equal(allowedOrigin('http://localhost:8788', 'http://localhost:8788/api/turn'), 'http://localhost:8788');
   assert.equal(allowedOrigin('http://127.0.0.1:8788', 'http://127.0.0.1:8788/api/turn'), 'http://127.0.0.1:8788');
-  assert.equal(allowedOrigin('http://localhost:8788', 'https://dev.open-hearts.pages.dev/api/turn'), null);
+  assert.equal(allowedOrigin('http://localhost:8788', 'https://play.openhearts.game/api/turn'), null);
   assert.equal(allowedOrigin('http://127.0.0.1:8788'), null);
   // The browser rig's site and app (e2e/drive.mjs), on this machine only.
   assert.equal(allowedOrigin('http://play.openhearts.localhost:8788', 'http://play.openhearts.localhost:8788/api/turn'), 'http://play.openhearts.localhost:8788');
@@ -149,23 +149,46 @@ test('mint: an upstream that refuses, is down, or talks nonsense is a bad gatewa
 test('the worker: assets pass through, handlers answer, the rest is 404', async () => {
   const asset = await worker.fetch(new Request('https://dev.open-hearts.pages.dev/play/index.html'), env);
   assert.equal(await asset.text(), 'asset');
-  const missing = await worker.fetch(new Request('https://dev.open-hearts.pages.dev/api/nothing'), env);
+  const missing = await worker.fetch(new Request('https://play.openhearts.game/api/nothing'), env);
   assert.equal(missing.status, 404);
-  const wrongMethod = await worker.fetch(new Request('https://dev.open-hearts.pages.dev/api/turn'), env);
+  const wrongMethod = await worker.fetch(new Request('https://play.openhearts.game/api/turn'), env);
   assert.equal(wrongMethod.status, 405);
   assert.equal(wrongMethod.headers.get('allow'), 'POST, OPTIONS');
 });
 
+test('the worker: production answers /api/ on the app\'s host and this machine\'s, and nowhere else; a preview, wherever it is reached', async () => {
+  const ask = (host, e = env) => worker.fetch(new Request(`https://${host}/api/turn`, { method: 'POST', body: 'not json' }), e);
+  // Not found, as for a handler that is not there: the address a
+  // production deployment also has, at which the zone's rate limit on
+  // the app's host does not reach, and one of its own for as long as it
+  // is kept.
+  for (const host of ['open-hearts.pages.dev', 'abc123.open-hearts.pages.dev', 'main.open-hearts.pages.dev', 'dev.open-hearts.pages.dev']) {
+    const there = await ask(host);
+    assert.equal(there.status, 404, host);
+    assert.deepEqual(await there.json(), { error: 'no such handler' }, host);
+  }
+  assert.notEqual((await ask('play.openhearts.game')).status, 404, 'the app\'s host');
+  assert.notEqual((await ask('play.openhearts.localhost')).status, 404, 'the rig\'s');
+  assert.notEqual((await worker.fetch(new Request('http://127.0.0.1:8788/api/turn', { method: 'POST', body: 'not json' }), env)).status, 404, 'this machine');
+  // A preview runs with its own setting, and is reached at the address it has.
+  const preview = { ...env, OH_DEPLOYMENT: 'preview' };
+  assert.notEqual((await ask('dev.open-hearts.pages.dev', preview)).status, 404);
+  // The site's host says where the service went, as it did.
+  assert.equal((await (await ask('openhearts.game')).json()).error, 'the service has moved to play.openhearts.game');
+  // The assets are not behind it.
+  assert.equal(await (await worker.fetch(new Request('https://open-hearts.pages.dev/play/index.html'), env)).text(), 'asset');
+});
+
 test('the worker: a preflight from an allowed origin, and none from another', async () => {
-  const ok = await worker.fetch(new Request('https://dev.open-hearts.pages.dev/api/turn', { method: 'OPTIONS', headers: { origin: 'https://dev.open-hearts.pages.dev' } }), env);
+  const ok = await worker.fetch(new Request('https://play.openhearts.game/api/turn', { method: 'OPTIONS', headers: { origin: 'https://dev.open-hearts.pages.dev' } }), env);
   assert.equal(ok.status, 204);
   assert.equal(ok.headers.get('access-control-allow-origin'), 'https://dev.open-hearts.pages.dev');
   const local = await worker.fetch(new Request('http://127.0.0.1:8788/api/turn', { method: 'OPTIONS', headers: { origin: 'http://127.0.0.1:8788' } }), env);
   assert.equal(local.headers.get('access-control-allow-origin'), 'http://127.0.0.1:8788', 'a dev machine, asking itself');
-  const fromLocal = await worker.fetch(new Request('https://dev.open-hearts.pages.dev/api/turn', { method: 'OPTIONS', headers: { origin: 'http://127.0.0.1:8788' } }), env);
+  const fromLocal = await worker.fetch(new Request('https://play.openhearts.game/api/turn', { method: 'OPTIONS', headers: { origin: 'http://127.0.0.1:8788' } }), env);
   assert.equal(fromLocal.headers.get('access-control-allow-origin'), null, 'a localhost page, asking the deployed site');
   assert.equal(ok.headers.get('access-control-allow-methods'), 'POST, OPTIONS');
-  const no = await worker.fetch(new Request('https://dev.open-hearts.pages.dev/api/turn', { method: 'OPTIONS', headers: { origin: 'https://evil.example' } }), env);
+  const no = await worker.fetch(new Request('https://play.openhearts.game/api/turn', { method: 'OPTIONS', headers: { origin: 'https://evil.example' } }), env);
   assert.equal(no.status, 204);
   assert.equal(no.headers.get('access-control-allow-origin'), null);
 });
@@ -173,7 +196,7 @@ test('the worker: a preflight from an allowed origin, and none from another', as
 test('the worker: a key is required, then credentials come back, no-store', async () => {
   const bad = await worker.fetch(post({ key: 'short' }), env);
   assert.equal(bad.status, 400);
-  const none = await worker.fetch(new Request('https://dev.open-hearts.pages.dev/api/turn', { method: 'POST', body: 'not json' }), env);
+  const none = await worker.fetch(new Request('https://play.openhearts.game/api/turn', { method: 'POST', body: 'not json' }), env);
   assert.equal(none.status, 400);
   // A subscribed device, asking for itself (who is asking, below).
   const held = { ...env, OH_STORE: kvOf(await household(Date.now(), ADA.public)) };
@@ -264,7 +287,7 @@ const kvOf = (store, puts = []) => ({
 /// The worker, configured, over [store]; and a way to ask it.
 const serving = (store, puts) => ({
   held: { ...env, OH_SERVICE_SECRET: SERVICE_SECRET, OH_SERVICE_KEY: SERVICE_KEY, OH_STORE: kvOf(store, puts) },
-  send: (what, body) => new Request(`https://dev.open-hearts.pages.dev/api/${what}`, { method: 'POST', body: JSON.stringify(body) }),
+  send: (what, body) => new Request(`https://play.openhearts.game/api/${what}`, { method: 'POST', body: JSON.stringify(body) }),
 });
 
 test('days: an ISO date in UTC, and a month on from one', () => {
@@ -367,7 +390,7 @@ test('the licence: a suspended account is told so, apart from having no subscrip
 });
 
 test('the licence route: a key is required, and what comes back verifies', async () => {
-  const at = 'https://dev.open-hearts.pages.dev/api/licence';
+  const at = 'https://play.openhearts.game/api/licence';
   const withStore = { ...env, OH_SERVICE_SECRET: SERVICE_SECRET, OH_SERVICE_KEY: SERVICE_KEY, OH_STORE: kvOf(subscribed(ADA.public, { renews_at: '2027-01-01' })) };
   const bad = await worker.fetch(new Request(at, { method: 'POST', body: JSON.stringify({ key: 'short' }) }), withStore);
   assert.equal(bad.status, 400);
@@ -392,9 +415,9 @@ test('the licence route: a key is required, and what comes back verifies', async
 // ---- buying -------------------------------------------------------------
 
 test('where a buyer may be sent back to: this site, and nowhere else', () => {
-  const at = 'https://dev.open-hearts.pages.dev/api/checkout';
-  assert.equal(sameSite('https://dev.open-hearts.pages.dev/play/?bought=1', at), 'https://dev.open-hearts.pages.dev/play/?bought=1');
-  assert.equal(sameSite('/play/', at), 'https://dev.open-hearts.pages.dev/play/');
+  const at = 'https://play.openhearts.game/api/checkout';
+  assert.equal(sameSite('https://play.openhearts.game/play/?bought=1', at), 'https://play.openhearts.game/play/?bought=1');
+  assert.equal(sameSite('/play/', at), 'https://play.openhearts.game/play/');
   assert.equal(sameSite('https://evil.example/paid', at), null);
   assert.equal(sameSite('https://open-hearts.pages.dev/play/', at), null, 'another branch is another origin');
   assert.equal(sameSite(undefined, at), null);
@@ -505,7 +528,7 @@ test('the webhook route: a refund ends the subscription, and is sent again when 
   const store = memoryStore();
   await store.put('SUB#sub_9', 'META', { source: 'stripe' });
   const shop = { ...env, OH_STRIPE_WEBHOOK_SECRET: SIGNING, OH_STORE: kvOf(store), OH_STRIPE_SECRET: 'rk_test' };
-  const at = 'https://dev.open-hearts.pages.dev/api/stripe';
+  const at = 'https://play.openhearts.game/api/stripe';
   const raw = JSON.stringify({ type: 'charge.refunded', data: { object: refunded() } });
   const send = () => worker.fetch(new Request(at, { method: 'POST', headers: { 'stripe-signature': 'x' }, body: raw }), shop);
   const realFetch = globalThis.fetch;
@@ -653,7 +676,7 @@ test('only a checkout this service made, and paid for, binds a device', async ()
 test('the webhook route: unsigned is refused, signed is recorded and acknowledged', async () => {
   const store = memoryStore();
   const shop = { ...env, OH_STRIPE_WEBHOOK_SECRET: SIGNING, OH_STORE: kvOf(store) };
-  const at = 'https://dev.open-hearts.pages.dev/api/stripe';
+  const at = 'https://play.openhearts.game/api/stripe';
   const raw = JSON.stringify({
     type: 'customer.subscription.created',
     data: { object: { id: 'sub_9', current_period_end: Math.floor(Date.UTC(2027, 8, 16) / 1000) } },
@@ -679,7 +702,7 @@ test('the webhook route: a checkout paid for makes the backup codes and emails t
     EMAIL: { send: async (m) => got.push(m) },
     OH_MAIL_FROM: 'noreply@openhearts.game',
   };
-  const at = 'https://dev.open-hearts.pages.dev/api/stripe';
+  const at = 'https://play.openhearts.game/api/stripe';
   const raw = JSON.stringify({
     type: 'checkout.session.completed',
     data: {
@@ -768,7 +791,7 @@ test('the webhook route: one checkout delivered twice at once makes one account,
   };
   const raw = paidCheckout();
   const hook = async () =>
-    worker.fetch(new Request('https://dev.open-hearts.pages.dev/api/stripe', { method: 'POST', headers: { 'stripe-signature': await signHook(raw) }, body: raw }), shop);
+    worker.fetch(new Request('https://play.openhearts.game/api/stripe', { method: 'POST', headers: { 'stripe-signature': await signHook(raw) }, body: raw }), shop);
   const answers = await Promise.all([hook(), hook()]);
   assert.deepEqual(answers.map((a) => a.status), [200, 200]);
   const made = [...store.rows.keys()].filter((k) => /^ACCOUNT#[0-9a-f]{32}\|META$/.test(k));
@@ -794,7 +817,7 @@ test('the webhook route: a checkout its turn could not bind yet is sent again; o
   });
   const hook = async (answers) =>
     worker.fetch(
-      new Request('https://dev.open-hearts.pages.dev/api/stripe', { method: 'POST', headers: { 'stripe-signature': await signHook(raw) }, body: raw }),
+      new Request('https://play.openhearts.game/api/stripe', { method: 'POST', headers: { 'stripe-signature': await signHook(raw) }, body: raw }),
       { ...env, OH_STRIPE_WEBHOOK_SECRET: SIGNING, OH_STORE: kvOf(store), HOUSEHOLD: turns(answers) },
     );
   const busy = { status: 429, body: { error: 'too many at once: try again in a while' } };
@@ -814,7 +837,7 @@ test('the webhook route: a checkout its turn could not bind yet is sent again; o
 });
 
 test('the checkout route: the key, and somewhere on this site to come back to', async () => {
-  const at = 'https://dev.open-hearts.pages.dev/api/checkout';
+  const at = 'https://play.openhearts.game/api/checkout';
   const shop = { ...env, OH_STRIPE_SECRET: 'sk', OH_STRIPE_PRICE: 'price_1', OH_PRICE: STATED };
   const send = (body) => new Request(at, { method: 'POST', body: JSON.stringify(body) });
   assert.equal((await worker.fetch(send({ key: 'short', back: '/play/', cancelled: '/play/' }), shop)).status, 400);
@@ -1286,7 +1309,7 @@ test('TURN is for a device that holds a licence, and asks for it itself', async 
   // to the project by the gigabyte.
   const store = await household(Date.now(), ADA.public);
   const held = { ...env, OH_STORE: kvOf(store) };
-  const send = (body) => new Request('https://dev.open-hearts.pages.dev/api/turn', { method: 'POST', body: JSON.stringify(body) });
+  const send = (body) => new Request('https://play.openhearts.game/api/turn', { method: 'POST', body: JSON.stringify(body) });
   const realFetch = globalThis.fetch;
   okUpstream.calls.length = 0;
   globalThis.fetch = okUpstream;
@@ -1306,7 +1329,7 @@ test('a checkout is opened only by the device it is for', async () => {
   // Paying for somebody else's key would move their device onto a
   // subscription the payer can end.
   const shop = { ...env, OH_STRIPE_SECRET: 'sk', OH_STRIPE_PRICE: 'price_1', OH_PRICE: STATED };
-  const send = (body) => new Request('https://dev.open-hearts.pages.dev/api/checkout', { method: 'POST', body: JSON.stringify(body) });
+  const send = (body) => new Request('https://play.openhearts.game/api/checkout', { method: 'POST', body: JSON.stringify(body) });
   const realFetch = globalThis.fetch;
   globalThis.fetch = withPrice(async () => new Response(JSON.stringify({ url: 'https://checkout.stripe.com/c/pay/cs_1' }), { status: 200 }));
   try {
@@ -1627,7 +1650,7 @@ test('local mode: a local: sign-in links one device\'s account and brings the ne
   assert.deepEqual([nowhere.status, (await nowhere.json()).error], [404, 'that sign-in is not linked to an account']);
 
   // And the same token anywhere but this machine is nobody.
-  const away = new Request('https://dev.open-hearts.pages.dev/api/attest', { method: 'POST', body: JSON.stringify(await asking(CY, 'attest', { provider: 'google', token: 'local:cy' })) });
+  const away = new Request('https://play.openhearts.game/api/attest', { method: 'POST', body: JSON.stringify(await asking(CY, 'attest', { provider: 'google', token: 'local:cy' })) });
   assert.deepEqual([(await worker.fetch(away, held)).status], [401]);
 });
 
@@ -1991,9 +2014,9 @@ test('the manage route: signed by the device, and back only to this site', async
   const realFetch = globalThis.fetch;
   globalThis.fetch = stripeFake();
   try {
-    assert.equal((await worker.fetch(send('manage', { key: ADA.public, back: 'https://dev.open-hearts.pages.dev/play/' }), shop)).status, 401);
+    assert.equal((await worker.fetch(send('manage', { key: ADA.public, back: 'https://play.openhearts.game/play/' }), shop)).status, 401);
     assert.equal((await worker.fetch(send('manage', await asking(ADA, 'manage', { back: 'https://elsewhere.example/' })), shop)).status, 400);
-    const ok = await worker.fetch(send('manage', await asking(ADA, 'manage', { back: 'https://dev.open-hearts.pages.dev/play/' })), shop);
+    const ok = await worker.fetch(send('manage', await asking(ADA, 'manage', { back: 'https://play.openhearts.game/play/' })), shop);
     assert.equal(ok.status, 200);
     assert.equal((await ok.json()).url, 'https://billing.stripe.com/p/session/test_1');
   } finally {
@@ -2047,7 +2070,7 @@ test('a game\'s record: sent by a player signed for its table, kept, and shown o
   assert.deepEqual(await sent.json(), { kept: true });
 
   // Not by its address alone: looking at games is live play.
-  assert.equal((await worker.fetch(new Request(`https://dev.open-hearts.pages.dev/api/record/${table}`), env)).status, 404);
+  assert.equal((await worker.fetch(new Request(`https://play.openhearts.game/api/record/${table}`), env)).status, 404);
   assert.equal((await worker.fetch(send('review', await asking(CY, 'review', { what: table, table })), env)).status, 402, 'no subscription');
   const got = await worker.fetch(send('review', await asking(ADA, 'review', { what: table, table })), env);
   assert.equal(got.status, 200);

@@ -13,9 +13,12 @@
 //                          with the app's base moved there and the site's
 //                          links to the app pointed at it
 //
-// /api/ is the handlers on the app's host and on a preview, and not on
-// the site's: the app calls its own origin's, and so does everything
-// else that calls the service — Stripe, the stores, the monitors.
+// /api/ is the handlers on the app's host, on this machine's, and on a
+// preview, wherever it is reached; and not on the site's, nor on a
+// production deployment's own address (open-hearts.pages.dev), where the
+// zone's rate limit on the app's host does not reach. The app calls its
+// own origin's, and so does everything else that calls the service —
+// Stripe, the stores, the monitors (worker.mjs, answersApi).
 
 /// The app's own host.
 export const APP_HOST = 'play.openhearts.game';

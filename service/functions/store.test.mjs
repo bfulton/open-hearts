@@ -178,7 +178,7 @@ const assets = { fetch: async (url) => (String(url).endsWith('/play/schnorr.wasm
 const serving = (store, more = {}) => ({
   env: { ASSETS: assets, OH_SERVICE_SECRET: SERVICE_SECRET, OH_SERVICE_KEY: SERVICE_KEY, OH_STORE: kvOf(store), ...appleEnv, ...more },
   send: (what, body, headers = {}) =>
-    new Request(`https://dev.open-hearts.pages.dev/api/${what}`, { method: 'POST', headers, body: typeof body === 'string' ? body : JSON.stringify(body) }),
+    new Request(`https://play.openhearts.game/api/${what}`, { method: 'POST', headers, body: typeof body === 'string' ? body : JSON.stringify(body) }),
 });
 
 const bring = async (pair, store, proof) => ({ ...(await asking(pair, 'store', proof)), store, proof });
@@ -500,7 +500,7 @@ async function pushToken(claims, key = rsa.privateKey) {
 
 test('Play\'s notifications, pushed by Pub/Sub: checked, then Play asked what the purchase is now', async () => {
   const store = memoryStore();
-  const push = { OH_PLAY_PUSH_AUDIENCE: 'https://dev.open-hearts.pages.dev/api/play', OH_PLAY_PUSH_EMAIL: 'pubsub@open-hearts.iam.gserviceaccount.com' };
+  const push = { OH_PLAY_PUSH_AUDIENCE: 'https://play.openhearts.game/api/play', OH_PLAY_PUSH_EMAIL: 'pubsub@open-hearts.iam.gserviceaccount.com' };
   const { env, send } = serving(store, { ...playEnv, ...push });
   const jwk = { ...(await crypto.subtle.exportKey('jwk', rsa.publicKey)), kid: 'push-1', alg: 'RS256', use: 'sig' };
   const claims = { iss: 'https://accounts.google.com', aud: push.OH_PLAY_PUSH_AUDIENCE, email: push.OH_PLAY_PUSH_EMAIL, email_verified: true, exp: Math.floor(now / 1000) + 600 };

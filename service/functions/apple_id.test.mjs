@@ -322,12 +322,14 @@ test('appleIdNotice: what a notice says, read with the keys handed in', async ()
   assert.equal(await appleIdNotice(await notice('consent-revoked'), env, async () => new Response('down', { status: 503 })), null);
 });
 
-test('the handler is on the app\'s host and a preview\'s, and not the site\'s', async () => {
+test('the handler is on the app\'s host and a preview\'s, and not the site\'s nor a production deployment\'s own address', async () => {
   const { env } = await linked();
   const there = await tell(env, await notice('email-enabled'));
   assert.equal(there.status, 200);
-  const preview = await tell(env, await notice('email-enabled'), { host: 'dev.open-hearts.pages.dev' });
+  const preview = await tell({ ...env, OH_DEPLOYMENT: 'preview' }, await notice('email-enabled'), { host: 'dev.open-hearts.pages.dev' });
   assert.equal(preview.status, 200);
+  const pagesHost = await tell(env, await notice('email-enabled'), { host: 'open-hearts.pages.dev' });
+  assert.deepEqual(pagesHost, { status: 404, body: { error: 'no such handler' } });
   const site = await tell(env, await notice('account-deleted'), { host: 'openhearts.game' });
   assert.deepEqual(site, { status: 404, body: { error: 'the service has moved to play.openhearts.game' } });
   assert.equal((await tell(env, null, { method: 'GET' })).status, 405);

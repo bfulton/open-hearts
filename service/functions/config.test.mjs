@@ -14,7 +14,7 @@ const kvWith = (rows) => ({
   },
 });
 
-const ask = (env, init) => worker.fetch(new Request('https://dev.open-hearts.pages.dev/api/config', init), env);
+const ask = (env, init) => worker.fetch(new Request('https://play.openhearts.game/api/config', init), env);
 
 test('no row, or no store, is the defaults: everything open, nothing said', async () => {
   for (const env of [{}, { OH_STORE: kvWith({}) }]) {
