@@ -121,9 +121,7 @@ To write a test that stays fast, see
 
 - `packages/deal`: every primitive round trips. Four sessions in one
   process deal, pass, play, lose a seat and rebuild it, and audit, and a
-  verifier that saw only the messages checks the result. The share-token
-  path opens a departed seat's hand and a pass sealed to it while
-  `knowsSecret` stays false.
+  verifier that saw only the messages checks the result.
 - `packages/table/test/refereed_test.dart`: whole sealed games at one,
   three and four people over the simulator's referee, with the house at
   the table, that verify to the end. They cover people going mid-hand,
