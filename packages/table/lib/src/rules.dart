@@ -131,9 +131,9 @@ class TableRules {
   /// The deal's primitives, for a sealed table.
   final DealCrypto? crypto;
 
-  /// The key this side acts with — a person's, or the house's — or null
-  /// for a side that only follows: the house watching a table, a
-  /// verifier.
+  /// The key this side acts with — a person's, or the house's, which
+  /// also holds a piece of every person's escrow — or null for a
+  /// verifier, which only reads.
   final PublicKey? myKey;
 
   /// The seat this side holds the deal secret of, where it holds one:
@@ -930,16 +930,6 @@ class TableRules {
     return null;
   }
 
-  /// Where the lead card is for [hand], as the table has it: the seat
-  /// that leads the first trick, passes counted.
-  int? leaderOf(int hand) {
-    final d = _deals[hand];
-    if (d == null) return null;
-    if (hand != game.handNumber) return d.leader;
-    final lead = _leadPosition(d);
-    return lead == null ? null : d.holderOf(lead);
-  }
-
   /// Whether [seat] owes the hand its audit: a keyed seat somebody still
   /// takes the turns of, whose secret the log has not had yet.
   bool _owesAudit(int seat) => _keyed(seat) && actorOf(seat) != null && !_progress.audited.contains(seat);
@@ -1078,7 +1068,6 @@ class TableRules {
         1 => d.acceptShuffle(b, verified: true),
         2 => d.acceptTokens(b, verified: true),
         3 => d.acceptDeclaration(b, verified: true),
-        4 => d.acceptAudit(b, verified: true),
         _ => false,
       };
 
@@ -1154,9 +1143,9 @@ class TableRules {
     if (_try((d) => d.acceptRelease(b))) taken.add(ev);
   }
 
-  /// The card a bot plays at [seat] where [g] stands, with [played] the
-  /// cards played this hand before it.
-  static Card botCard(HeartsGame g, int seat, Set<Card> played, {Persona? persona, List<SeatHolder>? holders}) {
+  /// The card [persona], a bot at [seat], plays where [g] stands, with
+  /// [played] the cards played this hand before it.
+  static Card botCard(HeartsGame g, int seat, Set<Card> played, Persona persona) {
     final view = BotView(
       seat: seat,
       hand: g.handOf(seat),
@@ -1166,10 +1155,10 @@ class TableRules {
       isFirstTrick: g.isFirstTrick,
       taken: g.taken,
     );
-    return Bot(persona: persona ?? (holders![seat] as BotSeat).persona).chooseCard(view, g.legalPlaysFor(seat));
+    return Bot(persona: persona).chooseCard(view, g.legalPlaysFor(seat));
   }
 
-  Card _botCardHere(HeartsGame g, int seat, Set<Card> played) => botCard(g, seat, played, holders: _holders);
+  Card _botCardHere(HeartsGame g, int seat, Set<Card> played) => botCard(g, seat, played, (_holders[seat] as BotSeat).persona);
 
   /// What every side sees of the table now, alike: whose turns are open
   /// and since when, who holds the seats and who has gone, the hand and

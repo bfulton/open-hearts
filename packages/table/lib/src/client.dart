@@ -63,12 +63,12 @@ class TableClient {
     Random? random,
     this.trace,
   }) : _random = random ?? Random.secure() {
-    if (role == Role.person && spec == null) throw ArgumentError('a person sits at the table they were seated at');
+    if (role == Role.person && spec?.id != tableId) throw ArgumentError('a person sits at the table they were seated at');
     if (role == Role.houseSeat && (seat == null || houseSecret == null)) throw ArgumentError('the house plays a seat with a secret of its own');
     rules = TableRules(
       tableId: tableId,
       crypto: crypto,
-      myKey: role == Role.person || role == Role.houseSeat || role == Role.houseFollower ? signer.publicKey : null,
+      myKey: signer.publicKey,
       mySeat: role == Role.person ? spec!.seatOf(signer.publicKey) : (role == Role.houseSeat ? seat : null),
       wrap: signer.sharedSecretWith,
       secretFor: _secretFor,
@@ -260,9 +260,6 @@ class TableClient {
 
   void _changed() {
     if (_closed) return;
-    if (started && role == Role.person && jsonEncode(rules.spec!.toJson()) != jsonEncode(spec!.toJson())) {
-      _trace('the log started a table other than the one seated');
-    }
     if (rules.cannotDeal != null && role == Role.person && amSeated && !_left) leave();
     _act();
     _release();
@@ -346,7 +343,7 @@ class TableClient {
         });
         return;
       }
-      _sayPlay(s, TableRules.botCard(g, s, rules.played, holders: rules.holders));
+      _sayPlay(s, TableRules.botCard(g, s, rules.played, persona));
     }
   }
 
@@ -454,7 +451,7 @@ class TableClient {
       'n': rules.endN!,
       'hash': rules.endHash!,
       'state': rules.state.name,
-      'totals': started ? rules.game.totals : const [0, 0, 0, 0],
+      'totals': rules.game.totals,
     });
   }
 

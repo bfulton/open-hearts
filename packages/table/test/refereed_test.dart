@@ -30,6 +30,14 @@ void agree(SimTable t, {TableState state = TableState.finished, Set<String> exce
 }
 
 void main() {
+  test('a person\'s side is of the table they were seated at, and no other', () {
+    final t = SimTable(humans: 1);
+    TableClient sideOf(String table) => TableClient(tableId: table, spec: t.spec, signer: t.signers.first, line: t.lines.first, clock: t.clock);
+    expect(() => sideOf('f' * 32), throwsArgumentError);
+    expect(sideOf(t.spec.id).tableId, t.spec.id);
+    t.close();
+  });
+
   test('four people play a whole unsealed game', () {
     final t = SimTable(humans: 4, seed: 3);
     t.start();
