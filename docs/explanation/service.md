@@ -478,7 +478,9 @@ Spanish, Portuguese, German or French, or one of a few words refused
 even inside another word. So is a name that would pass for Open Hearts
 itself or the people who run it: the game's name, and words such as
 *admin*, *moderator*, *support*, *staff*, *official* and *operator* in
-the same five languages. Words are compared in lower case, with
+the same five languages, whether written in Latin letters or in the
+Cyrillic and Greek letters drawn like them, as in *Аdmin* with a
+Cyrillic *А*. Words are compared in lower case, with
 accents folded and with digits and signs written for letters read as
 letters, so `5h1t` is read as *shit*. Words are matched whole, so
 *Cassandra*, *Scunthorpe*, *Staffan* and *Supporter* stay names. Entries that would refuse

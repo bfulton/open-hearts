@@ -51,15 +51,30 @@ const _reservedPhrases = [
   ['open', 'hearts'],
 ];
 
+/// Cyrillic and Greek letters drawn like the Latin letters the reserved
+/// words have, as those letters (names.mjs, LOOK_ALIKES): a name written
+/// in them is held to the reserved words read this way, so that `Аdmin`
+/// with a Cyrillic А does not pass for staff. Not to the lists, or a real
+/// word in those alphabets could be taken for one of theirs.
+const _lookAlikes = {
+  'А': 'A', 'Е': 'E', 'К': 'K', 'М': 'M', 'Н': 'H', 'О': 'O', 'Р': 'P', 'С': 'C', 'Т': 'T', 'У': 'Y', 'Ѕ': 'S', 'І': 'I', 'Ү': 'Y', 'Һ': 'H', //
+  'а': 'a', 'е': 'e', 'о': 'o', 'р': 'p', 'с': 'c', 'у': 'y', 'ѕ': 's', 'і': 'i', 'ԁ': 'd', 'һ': 'h', 'ү': 'y',
+  'Α': 'A', 'Ε': 'E', 'Η': 'H', 'Ι': 'I', 'Κ': 'K', 'Μ': 'M', 'Ν': 'N', 'Ο': 'O', 'Ρ': 'P', 'Τ': 'T', 'Υ': 'Y',
+  'α': 'a', 'ι': 'i', 'κ': 'k', 'ο': 'o', 'ρ': 'p', 'υ': 'u', 'η': 'n',
+};
+
 bool _blocked(String word) => blockedWords.contains(word) || _reservedWords.contains(word);
 
-/// Whether [word] is refused: on the lists, or on them once a
+/// Whether [word] is refused by [listed]: on it, or on it once a
 /// plural's s is taken off.
-bool _refusedWord(String word) => _blocked(word) || (word.length > 2 && word.endsWith('s') && _blocked(word.substring(0, word.length - 1)));
+bool _refusedWord(String word, bool Function(String) listed) =>
+    listed(word) || (word.length > 2 && word.endsWith('s') && listed(word.substring(0, word.length - 1)));
 
-/// Whether [words], a name's in order, are refused.
-bool _refusedWords(List<String> words) {
-  if (words.any(_refusedWord)) return true;
+/// Whether [words], a name's in order, are refused; with [reservedOnly],
+/// for passing for Open Hearts or its staff alone.
+bool _refusedWords(List<String> words, {bool reservedOnly = false}) {
+  bool refused(String word) => _refusedWord(word, reservedOnly ? _reservedWords.contains : _blocked);
+  if (words.any(refused)) return true;
   // Letters one at a time, `f u c k`: each run of two or more read as a
   // word.
   var run = '';
@@ -68,10 +83,10 @@ bool _refusedWords(List<String> words) {
       run += w;
       continue;
     }
-    if (run.runes.length > 1 && _refusedWord(run)) return true;
+    if (run.runes.length > 1 && refused(run)) return true;
     run = '';
   }
-  for (final phrase in [...blockedPhrases, ..._reservedPhrases]) {
+  for (final phrase in [if (!reservedOnly) ...blockedPhrases, ..._reservedPhrases]) {
     for (var i = 0; i + phrase.length <= words.length; i++) {
       var all = true;
       for (var j = 0; j < phrase.length && all; j++) {
@@ -80,14 +95,18 @@ bool _refusedWords(List<String> words) {
       if (all) return true;
     }
   }
+  if (reservedOnly) return false;
   final joined = words.join();
   return blockedAnywhere.any(joined.contains);
 }
 
 /// Whether [name] may not be shown to others: as written, and with
-/// words run together as `ShitHead` parted.
+/// words run together as `ShitHead` parted; and for the reserved words,
+/// with look-alike letters read as the Latin ones they are drawn like.
 bool nameRefused(String name) {
   if (blockedSymbols.any(name.contains)) return true;
   final parted = name.replaceAllMapped(_camel, (m) => '${m[1]} ${m[2]}');
-  return _refusedWords(_foldedWords(name)) || _refusedWords(_foldedWords(parted));
+  if (_refusedWords(_foldedWords(name)) || _refusedWords(_foldedWords(parted))) return true;
+  String latin(String s) => s.split('').map((ch) => _lookAlikes[ch] ?? ch).join();
+  return _refusedWords(_foldedWords(latin(name)), reservedOnly: true) || _refusedWords(_foldedWords(latin(parted)), reservedOnly: true);
 }
