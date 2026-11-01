@@ -25,6 +25,7 @@
 
 import { entitlementOf } from './accounts.mjs';
 import { nameRefused } from './names.mjs';
+import { REFUSED } from './refusals.mjs';
 import { isAccount } from './rows.mjs';
 
 /// The icons the app offers, by their keys (AvatarIcons.all).
@@ -120,7 +121,7 @@ async function profileAccount(store, key, now) {
 /// sends its own.
 export async function profileRead(op, store, { now = Date.now() } = {}) {
   const account = await profileAccount(store, op.key, now);
-  if (!account) return { status: 402, body: { error: 'no subscription' } };
+  if (!account) return { status: 402, body: { error: REFUSED.noSubscription } };
   const row = await store.get(`ACCOUNT#${account}`, 'PROFILE');
   return { status: 200, body: row ? profileShown(row) : { profile: null, version: 0 } };
 }
@@ -131,7 +132,7 @@ export async function profileRead(op, store, { now = Date.now() } = {}) {
 /// is given.
 export async function profileWritten(op, store, active, { now = Date.now(), pictures = null } = {}) {
   const account = await profileAccount(store, op.key, now);
-  if (!account) return { status: 402, body: { error: 'no subscription' } };
+  if (!account) return { status: 402, body: { error: REFUSED.noSubscription } };
   const checked = profileOf(op.profile);
   if (checked.error) return { status: 400, body: { error: checked.error } };
   // From the device in hand, and no other: a device that has stepped

@@ -24,6 +24,7 @@
 
 import { accountOfKey, entitlementOf } from './accounts.mjs';
 import { inHousehold } from './household.mjs';
+import { REFUSED } from './refusals.mjs';
 import { dayAfter, dayOf, digestOf, earlier, hex, storeOf } from './rows.mjs';
 import { S, notConfigured } from './settings.mjs';
 import { SUSPENDED_WHY } from './suspension.mjs';
@@ -177,7 +178,7 @@ export async function licence(key, env, { signer, now = Date.now(), open = false
     // Said apart from having no subscription, so that the app says why
     // live play is shut rather than offering to sell it again.
     if ((written ?? (await store.get(`KEY#${key}`, 'ENTITLEMENT')))?.suspended) return { status: 403, body: { error: SUSPENDED_WHY, suspended: true } };
-    return { status: 402, body: { error: 'no subscription' } };
+    return { status: 402, body: { error: REFUSED.noSubscription } };
   }
   const until = earlier(dayAfter(now, S().licenceDays), held.licensed_until);
   const signed = await licenceFor(key, held.account, until, { signer, ...keys });

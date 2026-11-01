@@ -1,5 +1,6 @@
 // Certificates, as little of X.509 as the App Store's chain needs.
 
+import { REFUSED } from './refusals.mjs';
 import { un64 } from './rows.mjs';
 
 /// One DER element at [at]: its tag, where its content starts and ends.
@@ -182,15 +183,15 @@ export async function appleSigned(jws, { roots = appleRoots, now = Date.now() } 
 export async function appleTransaction(jws, env, { roots, now = Date.now() } = {}) {
   const bundle = env.OH_APPLE_BUNDLE_ID;
   const product = env.OH_APPLE_PRODUCT;
-  if (!bundle || !product) return { status: 503, body: { error: 'the store is not set up yet' } };
+  if (!bundle || !product) return { status: 503, body: { error: REFUSED.storeNotSetUp } };
   const t = await appleSigned(jws, { roots, now });
-  if (!t) return { status: 401, body: { error: 'not from the store' } };
+  if (!t) return { status: 401, body: { error: REFUSED.notFromStore } };
   // Another app's, another product's, or not a subscription at all.
   if (t.bundleId !== bundle || t.productId !== product || t.type !== 'Auto-Renewable Subscription') {
-    return { status: 401, body: { error: 'not from the store' } };
+    return { status: 401, body: { error: REFUSED.notFromStore } };
   }
   if (typeof t.originalTransactionId !== 'string' || !/^\d{1,32}$/.test(t.originalTransactionId) || !Number.isFinite(t.expiresDate)) {
-    return { status: 401, body: { error: 'not from the store' } };
+    return { status: 401, body: { error: REFUSED.notFromStore } };
   }
   return {
     subscription: `apple:${t.originalTransactionId}`,

@@ -1,6 +1,7 @@
 // Buying in a store: the App Store's and Google Play's purchases,
 // checked as each store signs them.
 
+import { REFUSED } from './refusals.mjs';
 import { digestOf } from './rows.mjs';
 import { jwtOf } from './signin.mjs';
 
@@ -100,8 +101,8 @@ const PLAY_PAID = new Set(['SUBSCRIPTION_STATE_ACTIVE', 'SUBSCRIPTION_STATE_IN_G
 export async function playPurchase(token, env, fetchImpl = fetch, { now = Date.now(), store = null } = {}) {
   const pkg = env.OH_PLAY_PACKAGE;
   const product = env.OH_PLAY_PRODUCT;
-  if (!pkg || !product || !env.OH_PLAY_SERVICE_ACCOUNT) return { status: 503, body: { error: 'the store is not set up yet' } };
-  if (typeof token !== 'string' || !/^[A-Za-z0-9._:-]{10,1024}$/.test(token)) return { status: 401, body: { error: 'not from the store' } };
+  if (!pkg || !product || !env.OH_PLAY_SERVICE_ACCOUNT) return { status: 503, body: { error: REFUSED.storeNotSetUp } };
+  if (typeof token !== 'string' || !/^[A-Za-z0-9._:-]{10,1024}$/.test(token)) return { status: 401, body: { error: REFUSED.notFromStore } };
   let access;
   let res;
   try {
@@ -110,19 +111,19 @@ export async function playPurchase(token, env, fetchImpl = fetch, { now = Date.n
       headers: { authorization: `Bearer ${access}` },
     });
   } catch {
-    return { status: 502, body: { error: 'the store is not answering' } };
+    return { status: 502, body: { error: REFUSED.storeNotAnswering } };
   }
   // A token Play has never heard of, or not this app's.
-  if (res.status === 400 || res.status === 404 || res.status === 410) return { status: 401, body: { error: 'not from the store' } };
-  if (!res.ok) return { status: 502, body: { error: 'the store is not answering' } };
+  if (res.status === 400 || res.status === 404 || res.status === 410) return { status: 401, body: { error: REFUSED.notFromStore } };
+  if (!res.ok) return { status: 502, body: { error: REFUSED.storeNotAnswering } };
   let p;
   try {
     p = await res.json();
   } catch {
-    return { status: 502, body: { error: 'the store is not answering' } };
+    return { status: 502, body: { error: REFUSED.storeNotAnswering } };
   }
   const line = Array.isArray(p.lineItems) ? p.lineItems.find((l) => l?.productId === product) : null;
-  if (!line) return { status: 401, body: { error: 'not from the store' } };
+  if (!line) return { status: 401, body: { error: REFUSED.notFromStore } };
   const until = Date.parse(line.expiryTime);
   // Play refunds a purchase nobody acknowledged within three days; this
   // is where it is taken, so this is where it is acknowledged.

@@ -4,6 +4,7 @@
 
 import { APP_HOST } from './app_host.mjs';
 import { signerFor } from './licence.mjs';
+import { REFUSED } from './refusals.mjs';
 import { digestOf } from './rows.mjs';
 import { S, isLocal } from './settings.mjs';
 
@@ -81,7 +82,7 @@ export async function askedBy(body, handler, what, signer, { now = Date.now() } 
     return { status: 401, body: { error: 'not signed by that key' } };
   }
   if (Math.abs(now / 1000 - at) > S().requestToleranceS) {
-    return { status: 401, body: { error: "this device's clock is out by more than five minutes" } };
+    return { status: 401, body: { error: REFUSED.clockOff } };
   }
   return { key };
 }

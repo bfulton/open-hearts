@@ -4,6 +4,7 @@
 
 import { inHousehold } from './household.mjs';
 import { linkedAccount } from './logins.mjs';
+import { REFUSED } from './refusals.mjs';
 import { dayOf, digestOf, un64 } from './rows.mjs';
 import { notConfigured } from './settings.mjs';
 
@@ -139,7 +140,7 @@ export async function jwtOf(provider, token, fetchImpl = fetch, { now = Date.now
 export async function supersede(who, key, store, env, login, { now = Date.now() } = {}) {
   if (!login) return { status: 503, body: notConfigured('OH_ID_HMAC') };
   const account = await linkedAccount(store, login);
-  if (!account) return { status: 404, body: { error: 'that sign-in is not linked to an account' } };
+  if (!account) return { status: 404, body: { error: REFUSED.accountNowhere } };
   const joined = await inHousehold(env, account, { op: 'join', key, account, now });
   if (joined.status !== 200) return joined;
   return { status: 200, body: { account, at: dayOf(now) }, entitlement: joined.body.entitlement };

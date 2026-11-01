@@ -9,6 +9,7 @@
 // payment (docs/explanation/service.md, "Payment").
 
 import { paidFor } from './accounts.mjs';
+import { REFUSED } from './refusals.mjs';
 import { dayOf, isAccount } from './rows.mjs';
 import { S, SITE, STRIPE_PRICE } from './settings.mjs';
 import { dateSubscription } from './subscriptions.mjs';
@@ -409,9 +410,9 @@ export async function manage(key, back, store, env, fetchImpl = fetch) {
   if (!secret) return { status: 503, body: { error: 'the shop is not open yet' } };
   const account = (await store.get(`KEY#${key}`, 'ENTITLEMENT'))?.account;
   // Bound to it, not merely once on it: a dropped device keeps no say.
-  if (!isAccount(account) || !(await store.get(`ACCOUNT#${account}`, `DEVICE#${key}`))) return { status: 402, body: { error: 'no subscription' } };
+  if (!isAccount(account) || !(await store.get(`ACCOUNT#${account}`, `DEVICE#${key}`))) return { status: 402, body: { error: REFUSED.noSubscription } };
   const subscription = (await store.get(`ACCOUNT#${account}`, 'META'))?.subscription;
-  if (!subscription) return { status: 402, body: { error: 'no subscription' } };
+  if (!subscription) return { status: 402, body: { error: REFUSED.noSubscription } };
   if (!subscription.startsWith('sub_')) return { status: 409, body: { error: 'not a web subscription' } };
   const auth = stripeAuth(secret);
   let customer = (await store.get(`SUB#${subscription}`, 'CUSTOMER'))?.customer;

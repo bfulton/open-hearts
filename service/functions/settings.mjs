@@ -46,9 +46,9 @@ export const SERVICE_DEFAULTS = Object.freeze({
   ticketReuseMinutes: 2,
   turnTtlS: 4 * 60 * 60,
   // How far a request's second may be from ours: clocks drift, and a
-  // phone out by more than this is told so — in words that say five
-  // minutes, which the app knows the refusal by (app/lib/net/
-  // household.dart): a change here is a change there.
+  // phone out by more than this is told so, in words that say five
+  // minutes whatever this is, since the app knows the refusal by them
+  // (refusals.mjs, clockOff).
   requestToleranceS: 300,
   // How old a webhook's own timestamp may be: a replay is not a payment.
   webhookToleranceS: 300,

@@ -22,6 +22,7 @@ import { deleteAccount } from './deletion.mjs';
 import { attest, unlinkSignIn } from './logins.mjs';
 import { sendNotice } from './notices.mjs';
 import { profileRead, profileWritten } from './profile.mjs';
+import { REFUSED } from './refusals.mjs';
 import { storeOf } from './rows.mjs';
 import { S, SITE, notConfigured, settle } from './settings.mjs';
 import { bindPurchase } from './subscriptions.mjs';
@@ -100,7 +101,7 @@ async function heldIn(account, key, store, now) {
   // tells it, so that one the relay's word missed shuts live play at
   // its next renewal.
   if ((await store.get(`KEY#${key}`, 'ENTITLEMENT'))?.suspended) return { refused: { status: 403, body: { error: SUSPENDED_WHY, suspended: true } } };
-  return { refused: { status: 402, body: { error: 'no subscription' } } };
+  return { refused: { status: 402, body: { error: REFUSED.noSubscription } } };
 }
 
 /// The version of [account]'s profile, 0 for none: said with each
@@ -161,9 +162,9 @@ async function dropActive(account, device, active, revoke) {
 /// dropped while it was the one in use is cut off at the relay at once.
 export async function dropDevice(key, device, store, { now = Date.now(), active = null, revoke = null } = {}) {
   const account = await accountOfKey(store, key);
-  if (!account) return { status: 402, body: { error: 'no subscription' } };
+  if (!account) return { status: 402, body: { error: REFUSED.noSubscription } };
   const devices = await devicesOn(store, account);
-  if (!devices.some((d) => d.key === device)) return { status: 404, body: { error: 'not a device on this subscription' } };
+  if (!devices.some((d) => d.key === device)) return { status: 404, body: { error: REFUSED.notADevice } };
   await store.del(`ACCOUNT#${account}`, `DEVICE#${device}`);
   // And the entitlement that device holds, which is gone rather than
   // run out: a licence is one read, and a row saying it is paid up to
@@ -247,7 +248,7 @@ export async function householdOp(op, store, { now = Date.now(), mail = null, ac
   // account outside its turn. A site older than this names none, and the
   // op finds the device's account by its row, as before.
   if (FOR_THE_DEVICE.has(op.op) && typeof op.account === 'string' && !(await deviceOf(store, op.account, op.key))) {
-    return op.op === 'delete' ? { status: 404, body: { error: 'no account' } } : { status: 402, body: { error: 'no subscription' } };
+    return op.op === 'delete' ? { status: 404, body: { error: 'no account' } } : { status: 402, body: { error: REFUSED.noSubscription } };
   }
   switch (op.op) {
     case 'ticket':
@@ -275,7 +276,7 @@ export async function householdOp(op, store, { now = Date.now(), mail = null, ac
       return dropDevice(op.key, op.device, store, { now, active, revoke });
     case 'list': {
       const account = await accountOfKey(store, op.key);
-      if (!account) return { status: 402, body: { error: 'no subscription' } };
+      if (!account) return { status: 402, body: { error: REFUSED.noSubscription } };
       const inUseNow = (await active.get(account))?.key ?? null;
       const devices = (await devicesOn(store, account)).map((d) => ({ ...d, ...(d.key === inUseNow ? { active: true } : {}) }));
       // Which sign-in the account is linked to, if any: the account's
