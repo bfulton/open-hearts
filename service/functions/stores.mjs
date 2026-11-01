@@ -2,7 +2,7 @@
 // checked as each store signs them.
 
 import { REFUSED } from './refusals.mjs';
-import { bytesOf64, digestOf, hex } from './rows.mjs';
+import { base64Of, bytesOf64, digestOf, hex } from './rows.mjs';
 import { PROVIDERS, jwtOf } from './signin.mjs';
 import { appleSigned } from './x509.mjs';
 
@@ -87,7 +87,7 @@ let playAccess = null;
 export const forgetPlayAccess = () => (playAccess = null);
 
 const pemBytes = (pem) => bytesOf64(String(pem).replace(/-----[^-]+-----/g, '').replace(/\s+/g, ''));
-const b64url = (bytes) => btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+const b64url = (bytes) => base64Of(bytes).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 const b64urlText = (text) => b64url(new TextEncoder().encode(text));
 
 /// An access token for the Play Developer API, from the service

@@ -89,6 +89,11 @@ export async function digestOf(text) {
 /// Base64 [s] as its bytes. Throws for anything that is not base64.
 export const bytesOf64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
 
+/// [bytes] as base64. Each byte is an argument to String.fromCharCode,
+/// so it is for what is small: a picture (PROFILE_PICTURE_MOST, 12,000
+/// bytes) or less.
+export const base64Of = (bytes) => btoa(String.fromCharCode(...bytes));
+
 /// Base64url [s], padded or not, as its bytes.
 export const un64 = (s) => {
   const padded = s.replace(/-/g, '+').replace(/_/g, '/');

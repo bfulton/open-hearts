@@ -45,7 +45,7 @@ import { pictureHash } from './arachnid.mjs';
 import { CHECKERS, SHIELD, anyChecker, checkerIn, checkerOf, listed, verdictOf } from './checkers.mjs';
 import { Unreadable } from './jpeg.mjs';
 import { PICTURES_ROW, deleteCopy, pictureDigest, pictureKey, withheldOf, withholding } from '../functions/pictures.mjs';
-import { isAccount, storeOf } from '../functions/rows.mjs';
+import { base64Of, bytesOf64, isAccount, storeOf } from '../functions/rows.mjs';
 import { orderOf } from '../functions/suspension.mjs';
 import { accountsWith } from '../tool/find.mjs';
 import { placeOrder } from '../tool/suspend.mjs';
@@ -70,8 +70,6 @@ export const HOW_MOST = 300;
 /// How long before a step that failed is tried again: a minute, then
 /// doubling, to six hours at the most.
 export const retryAfter = (tries) => Math.min(6 * 60 * 60 * 1000, 60 * 1000 * 2 ** Math.max(0, tries - 1));
-
-const bytesOf = (base64) => Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
 
 /// Who said a picture the operator reported is a match, as its row
 /// keeps what was said of it (KnownPictures, `pic:`).
@@ -364,7 +362,7 @@ export class KnownPictures {
     const { by, at } = answers;
     let failure = null;
     if (verdictOf(by, checker.id) === null && !Object.hasOwn(by, checker.id)) {
-      const bytes = bytesOf(jpeg);
+      const bytes = bytesOf64(jpeg);
       let said = null;
       try {
         said = await checker.ask(bytes, digest);
@@ -421,17 +419,16 @@ export class KnownPictures {
   /// (suspension.mjs, HELD). Null for none.
   async copyOf(digest, accounts) {
     const env = this.env;
-    const b64 = (bytes) => btoa(String.fromCharCode(...bytes));
     const read = async (bucket, key) => (bucket ? await r2Objects(bucket).read(key) : null);
     const others = env.OH_PICTURES ? await accountsWith(r2Objects(env.OH_PICTURES), digest) : [];
     for (const account of new Set([...accounts, ...others])) {
       const copy = await read(env.OH_PICTURES, pictureKey(account, digest));
-      if (copy) return b64(copy);
+      if (copy) return base64Of(copy);
     }
     const store = storeOf(env);
     for (const account of accounts) {
       const held = await read(env.OH_RECORDS, heldPictureKey(account, digest));
-      if (held) return b64(held);
+      if (held) return base64Of(held);
       const taken = (await store?.get(`ACCOUNT#${account}`, 'HELD'))?.picture;
       if (taken && (await pictureDigest(taken)) === digest) return taken;
     }
@@ -560,7 +557,7 @@ export class KnownPictures {
       await attempt('held', async () => {
         if (!store || !env.OH_RECORDS) throw new Error('no store or OH_RECORDS');
         await hold(store, c.account, { now });
-        await env.OH_RECORDS.put(heldPictureKey(c.account, c.digest), bytesOf(c.jpeg), { httpMetadata: { contentType: 'image/jpeg' } });
+        await env.OH_RECORDS.put(heldPictureKey(c.account, c.digest), bytesOf64(c.jpeg), { httpMetadata: { contentType: 'image/jpeg' } });
         if (env.OH_PICTURES) await keepHeldPictures(r2Objects(env.OH_PICTURES), r2Objects(env.OH_RECORDS), c.account);
       });
       await attempt('ended', async () => {
@@ -593,7 +590,7 @@ export class KnownPictures {
           username: ncmec.username,
           password: ncmec.password,
           report,
-          jpeg: bytesOf(c.jpeg),
+          jpeg: bytesOf64(c.jpeg),
           fileName,
           details: (reportId, fileId) => fileDetailsXml({ reportId, fileId, fileName, at: c.at, digest: c.digest, shown: c.shown, viewed: !!c.viewed }),
           fetchImpl: this.http,

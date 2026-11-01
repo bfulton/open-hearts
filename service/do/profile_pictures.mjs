@@ -26,12 +26,10 @@
 
 import { alertKnownProblem } from '../functions/alerts.mjs';
 import { NOT_THEIRS_WHY, changePicture, copiesOf, currentOf, knownFlags, pictureDigest, pictureIn, pictureKey, settleCopies } from '../functions/pictures.mjs';
-import { isAccount, storeOf } from '../functions/rows.mjs';
+import { bytesOf64, isAccount, storeOf } from '../functions/rows.mjs';
 import { knownAsker } from './known.mjs';
 import { checkOf, checkPicture, checkText, hiddenFor, hidePictures } from './review.mjs';
 import { lobbyKind } from './relay.mjs';
-
-const bytesOf = (base64) => Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
 
 /// How a copy is served: for the email, a day in any cache.
 const COPY_HTTP = { contentType: 'image/jpeg', cacheControl: 'public, max-age=86400' };
@@ -130,7 +128,7 @@ export function accountPictures(env, { now = Date.now, log = (line) => console.l
             check = 'failed';
           }
         }
-        await bucket.put(mine, bytesOf(picture), { httpMetadata: COPY_HTTP, customMetadata: { at, last: at, ...(check ? { check } : {}), ...knownFlags(said, answer) } });
+        await bucket.put(mine, bytesOf64(picture), { httpMetadata: COPY_HTTP, customMetadata: { at, last: at, ...(check ? { check } : {}), ...knownFlags(said, answer) } });
       }
       // The one before says from now that it is no longer the account's;
       // its own copy as it was listed stays in the order, so that one

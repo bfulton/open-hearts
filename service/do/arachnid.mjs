@@ -6,6 +6,7 @@
 // Shield is never sent the picture: the relay decodes it (jpeg.mjs),
 // makes its PDQ hash (pdq.mjs), and asks Shield about the hash.
 
+import { base64Of } from '../functions/rows.mjs';
 import { jpegPixels } from './jpeg.mjs';
 import { pdqHash } from './pdq.mjs';
 
@@ -34,12 +35,12 @@ export class ShieldFailed extends Error {}
 export function pictureHash(jpeg) {
   const { width, height, rgb } = jpegPixels(jpeg);
   const { hash, quality } = pdqHash(rgb, width, height);
-  return { hash: btoa(String.fromCharCode(...hash)), quality };
+  return { hash: base64Of(hash), quality };
 }
 
 /// The value of an Authorization header for [username] and [password]
 /// (RFC 7617, in UTF-8).
-const basic = (username, password) => `Basic ${btoa(String.fromCharCode(...new TextEncoder().encode(`${username}:${password}`)))}`;
+const basic = (username, password) => `Basic ${base64Of(new TextEncoder().encode(`${username}:${password}`))}`;
 
 /// What Shield at [endpoint] (its PDQ call) says the PDQ hash [hash]
 /// (pictureHash) matches, asked with [username] and [password]: CSAM,
