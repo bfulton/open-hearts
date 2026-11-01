@@ -202,6 +202,17 @@ void main() {
       SharedPreferences.setMockInitialValues({chosenLanguageKey: 'ja'});
       expect(await chosenLanguage(Uri.parse('https://x/play/')), isNull);
     });
+
+    test('a language picked in the app is not undone by a reload of the address that asked for another', () async {
+      SharedPreferences.setMockInitialValues({});
+      addTearDown(() => appLanguage.value = null);
+      expect(await chosenLanguage(Uri.parse('https://x/play/?lang=fr')), const Locale('fr'), reason: 'opened from the French site');
+      await choose(const Locale('de'));
+      expect(await chosenLanguage(Uri.parse('https://x/play/?lang=fr')), const Locale('de'), reason: 'reloaded, the address unchanged');
+      expect(await chosenLanguage(Uri.parse('https://x/play/?lang=es')), const Locale('es'), reason: 'an address that asks for another');
+      await choose(null);
+      expect(await chosenLanguage(Uri.parse('https://x/play/?lang=es')), isNull, reason: 'and the device\'s own, chosen, holds too');
+    });
   });
 
   group('the screens', () {

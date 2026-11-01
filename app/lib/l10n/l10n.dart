@@ -69,12 +69,20 @@ Locale? languageInAddress([Uri? at]) => _spoken((at ?? Uri.base).queryParameters
 /// there is the app's too.
 const chosenLanguageKey = 'language';
 
-/// The language a person chose: the address's, kept for next time, or
-/// the one kept from before. Null leaves the choice to the device.
+/// The language the address last asked for and was given. `lang` stays
+/// in the address for the whole visit (router.dart, sessionParams), so
+/// a reload asks again; an address that asks for the language it was
+/// given last time leaves a language chosen since ([choose]) as it is.
+const _addressLanguageKey = 'language_from_address';
+
+/// The language a person chose: the address's, when it asks for one it
+/// was not given last time, kept for next time; else the one kept from
+/// before. Null leaves the choice to the device.
 Future<Locale?> chosenLanguage([Uri? at]) async {
   final prefs = await SharedPreferences.getInstance();
   final asked = languageInAddress(at);
-  if (asked != null) {
+  if (asked != null && prefs.getString(_addressLanguageKey) != asked.languageCode) {
+    await prefs.setString(_addressLanguageKey, asked.languageCode);
     await prefs.setString(chosenLanguageKey, asked.languageCode);
     return asked;
   }
