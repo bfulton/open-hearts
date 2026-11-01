@@ -546,11 +546,9 @@ mod tests {
         let mut got = vec![0u8; POINT];
         assert_eq!(open_shared(&sealed[..SEALED], &parts, &mut got), Some(POINT));
         assert_eq!(got, whole, "the same token the key itself would have opened");
-        assert_ne!(
-            open_shared(&sealed[..SEALED], &parts[..POINT], &mut got.clone()).map(|_| got.clone()),
-            None,
-            "one part alone gives something"
-        );
+        let mut one = vec![0u8; POINT];
+        assert_eq!(open_shared(&sealed[..SEALED], &parts[..POINT], &mut one), Some(POINT), "one part alone still gives a point");
+        assert_ne!(one, whole, "but not the token");
     }
 
     /// And into more than two, for a table with no custodian to escrow to,
