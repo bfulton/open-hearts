@@ -335,3 +335,45 @@ test("an account is looked for by email in the webhook's Stripe API version, as 
   await findAccounts(store, 'ada@example.com', { stripeKey: 'rk_live_x', fetchImpl });
   assert.deepEqual(asked, [{ authorization: 'Bearer rk_live_x', 'stripe-version': STRIPE_VERSION }]);
 });
+
+test('oh account delete ends a web subscription still running in Stripe first, with nothing refunded, and asks Stripe nothing on a dry run or under a hold', async () => {
+  const subscribed = async () => {
+    const store = await webSubscriber();
+    await store.put('SUB#sub_9', 'ACCOUNT', { account });
+    await store.put('SUB#sub_9', 'META', { source: 'stripe', renews_at: '2027-03-01', cancelled_at: null });
+    await store.put('NOTICE#terms@2026-10-23', 'SUB#sub_9', { at: '2026-10-24T00:00:00Z', lang: 'en' });
+    return store;
+  };
+  // A dry run says what it would do, and asks Stripe for nothing at all (a fake that throws on any call).
+  const untouched = { async get() { throw new Error('asked Stripe'); }, async post() { throw new Error('asked Stripe'); }, async del() { throw new Error('asked Stripe'); } };
+  const store = await subscribed();
+  const dry = context(store, untouched);
+  assert.equal(await main(['account', 'delete', account], dry), 0);
+  assert.match(dry.said.join('\n'), /would end sub_9 in Stripe now: no renewal, and nothing refunded/);
+  assert.ok(await store.get(`ACCOUNT#${account}`, 'META'), 'a dry run deletes nothing');
+
+  // Under a legal hold nothing is ended and nothing is deleted.
+  const held = await subscribed();
+  await held.put(`ACCOUNT#${account}`, 'HOLD', { since: '2026-10-16', until: '2027-10-16', ref: null, deleteAsked: null });
+  assert.equal(await main(['account', 'delete', account, '--apply'], context(held, untouched)), 1);
+  assert.ok(await held.get(`ACCOUNT#${account}`, 'META'));
+
+  // The real run ends it, as the app's own deletion does (a reason, no refund), then deletes the rows, its notes with them.
+  const stripe = fakeStripe();
+  const done = context(store, stripe);
+  assert.equal(await main(['account', 'delete', account, '--apply'], done), 0);
+  assert.deepEqual(stripe.calls, [['DELETE', '/subscriptions/sub_9', { 'cancellation_details[comment]': 'account deleted' }]]);
+  assert.match(done.said.join('\n'), /ended sub_9/);
+  assert.deepEqual([...store.rows.keys()], [], 'the rows, the notes among them');
+
+  // Stripe failing leaves everything in place, to be run again.
+  const failing = await subscribed();
+  const broken = { ...fakeStripe(), async del() { throw new Error('Stripe said 500'); } };
+  assert.equal(await main(['account', 'delete', account, '--apply'], context(failing, broken)), 1);
+  assert.ok(await failing.get(`ACCOUNT#${account}`, 'META'));
+
+  // A subscription bought in a store is still the owner's to cancel there.
+  const apple = await webSubscriber('apple');
+  await apple.put('SUB#sub_9', 'META', { source: 'apple', renews_at: '2027-03-01', cancelled_at: null });
+  assert.equal(await main(['account', 'delete', account, '--apply'], context(apple, untouched)), 1);
+});

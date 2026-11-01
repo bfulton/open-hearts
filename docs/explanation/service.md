@@ -573,10 +573,13 @@ that a late event about it is turned away. Under a legal hold
 (`holds.mjs`), nothing is deleted or ended: the asking is noted, and the
 app is answered as for a deletion.
 
-From the operator's command, a subscription still paid up is cancelled
-first. A web subscription cancelled but still running keeps its notes of
-the changes it was told of: Stripe still lists it, and `oh terms notify`
-would otherwise write to its subscriber about them again. Where the
+From the operator's command, a web subscription still running is ended
+in Stripe first, as above, with nothing refunded, before any row that
+names it is deleted; a store subscription still paid up and not
+cancelled is refused, since only its owner can cancel it. A store
+subscription cancelled but still running keeps its notes of the changes
+it was told of, so that `oh terms notify` does not write to it about them
+again. Under a legal hold the command ends and changes nothing. Where the
 `Household` object runs, its note of the device in use (its key, the
 epoch, times, the table it said it sat at, the relay objects it was seen
 at, and whether the account was suspended) is in the object's own

@@ -148,9 +148,9 @@ Puts back what remove held. A name taken off kept games stays off them.
 oh account delete <account> [--apply]
 ```
 
-Deletes an account's data on its owner's request: its name off its kept games, and every row the service keeps for it. Refuses an account whose subscription is still paid up: cancel it first.
+Deletes an account's data on its owner's request: its name off its kept games, and every row the service keeps for it. A web subscription still running is ended in Stripe first, as the app's own deletion ends it, with nothing refunded; its notes of the changes it was told of go with the rest. Refuses an account whose store subscription is still paid up and not cancelled: its owner cancels it in the store. Refuses an account under a legal hold, ending nothing.
 
-- **Needs:** `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, (Workers R2 Storage Edit)
+- **Needs:** `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, (Workers R2 Storage Edit), STRIPE_API_KEY (for a web subscription still running)
 - **How-to:** [delete-an-accounts-data.md](../how-to/delete-an-accounts-data.md)
 - **Example:** `oh account delete 0123456789abcdef0123456789abcdef --apply`
 

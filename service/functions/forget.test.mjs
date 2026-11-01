@@ -222,9 +222,10 @@ test('every subscription an account has had goes with it, and nobody else\'s', a
   assert.deepEqual(await accountsPaidBy(store, stripe, 'ada@example.com'), []);
 });
 
-test('the operator\'s tool keeps the notes of a web subscription Stripe still runs, so its subscriber is not told again', async () => {
+test('the operator\'s tool ends a web subscription still running before it deletes, and keeps only a store subscription\'s notes', async () => {
   const now = Date.parse('2026-11-01T12:00:00Z');
-  const bucket = { list: async () => [], get: async () => null, put: async () => {} };
+  const puts = [];
+  const bucket = { list: async () => [], get: async () => null, put: async (...args) => puts.push(args) };
   /// Ada's account with sub_1, whose META is [meta], told of a change to the terms.
   const subscribed = async (meta) => {
     const store = memoryStore();
@@ -234,18 +235,61 @@ test('the operator\'s tool keeps the notes of a web subscription Stripe still ru
     await store.put('NOTICE#terms@2026-10-23', 'SUB#sub_1', { at: '2026-10-24T00:00:00Z', lang: 'en' });
     return { ...store, list: keysOf(store) };
   };
-  // Not cancelled: refused, and nothing deleted.
+  const ended = [];
+  const endWeb = async (id) => ended.push(id);
+  const run = (store, options = {}) => forget(store, bucket, ADA, { apply: true, now, ...options });
+
+  // Running to 2027-03-01, not cancelled: a dry run says it would end it and ends nothing; the real
+  // run ends it, then deletes everything, its note with the rest.
   const paid = await subscribed({ renews_at: '2027-03-01', cancelled_at: null });
-  await assert.rejects(forget(paid, bucket, ADA, { apply: true, now }), /sub_1 is still paid up to 2027-03-01; cancel it first/);
-  assert.ok(paid.rows.has(`ACCOUNT#${ADA}|META`));
-  // Cancelled, and running to 2027-03-01: Stripe still lists it, so its note stays.
+  const said = [];
+  await run(paid, { apply: false, endWeb, log: (line) => said.push(line) });
+  assert.deepEqual(ended, []);
+  assert.ok(said.includes('would end sub_1 in Stripe now: no renewal, and nothing refunded'));
+  assert.ok(paid.rows.has(`ACCOUNT#${ADA}|META`), 'a dry run deletes nothing');
+  await run(paid, { endWeb });
+  assert.deepEqual(ended, ['sub_1']);
+  assert.deepEqual([...paid.rows.keys()], []);
+
+  // Cancelled, and running to 2027-03-01: Stripe still lists it, so it is ended too, and its note goes.
   const running = await subscribed({ renews_at: '2027-03-01', cancelled_at: '2026-10-30' });
-  await forget(running, bucket, ADA, { apply: true, now });
-  assert.deepEqual([...running.rows.keys()], ['NOTICE#terms@2026-10-23|SUB#sub_1']);
-  // Ended in Stripe today: its note goes with the rest.
-  const ended = await subscribed({ renews_at: '2026-11-01', cancelled_at: '2026-11-01', final: true });
-  await forget(ended, bucket, ADA, { apply: true, now });
-  assert.deepEqual([...ended.rows.keys()], []);
+  await run(running, { endWeb });
+  assert.deepEqual(ended, ['sub_1', 'sub_1']);
+  assert.deepEqual([...running.rows.keys()], []);
+
+  // Already ended in Stripe: nothing to end, and its note goes with the rest.
+  const over = await subscribed({ renews_at: '2026-11-01', cancelled_at: '2026-11-01', final: true });
+  await run(over, { endWeb });
+  assert.equal(ended.length, 2);
+  assert.deepEqual([...over.rows.keys()], []);
+
+  // Stripe not answering: nothing deleted, nothing marked, and the run is run again.
+  const stuck = await subscribed({ renews_at: '2027-03-01', cancelled_at: null });
+  const marked = puts.length;
+  await assert.rejects(run(stuck, { endWeb: async () => { throw new Error('Stripe said 500'); } }), /Stripe said 500/);
+  assert.ok(stuck.rows.has(`ACCOUNT#${ADA}|META`));
+  assert.equal(puts.length, marked, 'not marked');
+
+  // Without a way to end it, or for a subscription bought in a store, one not cancelled is refused.
+  await assert.rejects(run(await subscribed({ renews_at: '2027-03-01', cancelled_at: null })), /sub_1 is still paid up to 2027-03-01; cancel it first/);
+  const store = await subscribed({ source: 'apple', renews_at: '2027-03-01', cancelled_at: null });
+  await assert.rejects(run(store, { endWeb }), /sub_1 is still paid up to 2027-03-01; cancel it first/);
+  assert.equal(ended.length, 2, 'a store\'s is not Stripe\'s to end');
+  assert.ok(store.rows.has(`ACCOUNT#${ADA}|META`));
+  // One that is cancelled and runs on keeps its notes: it is still a subscriber's, and is not written to again about a change it was told of.
+  const kept = await subscribed({ source: 'apple', renews_at: '2027-03-01', cancelled_at: '2026-10-30' });
+  await run(kept, { endWeb });
+  assert.deepEqual([...kept.rows.keys()], ['NOTICE#terms@2026-10-23|SUB#sub_1']);
+
+  // Under a legal hold nothing is ended, marked, changed or deleted.
+  const held = await subscribed({ renews_at: '2027-03-01', cancelled_at: null });
+  await held.put(`ACCOUNT#${ADA}`, 'HOLD', { since: '2026-10-16', until: '2027-10-16', ref: null, deleteAsked: null });
+  const before = [...held.rows.keys()].sort();
+  const markedBefore = puts.length;
+  await assert.rejects(run(held, { endWeb }), /held since 2026-10-16, until at least 2027-10-16/);
+  assert.equal(ended.length, 2);
+  assert.equal(puts.length, markedBefore, 'not marked');
+  assert.deepEqual([...held.rows.keys()].sort(), before);
 });
 
 test('a lapsed subscriber who pays again keeps a note of the subscription before, and both go with the account, found without a listing', async () => {

@@ -11,26 +11,41 @@
 
 import { anonymizeGames, forgottenKey } from '../functions/records.mjs';
 import { forgetAccount } from '../functions/deletion.mjs';
+import { Held, holdOf } from '../functions/holds.mjs';
 import { dayOf, isAccount } from '../functions/rows.mjs';
 
 /// [account] forgotten: the mark that keeps its name off games kept
 /// from then on, its name off the games already kept, and every row the
 /// service keeps for it. With [apply] false, says what it would do and
 /// changes nothing. [log] is told each step, by key and seat, never a
-/// name, a code or a profile. Throws, changing nothing, for an account
-/// whose subscription is still paid up: that is cancelled first, or its
-/// next renewal would find nothing to renew. {games, rows}: how many.
-export async function forget(store, bucket, account, { apply = false, log = () => {}, now = Date.now() } = {}) {
+/// name, a code or a profile. A web subscription still running is ended
+/// first, by [endWeb] (given its id; not called without [apply]), as the
+/// app's own deletion ends it (service/functions/worker.mjs,
+/// deleteRoute), before any row that names it is deleted: a run that
+/// stops there is run again and finds it. Any other subscription still
+/// paid up, one bought in a store, makes this throw, changing nothing:
+/// its owner cancels it in the store, or its next renewal would find
+/// nothing to renew. Throws [Held], changing nothing and ending nothing,
+/// while the account is under a legal hold (holds.mjs).
+/// {games, rows}: how many.
+export async function forget(store, bucket, account, { apply = false, log = () => {}, now = Date.now(), endWeb = null } = {}) {
   if (!isAccount(account)) throw new Error('name the account, 32 hex');
+  const held = await holdOf(store, account);
+  if (held) throw new Held(held);
   const subscription = (await store.get(`ACCOUNT#${account}`, 'META'))?.subscription;
   const sub = typeof subscription === 'string' ? await store.get(`SUB#${subscription}`, 'META') : null;
-  const running = !!sub && !sub.final && sub.renews_at >= dayOf(now);
+  let running = !!sub && !sub.final && sub.renews_at >= dayOf(now);
+  if (running && sub.source === 'stripe' && endWeb) {
+    log(`${apply ? 'ending' : 'would end'} ${subscription} in Stripe now: no renewal, and nothing refunded`);
+    if (apply) await endWeb(subscription);
+    running = false;
+  }
   if (running && !sub.cancelled_at) throw new Error(`${subscription} is still paid up to ${sub.renews_at}; cancel it first`);
-  // A web subscription that is cancelled but runs to the end of what was
-  // paid for is still a subscriber's in Stripe, and `oh terms notify`
-  // writes to every subscription with no note that it was told of a
-  // change (ops/terms.mjs). So its notes stay, and this person is not
-  // written to again about a change they were told of.
+  // A subscription that is cancelled but runs to the end of what was paid
+  // for is still a subscriber's, and `oh terms notify` writes to every
+  // subscription with no note that it was told of a change (ops/terms.mjs).
+  // So its notes stay, and this person is not written to again about a
+  // change they were told of. (Only a store's: a web one is ended above.)
   const notesKept = running ? [subscription] : [];
   // The mark first: a game kept from then on, one that ends while this
   // runs or that the account plays while its last licence runs, is kept

@@ -731,6 +731,17 @@ squashed from a pull request, the pull request's number.
   service reads no request body past its bound, and quotes a report's
   note in the operator's email so that it cannot pass for instructions.
   (2026-11-01, #47)
+- `oh account delete` ends a web subscription that is still running in
+  Stripe before it deletes anything, as the app's own deletion does, with
+  nothing refunded, and so no longer keeps that subscription's notes of
+  the changes it was told of; it had refused an account whose
+  subscription was still paid up, and kept the notes of one cancelled
+  but still running, so that `oh terms notify` would not write to the
+  person again. Stripe not answering stops it with nothing deleted. The
+  command now also checks for a legal hold before it marks the account
+  forgotten or changes any kept game, where it used to do both first and
+  refuse only when it came to the rows. A store subscription still paid
+  up and not cancelled is still refused. (2026-11-01, #47)
 - Production's service no longer answers on its `open-hearts.pages.dev`
   addresses. `/api/` was answered there too, at the project's own
   address and at one for each production deployment kept, where the
