@@ -30,7 +30,7 @@ import { carryOutNotice, noticesOf, toldVersions } from './notices.mjs';
 import { MOST_PROFILE_BODY } from './profile.mjs';
 import { anonymizeGames, keepRecord, keptGames, markForgotten, recordMost, recordResponse, tableIdShape } from './records.mjs';
 import { REFUSED } from './refusals.mjs';
-import { isAccount, storeOf } from './rows.mjs';
+import { bytesOf64, isAccount, storeOf } from './rows.mjs';
 import { S, notConfigured, openHouse, settle } from './settings.mjs';
 import { APPLE_ID_GONE, PROVIDERS, appleIdNotice, supersede, unlinkFromAccount, whoSignedIn } from './signin.mjs';
 import { playPurchase, playSubscriptionOf, pushedByPlay, storeAccountOf } from './stores.mjs';
@@ -694,7 +694,7 @@ async function playRoute(request, env) {
   let note;
   try {
     const pushed = JSON.parse((await textOf(request, MOST_BODY)) ?? '');
-    note = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(pushed.message.data), (c) => c.charCodeAt(0))));
+    note = JSON.parse(new TextDecoder().decode(bytesOf64(pushed.message.data)));
   } catch {
     return json(request, 400, { error: 'not a notification' });
   }

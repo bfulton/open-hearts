@@ -22,7 +22,7 @@
 
 import { nameRefused } from './names.mjs';
 import { PROFILE_NAME_MOST } from './profile.mjs';
-import { dayOf } from './rows.mjs';
+import { dayOf, digestOf, isAccount, licenceStatement } from './rows.mjs';
 
 /// A table's id (packages/table, spec.dart, newTableId).
 export const tableIdShape = /^[0-9a-f]{32}$/;
@@ -54,14 +54,11 @@ export async function markForgotten(binding, account, { now = Date.now() } = {})
   await binding.put(forgottenKey(account), JSON.stringify({ forgotten: dayOf(now) }), { httpMetadata: { contentType: 'application/json' } });
 }
 
-/// An account's number (rows.mjs, isAccount).
-const accountShape = /^[0-9a-f]{32}$/;
-
 /// The id an event of [table] has: the hash of what it says, as the
 /// table writes it (packages/table, events.dart, `_canonical`): every
 /// object's keys in order, at every depth.
 export async function eventIdOf(table, event) {
-  return sha256Hex(inOrder([table, event.author, event.kind, event.body]));
+  return digestOf(inOrder([table, event.author, event.kind, event.body]));
 }
 
 /// [json] written out with every object's keys in order at every depth,
@@ -76,17 +73,6 @@ function inOrder(json) {
   return `{${keys.map((k) => `${JSON.stringify(k)}:${inOrder(json[k])}`).join(',')}}`;
 }
 
-/// SHA-256 of [text], hex.
-async function sha256Hex(text) {
-  const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text)));
-  return [...digest].map((b) => b.toString(16).padStart(2, '0')).join('');
-}
-
-/// What a licence is the service's signature over: this, and then the
-/// device's key, its account, its last day and the plan, a line each
-/// (licence.mjs, licenceFor; packages/table, licence.dart).
-const licenceStatement = 'oh-licence/2';
-
 /// Why [seats] are not seats the app would show, or null: every
 /// person's seat carries a licence the service ([service], its public
 /// key) signed for the seat's key, and no account sits twice, as the
@@ -99,9 +85,8 @@ async function licenceProblem(seats, service, verify) {
   for (const [s, seat] of seats.entries()) {
     if (typeof seat?.bot === 'string') continue;
     const { key, account, until, plan, sig } = seat?.licence ?? {};
-    const lines = [key, account, until, plan];
-    const shaped = key === seat?.key && lines.every((v) => typeof v === 'string' && !v.includes('\n')) && /^[0-9a-f]{128}$/.test(sig ?? '');
-    if (!shaped || !verify(service, await sha256Hex([licenceStatement, ...lines].join('\n')), sig)) return `seat ${s} has no licence for its key`;
+    const shaped = key === seat?.key && [key, account, until, plan].every((v) => typeof v === 'string' && !v.includes('\n')) && /^[0-9a-f]{128}$/.test(sig ?? '');
+    if (!shaped || !verify(service, await digestOf(licenceStatement(key, account, until, plan)), sig)) return `seat ${s} has no licence for its key`;
     if (seated.has(account)) return `seat ${s} is an account already seated`;
     seated.add(account);
   }
@@ -179,7 +164,7 @@ const packed = (text) => new Response(new Blob([text]).stream().pipeThrough(new 
 /// one account's games are found without reading every game
 /// (anonymizeGames).
 function seatedAccounts(record) {
-  return [...new Set(record.spec.seats.map((s) => s?.licence?.account).filter((a) => typeof a === 'string' && accountShape.test(a)))];
+  return [...new Set(record.spec.seats.map((s) => s?.licence?.account).filter(isAccount))];
 }
 
 /// Thrown for a kept record that JSON.stringify would not write back as

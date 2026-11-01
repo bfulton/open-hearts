@@ -20,7 +20,7 @@ export function allowedOrigin(origin, requestUrl = null) {
   } catch {
     return null;
   }
-  if (host === 'localhost' || host === '127.0.0.1' || host.endsWith('.localhost')) return requestUrl && isLocal(requestUrl) ? origin : null;
+  if (isLocal(origin)) return requestUrl && isLocal(requestUrl) ? origin : null;
   if (host === 'openhearts.game' || host === 'www.openhearts.game' || host === APP_HOST) return origin;
   if (host === 'open-hearts.pages.dev' || host.endsWith('.open-hearts.pages.dev')) return origin;
   return null;

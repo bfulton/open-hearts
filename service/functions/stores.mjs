@@ -2,7 +2,7 @@
 // checked as each store signs them.
 
 import { REFUSED } from './refusals.mjs';
-import { digestOf } from './rows.mjs';
+import { bytesOf64, digestOf, hex } from './rows.mjs';
 import { jwtOf } from './signin.mjs';
 
 // ---- buying in a store -------------------------------------------------
@@ -40,12 +40,11 @@ import { jwtOf } from './signin.mjs';
 /// (app/lib/net/store_buying.dart); a test pins both.
 export async function storeAccountOf(key) {
   const h = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`oh-store/1\n${key}`)));
-  const hex = [...h].map((b) => b.toString(16).padStart(2, '0')).join('');
   const u = h.slice(0, 16);
   u[6] = (u[6] & 0x0f) | 0x40;
   u[8] = (u[8] & 0x3f) | 0x80;
-  const x = [...u].map((b) => b.toString(16).padStart(2, '0')).join('');
-  return { google: hex, apple: `${x.slice(0, 8)}-${x.slice(8, 12)}-${x.slice(12, 16)}-${x.slice(16, 20)}-${x.slice(20)}` };
+  const x = hex(u);
+  return { google: hex(h), apple: `${x.slice(0, 8)}-${x.slice(8, 12)}-${x.slice(12, 16)}-${x.slice(16, 20)}-${x.slice(20)}` };
 }
 
 // ---- Google Play ---------------------------------------------------------
@@ -58,7 +57,7 @@ let playAccess = null;
 /// Forgets the cached Play access token, for a test.
 export const forgetPlayAccess = () => (playAccess = null);
 
-const pemBytes = (pem) => Uint8Array.from(atob(String(pem).replace(/-----[^-]+-----/g, '').replace(/\s+/g, '')), (c) => c.charCodeAt(0));
+const pemBytes = (pem) => bytesOf64(String(pem).replace(/-----[^-]+-----/g, '').replace(/\s+/g, ''));
 const b64url = (bytes) => btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 const b64urlText = (text) => b64url(new TextEncoder().encode(text));
 
