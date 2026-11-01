@@ -74,7 +74,7 @@ For the environment variables both read, see [Environment variables](configurati
 | File | What it does | Main flags |
 |---|---|---|
 | `app/tool/affected_tests.mjs` | Prints the app's test files whose imports reach a changed file, or `all`. `./check.sh quick` runs it. | The changed paths, from the repository's root. |
-| `app/tool/defines.mjs` | Writes the phone build's `--dart-define-from-file` from `config/openhearts.json` (`appDefines`). Refuses a file with no `serviceKey`, `houseKey` or `appOrigin`. `build_phone.sh` runs it. | `<out.json>` |
+| `app/tool/defines.mjs` | Writes the phone build's `--dart-define-from-file` from `config/openhearts.json` (`appDefines`), with the build's commit and date (`OH_BUILD_TAG`, `OH_BUILD_DATE`). Refuses a file with no `serviceKey`, `houseKey` or `appOrigin`. `build_phone.sh` and the `ios` workflow run it. | `<out.json>` |
 | `app/tool/icons.mjs` | Draws every icon and launch image the app and the site ship from `app/tool/icon.svg`. Run it from `app`. | None |
 
 ## Docs tools

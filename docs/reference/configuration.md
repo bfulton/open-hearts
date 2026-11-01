@@ -12,7 +12,7 @@ The non-secret configuration, committed and the same for every deployment.
 - The relay worker reads it the same way (`service/do/worker.mjs`).
 - Where the environment says it is a preview (`OH_DEPLOYMENT` is `preview`), the file is read as a preview has it (`configFor`): `serviceKey` is `preview.serviceKey` and `houseKey` is `preview.houseKey`, or none while there is none, never production's.
 - `deploy.sh` compiles `serviceKey` and `houseKey` (a preview's: `preview.serviceKey` and `preview.houseKey`), `google.webClientId` and `apple.servicesId` into the web build.
-- `app/tool/defines.mjs` writes the phone build's `--dart-define-from-file` from it (`appDefines`).
+- `app/tool/defines.mjs` writes the phone build's `--dart-define-from-file` from it (`appDefines`), with the build's commit and date beside it.
 - A field that is `null` is left out, so the feature that needs it stays off.
 
 | Field | Worker name (`configEnv`) | Build define (`appDefines`) | What it is |
@@ -181,6 +181,8 @@ Compile-time values the app reads with `String.fromEnvironment`. They are not en
 | `OH_GOOGLE_CLIENT_ID`, `OH_APPLE_SERVICE_ID` | `app/lib/net/provider_tokens.dart` | `deploy.sh`, `app/tool/defines.mjs` |
 | `OH_APPLE_PRODUCT`, `OH_PLAY_PRODUCT`, `OH_PLAY_PACKAGE` | `app/lib/net/store_buying.dart` | `app/tool/defines.mjs` (not `OH_PLAY_PACKAGE`) |
 | `OH_RELAYS` | `app/lib/net/relays.dart` | `deploy.sh`: empty for production, and the preview relay for a preview. A comma list replaces the build's relays, and the remote config's. |
+| `OH_BUILD_TAG`, `OH_BUILD_DATE` | `app/lib/build_info.dart` | `deploy.sh`, `app/tool/defines.mjs`: the short commit, with `+` for a tree with uncommitted changes, and the UTC date. Without them a build says `dev`. |
+| `OH_UPDATE_CHECK` | `app/lib/build_info.dart` | `deploy.sh`: `true`, which turns the "new build" pill on. |
 
 ## Remote config
 

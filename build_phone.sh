@@ -5,7 +5,9 @@
 # crypto/build_android.sh): every live table is sealed, and a phone
 # without them plays alone. Then the release, compiled with what
 # config/openhearts.json names (app/tool/defines.mjs): the service key it
-# takes a licence from, the sign-in identifiers, and the store products.
+# takes a licence from, the sign-in identifiers, and the store products;
+# and the build's commit and date, which the About page shows and the
+# remote config's update notice compares.
 # A release built any other way is refused, by Xcode (app/ios/
 # release_check.sh) and by Gradle (app/android/app/build.gradle.kts).
 #

@@ -40,16 +40,21 @@ machine rather than at Cloudflare.
 
 ## Knowing which build is running
 
-The build's identity is compiled in. `deploy.sh` generates
-`app/lib/build_info.g.dart` with the short commit hash, the date and the
-update check turned on, and restores the committed placeholder
-afterwards. It also writes `play/build-info.json` with the same hash.
+The build's identity is compiled in, as the defines `OH_BUILD_TAG` (the
+short commit hash) and `OH_BUILD_DATE` (the UTC date) that
+`app/lib/build_info.dart` reads. `deploy.sh` passes both to the web
+build, with `OH_UPDATE_CHECK` to turn the update check on, and writes
+`play/build-info.json` with the same hash. `build_phone.sh` and the
+`ios` workflow get both from `app/tool/defines.mjs`. A build without
+them, such as a local run, a test or CI, says `dev`.
 
 - The About page shows the hash and the date.
-- A deployed build fetches `build-info.json` at launch and whenever it
-  returns to the foreground. If the published hash differs from its own,
-  it shows a tap-to-reload pill. Local runs, tests and CI keep the
-  placeholder, so the pill never appears there.
+- The remote config's `update` notice compares the date, so it reaches
+  phone builds as well as the web.
+- A deployed web build fetches `build-info.json` at launch and whenever
+  it returns to the foreground. If the published hash differs from its
+  own, it shows a tap-to-reload pill. Local runs, tests and CI build
+  without `OH_UPDATE_CHECK`, so the pill never appears there.
 - `site/public/_headers` marks the entry points `no-store`, so a cached
   bootstrap cannot load an old build.
 - A hash ending in `+` was deployed from a tree with uncommitted

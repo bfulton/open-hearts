@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { test } from 'node:test';
+import { fileURLToPath } from 'node:url';
 import { appDefines, configEnv, configFor, withConfig } from './deployment.mjs';
 
 const committed = JSON.parse(readFileSync(new URL('../../config/openhearts.json', import.meta.url), 'utf8'));
@@ -93,4 +97,21 @@ test('a phone build is compiled with the key, the sign-in identifiers and the pr
   assert.equal(committed.stripePrice, 'openhearts_annual');
   // A field left null is left out, so the build's own default stands.
   assert.deepEqual(appDefines({ serviceKey: 'k', google: { webClientId: null } }), { OH_SERVICE_KEY: 'k' });
+});
+
+test('a phone build is told its commit and the day it was made, as deploy.sh tells the web build', () => {
+  // Without the day, the remote config's update notice, which asks
+  // builds made before a day to update, never reaches a phone
+  // (app/lib/build_info.dart, buildDate).
+  const dir = mkdtempSync(join(tmpdir(), 'defines-'));
+  const day = () => new Date().toISOString().slice(0, 10);
+  const before = day();
+  execFileSync('node', [fileURLToPath(new URL('../../app/tool/defines.mjs', import.meta.url)), join(dir, 'defines.json')]);
+  const defines = JSON.parse(readFileSync(join(dir, 'defines.json'), 'utf8'));
+  rmSync(dir, { recursive: true });
+  const sha = execFileSync('git', ['rev-parse', '--short', 'HEAD'], { encoding: 'utf8' }).trim();
+  assert.match(defines.OH_BUILD_TAG, new RegExp(`^${sha}\\+?$`));
+  assert.match(defines.OH_BUILD_DATE, /^\d{4}-\d{2}-\d{2}$/);
+  assert.ok([before, day()].includes(defines.OH_BUILD_DATE), defines.OH_BUILD_DATE);
+  assert.equal(defines.OH_SERVICE_KEY, committed.serviceKey, 'beside what the config names');
 });
