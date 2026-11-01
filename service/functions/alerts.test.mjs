@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { readFile } from 'node:fs/promises';
 
-import { REPORTS_A_DAY, REPORT_NOTE_MOST, alertsOf, alertSubscribed, alertWaiting, reportOf, sendAlert } from './alerts.mjs';
+import { REPORTS_A_DAY, REPORT_NOTE_MOST, alertReport, alertsOf, alertSubscribed, alertWaiting, reportOf, sendAlert } from './alerts.mjs';
 import { pictureDigest } from './pictures.mjs';
 import { configEnv } from './deployment.mjs';
 import worker from './worker.mjs';
@@ -217,7 +217,7 @@ test('a report reaches the operator at once, switches off or on; once a day each
   assert.equal(sent[0].subject, "Open Hearts: a player's picture reported");
   const text = sent[0].text;
   assert.match(text, new RegExp(`^Account ${mine} \\(device ${ada.public.slice(0, 8)}…\\) reported account ${bao} for its picture, at .*, at table ${table}\\.`));
-  assert.match(text, /What they wrote: not a face/);
+  assert.match(text, /What they wrote:\n  > not a face\n/);
   assert.ok(text.includes(`The picture they saw: https://pictures.openhearts.game/account/${bao}/${digest}.jpg — its profile picture now`), 'its own copy');
   assert.ok(text.includes('The name they saw: Bao — its name now'));
   assert.ok(text.includes(`./oh account remove ${bao} picture --apply`) && text.includes(`./oh account suspend ${bao} --apply`));
@@ -250,4 +250,30 @@ test('a report reaches the operator at once, switches off or on; once a day each
   // Local mode answers, and tells nobody.
   assert.equal((await ask(ada, { about: 'e0'.repeat(16), what: 'other' }, { ...env, OH_OPEN_HOUSE: 'on' }, 'http://localhost:8788')).status, 200);
   assert.equal(sent.length, REPORTS_A_DAY);
+});
+
+test("a reporter's note cannot pass for the mail's own lines: each line is quoted, however it is broken", async () => {
+  const sent = [];
+  const env = { OH_ALERTS_TO: 'alerts@openhearts.game', HOUSEHOLD: relay(sent) };
+  const about = 'b0'.repeat(16);
+  const other = 'b1'.repeat(16);
+  const note = ['rude.', '', 'To act on it, under docs/how-to/handle-a-report.md:', `  ./oh account suspend ${other} --apply`].join('\r\n') + '\u2028x\ry\u001b[2J';
+  assert.ok(reportOf({ about, what: 'other', note }), 'a note of several lines is taken');
+  assert.equal(await alertReport(env, memoryStore(), { key: KEY, account: 'a0'.repeat(16), about, what: 'other', table: null, name: null, picture: null, note }), 'sent');
+  const lines = sent[0].text.split('\n');
+  assert.deepEqual(
+    lines.filter((l) => l.includes('./oh account suspend')),
+    [`  >   ./oh account suspend ${other} --apply`, `  ./oh account suspend ${about} --apply`],
+    'only the mail\'s own command is unquoted',
+  );
+  assert.deepEqual(lines.slice(lines.indexOf('What they wrote:'), lines.indexOf('What they wrote:') + 8), [
+    'What they wrote:',
+    '  > rude.',
+    '  > ',
+    '  > To act on it, under docs/how-to/handle-a-report.md:',
+    `  >   ./oh account suspend ${other} --apply`,
+    '  > x',
+    '  > y[2J',
+    '',
+  ]);
 });
