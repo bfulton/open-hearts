@@ -203,6 +203,52 @@ test('a stub of a game, sent before its end, does not stand in the way of the ga
   assert.equal(b.puts.length, puts + 1, 'only the name of the seat that sent it');
 });
 
+/// A real game like the one above, but one in whose log a seated person
+/// put three events the table does not read as it went (tool/game_fixture.dart
+/// --unread): one of a kind no build knows, and two of a kind it knows with
+/// the body of none. The house's word names a log that holds them, and
+/// Dart verifies the record to its end (kept_records_test.dart).
+const unreadFour = gunzipSync(await readFile(new URL('../../packages/table/test/fixtures/refereed_unread.json.gz', import.meta.url))).toString().trim();
+const withUnread = JSON.parse(unreadFour);
+const fromUnread = (b, key, text = unreadFour) =>
+  keepRecord(b, key, withUnread.spec.id, text, { verify: signer.verify, service: keys[1].public, house: withUnread.spec.house });
+
+test('a real game in whose log a person put events no side reads is marked all the same, and a stub of it does not stay', async () => {
+  const odd = withUnread.log.filter((entry) => {
+    const e = entry.e;
+    return e && (e.kind === 'wave' || (e.kind === 'play' && !('card' in e.body)) || (e.kind === 'release' && !('about' in e.body)));
+  });
+  assert.deepEqual(odd.map((entry) => entry.e.kind), ['wave', 'play', 'release']);
+  const [liar] = odd.map((entry) => entry.e.author);
+  assert.ok(odd.every((entry) => entry.e.author === liar));
+  assert.ok(withUnread.spec.seats.some((seat) => seat.key === liar), 'a person at the table');
+  // The house's word names the log with them in it.
+  const result = withUnread.log.map((entry) => entry.e).find((e) => e?.kind === 'result');
+  assert.equal((await logHashes(withUnread.log))[result.body.n], result.body.hash);
+  assert.ok(odd.every((entry) => entry.n < result.body.n));
+
+  // Kept from each of its people, the liar among them: marked.
+  for (const seat of withUnread.spec.seats) {
+    const b = bucket();
+    assert.deepEqual(await fromUnread(b, seat.key), { status: 200, body: { kept: true } });
+    assert.equal(b.kept.get(`tables/${withUnread.spec.id}.json`).custom.vouched, '1');
+  }
+  // A stub of it, sent first by one of the others, does not stay.
+  const [one, two, three] = withUnread.spec.seats.map((seat) => seat.key);
+  const resultAt = withUnread.log.findIndex((entry) => entry.e?.kind === 'result');
+  const stub = JSON.stringify({ ...withUnread, log: withUnread.log.slice(0, resultAt - 40) });
+  const b = bucket();
+  assert.deepEqual(await fromUnread(b, one, stub), { status: 200, body: { kept: true } });
+  const kept = () => b.kept.get(`tables/${withUnread.spec.id}.json`);
+  assert.equal(kept().custom.vouched, undefined);
+  assert.deepEqual(await fromUnread(b, three), { status: 200, body: { kept: true } });
+  assert.equal(kept().custom.vouched, '1');
+  assert.equal(JSON.parse(gunzipSync(kept().body).toString()).log.length, withUnread.log.length);
+  assert.deepEqual(await fromUnread(b, one, stub), { status: 200, body: { kept: true, already: true } });
+  assert.deepEqual(await fromUnread(b, two), { status: 200, body: { kept: true, already: true } });
+  assert.equal(JSON.stringify(JSON.parse(gunzipSync(kept().body).toString()).log), JSON.stringify(withUnread.log), 'the log as it was, entry for entry');
+});
+
 test('a player at the table sends its record, and it is kept packed, once', async () => {
   const b = bucket();
   const text = record();
@@ -503,7 +549,7 @@ async function vouched(text, key = ADA, house = HOUSE.public) {
   return keptAt(b).custom.vouched === '1';
 }
 
-test('a copy carries the house\'s word when its log is the one the house signed for, every entry in it reads, and it is as the app writes it, and not otherwise', async () => {
+test('a copy carries the house\'s word when its log is the one the house signed for, every event in it is shaped as the referee took it, and it is as the app writes it, and not otherwise', async () => {
   const whole = await mini();
   assert.equal(await vouched(whole), true, 'a game in miniature');
   assert.equal(await vouched(whole, BAO), true, 'from either of its players');
@@ -513,6 +559,19 @@ test('a copy carries the house\'s word when its log is the one the house signed 
   // A word that names fewer entries than came before it, by the hash of those.
   assert.equal(await vouched(await mini({ word: { n: 4 } })), true, 'the log as it stood when the house said it');
 
+  // Events the table does not read, put in the log by the people at it
+  // and taken by the referee under their ids and signatures: entries
+  // every side skips, and that the house's word names like any.
+  const wave = await said(bao, 'wave', { at: 1 });
+  const noCard = await said(ada, 'play', { hand: 0, turn: 5, seat: 0 });
+  const noAbout = await said(bao, 'release', { hand: 0 });
+  const notText = await said(ada, 5, 'not a map');
+  const among = (...events) => (l) => [l[0], l[1], ...events.map((e, i) => ({ t: 1300 + i, e })), ...l.slice(2)].map((entry, n) => ({ ...entry, n }));
+  assert.equal(await vouched(await mini({ log: among(wave, noCard) })), true, 'an event of a kind no build knows, and one of a kind it knows with the body of none');
+  assert.equal(await vouched(await mini({ log: among(wave, noCard, noAbout, notText) })), true, 'and more of them, of one kind or another');
+  assert.equal(await vouched(await mini({ baoPlay: wave })), true, 'in the place of a play');
+  assert.equal(await vouched(await mini({ log: among(wave, noCard) }), BAO), true, 'from either of its players');
+
   const deep = (n) => (n ? [deep(n - 1)] : []);
   const startsLikeOne = await said(ada, 'play', { hand: 0, turn: 0, seat: 0, card: '2C', spec: miniSpec });
   const hashes = await logHashes(await played());
@@ -521,6 +580,9 @@ test('a copy carries the house\'s word when its log is the one the house signed 
     r.log.forEach((e, i) => (e.n = i));
     return r;
   };
+  // An event of a kind no build knows, in the place of Bao's play, changed
+  // in the way each of these says.
+  const waved = (change) => mini({ baoPlay: structuredClone(wave), change: (r) => { change(r.log[4].e); return r; } });
   const wrong = [
     // The house's word is not there, is not the house's, or does not name this log.
     ['no word of the house', await mini({ word: null })],
@@ -533,14 +595,21 @@ test('a copy carries the house\'s word when its log is the one the house signed 
     ['an entry dropped, the rest numbered again', await mini({ change: (r) => { r.log.splice(2, 1); r.log.forEach((e, i) => (e.n = i)); return r; } })],
     ['two events in another order, numbered as they were', await mini({ change: swap })],
     ['a connection of another key', await mini({ change: (r) => { r.log[3].up = ADA; return r; } })],
-    // Every entry reads, and is nothing more than the referee wrote.
+    // Every event is as the referee took it, and nothing in the record is more than it wrote.
     ['an event changed, its id as it was', await mini({ change: (r) => { r.log[1].e.body.card = '3C'; return r; } })],
     ['an event with the signature of another', await mini({ change: (r) => { r.log[4].e.sig = r.log[1].e.sig; return r; } })],
     ['an event of another table', await mini({ change: (r) => { r.log[4].e.table = 'f'.repeat(32); return r; } })],
     ['an event with a key of its own', await mini({ change: (r) => { r.log[1].e.more = 1; return r; } })],
-    ['an event no side reads: a kind it does not know', await mini({ baoPlay: await said(bao, 'wave', { at: 1 }) })],
-    ['an event no side reads: a play with no card', await mini({ baoPlay: await said(bao, 'play', { hand: 0, turn: 5, seat: 1 }) })],
-    ['an event nested deeper than any side reads', await mini({ baoPlay: await said(bao, 'play', { hand: 0, turn: 5, seat: 1, card: '3C', deep: deep(40) }) })],
+    ['an event nested deeper than any is', await mini({ baoPlay: await said(bao, 'play', { hand: 0, turn: 5, seat: 1, card: '3C', deep: deep(40) }) })],
+    ['an event from a key that is none of the table\'s', await mini({ baoPlay: await said(keys[1], 'play', { hand: 0, turn: 5, seat: 1, card: '3C' }) })],
+    // The same of the events no side reads: they are held to all of it.
+    ['an event no side reads, changed, its id as it was', await waved((e) => { e.body.at = 2; })],
+    ['an event no side reads, with the signature of another', await waved((e) => { e.sig = 'ab'.repeat(64); })],
+    ['an event no side reads, of another table', await waved((e) => { e.table = 'f'.repeat(32); })],
+    ['an event no side reads, with a key of its own', await waved((e) => { e.more = 1; })],
+    ['an event no side reads, from a key that is none of the table\'s', await mini({ baoPlay: await said(keys[1], 'wave', { at: 1 }) })],
+    ['an event no side reads, with no id', await waved((e) => { e.id = 'wave'; })],
+    ['an event no side reads, nested deeper than any is', await mini({ baoPlay: await said(bao, 'wave', { deep: deep(40) }) })],
     ['an entry holding an event and a connection', await mini({ log: (l) => { l[1] = { ...l[1], up: BAO }; return l; } })],
     ['an entry with a key of its own', await mini({ log: (l) => { l[2] = { ...l[2], x: 1 }; return l; } })],
     ['an entry not numbered by where it is', await mini({ log: (l) => { l[3].n = 7; return l; } })],
@@ -561,11 +630,13 @@ test('a copy carries the house\'s word when its log is the one the house signed 
   assert.equal(await vouched(whole, ADA, 'ab'.repeat(32)), false, 'another house');
   assert.equal(await vouched(whole, ADA, null), false, 'none');
   assert.equal(await vouched(whole, ADA, HOUSE.public.toUpperCase()), false, 'not in the form a key is in');
-  // A log with an entry no side reads is the game still, first come as it was:
-  // kept, and the next copy is not put in its place.
+  // A person putting events no side reads in the log leaves the game
+  // marked, so the copy cut short that was sent first does not stay.
   const b = bucket();
-  assert.equal((await keepAt(b, ADA, wrong[13][1])).status, 200);
-  assert.deepEqual(await keepAt(b, BAO, whole), { status: 200, body: { kept: true } }, 'but the whole game replaces it');
+  assert.equal((await keepAt(b, ADA, await mini({ word: null, log: among(wave, noCard) }))).status, 200);
+  assert.equal(keptAt(b).custom.vouched, undefined, 'a stub');
+  assert.deepEqual(await keepAt(b, BAO, await mini({ log: among(wave, noCard) })), { status: 200, body: { kept: true } }, 'but the whole game replaces it');
+  assert.equal(keptAt(b).custom.vouched, '1');
 });
 
 test('a copy that carries the house\'s word is kept in the place of one that does not, on the etag it read; and a copy is never put over one that does', async () => {

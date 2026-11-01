@@ -135,9 +135,9 @@ const isInt = Number.isSafeInteger;
 
 /// What a record, an entry of its log and an event of one have, and no
 /// more: the keys the app writes (packages/table, record.dart, log.dart,
-/// events.dart), which the referee writes an entry with
-/// (service/do/referee.mjs). A copy that carries more carries what
-/// nothing vouches for.
+/// events.dart), which the referee writes an entry with, and takes an
+/// event with (service/do/referee.mjs). A copy that carries more carries
+/// what nothing vouches for.
 const recordKeys = new Set(['v', 'spec', 'log', 'names']);
 const entryKeys = new Set(['n', 't', 'e', 'up', 'down']);
 const eventKeys = ['author', 'body', 'id', 'kind', 'sig', 'table'];
@@ -160,32 +160,11 @@ function shallow(value) {
   return true;
 }
 
-/// Whether [body] has every field the table reads of an event of [kind],
-/// each of its type (events.dart, TableEvent.wellFormed), and [kind] is
-/// one of the table's (EventKind): an event whose id and signature check,
-/// and which is not, is an entry no side reads.
-function wellFormed(kind, body) {
-  const ints = (...fields) => fields.every((f) => isInt(body[f]));
-  const atTurn = ints('hand', 'turn', 'seat');
-  switch (kind) {
-    case 'start':
-      return isObject(body.spec);
-    case 'deal':
-      return atTurn && ints('round');
-    case 'pass':
-      return atTurn && (!Object.hasOwn(body, 'cards') || (Array.isArray(body.cards) && body.cards.every((c) => typeof c === 'string')));
-    case 'play':
-      return atTurn && typeof body.card === 'string';
-    case 'leave':
-      return ints('seat');
-    case 'release':
-      return ints('hand', 'about');
-    case 'result':
-      return ints('n') && typeof body.hash === 'string' && typeof body.state === 'string' && Array.isArray(body.totals) && body.totals.every(isInt);
-    default:
-      return false;
-  }
-}
+/// Whether [body] is a result as the table reads one (packages/table,
+/// events.dart, TableEvent.wellFormed, EventKind.result): the house's
+/// word is taken from no other.
+const resultReads = (body) =>
+  isInt(body.n) && typeof body.hash === 'string' && typeof body.state === 'string' && Array.isArray(body.totals) && body.totals.every(isInt);
 
 /// What an entry adds to the log's running hash (packages/table, log.dart,
 /// LogEntry.digestInput): an event by its id, a connection by its key, a
@@ -230,27 +209,33 @@ function withNames(record, names) {
 
 /// Whether [record], sent as [text] for [table], carries the house's
 /// checked result: the log is the one the house signed for, whole as far
-/// as the house saw it, and every entry in it is one every side reads,
-/// so that opening it shows the game.
+/// as the house saw it, and nothing in it is more than the referee took.
 ///
 ///  - the record is how the app writes one, nothing in it but what it
 ///    writes, and its spec is the one the log's start says;
 ///  - every entry is numbered by where it is, and holds at most one of an
 ///    event, a connection opening and one closing;
-///  - every event is table [table]'s, has the keys of one and a body its
-///    kind has, its id is the hash of what it says and its signature
-///    checks (no entry reads as an event no side reads);
+///  - every event is shaped as the referee takes one (service/do/referee.mjs,
+///    eventIn, take): table [table]'s, from one of the table's writers (its
+///    people and its house), the keys of an event and no more, not nested
+///    deeper than any is, its id the hash of what it says and its
+///    signature on the id checking. Whether the table reads it is not
+///    asked: an event of a kind it does not know, or of a body none of
+///    its kind has, is an entry every side skips (log.dart, LogEntry.unread;
+///    kept_records_test.dart holds that such a record opens), and its id
+///    is in the hash like any;
 ///  - a result by the table's house, the house this service has
 ///    ([house], OH_HOUSE_KEY), is among them, naming no more of the log
 ///    than came before it, and the hash of that many entries is the hash
 ///    it names (logHashes).
 ///
-/// A game with no result in it (one that failed) and a log that holds an
-/// event this build does not read are not this, and stay as they come.
+/// A game with no result in it (one that failed) is not this, and stays
+/// as it comes.
 async function vouches(record, text, table, house, verify) {
   const { spec, log } = record;
   if (!is64(house) || spec.house !== house) return false;
-  if (!Object.keys(record).every((k) => recordKeys.has(k)) || !log.length || !shallow(spec) || !writtenAsSent(record, text)) return false;
+  if (!Object.keys(record).every((k) => recordKeys.has(k)) || !shallow(spec) || !writtenAsSent(record, text)) return false;
+  const writers = new Set([house, ...spec.seats.flatMap((seat) => (is64(seat?.key) ? [seat.key] : []))]);
   const results = [];
   for (const [i, entry] of log.entries()) {
     if (!isObject(entry) || !Object.keys(entry).every((k) => entryKeys.has(k)) || entry.n !== i || !isInt(entry.t)) return false;
@@ -259,13 +244,12 @@ async function vouches(record, text, table, house, verify) {
     if ((up != null && !is64(up)) || (down != null && !is64(down))) return false;
     if (e == null) continue;
     if (!isObject(e) || Object.keys(e).sort().join() !== eventKeys.join() || !shallow(e)) return false;
-    if (!is64(e.id) || !is64(e.author) || !is128(e.sig) || e.table !== table) return false;
-    if (!isObject(e.body) || !wellFormed(e.kind, e.body)) return false;
-    if (e.kind === 'result' && e.author === house && e.body.n >= 0 && e.body.n <= i) results.push(e);
+    if (!is128(e.sig) || e.table !== table || !writers.has(e.author)) return false;
+    if (e.kind === 'result' && e.author === house && isObject(e.body) && resultReads(e.body) && e.body.n <= i) results.push(e);
   }
   // The log starts the table the record says, as a verifier holds it to.
-  const start = log[0].e;
-  if (start?.kind !== 'start' || inOrder(start.body.spec) !== inOrder(spec)) return false;
+  const start = log[0]?.e;
+  if (start?.kind !== 'start' || inOrder(start.body?.spec) !== inOrder(spec)) return false;
   if (!results.length) return false;
   const hashes = await logHashes(log, Math.max(...results.map((e) => e.body.n)));
   if (!results.some((e) => hashes[e.body.n] === e.body.hash)) return false;

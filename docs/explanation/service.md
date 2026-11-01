@@ -684,14 +684,18 @@ nobody could open, so the first copy is kept only while none carries
 that result. A copy does when its log is the one the house signed for:
 the house's `result` names the log by its length and hash
 (`LogHash`; `logHashes` in `service/functions/records.mjs`, held to the
-app's by a file of cases both read), every event in it reads, with an id
+app's by a file of cases both read), every event in it is shaped as the
+referee takes one, from a person at the table or its house, with an id
 that is the hash of what it says and a signature that checks, and the
-record has nothing in it the app does not write. The copy kept is marked
+record has nothing in it the app does not write. An event the table
+does not read (one of a kind no build knows, or of a kind it knows with
+the body of none) counts like any: every side skips it and the house's
+hash names its id, so a person who puts one in the log leaves the copies
+of the game marked, and the game opens. The copy kept is marked
 `vouched` beside it in R2. A copy that carries the result replaces one
 kept that does not, on the etag it read, so that two devices sending at
 once cannot put one over the other unseen, and nothing replaces one that
-does. A game that failed has no result, and a log that holds an event no
-side reads is not checked this far: those stay first come.
+does. A game that failed has no result, and stays first come.
 
 A name beside a record is unsigned, and is kept from no one but its own
 seat. Each copy brings its sender's seat's name, and the names of the

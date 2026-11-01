@@ -5,7 +5,9 @@
 ///
 /// test/fixtures/ holds one game of the referee's (refereed_four, made
 /// with tool/game_fixture.dart: four people with real keys, the browser
-/// rig's house, to the end of a game to fifty), and two sealed games as
+/// rig's house, to the end of a game to fifty) and another like it in
+/// whose log a person put events the table does not read
+/// (refereed_unread, made with `--unread`), and two sealed games as
 /// the library built on arkworks 0.3 wrote them (once, with a tool since
 /// gone): four people to the end of the game, and three people and a bot
 /// where a person leaves mid-hand and the hand is finished from escrow.
@@ -153,6 +155,35 @@ void main() {
       expect(v.vouched, isTrue);
       expect(v.totals, [5, 34, 63, 28]);
       expect(v.winners, [0]);
+    });
+
+    test('a game in whose log a person put events the table does not read verifies to its end, and the house\'s word with it', () {
+      // refereed_unread (tool/game_fixture.dart --unread): the same kind of
+      // game, but a seated person put three events in its log as it went,
+      // one of a kind no build knows and two of a kind it knows with the
+      // body of none. The referee took them under their ids and the
+      // signatures on them; no side reads them, and the house's word
+      // names a log that holds them.
+      final unread = fixture('refereed_unread');
+      final r = GameRecord.parse(unread);
+      expect(r, isNotNull, reason: 'the record reads');
+      final entries = [for (final e in r!.log) if (e.unread != null) e];
+      expect([for (final e in entries) e.unread!['kind']], ['wave', 'play', 'release']);
+      expect(entries.map((e) => e.unread!['author']).toSet(), hasLength(1));
+      expect(r.spec.seatOf(entries.first.unread!['author'] as String), isNotNull, reason: 'a seated person put them there');
+      final v = verified(unread);
+      expect(v.ok, isTrue, reason: v.reason);
+      expect(v.state, TableState.finished);
+      expect(v.vouched, isTrue);
+      // They are in the log the house named: the hash of the log up to its
+      // word takes each one's id like any event's.
+      final hash = LogHash();
+      for (final e in r.log.takeWhile((e) => e.event?.kind != EventKind.result)) {
+        hash.add(e);
+      }
+      final word = r.log.map((e) => e.event).whereType<TableEvent>().firstWhere((e) => e.kind == EventKind.result);
+      expect(word.body['hash'], hash.value);
+      expect(word.body['n'], hash.count);
     });
 
     test('naming another house, it is no game of this build\'s', () {
