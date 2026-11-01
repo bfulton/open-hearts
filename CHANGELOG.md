@@ -691,7 +691,9 @@ squashed from a pull request, the pull request's number.
   rate them as having left. A pool table's salt is now a value only the
   house can make, and the house serves no rated table without it; at a
   table it did not seat, it publishes no result while a person there
-  never said anything. (2026-11-01, #47)
+  never said anything. Rated games already in play when this house
+  first deploys stall without a result, since they were seated
+  without that salt. (2026-11-01, #47)
 - A malformed deal message can no longer crash the house. Inputs of the
   wrong size were read past their end by the deal library, and a
   shuffle proof with a list of the wrong length made it abort the whole
