@@ -175,15 +175,23 @@ object runs on one thread shared by everyone on that tag.
   house's word on the game, and none past `ticksInARowMost` since the
   last event. So nobody else can lengthen the log with ticks, nobody
   can once the game is over, and at a table whose house never says that
-  word (one with no house, or one the house will not serve) its people
+  word (one with no house, or whose house has not come) its people
   cannot tick for ever. Once the log holds `notesMost` ticks and
   connections noted, it takes no more ticks and notes no more
   connections closing. It still notes a person back whom it last noted
   gone, or they would stay gone on every side's rules and lose their
   seat at their next turn; nobody is noted gone after that point, so
   this happens at most once for each, and otherwise only events grow
-  the log. These bound each table. A subscriber can still start as many
-  tables as it likes, which is left to the account's spend alerts.
+  the log. These bound each table. The referee asks for the house until
+  the house has said a result, and a table the house will not serve (a
+  seat without the licence the service signed for its key, an account
+  seated twice, a rated table the house did not seat) is given the
+  house's word that it will not, once, in the table's own log and
+  nowhere else: it fails there for every side, rates nobody, and costs
+  one wake of the house. Without that word the house would be woken for
+  it every twenty seconds until the log's notes ran out. A subscriber
+  can still start as many tables as it likes, which is left to the
+  account's spend alerts.
 - Each socket is bounded: message size, REQ size (so a socket's
   subscriptions always fit in the attachment a hibernating socket
   carries), a few subscriptions (`maxSubscriptions`), and a

@@ -685,6 +685,79 @@ test('the house is wanted as a sealed table starts, and while it is away, until 
   assert.equal(unsealed.wanted.n, 0);
 });
 
+/// One table's object and the wakes of its house, as the deployed object
+/// has them (worker.mjs): the wake limiter behind `wanted`, asking
+/// `wantsHouse` again when the while is up, on a clock a test moves.
+/// [houseSays] is what the house does when woken, and nothing else: it
+/// connects, asks for the log, says that event if there is one, and
+/// goes — a visit — as the wake is made. (It asks from the log's end:
+/// from the start, each of fifty thousand visits would be sent the
+/// whole log, which is no part of what is held here.) Runs for [days]
+/// days from the table's start.
+async function wakesOver(days, houseSays) {
+  const now = clock();
+  const timers = [];
+  const woken = [];
+  let relay;
+  const want = wakeLimiter({
+    wake: () => woken.push(now()),
+    stillWanted: async () => relay.wantsHouse,
+    now,
+    later: (fn, ms) => timers.push({ fn, at: now() + ms }),
+  });
+  relay = objectRelay(verify, { tag: table, now, gate: gateOn(now), house: house.public, wanted: want });
+  const a = socket();
+  relay.open(a);
+  await answerAs(relay, a, ada, now);
+  await say(relay, a, await wrapped(await startOf(ada)));
+  const word = houseSays ? await wrapped(await tableEvent(house, ...houseSays)) : null;
+  const end = now() + days * 24 * 60 * 60 * 1000;
+  let visited = 0;
+  for (;;) {
+    for (; visited < woken.length; visited++) {
+      const h = socket();
+      relay.open(h, null, { account: null, key: house.public, epoch: 0, until: Math.floor(now() / 1000) + 600 });
+      await relay.message(h, JSON.stringify(['LOG', 'log', relay.entries.length]));
+      if (word) await say(relay, h, word);
+      relay.close(h);
+    }
+    timers.sort((x, y) => x.at - y.at);
+    if (!timers.length || timers[0].at > end) break;
+    const next = timers.shift();
+    now.at = next.at;
+    await next.fn();
+  }
+  return {
+    relay,
+    woken,
+    /// Whether it was wanted no more, rather than the days run out.
+    stopped: !timers.length,
+    comings: relay.entries.filter((e) => e.up === house.public || e.down === house.public).length,
+  };
+}
+
+test('a house that will not serve a table is woken for it once if it says so in the log, and every twenty seconds until the log\'s notes run out if it does not', async () => {
+  // The house that lets the table go and says nothing, for twelve days:
+  // each visit is an up and a down in the log, until it holds the most.
+  const silent = await wakesOver(12, null);
+  assert.ok(silent.woken.length > notesMost / 2 - 5 && silent.woken.length <= notesMost / 2 + 5, `${silent.woken.length} wakes`);
+  assert.ok(silent.relay.entries.length > notesMost, 'the log full of the house\'s comings and goings');
+  assert.ok(silent.stopped, 'and then no more');
+  assert.ok(silent.woken.at(-1) > 11 * 24 * 60 * 60 * 1000 + 1_000_000, 'after more than eleven days');
+
+  // The house that says it will not serve the table, as it does
+  // (packages/table, rules.dart, TableRules.refusal): a result that
+  // says failed. The wake as the table starts is the only wake in
+  // twelve days, and the house's coming and going is all the log notes
+  // of it: no up, which was not noted gone before, and one down.
+  const refused = await wakesOver(12, ['result', { n: 1, hash: 'x'.repeat(64), state: 'failed', totals: [0, 0, 0, 0] }]);
+  assert.equal(refused.woken.length, 1);
+  assert.equal(refused.comings, 1);
+  assert.equal(refused.relay.wantsHouse, false);
+  assert.ok(refused.stopped, 'no wake waits to be made');
+  assert.deepEqual(refused.relay.entries.map((e) => e.e?.kind ?? (e.down === house.public ? 'down' : e.up ? 'up' : 'tick')), ['start', 'result', 'down']);
+});
+
 test('a log written down comes back as it was, and goes on from there', async () => {
   const now = clock();
   const first = referee({ now, tag: plain });

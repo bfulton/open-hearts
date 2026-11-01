@@ -31,14 +31,23 @@
 // [tickGapMs], none after the house's word on the game, and none past
 // [ticksInARowMost] since the last event. So nobody else can lengthen
 // the log with ticks, nobody can once the game is over, and at a table
-// whose house never says that word (one with no house, or one the house
-// will not serve) its people cannot tick for ever. Once the log holds
+// whose house never says that word (one with no house, or whose house
+// has not come) its people cannot tick for ever. Once the log holds
 // [notesMost] ticks and connections noted, it takes no more ticks and
 // notes no more connections closing. It still notes a person back whom
 // it last noted gone, or they would stay gone on every side's rules and
 // lose their seat at their next turn. Nobody is noted gone after that
 // point, so this happens at most once for each, and otherwise only
 // events grow the log.
+//
+// The house is asked for until it has said a result, whatever the
+// result says (note, `said`): its word on how a game came out, or its
+// word that it will not serve the table (packages/table, rules.dart,
+// TableRules.refusal), which a table it refuses is given at once. A
+// house that merely let such a table go would be woken for it every
+// [wakeEveryMs] until the log's notes ran out ([notesMost] of them, an
+// up and a down a visit: some eleven and a half days), and a subscriber
+// who starts many such tables would multiply that.
 //
 // But for the start, which every side has to read as the same table
 // for anything after it to mean anything: a log that began with one
@@ -225,8 +234,9 @@ function eventIn(content) {
 /// [keep] is told of each entry as it is added, to write it down;
 /// [wanted] is told whenever the house is wanted and is not on the log
 /// — a start that names it, and every entry after while it is away,
-/// until its word on how the game came out is in; [send] sends text to
-/// a socket, [admitted] says whether a socket may be carried now.
+/// until its word on the table is in, whether how the game came out or
+/// that it will not serve the table; [send] sends text to a socket,
+/// [admitted] says whether a socket may be carried now.
 export function tableReferee({ table, verify, house = null, now = Date.now, entries: written = [], keep = null, wanted = null, send = () => {}, admitted = () => true }) {
   const entries = [];
   /// The start's writers ([writersOf]), once there is a start.
@@ -241,7 +251,9 @@ export function tableReferee({ table, verify, house = null, now = Date.now, entr
   /// The writers whose last connection's close is the last thing the
   /// log says of them.
   const downLogged = new Set();
-  /// Whether the house's word on the game is in.
+  /// Whether the house's word on the table is in: a result of its,
+  /// whatever it says. The referee decides nothing about it, and every
+  /// side reads it alike (rules.dart).
   let said = false;
   /// author -> how many characters of the log its events fill.
   const filled = new Map();
@@ -279,7 +291,8 @@ export function tableReferee({ table, verify, house = null, now = Date.now, entr
   const houseHere = () => !!spec?.house && (open.get(spec.house) ?? 0) > 0;
 
   /// Whether the table wants its house and the house is not on the log:
-  /// a sealed table whose house has not said its word.
+  /// a sealed table whose house has not said its word, how the game
+  /// came out or that it will not serve the table.
   const wantsHouse = () => !!spec?.house && !said && !houseHere();
 
   /// One more entry: numbered, stamped, written down, and sent to
