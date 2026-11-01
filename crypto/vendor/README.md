@@ -82,6 +82,12 @@ under `panic = "abort"` that ended the process that was checking it.
 Now it fails the argument. An honest argument has exactly these lengths,
 so it is checked as before.
 
+**`Parameters::enc_generator`**
+(`barnett-smart-card-protocol/src/discrete_log_cards/mod.rs`): the
+generator every key is made with, which the deal's own arguments (the
+token batch and the sealed token, `crypto/deal/src/ops.rs`) are made
+over. The parameters kept it private.
+
 **No `getrandom` `js` feature on wasm** (`proof-essentials/Cargo.toml`).
 The deal takes every random value as a seed the caller drew, and the
 feature pulled wasm-bindgen imports into a module the app loads bare.
