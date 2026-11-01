@@ -20,10 +20,9 @@ class RelayTransport implements ReactionLane {
       required this.signer,
       required this.table,
       this.log,
-      int pinned = 0,
       int refusalMs = RelayGroup.defaultRefusalMs,
       bool watchOnly = false})
-      : relays = Relays.turnedBy(relaysForTag(relays, table), table, pinned: pinned) {
+      : relays = relaysForTag(relays, table) {
     // The watch lane, and the players' reactions beside it: both are for
     // anyone looking at the table, watching it or seated at it.
     final watch = Filter(kinds: const [TableKinds.watch, TableKinds.react], tags: {'t': [table]}).toJson();

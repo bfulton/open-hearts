@@ -30,10 +30,6 @@ const ourRelay = 'wss://relay.openhearts.game/{tag}';
 /// The relays a deployed build starts on: ours.
 const deployedRelays = [ourRelay];
 
-/// How many relays at the front of [relays] are ours, kept first in
-/// every table's rotation. All of a deployed list; none of a local one.
-int pinnedRelays(List<Uri> relays) => relays.takeWhile(RemoteConfig.ours).length;
-
 /// The local relay, where a build served from this machine looks: ours
 /// on a node socket (service/do/host.mjs), on its own port, an object
 /// per tag as ours is.

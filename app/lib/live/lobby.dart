@@ -470,7 +470,7 @@ class Lobby extends ChangeNotifier {
         _changed();
         return null;
       }
-      transport = RelayTransport(relays: relays, signer: signer, table: tag, log: _relayLog, pinned: pinnedRelays(relays));
+      transport = RelayTransport(relays: relays, signer: signer, table: tag, log: _relayLog);
       _refusalSub = transport.refusals.listen((r) {
         if (_disposed) return;
         _relayNote = r == null ? null : words().noRelayTakesEvents(r);
@@ -642,7 +642,7 @@ class Lobby extends ChangeNotifier {
     // The watch lane and the reactions beside it, and nothing of the
     // table's own, which is the line's (packages/table, watch.dart,
     // reactions.dart).
-    final lanes = RelayTransport(relays: relays, signer: signer, table: spec.id, log: _relayLog, pinned: pinnedRelays(relays), watchOnly: true);
+    final lanes = RelayTransport(relays: relays, signer: signer, table: spec.id, log: _relayLog, watchOnly: true);
     final ledger = _standing?.ledger ?? Ledger();
     final controller = LiveController(
       spec: spec,

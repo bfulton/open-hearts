@@ -33,12 +33,10 @@ void main() {
   test('peers writing to different relays hear each other, listening on both', () async {
     final a = SchnorrSigner.generate();
     final b = SchnorrSigner.generate();
-    // Opposite orders: whichever way the table id turns them, the two
-    // list different relays first.
+    // Opposite orders: the order of the list decides nothing.
     final ta = RelayTransport(relays: [r1.url, r2.url], signer: a, table: 'both');
     final tb = RelayTransport(relays: [r2.url, r1.url], signer: b, table: 'both');
     await Future.wait([ta.allReady, tb.allReady]).timeout(const Duration(seconds: 5));
-    expect(ta.relays.first, isNot(tb.relays.first));
 
     final heardByB = next(tb);
     ta.sayWatch({'n': 1});
@@ -59,9 +57,7 @@ void main() {
     // everything to both, so b hears it anyway.
     final ta = RelayTransport(relays: [r1.url, r2.url], signer: a, table: 'half-deaf');
     await ta.allReady.timeout(const Duration(seconds: 5));
-    // b reads only the relay a lists second.
-    final other = ta.relays.first == r1.url ? r2.url : r1.url;
-    final tb = RelayTransport(relays: [other], signer: b, table: 'half-deaf');
+    final tb = RelayTransport(relays: [r2.url], signer: b, table: 'half-deaf');
     await tb.allReady.timeout(const Duration(seconds: 5));
 
     final beat = tb.lobby.first.timeout(const Duration(seconds: 5));

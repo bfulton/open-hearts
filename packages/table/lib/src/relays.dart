@@ -87,7 +87,7 @@ List<Uri> relaysForTag(List<Uri> relays, String tag) => [
           relay,
     ];
 
-/// The list itself: parsed from text, turned by a key.
+/// The list itself, parsed from text and written back.
 abstract final class Relays {
   /// `wss://a, wss://b` — commas, spaces or newlines between.
   static List<Uri> parse(String text) => [
@@ -96,24 +96,6 @@ abstract final class Relays {
       ];
 
   static String format(List<Uri> relays) => relays.join(', ');
-
-  /// The relays past the first [pinned] begun at the entry a hash of
-  /// [key] picks, the rest following in order: where a client writes
-  /// first among the interchangeable relays is a function of the table,
-  /// so tables spread over them. The [pinned] at the front stay first:
-  /// a primary relay, not spun out of place with the rest.
-  static List<Uri> turnedBy(List<Uri> relays, String key, {int pinned = 0}) {
-    if (relays.length - pinned < 2) return relays;
-    final tail = relays.sublist(pinned);
-    // FNV-1a over the key's code units: the same on every platform,
-    // which String.hashCode is not.
-    var h = 0x811c9dc5;
-    for (final u in key.codeUnits) {
-      h = ((h ^ u) * 0x01000193) & 0xffffffff;
-    }
-    final k = h % tail.length;
-    return [...relays.sublist(0, pinned), ...tail.sublist(k), ...tail.sublist(0, k)];
-  }
 }
 
 /// One socket to one relay. Connects, sends its subscriptions, hands
