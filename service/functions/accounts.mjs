@@ -141,6 +141,20 @@ export async function devicesOn(store, account) {
   return found.sort((a, b) => String(a.bound_at).localeCompare(String(b.bound_at)) || a.key.localeCompare(b.key));
 }
 
+/// The devices of [account] whose entitlement row is still the
+/// account's, each with that row, {key, row}: what an ending, a
+/// suspension and a deletion write down or delete, and never a row of
+/// another account's.
+export async function devicesWithRows(store, account) {
+  const found = [];
+  for (const sk of await store.under(`ACCOUNT#${account}`, 'DEVICE#')) {
+    const key = sk.slice('DEVICE#'.length);
+    const row = await store.get(`KEY#${key}`, 'ENTITLEMENT');
+    if (row?.account === account) found.push({ key, row });
+  }
+  return found;
+}
+
 /// The account [key] is a device of, by its own row; null for none.
 export const accountOfKey = async (store, key) => {
   const account = (await store.get(`KEY#${key}`, 'ENTITLEMENT'))?.account;

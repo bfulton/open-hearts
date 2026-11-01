@@ -5,7 +5,7 @@
 // stays, its results on the relay, names its account number, which
 // nothing left in the service ties to it.
 
-import { accountOfKey, backupRow } from './accounts.mjs';
+import { accountOfKey, backupRow, devicesWithRows } from './accounts.mjs';
 import { Held, holdOf, holdRow } from './holds.mjs';
 import { noticeRow } from './notices.mjs';
 import { dayOf, isAccount } from './rows.mjs';
@@ -72,10 +72,7 @@ export async function forgetAccount(store, account, { dry = false, keys = null, 
     if (!dry) await store.del(pk, sk);
   };
   const pk = `ACCOUNT#${account}`;
-  for (const sk of await store.under(pk, 'DEVICE#')) {
-    const key = sk.slice('DEVICE#'.length);
-    if ((await store.get(`KEY#${key}`, 'ENTITLEMENT'))?.account === account) await del(`KEY#${key}`, 'ENTITLEMENT');
-  }
+  for (const { key } of await devicesWithRows(store, account)) await del(`KEY#${key}`, 'ENTITLEMENT');
   for (const c of (await store.get(pk, 'BACKUP'))?.codes ?? []) await del(await backupRow(c.code), 'META');
   const login = (await store.get(pk, 'LOGIN'))?.login;
   if (typeof login === 'string' && login.startsWith('LOGIN#')) await del(login, 'IDENTITY');

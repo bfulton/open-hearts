@@ -18,6 +18,7 @@
 // can be carried out twice to the same end, since the answer to the
 // first can be lost and the tool asks again.
 
+import { devicesWithRows } from './accounts.mjs';
 import { holdOf } from './holds.mjs';
 import { PICTURES_ROW, pictureDigest, releasing, withholding } from './pictures.mjs';
 import { dayOf, isAccount } from './rows.mjs';
@@ -94,18 +95,6 @@ export async function carryOut(op, store, active, { now = Date.now(), revoke = n
   }
   await store.del(...orderRow(op.order));
   return { status: 200, body: { act: order.act, ...body } };
-}
-
-/// Every device of [account], each with its entitlement row where that
-/// row is still the account's.
-async function devicesWithRows(store, account) {
-  const found = [];
-  for (const sk of await store.under(`ACCOUNT#${account}`, 'DEVICE#')) {
-    const key = sk.slice('DEVICE#'.length);
-    const row = await store.get(`KEY#${key}`, 'ENTITLEMENT');
-    if (row?.account === account) found.push({ key, row });
-  }
-  return found;
 }
 
 /// [account] suspended: marked, so that a device brought in later is
