@@ -768,6 +768,18 @@ squashed from a pull request, the pull request's number.
   a popup of our own, which would take Apple's script and origin out of
   the page and the policy, is not done: it needs one real Apple sign-in on
   the web observed first. (2026-11-01, #47)
+- A table the house will not serve (a seat without a licence the
+  service signed for its key, or a rated table the house did not seat)
+  now ends at once. The house says so once, in the table's own log;
+  nobody is rated on it, nothing is published on the results tag, and
+  the table's object stops asking for the house. Before, such a table
+  woke the house every twenty seconds, an up and a down in its log each
+  time, until the log's notes ran out: about 50,000 wakes over eleven and
+  a half days for one table, which a subscriber starting many such
+  tables multiplied. At a table the house refuses, the existing
+  "Connection failure" screen shows at once instead of a minute later,
+  and an earlier build, which does not read the house's word, waits on
+  such a table as it did. (2026-11-01, #47)
 - `oh account delete` ends a web subscription that is still running in
   Stripe before it deletes anything, as the app's own deletion does, with
   nothing refunded, and so no longer keeps that subscription's notes of
