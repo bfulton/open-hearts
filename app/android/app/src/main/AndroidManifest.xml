@@ -1,9 +1,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- Everything live is on the network: the relays, the signalling,
-         WebRTC between the seats, TURN, the licence. The debug and
-         profile manifests have INTERNET for the Flutter tool, but a
-         release build reads only this one. WebRTC's network monitor
-         reads the network's state as well. -->
+    <!-- Everything live is on the network: the relays, TURN, the
+         licence. The debug and profile manifests have INTERNET for the
+         Flutter tool, but a release build reads only this one. The
+         network's state was read by WebRTC's network monitor, which the
+         app no longer carries; the permission stays until the merged
+         release manifest shows nothing else reads it. -->
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
     <!-- Live play is bought as a Google Play subscription
