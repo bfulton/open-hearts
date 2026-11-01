@@ -178,7 +178,7 @@ void main() {
     ledger.apply(game('t1', [20, 50, 60, 70]));
     ledger.apply(game('t2', [80, 30, 40, 50]));
 
-    final stats = fromStanding(const PlayerStats(), net.Standing(ledger, me), me);
+    final stats = fromStanding(const PlayerStats(), net.Standing(ledger, me));
     expect(stats.asking, isFalse, reason: 'an answer is not a question still out');
     expect(stats.reached, isTrue);
     expect(stats.ratedGames, 2);
