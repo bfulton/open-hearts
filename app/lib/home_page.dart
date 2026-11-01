@@ -1009,8 +1009,7 @@ class _LivePaused extends StatelessWidget {
 class OperatorNotes extends StatefulWidget {
   const OperatorNotes({super.key, this.published = buildDate});
 
-  /// The day this build was published: the build's own, unless a test
-  /// says.
+  /// The day this build was made: the build's own, unless a test says.
   final String published;
 
   @override

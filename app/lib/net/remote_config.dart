@@ -305,8 +305,11 @@ class RemoteConfig {
 
   final Notice? banner;
 
-  /// A build published before this day ("2026-10-01") is asked to
-  /// update; null when none is.
+  /// A build made before this day ("2026-10-01") is asked to update;
+  /// null when none is. A web build is made the day it is deployed, and
+  /// a phone build the day build_phone.sh ran, before store review, so
+  /// a day later than that asks the newest phone version to update
+  /// while the stores have nothing newer.
   final String? updateBefore;
 
   /// What it is told, when the operator wrote something; the app's own
@@ -347,8 +350,9 @@ class RemoteConfig {
   /// same (LEFT_EARLY_BOUNDS, service/functions/config.mjs).
   static const leftEarlyBounds = (0, 60);
 
-  /// Whether [published] — this build's day, or "dev" — is a build the
-  /// operator asks to be updated. A local build has no day and never is.
+  /// Whether [published] — the day this build was made, or "dev" — is a
+  /// build the operator asks to be updated. A local build has no day and
+  /// never is.
   bool updateDue(String published) {
     final before = updateBefore;
     if (before == null || !_day.hasMatch(published)) return false;

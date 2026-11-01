@@ -58,7 +58,7 @@ export function configOf(raw) {
     const id = typeof raw.banner.id === 'string' && /^[\w.-]{1,64}$/.test(raw.banner.id) ? raw.banner.id : null;
     if (text && id) c.banner = { id, level: raw.banner.level === 'warn' ? 'warn' : 'info', text };
   }
-  // Please update: a build published before this day is asked to.
+  // Please update: a build made before this day is asked to.
   if (raw.update && typeof raw.update === 'object' && typeof raw.update.before === 'string' && DAY.test(raw.update.before)) {
     c.update = { before: raw.update.before, text: sayingOf(raw.update.text) };
   }

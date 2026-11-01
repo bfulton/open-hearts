@@ -50,7 +50,8 @@ them, such as a local run, a test or CI, says `dev`.
 
 - The About page shows the hash and the date.
 - The remote config's `update` notice compares the date, so it reaches
-  phone builds as well as the web.
+  phone builds as well as the web. A phone build's date is the day it
+  was built, before store review, not the day the store published it.
 - A deployed web build fetches `build-info.json` at launch and whenever
   it returns to the foreground. If the published hash differs from its
   own, it shows a tap-to-reload pill. Local runs, tests and CI build

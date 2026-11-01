@@ -195,7 +195,7 @@ The row `config|app` in `OH_STORE`, which the `config` handler serves to every d
 | `offer` | Boolean | `true` | `false` hides the paid tier from devices that have not bought it. |
 | `relays` | 1 to `MOST_RELAYS` `wss:` URLs on `openhearts.game` or a subdomain, with no user info. All must pass, or none is taken. | The build's (`ourRelay` in `app/lib/net/relays.dart`) | Replaces the build's relays, read at app start. A build served from a local host, or built with `OH_RELAYS`, ignores it. |
 | `banner` | `id` matching `^[\w.-]{1,64}$`; `level` `warn` (anything else is `info`); `text` by two-letter language code, English required, each up to `LONGEST_SAY` characters | None | A line on the front door. |
-| `update` | `before` as `YYYY-MM-DD`; optional `text` as for `banner` | None | Asks builds published before that day to update. |
+| `update` | `before` as `YYYY-MM-DD`; optional `text` as for `banner` | None | Asks builds made before that day to update. A web build is made the day `deploy.sh` deploys it, and a phone build the day `build_phone.sh` or the `ios` workflow ran, which is before store review. So set `before` no later than the day the version in the stores was built, or that version is asked to update while the stores have nothing newer. |
 | `feedback` | An `https:` URL or a `mailto:` address | The project's issues | Where "Tell us what's broken" sends a report. |
 | `table` | See [Table clocks](#table-clocks). All fields pass, or none is served. | The standard table | The clocks of the tables the house seats in the pools, and of a friends' table this device starts. |
 | `waits` | See the next table. | The app's own | How long the app waits on the network. |
