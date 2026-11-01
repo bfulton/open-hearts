@@ -731,6 +731,32 @@ squashed from a pull request, the pull request's number.
   service reads no request body past its bound, and quotes a report's
   note in the operator's email so that it cannot pass for instructions.
   (2026-11-01, #47)
+- A sealed pass no longer shows the cards passed to anyone reading the
+  game's log. The proof that goes with each passed token travelled in
+  the clear beside the seals, and with the other seats' public tokens it
+  was enough to work out the card (all three cards of a pass, in a test).
+  It now travels inside what is sealed to the receiver, hidden under a
+  pad only the passer and the receiver can make, or the whole table once
+  one of them has left and its secret is rebuilt. A pass made by an
+  earlier build is refused at a live table; games already kept still
+  verify as they did. A passer can still hand the receiver a proof that
+  does not verify, which leaves those cards shut to the receiver: that
+  was so before, and nobody can check it without opening the seal.
+  (2026-11-01, #47)
+- A game's record is kept from the copy that carries the house's word
+  on how it came out, not from whichever copy arrived first. A copy cut
+  short, which any player at the table could send before the game was
+  over and which nobody could open, no longer keeps the game from being
+  opened: the whole game replaces it, and is never replaced. A name beside
+  a kept game is put there only by its own seat's device, so one player
+  can no longer name everybody else's seats; until a seat's device has
+  sent, the game shows that seat as "Player N", as a seat with no name
+  already was. (2026-11-01, #47)
+- Signing in with Apple or Google signs the provider and its token
+  with the request, so a sign-in request taken off the wire can no
+  longer be sent again with somebody else's sign-in in its place. A
+  build from before this change cannot sign in until it is updated.
+  (2026-11-01, #47)
 - `oh account delete` ends a web subscription that is still running in
   Stripe before it deletes anything, as the app's own deletion does, with
   nothing refunded, and so no longer keeps that subscription's notes of
