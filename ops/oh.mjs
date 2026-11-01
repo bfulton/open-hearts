@@ -46,7 +46,9 @@ export function parse(command, argv) {
       if (takes.has(name)) flags[name] = true;
       else if (takes.has(`${name}=`)) {
         const value = argv[++i];
-        if (value === undefined || value.startsWith('--')) throw new Usage(`--${name} takes a value`);
+        // An empty value is most likely an unset shell variable: refused,
+        // not taken as no value at all.
+        if (value === undefined || value === '' || value.startsWith('--')) throw new Usage(`--${name} takes a value`);
         flags[name] = value;
       } else throw new Usage(`${command.words.join(' ')} takes no --${name}`);
     } else positional.push(a);

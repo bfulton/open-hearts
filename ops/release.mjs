@@ -1,7 +1,7 @@
 // `oh deploy …` and `oh verify`: the relay worker and the site put into
 // production, relay first, and production checked afterwards
-// (docs/how-to/deploy.md), and the site's old deployments swept up
-// after. Publishing a change to the terms is a deploy of the site too
+// (docs/how-to/deploy.md), deleting the site's old deployments on the
+// way. Publishing a change to the terms is a deploy of the site too
 // (docs/how-to/change-the-terms.md). What has to hold before anything reaches
 // production is in gate.mjs, which deploy.sh and the relay's build step
 // run themselves, so that deploying without oh is held to it too.
@@ -146,25 +146,27 @@ export async function site(ctx, { flags }) {
     ctx.log(`  publishes the ${document} of ${versionOf(entry)}, a ${entry.change} change${told(entry) ? ': every device is shown it, and no one is emailed it until you say (./oh terms notify --apply)' : ''}`);
     if (entry.change === 'price') ctx.log(`  then make Stripe's price match the terms (./oh infra --only stripe --apply): until it does, the shop does not sell`);
   }
-  if (label === 'main') ctx.log(`  then sweeps up old deployments, keeping the newest ${PREVIEWS_KEPT} previews, production's newest ${PRODUCTION_KEPT} and every one that is live (oh deploy prune says which would go)`);
+  if (label === 'main') ctx.log(`  first deletes old deployments: oh deploy prune lists the ones that would go`);
   const ready = label !== 'main' || (await cleared(ctx, 'site', flags.apply));
   if (!flags.apply) {
     ctx.log(ready ? 'nothing deployed; --apply deploys it' : 'nothing deployed');
     return;
   }
-  const code = await ctx.run(join(root, 'deploy.sh'), [label]);
-  if (code !== 0) throw new Failed(`site: deploy.sh exited ${code}`);
-  // Production's deploy is from main as it was reviewed, and sweeps;
-  // a preview's is from anything, and touches nothing of production's.
-  // What a sweep leaves is no harm to anybody, so the deploy, which has
-  // happened, is not failed for it, whatever stopped it.
+  // Only a production deploy sweeps. It runs from reviewed code on main;
+  // a preview deploy runs whatever is checked out, so it must not delete
+  // production's deployments. The sweep runs before publishing, while the
+  // deployment being replaced is still live and so still kept: it stays
+  // there to roll back to. A failed sweep leaves extra deployments behind,
+  // which harms nothing, so it does not stop the deploy.
   if (label === 'main') {
     try {
       await sweep(ctx, { apply: true });
     } catch (e) {
-      ctx.warn(`published, but the sweep of old deployments: ${e?.message ?? e}; ./oh deploy prune --apply tries again`);
+      ctx.warn(`could not delete old deployments: ${e?.message ?? e}. Deploying anyway; ./oh deploy prune --apply tries again.`);
     }
   }
+  const code = await ctx.run(join(root, 'deploy.sh'), [label]);
+  if (code !== 0) throw new Failed(`site: deploy.sh exited ${code}`);
   if (publishing.some(({ entry }) => told(entry))) ctx.log('published: now email web subscribers what changed (./oh terms notify --apply)');
 }
 
@@ -172,7 +174,6 @@ export async function site(ctx, { flags }) {
 /// the site (docs/how-to/deploy.md). A key rotation goes the other way
 /// round, by hand (docs/how-to/rotate-the-service-key.md).
 export async function all(ctx, said) {
-  if (said.flags.label && said.flags.label !== 'main') throw new Usage('deploy all is production; a preview is deploy site --label <name>');
   await relay(ctx, said);
   await site(ctx, { ...said, flags: { ...said.flags, label: 'main' } });
 }
@@ -184,47 +185,58 @@ export async function prune(ctx, { flags }) {
 }
 
 // ---- sweeping up old deployments ---------------------------------------
-// Every upload of the site is a deployment Cloudflare keeps for ever,
-// and a few dozen of them make the project's own list useless. So each
-// production deploy of the site sweeps up after itself, and oh deploy
-// prune sweeps on its own (docs/how-to/deploy.md).
+// Cloudflare keeps every upload of the site as a deployment until it is
+// deleted. A production deploy deletes the old ones first, and
+// `oh deploy prune` does the same on its own (docs/how-to/deploy.md).
 
-/// What a sweep keeps of each: the newest few previews, and the live
-/// production deployment and the two before it, to roll back to.
+/// How many deployments of each kind a sweep keeps: the newest
+/// [PREVIEWS_KEPT] previews and the newest [PRODUCTION_KEPT] production
+/// deployments. It also keeps the newest that many that succeeded, so
+/// failed uploads never push out the deployments a rollback needs.
 export const PREVIEWS_KEPT = 5;
 export const PRODUCTION_KEPT = 3;
 
-/// How many deployments Cloudflare lists a page, and how many pages a
-/// sweep reads at most: anything older than that is left for the next.
+/// Cloudflare lists deployments [LISTED] to a page. A sweep reads at most
+/// [LISTED_PAGES] pages; anything older waits for the next sweep.
 const LISTED = 25;
 const LISTED_PAGES = 100;
 
-/// Of the Pages project's [deployments], the ones a sweep deletes:
-/// the previews past the newest [keep] and production's past the newest
-/// [PRODUCTION_KEPT], newest first, and never one with an alias. An
-/// alias is a deployment that is live: production's on its domains, or
-/// the newest of a preview's branch, on its branch's address; Cloudflare
-/// refuses to delete a preview that has one unless forced, and a sweep
-/// never forces.
+/// Whether Cloudflare finished publishing [d]. Only such a deployment can
+/// be rolled back to.
+const succeeded = (d) => d.latest_stage?.name === 'deploy' && d.latest_stage?.status === 'success';
+
+/// The deployments a sweep deletes, newest first. For each kind (previews,
+/// and production), it keeps the newest [keep] (always [PRODUCTION_KEPT]
+/// for production), and the newest that many that succeeded, and deletes
+/// the rest. It never deletes a deployment with an alias: that is one that
+/// is live, either production's on its domains or the newest of a preview
+/// branch on its branch's address. (Cloudflare refuses to delete an
+/// aliased preview unless forced, and a sweep never forces.)
+///
+/// Throws Failed if a deployment has no readable date: the dates decide
+/// which are newest, and a deletion cannot be undone.
 export function sweepable(deployments, keep = PREVIEWS_KEPT) {
-  // Newest first by when each was made, whatever order they were listed
-  // in; one with no date sorts first, so is kept.
-  const newest = [...deployments].sort((a, b) => (String(a.created_on) < String(b.created_on) ? 1 : String(a.created_on) > String(b.created_on) ? -1 : 0));
+  const madeAt = (d) => Date.parse(d.created_on);
+  const undated = deployments.find((d) => Number.isNaN(madeAt(d)));
+  if (undated) throw new Failed(`Cloudflare listed deployment ${undated.id} without a readable date (${JSON.stringify(undated.created_on ?? null)}), so nothing was deleted`);
+  const newest = [...deployments].sort((a, b) => madeAt(b) - madeAt(a));
   const seen = { production: 0, preview: 0 };
+  const seenSucceeded = { production: 0, preview: 0 };
   const doomed = [];
   for (const d of newest) {
     const kind = d.environment === 'production' ? 'production' : 'preview';
+    const limit = kind === 'production' ? PRODUCTION_KEPT : keep;
     seen[kind] += 1;
-    if (seen[kind] <= (kind === 'production' ? PRODUCTION_KEPT : keep)) continue;
-    if (d.aliases?.length) continue;
-    doomed.push(d);
+    if (succeeded(d)) seenSucceeded[kind] += 1;
+    const kept = seen[kind] <= limit || (succeeded(d) && seenSucceeded[kind] <= limit) || d.aliases?.length > 0;
+    if (!kept) doomed.push(d);
   }
   return doomed;
 }
 
-/// The Pages project's deployments API at [path] with [method]: the
-/// answer's JSON when Cloudflare says it succeeded, or Failed with what
-/// it said.
+/// Calls the Pages project's deployments API ([method] on [path]) and
+/// returns the answer's JSON. Throws Failed unless Cloudflare answered
+/// and said it succeeded.
 async function deploymentsApi(ctx, method, path = '') {
   const [token, account] = need(ctx.env, 'CLOUDFLARE_API_TOKEN', 'CLOUDFLARE_ACCOUNT_ID');
   const url = `https://api.cloudflare.com/client/v4/accounts/${account}/pages/projects/${pages.project}/deployments${path}`;
@@ -239,40 +251,44 @@ async function deploymentsApi(ctx, method, path = '') {
   return body;
 }
 
-/// Every deployment of the Pages project, a page at a time, once each.
+/// Every deployment of the Pages project, each once.
 async function listDeployments(ctx) {
   const found = new Map();
   for (let page = 1; page <= LISTED_PAGES; page++) {
-    const listed = (await deploymentsApi(ctx, 'GET', `?per_page=${LISTED}&page=${page}`)).result ?? [];
-    // One made meanwhile moves every later one down a place, so the
-    // last of a page can be the first of the next.
+    const path = `?per_page=${LISTED}&page=${page}`;
+    const listed = (await deploymentsApi(ctx, 'GET', path)).result;
+    // An answer without a list is a failure, not an empty project:
+    // taking it for one would report that there was nothing to delete.
+    if (!Array.isArray(listed)) throw new Failed(`Cloudflare's answer to GET deployments${path} has no list of deployments: ${JSON.stringify(listed ?? null)}`);
+    // A deployment made while we page through shifts the rest down by
+    // one, so the last of one page can come again as the first of the
+    // next. Keyed by id, it is counted once.
     for (const d of listed) found.set(d.id, d);
     if (listed.length < LISTED) break;
   }
   return [...found.values()];
 }
 
-/// A deployment, as a sweep says it: its id, when it was made, and from
-/// which branch.
+/// One line describing [d]: its id, when it was made, and its branch.
 function deploymentLine(d) {
-  const made = String(d.created_on ?? '').slice(0, 16).replace('T', ' ');
-  return `${String(d.id).slice(0, 8)}  ${made}  ${d.deployment_trigger?.metadata?.branch ?? '?'} (${d.environment})`;
+  const made = String(d.created_on).slice(0, 16).replace('T', ' ');
+  return `${String(d.id).slice(0, 8)}  ${made}  ${d.deployment_trigger?.metadata?.branch ?? '?'} (${d.environment}${succeeded(d) ? '' : ', failed'})`;
 }
 
-/// Deletes the deployments [sweepable] picks, keeping the newest [keep]
-/// previews, and says each; Failed if any was not deleted, every one
-/// having been tried. Without [apply], says which it would delete.
+/// Deletes the deployments [sweepable] picks and reports each one. Every
+/// deletion is tried; Failed afterwards if any did not go. Without
+/// [apply], it only lists what it would delete.
 async function sweep(ctx, { keep = PREVIEWS_KEPT, apply = false } = {}) {
   const listed = await listDeployments(ctx);
   const doomed = sweepable(listed, keep);
-  const kept = `the newest ${keep} preview(s), production's newest ${PRODUCTION_KEPT} and every one that is live`;
+  const kept = `Kept: of the previews, the newest ${keep} and the newest ${keep} that succeeded; of production's, the newest ${PRODUCTION_KEPT} and the newest ${PRODUCTION_KEPT} that succeeded; and every live one.`;
   if (!doomed.length) {
-    ctx.log(`nothing to sweep: ${listed.length} deployment(s), all of them ${kept}`);
+    ctx.log(`nothing to delete among ${listed.length} deployment(s). ${kept}`);
     return;
   }
   if (!apply) {
     for (const d of doomed) ctx.log(`would delete ${deploymentLine(d)}`);
-    ctx.log(`${doomed.length} of ${listed.length} deployment(s) would go, keeping ${kept}; --apply deletes them`);
+    ctx.log(`would delete ${doomed.length} of ${listed.length} deployment(s); --apply deletes them. ${kept}`);
     return;
   }
   const failed = [];
@@ -285,8 +301,8 @@ async function sweep(ctx, { keep = PREVIEWS_KEPT, apply = false } = {}) {
       failed.push(d);
     }
   }
-  if (failed.length) throw new Failed(`swept ${doomed.length - failed.length} of ${doomed.length}: ${failed.length} not deleted (above)`);
-  ctx.log(`swept ${doomed.length} of ${listed.length} deployment(s), keeping ${kept}`);
+  if (failed.length) throw new Failed(`deleted ${doomed.length - failed.length} of ${doomed.length} old deployment(s); ${failed.length} could not be deleted (above)`);
+  ctx.log(`deleted ${doomed.length} of ${listed.length} deployment(s). ${kept}`);
 }
 
 async function head(ctx) {

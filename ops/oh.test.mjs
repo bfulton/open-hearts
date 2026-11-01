@@ -11,7 +11,7 @@ import { join } from 'node:path';
 import { test } from 'node:test';
 
 import { ARGUMENTS, COMMANDS } from './commands.mjs';
-import { root } from './env.mjs';
+import { Failed, root } from './env.mjs';
 import { releaseProblems } from './gate.mjs';
 import { commandOf, main, markdown, parse } from './oh.mjs';
 import { INVITED_DAYS, withHouseKey, withPreviewKey } from './preview.mjs';
@@ -162,22 +162,24 @@ test('production is released only from main as it was reviewed', async () => {
   assert.deepEqual(preview.started.map((s) => s.args), [['my-change']]);
 });
 
-/// A deployment of the site as Cloudflare lists one: made [minute]
-/// minutes into a day, live when it has [aliases].
-const deployment = (id, environment, minute, aliases = null) => ({
+/// A deployment of the site as Cloudflare lists one, made [minute]
+/// minutes into a day. [aliases] makes it live; [status] is how its
+/// last stage, the deploy, ended.
+const deployment = (id, environment, minute, aliases = null, status = 'success') => ({
   id,
   environment,
   created_on: new Date(Date.UTC(2026, 9, 31, 0, minute)).toISOString().replace('Z', '000Z'),
   aliases,
+  latest_stage: { name: 'deploy', status },
   deployment_trigger: { metadata: { branch: environment === 'production' ? 'main' : 'dev' } },
 });
 
-/// The Pages project's deployments API, holding [deployments] newest
-/// first: a page of 25 at a time, every page after the first moved down
-/// a place by one made meanwhile when [shifted]; refusing to delete the
-/// ids in [refused], and answering [listing] instead of a list when it
-/// is given. What it was asked is in [asked], what it deleted in
-/// [deleted].
+/// A fake of the Pages project's deployments API holding [deployments],
+/// newest first, 25 to a page. With [shifted], every page after the
+/// first starts one place early, as when a deployment is made while
+/// the list is read. Deleting an id in [refused] fails. [listing], when
+/// given, answers every GET instead. [asked] records each request,
+/// [deleted] each id deleted.
 function pagesApi(deployments, { shifted = false, refused = [], listing = null } = {}) {
   const held = [...deployments];
   const api = { asked: [], deleted: [] };
@@ -204,9 +206,9 @@ function pagesApi(deployments, { shifted = false, refused = [], listing = null }
 }
 
 const cloudflareEnv = { CLOUDFLARE_API_TOKEN: 'tok', CLOUDFLARE_ACCOUNT_ID: 'acct' };
+const ids = (list) => list.map((d) => d.id);
 
-test('a sweep deletes the previews past the newest few and production past its newest three, and never one that is live', () => {
-  const ids = (list) => list.map((d) => d.id);
+test('a sweep keeps the newest previews and production deployments, the newest that succeeded, and every live one', () => {
   const listed = [
     deployment('p5', 'production', 50, ['https://openhearts.game', 'https://play.openhearts.game']),
     deployment('v8', 'preview', 48, ['https://dev.open-hearts.pages.dev']),
@@ -217,8 +219,8 @@ test('a sweep deletes the previews past the newest few and production past its n
     deployment('v4', 'preview', 41),
     deployment('p3', 'production', 40),
     deployment('v3', 'preview', 30),
-    // The newest of a branch nobody has deployed to since: still on its
-    // branch's address.
+    // The newest deployment of a branch nobody has deployed to since:
+    // still live on its branch's address.
     deployment('v2', 'preview', 20, ['https://pr38.open-hearts.pages.dev']),
     deployment('p2', 'production', 15),
     deployment('p1', 'production', 10),
@@ -226,12 +228,14 @@ test('a sweep deletes the previews past the newest few and production past its n
   ];
   assert.equal(PREVIEWS_KEPT, 5);
   assert.deepEqual(ids(sweepable(listed)), ['v3', 'p2', 'p1', 'v1']);
-  assert.deepEqual(ids(sweepable([...listed].reverse())), ['v3', 'p2', 'p1', 'v1'], 'by when each was made, not as listed');
-  assert.deepEqual(ids(sweepable(listed, 0)), ['v7', 'v6', 'v5', 'v4', 'v3', 'p2', 'p1', 'v1'], 'none kept but the live ones');
+  assert.deepEqual(ids(sweepable([...listed].reverse())), ['v3', 'p2', 'p1', 'v1'], 'ordered by date, not by how they were listed');
+  assert.deepEqual(ids(sweepable(listed, 0)), ['v7', 'v6', 'v5', 'v4', 'v3', 'p2', 'p1', 'v1'], 'only the live ones kept');
   assert.deepEqual(ids(sweepable(listed, 7)), ['p2', 'p1', 'v1']);
   assert.deepEqual(ids(sweepable(listed.filter((d) => d.environment === 'production'))), ['p2', 'p1']);
+  assert.deepEqual(sweepable([]), []);
 
-  // Rolled back: the live one is older than three that are not, and stays.
+  // Rolled back: the live deployment is older than three that are not
+  // live, and is kept.
   const rolledBack = [
     deployment('p4', 'production', 40),
     deployment('p3', 'production', 30),
@@ -240,17 +244,44 @@ test('a sweep deletes the previews past the newest few and production past its n
     deployment('p0', 'production', 5),
   ];
   assert.deepEqual(ids(sweepable(rolledBack)), ['p0']);
-  // Anything not production's is a preview's.
+  // Any environment but production counts as a preview.
   assert.deepEqual(ids(sweepable([deployment('x2', 'staging', 20), deployment('x1', 'staging', 10)], 1)), ['x1']);
-  // One with no date is taken as the newest, and kept.
-  assert.deepEqual(ids(sweepable([{ id: 'undated', environment: 'production' }, ...rolledBack.slice(0, 3)])), ['p2']);
-  assert.deepEqual(sweepable([]), []);
+
+  // Failed uploads don't push out the deployments a rollback needs: the
+  // newest three that succeeded are kept too.
+  const failing = [
+    deployment('n', 'production', 60, ['https://openhearts.game']),
+    deployment('f2', 'production', 55, null, 'failure'),
+    deployment('f1', 'production', 50, null, 'canceled'),
+    deployment('l', 'production', 40),
+    deployment('r1', 'production', 30),
+    deployment('r2', 'production', 20),
+  ];
+  assert.deepEqual(ids(sweepable(failing)), ['r2']);
+  const manyFailed = [
+    ...[5, 4, 3, 2, 1].map((n) => deployment(`f${n}`, 'production', 50 + n, null, 'failure')),
+    deployment('s3', 'production', 40, ['https://openhearts.game']),
+    deployment('s2', 'production', 30),
+    deployment('s1', 'production', 20),
+    deployment('s0', 'production', 10),
+  ];
+  assert.deepEqual(ids(sweepable(manyFailed)), ['f2', 'f1', 's0'], 'the newest three kept, failed or not, and the newest three that succeeded');
+  // Only a deploy stage that succeeded counts as succeeded.
+  const unfinished = { ...deployment('b', 'preview', 30), latest_stage: { name: 'build', status: 'success' } };
+  assert.deepEqual(ids(sweepable([deployment('f', 'preview', 40, null, 'failure'), unfinished, deployment('ok', 'preview', 20), deployment('old', 'preview', 10)], 1)), ['b', 'old']);
+
+  // Without a readable date for every deployment, which are newest can't
+  // be known, and nothing is deleted.
+  for (const created_on of [undefined, null, '', 'yesterday']) {
+    const odd = { ...deployment('odd', 'preview', 30), created_on };
+    assert.throws(() => sweepable([odd, ...listed]), (e) => e instanceof Failed && /deployment odd without a readable date \(.*\), so nothing was deleted/.test(e.message), String(created_on));
+  }
 });
 
-test('oh deploy prune says what would go, reading every page once, and with --apply deletes it, every one tried', async () => {
+test('oh deploy prune lists what would go, reading every page once, and with --apply deletes it, trying every one', async () => {
   // Fifty: production's newest three, then previews, the newest of them
-  // live; listed in two full pages and the one a deployment made
-  // meanwhile pushes over.
+  // live. They come in two full pages and a third, which a deployment
+  // made while listing pushes one over into.
   const fifty = [
     deployment('p3', 'production', 600, ['https://openhearts.game']),
     deployment('p2', 'production', 590),
@@ -258,27 +289,33 @@ test('oh deploy prune says what would go, reading every page once, and with --ap
     ...Array.from({ length: 47 }, (_, i) => deployment(`v${String(47 - i).padStart(2, '0')}`, 'preview', 500 - i, i === 0 ? ['https://dev.open-hearts.pages.dev'] : null)),
   ];
   const doomedIds = fifty.slice(8).map((d) => d.id);
+  const kept = "Kept: of the previews, the newest 5 and the newest 5 that succeeded; of production's, the newest 3 and the newest 3 that succeeded; and every live one.";
 
   const dry = pagesApi(fifty, { shifted: true });
   const looked = fake({ env: cloudflareEnv, fetch: dry.fetch });
   assert.equal(await main(['deploy', 'prune'], looked), 0);
   assert.deepEqual(dry.asked, ['GET ?per_page=25&page=1', 'GET ?per_page=25&page=2', 'GET ?per_page=25&page=3']);
   assert.deepEqual(dry.deleted, []);
-  const would = looked.said.filter((l) => l.startsWith('would delete'));
-  assert.deepEqual(would.map((l) => l.split(' ')[2]), doomedIds.map((id) => id.slice(0, 8)), 'each once, though one was listed twice');
+  const would = looked.said.filter((l) => l.startsWith('would delete '));
+  assert.deepEqual(would.slice(0, -1).map((l) => l.split(' ')[2]), doomedIds.map((id) => id.slice(0, 8)), 'each once, though one was listed twice');
   assert.equal(would[0], 'would delete v42  2026-10-31 08:15  dev (preview)');
-  assert.match(looked.said.at(-1), /^42 of 50 deployment\(s\) would go, keeping the newest 5 preview\(s\), production's newest 3 and every one that is live; --apply deletes them$/);
+  assert.equal(looked.said.at(-1), `would delete 42 of 50 deployment(s); --apply deletes them. ${kept}`);
 
   const real = pagesApi(fifty);
   const swept = fake({ env: cloudflareEnv, fetch: real.fetch });
   assert.equal(await main(['deploy', 'prune', '--apply'], swept), 0);
   assert.deepEqual(real.deleted, doomedIds);
-  assert.ok(real.asked.filter((a) => a.startsWith('DELETE')).every((a, i) => a === `DELETE /${doomedIds[i]}`));
-  assert.match(swept.said.at(-1), /^swept 42 of 50 deployment\(s\)/);
+  assert.deepEqual(real.asked.filter((a) => a.startsWith('DELETE')), doomedIds.map((id) => `DELETE /${id}`));
+  assert.equal(swept.said.at(-1), `deleted 42 of 50 deployment(s). ${kept}`);
 
   const fewer = pagesApi(fifty);
   assert.equal(await main(['deploy', 'prune', '--keep', '40', '--apply'], fake({ env: cloudflareEnv, fetch: fewer.fetch })), 0);
   assert.deepEqual(fewer.deleted, doomedIds.slice(35));
+
+  // A failed upload is said to be one.
+  const failed = fake({ env: cloudflareEnv, fetch: pagesApi([...fifty.slice(0, 8), deployment('vf', 'preview', 1, null, 'failure')]).fetch });
+  assert.equal(await main(['deploy', 'prune'], failed), 0);
+  assert.equal(failed.said[0], 'would delete vf  2026-10-31 00:01  dev (preview, failed)');
 
   // Cloudflare refuses one: the rest are deleted all the same, and the
   // sweep fails saying so.
@@ -286,45 +323,54 @@ test('oh deploy prune says what would go, reading every page once, and with --ap
   const partly = fake({ env: cloudflareEnv, fetch: refusing.fetch });
   assert.equal(await main(['deploy', 'prune', '--apply'], partly), 1);
   assert.deepEqual(refusing.deleted, doomedIds.filter((id) => id !== 'v30'));
-  assert.ok(partly.said.some((l) => /^not deleted v30 .*Cloudflare said 400 to DELETE deployments\/v30: .*not now/.test(l)));
-  assert.match(partly.warned.join('\n'), /swept 41 of 42: 1 not deleted \(above\)/);
+  assert.ok(partly.said.some((l) => /^not deleted v30 .*: Cloudflare said 400 to DELETE deployments\/v30: .*not now/.test(l)));
+  assert.match(partly.warned.join('\n'), /deleted 41 of 42 old deployment\(s\); 1 could not be deleted \(above\)/);
 
-  // Nothing to sweep.
+  // Nothing to delete.
   const tidy = fake({ env: cloudflareEnv, fetch: pagesApi(fifty.slice(0, 8)).fetch });
   assert.equal(await main(['deploy', 'prune', '--apply'], tidy), 0);
-  assert.deepEqual(tidy.said, ['nothing to sweep: 8 deployment(s), all of them the newest 5 preview(s), production\'s newest 3 and every one that is live']);
+  assert.deepEqual(tidy.said, [`nothing to delete among 8 deployment(s). ${kept}`]);
 
-  // Asked wrongly, or unable to list: nothing is deleted.
-  assert.equal(await main(['deploy', 'prune', '--keep', 'many', '--apply'], fake({ env: cloudflareEnv, fetch: real.fetch })), 2);
+  // Asked wrongly, or unable to read the list: nothing is deleted.
+  for (const keep of ['many', '', '-1']) assert.equal(await main(['deploy', 'prune', '--keep', keep, '--apply'], fake({ env: cloudflareEnv, fetch: real.fetch })), 2, `--keep ${JSON.stringify(keep)}`);
   const bare = fake({ fetch: real.fetch });
   assert.equal(await main(['deploy', 'prune', '--apply'], bare), 1);
   assert.match(bare.warned.join('\n'), /needs CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID/);
-  const denied = fake({ env: cloudflareEnv, fetch: pagesApi(fifty, { listing: () => Response.json({ success: false, errors: [{ code: 10000, message: 'Authentication error' }] }, { status: 403 }) }).fetch });
-  assert.equal(await main(['deploy', 'prune', '--apply'], denied), 1);
-  assert.match(denied.warned.join('\n'), /Cloudflare said 403 to GET deployments\?per_page=25&page=1: .*Authentication error/);
-  const proxied = fake({ env: cloudflareEnv, fetch: pagesApi(fifty, { listing: () => new Response('<html>a proxy said no</html>', { status: 200 }) }).fetch });
-  assert.equal(await main(['deploy', 'prune'], proxied), 1, 'an answer that is not Cloudflare\'s is no list');
-  assert.match(proxied.warned.join('\n'), /Cloudflare said 200 to GET deployments\?per_page=25&page=1: not JSON$/);
+  const refusedList = async (answer, pattern) => {
+    const api = pagesApi(fifty, { listing: answer });
+    const ctx = fake({ env: cloudflareEnv, fetch: api.fetch });
+    assert.equal(await main(['deploy', 'prune', '--apply'], ctx), 1, String(pattern));
+    assert.match(ctx.warned.join('\n'), pattern);
+    assert.deepEqual(api.deleted, []);
+  };
+  await refusedList(() => Response.json({ success: false, errors: [{ code: 10000, message: 'Authentication error' }] }, { status: 403 }), /Cloudflare said 403 to GET deployments\?per_page=25&page=1: .*Authentication error/);
+  await refusedList(() => Response.json({ success: true, errors: [], result: [] }, { status: 500 }), /Cloudflare said 500 to GET deployments\?per_page=25&page=1/);
+  await refusedList(() => new Response('<html>a proxy said no</html>', { status: 200 }), /Cloudflare said 200 to GET deployments\?per_page=25&page=1: not JSON$/);
+  for (const result of [undefined, null, { not: 'a list' }, 'none']) {
+    await refusedList(() => Response.json({ success: true, errors: [], result }), /Cloudflare's answer to GET deployments\?per_page=25&page=1 has no list of deployments/);
+  }
+  await refusedList(() => Response.json({ success: true, errors: [], result: [{ ...fifty[9], created_on: null }, ...fifty.slice(0, 9)] }), /without a readable date \(null\), so nothing was deleted/);
   const unreachable = fake({ env: cloudflareEnv, fetch: async () => { throw new TypeError('fetch failed'); } });
   assert.equal(await main(['deploy', 'prune'], unreachable), 1);
   assert.match(unreachable.warned.join('\n'), /Cloudflare did not answer GET deployments\?per_page=25&page=1: fetch failed/);
   assert.equal(real.deleted.length, doomedIds.length, 'none of those deleted anything');
 });
 
-test("production's site deploy sweeps up after publishing, and stands if the sweep fails; a preview's sweeps nothing", async () => {
+test("production's site deploy deletes old deployments first and deploys even if that fails; a preview's deletes nothing", async () => {
   const git = (answers) => async (command, args) => ({ code: 0, out: answers[args.join(' ')] ?? '' });
   const onMain = git({ 'rev-parse HEAD': 'abc1234\n', 'rev-parse origin/main': 'abc1234\n', 'rev-parse --abbrev-ref HEAD': 'main\n' });
+  // Rolled back to p1, which is live; seven previews.
   const listed = [
-    deployment('p5', 'production', 50, ['https://openhearts.game']),
-    deployment('p4', 'production', 40),
-    deployment('p3', 'production', 30),
-    deployment('p2', 'production', 20),
-    deployment('v1', 'preview', 10),
+    deployment('p4', 'production', 50),
+    deployment('p3', 'production', 40),
+    deployment('p2', 'production', 30),
+    deployment('p1', 'production', 20, ['https://openhearts.game']),
+    deployment('p0', 'production', 10),
+    ...[7, 6, 5, 4, 3, 2, 1].map((n) => deployment(`v${n}`, 'preview', n)),
   ];
-  /// A deploy of the site where deploy.sh exits [published], against
-  /// [api]: what happened, in order. With [relay], deploy all's relay
-  /// before it, with no PhotoDNA module to fetch and its folder a
-  /// throwaway one.
+  /// A deploy where deploy.sh exits [published], against [api]: what
+  /// happened, in order. With [relay], deploy all's relay before it,
+  /// with no PhotoDNA module to fetch and a throwaway module folder.
   const deploy = async (argv, api, { published = 0, capture = onMain, relay = false } = {}) => {
     const site = settled();
     const order = [];
@@ -347,49 +393,60 @@ test("production's site deploy sweeps up after publishing, and stands if the swe
     return { code, order, said: ctx.said.join('\n'), warned: ctx.warned.join('\n') };
   };
 
+  // The live deployment, older than three that are not, is kept: it is
+  // the one a bad deploy rolls back to. Five previews are kept.
   const api = pagesApi(listed);
   const done = await deploy(['deploy', 'site', '--apply'], api);
   assert.equal(done.code, 0, done.warned);
-  assert.deepEqual(done.order, ['deploy.sh main', 'GET cloudflare', 'DELETE cloudflare']);
-  assert.deepEqual(api.deleted, ['p2']);
-  assert.match(done.said, /deleted p2 .* main \(production\)\nswept 1 of 5 deployment\(s\)/);
+  assert.deepEqual(done.order, ['GET cloudflare', 'DELETE cloudflare', 'DELETE cloudflare', 'DELETE cloudflare', 'deploy.sh main']);
+  assert.deepEqual(api.deleted, ['p0', 'v2', 'v1']);
+  assert.match(done.said, /deleted v1 .* dev \(preview\)\ndeleted 3 of 12 deployment\(s\)\. Kept: /);
   assert.equal(done.warned, '');
 
-  // The same from deploy all, whose site is production's.
+  // The same from deploy all, after its relay.
   const viaAll = await deploy(['deploy', 'all', '--apply'], pagesApi(listed), { relay: true });
   assert.equal(viaAll.code, 0, viaAll.warned);
-  assert.deepEqual(viaAll.order.slice(-3), ['deploy.sh main', 'GET cloudflare', 'DELETE cloudflare']);
-  assert.ok(viaAll.order.slice(0, -3).every((o) => o.startsWith('npx ')), viaAll.order.join(', '));
+  assert.deepEqual(viaAll.order.slice(-5), ['GET cloudflare', 'DELETE cloudflare', 'DELETE cloudflare', 'DELETE cloudflare', 'deploy.sh main']);
+  assert.ok(viaAll.order.slice(0, -5).every((o) => o.startsWith('npx ')), viaAll.order.join(', '));
 
-  // Not published: nothing swept.
+  // Old deployments are deleted even if the publish then fails: they
+  // are the ones oh deploy prune would delete anyway.
   const unpublished = await deploy(['deploy', 'site', '--apply'], pagesApi(listed), { published: 1 });
   assert.equal(unpublished.code, 1);
-  assert.deepEqual(unpublished.order, ['deploy.sh main']);
+  assert.equal(unpublished.order.at(-1), 'deploy.sh main');
 
-  // The sweep fails: said, and the deploy stands.
-  const down = pagesApi(listed, { listing: () => Response.json({ success: false, errors: [{ code: 7003, message: 'no route' }] }, { status: 500 }) });
-  const failedSweep = await deploy(['deploy', 'site', '--apply'], down);
-  assert.equal(failedSweep.code, 0);
-  assert.match(failedSweep.warned, /^published, but the sweep of old deployments: Cloudflare said 500 to GET deployments\?per_page=25&page=1: .*no route.*; \.\/oh deploy prune --apply tries again$/);
-  const garbled = await deploy(['deploy', 'site', '--apply'], pagesApi(listed, { listing: () => Response.json({ success: true, result: { not: 'a list' } }) }));
-  assert.equal(garbled.code, 0, 'nor by an answer the sweep cannot read');
-  assert.match(garbled.warned, /^published, but the sweep of old deployments: .*not iterable; /);
-  const refused = pagesApi(listed, { refused: ['p2'] });
-  const partSweep = await deploy(['deploy', 'site', '--apply'], refused);
-  assert.equal(partSweep.code, 0);
-  assert.match(partSweep.warned, /^published, but the sweep of old deployments: swept 0 of 1: 1 not deleted \(above\); /);
+  // A sweep that fails is reported, and the deploy goes on.
+  const failures = [
+    [pagesApi(listed, { listing: () => Response.json({ success: false, errors: [{ code: 7003, message: 'no route' }] }, { status: 500 }) }), /^could not delete old deployments: Cloudflare said 500 to GET deployments\?per_page=25&page=1: .*no route.*\. Deploying anyway; \.\/oh deploy prune --apply tries again\.$/],
+    [pagesApi(listed, { refused: ['p0'] }), /^could not delete old deployments: deleted 2 of 3 old deployment\(s\); 1 could not be deleted \(above\)\. Deploying anyway; /],
+    [pagesApi(listed, { listing: () => Response.json({ success: true, result: { not: 'a list' } }) }), /^could not delete old deployments: Cloudflare's answer .* has no list of deployments/],
+  ];
+  for (const [failing, pattern] of failures) {
+    const went = await deploy(['deploy', 'site', '--apply'], failing);
+    assert.equal(went.code, 0, went.warned);
+    assert.equal(went.order.at(-1), 'deploy.sh main');
+    assert.match(went.warned, pattern);
+  }
 
-  // A dry run says it will sweep, and asks Cloudflare nothing.
+  // A dry run says it will delete old deployments, and asks Cloudflare
+  // nothing.
   const dry = await deploy(['deploy', 'site'], pagesApi(listed));
   assert.equal(dry.code, 0);
   assert.deepEqual(dry.order, []);
-  assert.match(dry.said, /then sweeps up old deployments, keeping the newest 5 previews, production's newest 3 and every one that is live \(oh deploy prune says which would go\)/);
+  assert.match(dry.said, /first deletes old deployments: oh deploy prune lists the ones that would go/);
 
-  // A preview's deploy publishes, and sweeps nothing.
+  // A preview's deploy publishes and deletes nothing.
   const preview = await deploy(['deploy', 'site', '--label', 'my-change', '--apply'], pagesApi(listed), { capture: git({ 'rev-parse --abbrev-ref HEAD': 'my-change\n' }) });
   assert.equal(preview.code, 0);
   assert.deepEqual(preview.order, ['deploy.sh my-change']);
-  assert.doesNotMatch(preview.said, /sweep/);
+  assert.doesNotMatch(preview.said, /delete/);
+
+  // An empty label is refused, not read as no label: on main that would
+  // be a production deploy.
+  const empty = await deploy(['deploy', 'site', '--label', '', '--apply'], pagesApi(listed));
+  assert.equal(empty.code, 2);
+  assert.deepEqual(empty.order, []);
+  assert.match(empty.warned, /--label takes a value/);
 });
 
 test('a relay deploy says what it lacks before it starts', async () => {

@@ -39,7 +39,7 @@ Use this guide to publish the site, the web app and the service's handlers to Cl
    ./oh deploy all --apply
    ```
 
-   The relay goes first because the `Household` object runs in the relay worker. A new site whose handlers ask the object something it does not know yet gets a 400 (`not a household operation`) until the relay is deployed. To deploy only one, use `./oh deploy relay --apply` or `./oh deploy site --apply`. Once the site is published, it [sweeps up old deployments](#sweep-up-old-deployments).
+   The relay goes first because the `Household` object runs in the relay worker. A new site whose handlers ask the object something it does not know yet gets a 400 (`not a household operation`) until the relay is deployed. To deploy only one, use `./oh deploy relay --apply` or `./oh deploy site --apply`. A production site deploy first [deletes old deployments](#sweep-up-old-deployments).
 
    For the relay, `oh` first runs `wrangler deploy --dry-run`, which runs `service/bench/build.sh` (it builds the deal and Schnorr libraries and compiles the house) and builds the house's image, but uploads nothing. A real deploy uploads the worker, live at once, before it builds the image, so an image that failed to build there would leave the new worker beside the old house. Only once the dry run has built both does `oh` deploy: the build again, the worker, and the house's image built and pushed.
 
@@ -106,9 +106,15 @@ Give each person their own invitation, since an account plays on one device at a
 
 ## Sweep up old deployments
 
-Every upload is a deployment Cloudflare keeps for ever. A production deploy of the site sweeps up after itself: once it has published, it deletes the previews past the newest five and production's deployments past the newest three (the live one and the two before it, to roll back to). It never deletes a deployment that is live: production's on its domains, or the newest of a preview's branch, on its branch's address. If the sweep fails, the deploy says so and still stands. A preview's deploy sweeps nothing.
+Cloudflare keeps every upload as a deployment until it is deleted. A production deploy of the site deletes the old ones before it publishes. It keeps:
 
-To sweep without deploying, see what would go first:
+- the newest five previews, and the newest five previews that succeeded
+- the newest three production deployments, and the newest three that succeeded, so there is always something to roll back to
+- every deployment that is live: production's on its domains, and the newest of each preview branch on its branch's address
+
+Because it runs before publishing, the deployment being replaced is still live at that point, so it is kept. After the deploy you can roll back to it. If the cleanup fails, the deploy says so and goes on. A preview's deploy deletes nothing.
+
+To clean up without deploying, see what would go first:
 
 ```bash
 ./oh deploy prune

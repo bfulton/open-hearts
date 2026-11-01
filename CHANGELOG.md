@@ -269,17 +269,21 @@ squashed from a pull request, the pull request's number.
 
 ### Changed
 
-- A production deploy of the site sweeps up the old deployments once it
-  has published, as `./oh deploy prune --apply` does, so nobody has to
-  remember to. It keeps the newest five previews, production's newest
-  three (the live one and two to roll back to), and every deployment
-  that is live: production's on its domains, and the newest of each
-  preview's branch on its branch's address. The sweep before counted
-  those last among the previews to delete, which Cloudflare refuses
-  unless forced. A sweep that fails is said, and the deploy stands. A
-  preview's deploy sweeps nothing. The sweep is `oh`'s now:
-  `deploy.sh` no longer takes `--prune`, and needs no Python.
-  (2026-11-01, #47)
+- A production deploy of the site deletes old deployments before it
+  publishes, as `./oh deploy prune --apply` does, so nobody has to
+  remember to. It keeps the newest five previews, the newest three
+  production deployments, as many again of each that succeeded (so
+  failed uploads never leave nothing to roll back to), and every live
+  deployment: production's on its domains, and the newest of each
+  preview branch on its branch's address. The old sweep counted those
+  last among the previews to delete, which Cloudflare refuses unless
+  forced. Running before publishing keeps the deployment being
+  replaced, since it is still live then. A listing it cannot read
+  deletes nothing. If the cleanup fails, the deploy says so and goes
+  on; a preview's deploy deletes nothing. The cleanup is `oh`'s now:
+  `deploy.sh` no longer takes `--prune`, and needs no Python. `oh`
+  refuses an empty flag value (`--label ''`), which is most likely an
+  unset variable. (2026-11-01, #47)
 - Bots never take longer over a card than the quickest person at the
   table. A person's pace is the middle of the times they took over their
   last three cards; at a live table the house keeps each bot's thinking

@@ -11,10 +11,9 @@
 #                (the worker routes by host, docs/explanation/service.md)
 #
 # Publishing is for looking at, not for keeping: every upload is a
-# deployment Cloudflare keeps for ever. So publish when there is
-# something to look at; ./oh deploy site sweeps up the old ones after
-# each production deploy, and ./oh deploy prune whenever it is asked
-# (ops/release.mjs, sweep).
+# deployment Cloudflare keeps until it is deleted. ./oh deploy site
+# deletes the old ones before each production deploy, and
+# ./oh deploy prune does it on its own (ops/release.mjs, sweep).
 #
 # Usage:  ./deploy.sh [branch-label], or better, ./oh deploy site
 # (docs/reference/oh.md), which says first what stands in the way.

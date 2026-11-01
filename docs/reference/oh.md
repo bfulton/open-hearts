@@ -304,7 +304,7 @@ Deploys the relay worker, and the house's container with it, from main; with --p
 oh deploy site [--apply] [--label <label>]
 ```
 
-Builds and publishes the site, the web app and the service's handlers: to production from main, or to a preview. The label names the preview; it is `main` (production) on main and `dev` elsewhere unless given. Production is refused unless HEAD is origin/main with nothing uncommitted, and unless the terms and the privacy policy are as the ledger says, with what a change needs done (oh terms status). Once production is published, the old deployments are swept up, as oh deploy prune --apply sweeps them; a sweep that fails is said, and the deploy stands. A preview's deploy sweeps nothing. It emails nobody: a change that matters to subscribers is emailed to them by oh terms notify.
+Builds and publishes the site, the web app and the service's handlers: to production from main, or to a preview. The label names the preview; it is `main` (production) on main and `dev` elsewhere unless given. Production is refused unless HEAD is origin/main with nothing uncommitted, and unless the terms and the privacy policy are as the ledger says, with what a change needs done (oh terms status). Before publishing production, it deletes old deployments as oh deploy prune --apply does; if that fails, it says so and deploys anyway. A preview's deploy deletes nothing. It emails nobody: a change that matters to subscribers is emailed to them by oh terms notify.
 
 - **Needs:** `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`
 - **How-to:** [deploy.md](../how-to/deploy.md)
@@ -328,7 +328,7 @@ Deploys production in the order that keeps devices playing: the relay, then the 
 oh deploy prune [--apply] [--keep <keep>]
 ```
 
-Deletes the site's old deployments: the previews past the newest few (5 unless --keep says) and production's past its newest three, never one that is live. A live deployment is one with an alias: production's on its domains, and the newest of each preview's branch on its branch's address. Every production deploy of the site sweeps the same way, keeping five previews.
+Deletes the site's old deployments, keeping the newest previews (5 unless --keep says), the newest 3 of production's, as many again of each that succeeded, and every live one. A live deployment is one with an alias: production's on its domains, and the newest of each preview branch on its branch's address. Every production deploy of the site does the same first, keeping 5 previews.
 
 - **Needs:** `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`
 - **How-to:** [deploy.md](../how-to/deploy.md#sweep-up-old-deployments)
