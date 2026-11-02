@@ -36,6 +36,7 @@ class SimTable {
     List<Signer>? keys,
     Signer? houseKey,
     Licence? Function(PublicKey key)? licenceOf,
+    int? deal,
     this.traces = false,
   }) : clock = VirtualClock() {
     final sealed = crypto != null;
@@ -60,6 +61,7 @@ class SimTable {
           rated: rated,
           house: sealed ? houseSigner.publicKey : null,
           salt: salt,
+          deal: deal,
         );
     // A rated table is one a pool seats, with the house's own salt,
     // unless the test gives it another.

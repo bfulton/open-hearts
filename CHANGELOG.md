@@ -479,6 +479,15 @@ squashed from a pull request, the pull request's number.
 
 ### Fixed
 
+- The house says it will not serve a table whose start it cannot read,
+  as it does for one it reads and refuses. The referee takes a start by
+  its id alone, and asks for the house until it has said a result; a
+  start this build does not parse, or of a revision of the deal it does
+  not speak (every table of an older build, since #50), left the house
+  woken for it every twenty seconds for some eleven days, and a
+  subscriber who started such tables could keep the house awake. Nobody
+  plays such a table, and the word, which no side reads, is for the
+  referee. (2026-11-01, #52)
 - Phone builds carry their commit and the day they were built, so the
   About page shows them and the operator's update notice can reach a
   phone build that is out of date. Before, every store build said

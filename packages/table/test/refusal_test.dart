@@ -226,6 +226,44 @@ void main() {
       });
     }
 
+    // A start the referee takes, since it checks only that the id is the
+    // spec's, and that this build does not read: it plays no revision of
+    // the deal but its own (rules.dart, _start). Nobody here plays such a
+    // table, the house included, which could say nothing of what it could
+    // not read, and so was woken for it until the log's notes ran out,
+    // some eleven days: the referee asks for the house until it has said a
+    // result, whatever the result says. No side reads the word either, the
+    // table having failed at its start for every side that reads as this
+    // one does.
+    group('refusing a start of another revision of the deal', () {
+      SimTable make() => SimTable(humans: 2, seed: 114, target: 1, crypto: crypto, deal: 1);
+
+      test('says so once in the table\'s log, naming the start, and lets the table go; the table is failed everywhere', () {
+        final t = make()..start();
+        expect(t.clock.runUntil(() => _houseSaid(t).isNotEmpty && t.house!.serving.isEmpty, limitMs: 60 * 60 * 1000), isTrue,
+            reason: 'the house\'s word is in the log and the house let the table go');
+        expect(t.following.map((c) => c.state), everyElement(TableState.failed));
+        expect(t.following.map((c) => c.started), everyElement(isFalse), reason: 'nobody read the start');
+        final said = _houseEvents(t);
+        expect(said, hasLength(1), reason: 'it plays no seat and deals nothing');
+        expect(said.single.kind, EventKind.result);
+        final afterStart = LogHash()..add(t.referee.log.first);
+        expect(said.single.body, {'n': 1, 'hash': afterStart.value, 'state': 'failed', 'totals': [0, 0, 0, 0]});
+        expect(t.results, isEmpty, reason: 'nothing reaches the results tag');
+        t.close();
+      });
+
+      test('is not woken again, however long the table stands', () {
+        final t = make();
+        final wakes = _wakes(t, forMs: 60 * 60 * 1000);
+        expect(wakes, 0, reason: 'woken $wakes more times in an hour');
+        expect(t.house!.serving, isEmpty, reason: 'the house followed it no longer');
+        expect(t.referee.log.where((e) => e.up == t.houseSigner.publicKey || e.down == t.houseSigner.publicKey), hasLength(1),
+            reason: 'it came and it went, and not again');
+        t.close();
+      });
+    });
+
     test('its word is the table\'s and no result: said on the results tag, it would be folded for nobody', () {
       final t = refused['a seat that shows no licence']!()..start();
       t.run();

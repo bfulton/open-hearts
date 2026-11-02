@@ -271,17 +271,36 @@ void main() {
       // one that could not sit at the table would: a seating, then none
       // while what it says may be from before it was seated, and then
       // another.
+      //
+      // This runs in real time, about ten seconds of it, on a machine that
+      // may be busy with other suites. So each time is the time the thing
+      // happened, taken where it was heard, and not the time this test got
+      // round to looking; a wait that does not come says which one, rather
+      // than ending at the test's own timeout; and where two times were
+      // heard by different sockets, the difference allows for one hearing
+      // later than the other.
+      Future<void> until(bool Function() done, String what, {int ms = 20000}) async {
+        final from = DateTime.now().millisecondsSinceEpoch;
+        while (!done()) {
+          if (DateTime.now().millisecondsSinceEpoch - from > ms) fail('$what did not happen in ${ms ~/ 1000} seconds');
+          await Future<void>.delayed(const Duration(milliseconds: 25));
+        }
+      }
+
       final h = await seats(staleMs: 5000, botsAfterMs: 0);
       final watching = RelayTransport(relays: [relay.url], signer: SchnorrSigner.generate(), table: poolTag('unrated'));
       await watching.ready;
       final stubborn = RelayTransport(relays: [relay.url], signer: SchnorrSigner.generate(), table: poolTag('unrated'));
       await stubborn.ready;
+      bool seatsStubborn(NostrEvent e) {
+        final c = jsonDecode(e.content) as Map;
+        return c['kind'] == 'match' && (c['seats'] as List).any((s) => (s as Map)['key'] == stubborn.signer.publicKey);
+      }
+
+      // When the house's seatings of it were heard, by one socket.
       final at = <int>[];
       final heard = watching.lobby.listen((e) {
-        final c = jsonDecode(e.content) as Map;
-        if (c['kind'] == 'match' && (c['seats'] as List).any((s) => (s as Map)['key'] == stubborn.signer.publicKey)) {
-          at.add(DateTime.now().millisecondsSinceEpoch);
-        }
+        if (seatsStubborn(e)) at.add(DateTime.now().millisecondsSinceEpoch);
       });
       final since = DateTime.now().millisecondsSinceEpoch;
       final beat = Timer.periodic(const Duration(milliseconds: 500), (_) {
@@ -293,27 +312,39 @@ void main() {
       final other = await join('O', rating: 4500);
       other.$2.waitForPerson();
       bool counted() => other.$2.present.any((w) => w.key == stubborn.signer.publicKey);
-      while (!counted()) {
-        await Future<void>.delayed(const Duration(milliseconds: 50));
-      }
-      while (at.isEmpty) {
-        await Future<void>.delayed(const Duration(milliseconds: 50));
-      }
-      await Future<void>.delayed(const Duration(milliseconds: 1000));
-      expect(counted(), isFalse, reason: 'seated a second ago, so not waiting, whatever it still says');
-      await Future<void>.delayed(const Duration(milliseconds: 2000));
-      expect(counted(), isTrue, reason: 'still saying it waits, after the seating could have reached it: waiting');
-      while (at.length < 2) {
-        await Future<void>.delayed(const Duration(milliseconds: 50));
-        if (DateTime.now().millisecondsSinceEpoch - since > 20000) fail('seated ${at.length} times in twenty seconds');
-      }
-      expect(at[1] - at[0], greaterThanOrEqualTo(5000), reason: 'not heard for the house\'s five seconds after its seating');
+      // The seating as that screen hears it, on its own socket, and what
+      // the screen shows of it just then: after the room's own handling
+      // of the seating, which listens before this does.
+      final heardByOther = <int>[];
+      final shownThen = <bool>[];
+      final seen = other.$1.lobby.listen((e) {
+        if (!seatsStubborn(e)) return;
+        final when = DateTime.now().millisecondsSinceEpoch;
+        scheduleMicrotask(() {
+          heardByOther.add(when);
+          shownThen.add(counted());
+        });
+      });
+      await until(counted, 'the screen counting somebody who says it waits');
+      await until(() => shownThen.isNotEmpty, 'the seating of the one waiting');
+      expect(shownThen.first, isFalse, reason: 'seated just now, so not waiting, whatever it still says');
+      // Then it is counted again, once the seating could have reached it
+      // (two seconds, here): not before, and not for long after.
+      await until(counted, 'the screen counting it again after its seating');
+      final counting = DateTime.now().millisecondsSinceEpoch - heardByOther.first;
+      expect(counting, greaterThanOrEqualTo(1900), reason: 'still saying it waits, but not counted for the two seconds after its seating');
+      expect(counting, lessThan(7000), reason: 'still saying it waits, after the seating could have reached it: waiting');
+      await until(() => at.length >= 2, 'its second seating');
+      // Not heard for the house's five seconds after its seating. Two
+      // hearings, by one socket, can each be late by another amount.
+      expect(at[1] - at[0], greaterThanOrEqualTo(4500), reason: 'not heard for the house\'s five seconds after its seating');
       beat.cancel();
       await heard.cancel();
+      await seen.cancel();
       watching.close();
       stubborn.close();
       closeAll([other, (h.$1, h.$2, null)]);
-    });
+    }, timeout: const Timeout(Duration(seconds: 90)));
 
     // A seating as the house says it (matching.dart, PoolHost): these
     // keys, bots in the other seats, salted with [salt], naming [named]

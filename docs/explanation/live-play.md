@@ -615,9 +615,22 @@ that. The word goes in the table's own log and nowhere else: the house
 publishes nothing on the results tag for a table it will not serve, and
 reads nothing more of it once it has said the word.
 
+It says the word of a start it cannot read as well: a spec this build
+does not parse, or one that names a revision of the deal it does not
+speak, as every table of an older build does (a build plays no revision
+but its own, [fair-deal](fair-deal.md#verification)). The referee takes a
+start by its id alone, so such a table is in the log, and nobody here
+plays it, but without a word the house would be woken for it for days.
+Every side has that table failed at its start, so none reads the word; it
+is for the referee. A house behind the builds that start tables, which is
+a site deployed before the relay, would refuse the tables of the newer
+revision for the while it is behind, so the relay goes first
+([deploy](../how-to/deploy.md#deploy-production)).
+
 A table the house has not yet reached, or reached through a relay that
 was down, is not refused: the house says the word only of a table whose
-start it has read and checked, and what it checks never changes.
+start it has read and checked, or cannot read, and what it checks never
+changes.
 
 ### What the house can see
 
