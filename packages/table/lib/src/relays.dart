@@ -20,8 +20,9 @@ import 'signing.dart';
 
 /// How long a device may hear nothing at all, with something it sent
 /// waiting on an answer, before it takes its socket for dead and makes
-/// it again. Our relay answers everything it is sent, so ten seconds of
-/// nothing is the line down.
+/// it again. Our relay answers everything it is sent but a tick
+/// ([RelayConnection.sendRaw]), so ten seconds of nothing is the line
+/// down.
 const unansweredMs = 10000;
 
 /// How long an answer may take on a slow line: something sent waits
@@ -103,7 +104,8 @@ abstract final class Relays {
 /// remakes itself when told to, and when its line looks down ([cutOff]):
 /// nothing at all heard for [unansweredMs] with something sent waiting
 /// on an answer, from a relay that answers everything it is sent — an
-/// event with OK, a subscription with the end of what it holds.
+/// event with OK, a subscription with the end of what it holds — but a
+/// tick, which [sendRaw] does not wait on.
 class RelayConnection {
   RelayConnection(
       {required this.url,
@@ -134,12 +136,19 @@ class RelayConnection {
 
   /// Sends [message] as it is, if the socket is open: false where it is
   /// not, and whoever is waiting on it says it again on the next.
-  bool sendRaw(List<Object?> message) {
+  ///
+  /// The relay's answer to [message] is what [cutOff] waits for, unless
+  /// [answered] is false: for a message the relay may leave without a
+  /// word, such as a tick, which the referee declines where the last
+  /// entry is under a quarter of a second old. Nothing more arrives to
+  /// answer it then, and a line that counted its silence as a stall
+  /// would make its socket afresh because a table is quiet.
+  bool sendRaw(List<Object?> message, {bool answered = true}) {
     final ch = _channel;
     if (ch == null || !_open) return false;
     try {
       ch.sink.add(jsonEncode(message));
-      _unansweredSince ??= _nowMs;
+      if (answered) _unansweredSince ??= _nowMs;
       return true;
     } on StateError catch (err) {
       log?.call('$url: not sent, the socket is closing: $err');

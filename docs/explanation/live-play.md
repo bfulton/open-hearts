@@ -388,16 +388,18 @@ the screen a beat, or a trick's hold, after the log opens it.
 
 A device can stop hearing the table while the table goes on hearing
 it: a satellite link on a plane, say, whose way in stalls while its
-way out still carries. Our relay answers everything it is sent, so the
-device asks its own line. When it has heard nothing at all for
-`unansweredMs` (ten seconds) while something it sent has waited longer
-than an answer takes (`answerMs`), it takes itself for cut off, makes
-its socket afresh (`RelayConnection` in `relays.dart`), and reads on
-from the entry it had. A device waiting on others has nothing to
-send, so once it has heard nothing for half of `unansweredMs` it asks
-for the log again from where it is (`onIdle`): the referee answers
-with whatever came since and the log's end, and no answer is what
-gives a stall away.
+way out still carries. Our relay answers everything it is sent but a
+tick, so the device asks its own line. When it has heard nothing at all
+for `unansweredMs` (ten seconds) while something it sent has waited
+longer than an answer takes (`answerMs`), it takes itself for cut off,
+makes its socket afresh (`RelayConnection` in `relays.dart`), and reads
+on from the entry it had. A tick is not waited on: the referee answers
+one with an entry and says nothing where it takes none, so a quiet table
+after a tick it declined is not a stalled line. A device waiting on
+others has nothing to send, so once it has heard nothing for half of
+`unansweredMs` it asks for the log again from where it is (`onIdle`):
+the referee answers with whatever came since and the log's end, and no
+answer is what gives a stall away.
 
 The screen says "Your connection is down — reconnecting" under the felt
 once a line that has been up has been down for three seconds

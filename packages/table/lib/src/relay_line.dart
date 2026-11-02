@@ -150,8 +150,12 @@ class RelayLine implements RefereeLine {
     _connection?.sendRaw(['EVENT', e.toJson()]);
   }
 
+  /// Not waited on: the referee answers a tick with an entry, and says
+  /// nothing where it takes none (`tickGapMs`, service/do/referee.mjs).
+  /// The idle ask for the log is what tells a line still carrying from
+  /// one stalled ([open]).
   @override
-  void tick() => _connection?.sendRaw(['TICK']);
+  void tick() => _connection?.sendRaw(['TICK'], answered: false);
 
   bool _up = false;
 
