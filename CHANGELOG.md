@@ -479,6 +479,15 @@ squashed from a pull request, the pull request's number.
 
 ### Fixed
 
+- A device no longer remakes a healthy connection to its table because
+  the referee left a tick unanswered. A side asks for a tick a moment
+  past a deadline, and the referee adds one only when its last entry is
+  at least a quarter of a second old; otherwise it says nothing. The
+  device took that silence for a stalled line, and after ten quiet
+  seconds dropped its socket and made another. The house did this in
+  six of fourteen runs of the four-browser suite on four busy cores. A
+  line whose way in has really stalled is still found out, by asking
+  for the log again. (2026-11-02)
 - The house says it will not serve a table whose start it cannot read,
   as it does for one it reads and refuses. The referee takes a start by
   its id alone, and asks for the house until it has said a result; a

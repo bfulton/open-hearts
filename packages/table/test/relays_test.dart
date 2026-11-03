@@ -57,6 +57,50 @@ void main() {
       expect(asks, hasLength(2), reason: 'its ask unanswered, the line made its socket afresh');
       expect(ups, [true, false, true], reason: 'up, down for the stall, and up again on the new socket');
     });
+
+    test('a tick the referee declines is not a silence to cut the line off for', () async {
+      // The referee answers a tick with an entry, and takes none where
+      // the last entry is under a quarter of a second old (tickGapMs,
+      // service/do/referee.mjs): then it says nothing at all, though
+      // the line is sound and it answers everything else. This relay
+      // answers a request for the log, as the referee does, and never
+      // a tick.
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(() => server.close(force: true));
+      var sockets = 0;
+      final asks = <int>[];
+      server.listen((request) async {
+        final ws = await WebSocketTransformer.upgrade(request);
+        sockets++;
+        ws.listen((raw) {
+          final m = jsonDecode(raw as String) as List;
+          if (m[0] == 'LOG') {
+            asks.add(sockets);
+            ws.add(jsonEncode(['LOGEND', m[1], 0]));
+          }
+        });
+      });
+      final line = RelayLine(
+          relays: [Uri.parse('ws://127.0.0.1:${server.port}')], signer: FakeSigner('declined'), table: 'cd' * 16, cutOffMs: 600);
+      addTearDown(line.close);
+      final ups = <bool>[];
+      line.onUp = ups.add;
+      line.open(0, (_) {});
+      var until = DateTime.now().add(const Duration(seconds: 10));
+      while (ups.isEmpty && DateTime.now().isBefore(until)) {
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+      }
+      expect(ups, [true], reason: 'up on the first socket');
+      line.tick();
+      // Four times what cuts a line off, and the table quiet all of it.
+      until = DateTime.now().add(const Duration(milliseconds: 2400));
+      while (DateTime.now().isBefore(until)) {
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+      }
+      expect(sockets, 1, reason: 'the unanswered tick was no reason to make the socket afresh');
+      expect(ups, [true], reason: 'and the line was never down');
+      expect(asks.length, greaterThan(1), reason: 'quiet a while, the line asked for the log, which shows a line carrying from one stalled');
+    });
   });
 }
 
