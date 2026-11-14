@@ -95,6 +95,13 @@ class Waiter {
   /// null for the pool's own.
   int? botsAfterMs;
 
+  /// When they began this wait as they last said it, by their own clock
+  /// ([WaitingRoom.since]); null where they said none. Nothing is timed
+  /// by it. It names the wait: the house says it back in the seating it
+  /// makes of that wait ([PoolHost]), and a device takes a seating as
+  /// its own by it ([WaitingRoom]).
+  int? saidSince;
+
   /// When their last heartbeat arrived, ms.
   int lastSeen = 0;
 
@@ -213,6 +220,9 @@ String poolTag(String pool, {int target = gameOverScore}) =>
 /// The pools there are: a rated game, and one that is not.
 const pools = ['rated', 'unrated'];
 
+/// The system's clock, ms since the epoch.
+int _wallMs() => DateTime.now().millisecondsSinceEpoch;
+
 /// How long a pool's round is: the house seats a pool once a round
 /// ([PoolHost]), and a seating says which round it was.
 const poolRoundMs = 5000;
@@ -236,6 +246,7 @@ class WaitingRoom {
     this.heartbeatMs = 2000,
     this.staleMs = poolStaleMs,
     int? nowMs,
+    int Function()? clock,
     this.log,
     this.avatar,
     this.picture,
@@ -243,7 +254,8 @@ class WaitingRoom {
     this.licence,
   })  : poolBotsAfterMs = botsAfterMs,
         botsAfterMs = botsAfterMs,
-        since = nowMs ?? DateTime.now().millisecondsSinceEpoch {
+        _clock = clock ?? _wallMs,
+        since = nowMs ?? (clock ?? _wallMs)() {
     for (final e in List.of(relay.lobbySoFar)) {
       _onLobby(e);
     }
@@ -285,8 +297,9 @@ class WaitingRoom {
   /// a waiter without one is not seated.
   final Licence? licence;
 
-  /// The house's round ([poolRoundMs]): a seating says the round it
-  /// was made in, and is for that round and no other.
+  /// The house's round ([poolRoundMs]). A seating says the round it was
+  /// made in, by the house's clock; one that does not name the wait it
+  /// is of is taken by that round (`_onLobby`).
   final int roundMs;
 
   /// The pool's wait before bots: what every waiter who has said
@@ -345,7 +358,10 @@ class WaitingRoom {
   Stream<TableSpec> get seated => _seated.stream;
 
   PublicKey get me => relay.signer.publicKey;
-  int get _now => DateTime.now().millisecondsSinceEpoch;
+
+  /// This device's clock: the system's, unless a test gives another.
+  final int Function() _clock;
+  int get _now => _clock();
   int _roundOf(int ms) => ms ~/ roundMs;
 
   /// Everyone waiting, as far as this device can tell, itself included,
@@ -418,34 +434,53 @@ class WaitingRoom {
           ),
         );
         w.lastSeen = _now;
+        // Which wait of theirs this is, as they say it now.
+        w.saidSince = switch (c['since']) { final int s => s, _ => null };
       case 'match':
         // The house's, or no seating at all.
         if (e.kind != TableKinds.lobby || house == null || e.pubkey != house) return;
-        final round = c['round'] as int?;
-        // A seating is for the round that made it and no other. It goes
+        // A seating is for the wait that made it and no other. It goes
         // out on the stored kind, so that a device arriving at a room
         // code is handed the room announced before it got there
         // (nostr.dart); a pool is subscribed to the same way, so a relay
         // hands a device that comes back to the pool the seatings of the
         // last minute (RelayTransport.poolHistorySeconds) — this device's
-        // own from its last game among them, at a table whose people
-        // have closed their apps.
+        // own from the wait before among them, at a table it has left.
         //
-        // A round or two either side of this device's clock, and no
-        // more: the round is the house's, by its clock, and a device
-        // further out than that is one that could not tell a seating of
-        // now from one of a minute ago.
-        if (round == null || (round - _roundOf(_now)).abs() > 2) return;
-        _maybeSeated(c);
+        // So each person's seat says the wait it is of, as that person's
+        // device said it began ([since], which the house says back), and
+        // a seat is of this wait when it says this one's. Nothing is
+        // asked of the clocks: the house's is its container's, and has
+        // been a quarter of a minute out.
+        //
+        // A seat that names no wait is a house's from before it named
+        // them, and goes by the round it says, the house's by its clock:
+        // a round or two either side of this device's, and no more.
+        final byRound = switch (c['round']) { final int round => (round - _roundOf(_now)).abs() <= 2, _ => false };
+        bool ofThisWait(Map<Object?, Object?> seat) {
+          final said = seat['since'];
+          if (said is! int) return byRound;
+          if (seat['key'] == me) return said == since;
+          // Another's: the wait this device hears them in now. One it
+          // has not heard waiting goes by the round, since all that
+          // turns on it is whether they are counted for a moment.
+          final other = _others[seat['key']];
+          return other == null ? byRound : said == other.saidSince;
+        }
+
+        final people = [
+          if (c['seats'] case final List<Object?> seats)
+            for (final s in seats)
+              if (s case {'key': String _}) s,
+        ];
+        if (people.any((s) => s['key'] == me && ofThisWait(s))) _maybeSeated(c);
         // Whoever it seated is waiting no longer, whether or not this
         // device was among them.
-        if (c['seats'] case final List<Object?> seats) {
-          for (final s in seats) {
-            if (s case {'key': final String key}) {
-              _others.remove(key);
-              _gone.add(key, _now);
-            }
-          }
+        for (final s in people) {
+          if (!ofThisWait(s)) continue;
+          final key = s['key'] as String;
+          _others.remove(key);
+          _gone.add(key, _now);
         }
     }
   }
@@ -546,9 +581,11 @@ class PoolHost {
     this.idleMs = 60000,
     Future<void>? ready,
     Random? random,
+    int Function()? clock,
     this.log,
     this.onIdle,
-  }) : _heardAt = DateTime.now().millisecondsSinceEpoch {
+  })  : _clock = clock ?? _wallMs,
+        _heardAt = (clock ?? _wallMs)() {
     _random = random ?? Random.secure();
     if (ready == null) {
       _ready = true;
@@ -617,7 +654,10 @@ class PoolHost {
 
   /// The house's key, which every table it seats names.
   PublicKey get house => relay.signer.publicKey;
-  int get _now => DateTime.now().millisecondsSinceEpoch;
+
+  /// The house's clock: the system's, unless a test gives another.
+  final int Function() _clock;
+  int get _now => _clock();
 
   /// Everyone waiting now, as the house hears them, by key.
   List<Waiter> get present {
@@ -658,6 +698,9 @@ class PoolHost {
     // Said again with every heartbeat, and changed by a choice made
     // while waiting; never past the most anyone waits.
     w.botsAfterMs = switch (c['botsAfter']) { final int b when b >= 0 && b <= WaitingRoom.personAtMostMs => b, _ => null };
+    // Which wait of theirs this is, by their own clock: said back in the
+    // seating, and timed by nothing here.
+    w.saidSince = switch (c['since']) { final int s => s, _ => null };
     _heardAt = now;
     _idle = false;
   }
@@ -723,6 +766,9 @@ class PoolHost {
               {
                 'key': humans[s].key,
                 'name': humans[s].name,
+                // The wait this seat is of, as its device said it began:
+                // what the device knows its own seating by.
+                if (humans[s].saidSince != null) 'since': humans[s].saidSince,
                 if (humans[s].avatar != null) 'avatar': humans[s].avatar,
                 if (humans[s].licence != null) 'licence': humans[s].licence!.toJson(),
               }

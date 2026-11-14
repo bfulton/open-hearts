@@ -79,6 +79,17 @@ runs the seating rule over everyone it hears and publishes one seating
 per table, signed by its key. A device entering a pool reads the
 seatings of the last minute (`poolHistorySeconds`).
 
+A seating is for the wait that made it. A device says when it began to
+wait, by its own clock, at every heartbeat, and the house says that back
+beside the seat it gives it. A device takes a seating that names its
+seat with this wait's time, and no other: not its own from the wait
+before, which the relay hands it again if it comes back within the
+minute. Nothing is asked of the two clocks. The house's is its
+container's, which was once found a quarter of a minute behind, and the
+rounds it numbered were then three away from every device's. A seating
+from a house that names no wait is taken by its round instead, within
+two of the device's own.
+
 A seating is the house's alone. A device takes one from its build's
 house and nobody else, and the pool's object carries one from nobody
 else either: anybody else's is answered as taken, so that the device

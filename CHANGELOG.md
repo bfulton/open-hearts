@@ -479,6 +479,18 @@ squashed from a pull request, the pull request's number.
 
 ### Fixed
 
+- Play live seats a player when the house's clock is out. A device took
+  a seating only when the round it named, by the house's clock, was
+  within two rounds (ten seconds) of its own; the house's container
+  started with its clock about fourteen seconds behind, so every seating
+  it made was ignored, and the player was told "No relay answered" after
+  forty seconds of a wait the house had answered four times. Now a
+  device says when it began to wait, the house says that back beside the
+  seat, and a device takes the seating that names this wait, whatever
+  either clock says. A device that waits again at once is no longer
+  handed its seating of the wait before, either. The two clocks may
+  still not be more than a minute apart: a pool is read from a minute
+  back. (2026-11-14, #54)
 - A device no longer remakes a healthy connection to its table because
   the referee left a tick unanswered. A side asks for a tick a moment
   past a deadline, and the referee adds one only when its last entry is
